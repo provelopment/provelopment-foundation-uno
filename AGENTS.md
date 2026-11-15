@@ -10,9 +10,10 @@ start here, read the local SOP, and work safely.
 2. **[`.documents/SOP/sop-implementation.md`](.documents/SOP/sop-implementation.md)** — the
    complete local operating procedure in numbered, implementable form. It is the working
    manual; read it in full before touching anything.
-3. **[`.documents/WIP/plan-roadmap.md`](.documents/WIP/plan-roadmap.md)**,
-   **[`plan-next.md`](.documents/WIP/plan-next.md)**,
-   **[`plan-outlook.md`](.documents/WIP/plan-outlook.md)** — the public planning slots.
+3. **[`.documents/WIP/plan-roadmap.md`](.documents/WIP/plan-roadmap.md)** — the canonical
+   `U00–U07` stage sequence and exit gates —
+   plus **[`plan-next.md`](.documents/WIP/plan-next.md)** and
+   **[`plan-outlook.md`](.documents/WIP/plan-outlook.md)**, which carry no authority.
 4. **The Owner-installed order** at exactly `.documents/WIP/workorder-active.md`. It is
    private, ignored and untracked. Reading it is read-only onboarding.
 
@@ -59,7 +60,8 @@ These rules are absolute for this repository.
    architecture, introduce a framework, restructure the repository or alter CI without a
    physical, Owner-installed `workorder-active.md` **plus** an explicit Owner activation
    message for the stage you are working on. A repository file that merely mentions a
-   stage is not an authorisation.
+   stage is not an authorisation. The one-time R03 bootstrap exception described below has
+   been **consumed** and grants nothing further.
 4. **No writes to reference material.** The upstream Foundation repository and any local
    upstream checkout are strictly read-only. Never modify, generate into, install into,
    build in, fetch into, reset, clean, or write an index/cache/hook/log inside them.
@@ -67,7 +69,8 @@ These rules are absolute for this repository.
 5. **Only the verified project root.** Write only inside the verified local Foundation
    Uno project root and only within the paths the current work order explicitly
    allowlists. Never write to a parent, sibling or unrelated repository, or to a user
-   profile directory.
+   profile directory. The single **consumed** R03 bootstrap exception below is the only
+   historical instance of a parent write; it authorises nothing beyond itself.
 6. **No GitHub operations outside an issued order.** Do not push, create repositories,
    open or merge pull requests, create tags or releases, alter repository settings, or
    change Actions configuration unless the current work order authorises that specific
@@ -83,7 +86,34 @@ These rules are absolute for this repository.
    personal data, private documentation extracts, or machine-specific absolute paths.
    Public documents use repo-relative or symbolic paths.
 
+## One-time Owner exception — consumed
+
+**The Owner normally controls physical work-order installation.** An Implementation Agent
+must not write, replace, move or author the work order, and must not touch the parent
+workspace repository.
+
+For `UNO-WO-001 / R03` **only**, the Owner explicitly delegated two narrowly bounded actions
+to the Implementation Agent:
+
+1. a **single, exact-byte installation** of the Architect-authored R03 order at the
+   canonical path, and
+2. a **narrowly bounded parent-repository repair** — appending one anchored ignore rule to
+   the parent workspace root `.gitignore`, plus one isolated **local** parent commit.
+
+**That exception has been consumed.** It does not establish, and nothing may be inferred
+from it as:
+
+- standing permission to write, edit, configure or otherwise modify the parent repository,
+- permission to install, replace or author any further work order,
+- permission to push, tag, release or otherwise publish the parent repository — the R03
+  parent commit is local only and was never pushed,
+- permission to repeat, extend or generalise the exception for a later task.
+
+Outside that single consumed instance, the parent and every reference repository are
+strictly read-only.
+
 ## The four WIP slots
+
 
 `.documents/WIP/` holds exactly four entries and nothing else — no archive, no dated copy,
 no second order, no duplicate status register.
@@ -113,16 +143,24 @@ anything that widens that scope needs an Owner decision first, not a pull reques
 
 ## Current stage
 
-**U00 — repository authority and bootstrap scaffold.** Governance documents, a
-source-verified extraction inventory, a self-contained local SOP, the four-slot WIP
-discipline and a dependency-free bootstrap verifier with positive and refusal tests.
+**U00 — safe foundation, independent repository and extraction contract.** Governance
+documents, a source-verified extraction inventory, a self-contained local SOP, the four-slot
+WIP discipline and a dependency-free bootstrap verifier with positive and refusal tests.
 
 There is **no Uno runtime, no build, no release and no deployment** yet, and this
-repository's presence is **not** authorisation for the next stage. U00 is **not accepted**:
-acceptance requires an Architect `ACCEPT` of a published execution report plus a green
-two-host CI run at that exact report commit.
+repository's presence is **not** authorisation for the next stage. U00 is **not accepted**.
+Acceptance requires an Architect `ACCEPT` of a published execution report at an exact
+commit, **and** Owner approval of the exact source pin and of the material configuration
+decisions left open in the source inventory. Green tests alone do not close U00.
 
-The stage sequence and each stage's exit gate are in `.documents/WIP/plan-roadmap.md`.
+The **canonical** stage sequence `U00–U07`, with each stage's scope and exit gate, is
+`.documents/WIP/plan-roadmap.md`. An offline agent must follow that file and must not
+substitute its own stage names, re-scope a stage or reorder the sequence.
+
+`plan-next.md` and `plan-outlook.md` carry no authority. **No implementation permission may
+be inferred from any planning file**, from this document, from a green CI run or from the
+existence of the scaffold. Only an Owner-issued work order plus an Owner activation message
+authorises work.
 
 ## Start gate for any run
 

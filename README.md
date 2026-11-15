@@ -57,10 +57,21 @@ project's documentation folder, maintained by the Architect:
 
 - Canonical Uno project folder: <https://drive.google.com/drive/folders/1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0>
 
-That folder holds the canonical `AGENTS.md`, `SOP-ARCHITECT.md`, `README.md`, `PLAN.md`,
-`BLUEPRINT.md` and `WIP.md`. This repository's `AGENTS.md` and `README.md` are useful,
-synchronised public entry points; **the canonical governing records are the Drive
-documents**. Canonical documentation content is not mirrored here.
+That folder holds the **seven** canonical Foundation Uno documents, maintained only by the
+Architect:
+
+1. `AGENTS.md` — canonical agent rules
+2. `SOP-ARCHITECT.md` — Architect role and review procedure
+3. `SOP-IMPLEMENTATION.md` — canonical implementation procedure
+4. `README.md` — canonical project orientation
+5. `PLAN.md` — canonical plan
+6. `BLUEPRINT.md` — canonical architecture blueprint
+7. `WIP.md` — canonical work-in-progress record
+
+This repository's `AGENTS.md`, `README.md`, `.documents/SOP/sop-implementation.md` and
+`.documents/WIP/plan-*.md` are synchronised public entry points and planning slots; **the
+canonical governing records are the Drive documents**. Canonical Drive content is not
+mirrored here, and this repository does not claim to have read it.
 
 ## Licence and rights
 
@@ -144,12 +155,21 @@ is not a production build and proves nothing about Next.js behaviour.
 
 ## Next stage
 
-**U01 — first extraction slice.** It is expected to take the upstream EFS content model
-(`Entity → Facet → Site → Page → representation`) as the starting architecture, strip
-the Hub/Spoke and presentation-site couplings, bring over one Entity's content
-foundation, and stand up a minimal, genuinely buildable Next.js runtime with real
-tests.
+The canonical stage sequence `U00–U07` is recorded in
+[`.documents/WIP/plan-roadmap.md`](.documents/WIP/plan-roadmap.md). The boundaries matter:
 
-U01 is **not** authorised by this repository, this README, or the presence of this
-scaffold. Each stage proceeds only under an Owner-issued work order. See
+- **U01 — independent codebase and reliable baseline.** Extract a buildable, testable
+  Foundation-derived Next.js / TypeScript source baseline into this repository and prove
+  the baseline builds and passes. U01 is a **baseline** stage.
+- **U02 — remove the Hub/Spoke domain and establish single-Entity authority**, including
+  refusal of zero-Entity and two-Entity configurations. The complete single-Entity and
+  Spoke-domain cutover belongs here, **not** in U01.
+- **U03 — public routing, content and metadata parity** (canonical addresses, optional base
+  path, Page/locale behaviour and visibility).
+
+**There is still no usable Uno website.** No `src/`, no Next.js app, no build, no dev
+server and no deployment exist at this stage; nothing in this repository serves a page.
+
+No stage is authorised by this repository, this README, the roadmap, a green CI run or the
+presence of the scaffold. Each stage proceeds only under an Owner-issued work order. See
 `AGENTS.md` for the working boundary.

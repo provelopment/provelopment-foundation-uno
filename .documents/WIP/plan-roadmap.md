@@ -6,84 +6,122 @@ accepted.** A stage closes only when the independent Chief Master Architect reco
 with a new work order.
 
 This file is a public planning summary. It is not an authorisation, not an acceptance
-record, and not a substitute for the Owner-installed `workorder-active.md`.
+record, and not a substitute for the Owner-installed `workorder-active.md`. **No
+implementation permission may be inferred from this file or from any other planning slot:
+planning describes intended stages, and only an Owner-issued work order authorises work.**
 
 ---
 
 ## Stage sequence
 
 Each stage depends on the previous stage's exit gate. Work may not start on a stage
-whose predecessor is still open.
+whose predecessor is still open. The stage names below are the canonical Foundation Uno
+sequence and must not be re-scoped by an implementation agent.
 
-### U00 — Repository authority and bootstrap scaffold
+### U00 — Safe foundation, independent repository and extraction contract
 
-**State: open.** The scaffold, the source inventory and the two-host bootstrap
-verification are published and green, but U00 is **not** accepted.
+**State: open.** U00 is a *foundation and contract* stage: it establishes an independent
+repository, a verified scaffold, a read-only extraction inventory and an explicit
+extraction contract. It is **not** the acceptance point for any runtime.
 
-Remaining obligation before U00 can be proposed for acceptance:
+**Evidence already reported or verified inside this stage** — recorded in the single
+execution report, and awaiting Architect verification rather than assumed:
 
-| # | Obligation | Owner of the obligation |
+| Evidence | Status |
+| --- | --- |
+| Private work order at exactly `.documents/WIP/workorder-active.md`, with no root-level alternative anywhere in the checkout | reported and verified locally |
+| Parent workspace guard: an anchored ignore rule reported from the parent's **own root** ignore file, with a preserved local parent commit | reported and verified locally — the parent commit is **local only**; it was neither pushed nor remotely verified |
+| Four-slot WIP discipline and exactly one overwritten report | reported and verified |
+| Self-contained local implementation SOP plus an offline `AGENTS.md` | reported for Architect review |
+| Two-host hosted bootstrap tests green at the published report commit | reported for Architect verification |
+
+**Remaining requirements before U00 can be accepted:**
+
+| # | Requirement | Owner |
 | --- | --- | --- |
-| 1 | The canonical work order must sit at exactly `.documents/WIP/workorder-active.md`, with no root-level alternative anywhere in the checkout. | Owner installs; agent verifies |
-| 2 | The parent workspace repository must carry an anchored ignore rule for this independent checkout, so it can never be absorbed as a submodule-style entry. | Owner/Architect policy; agent verifies only |
-| 3 | A self-contained local implementation SOP and a strengthened `AGENTS.md` must let an agent without a Drive connector work safely. | Agent produces; Architect reviews |
-| 4 | Both hosted verification jobs must be green at the exact published report commit. | Agent provides evidence; Architect verifies |
+| 1 | Architect `ACCEPT` of the published execution report at an exact commit | Chief Master Architect |
+| 2 | Owner approval of the **exact source pin** used for extraction | Owner |
+| 3 | Owner approval of the **material configuration decisions** left open in `.documents/Architecture/source-inventory.md` §11 | Owner |
 
-**Exit gate:** architect `ACCEPT` of the U00 report, plus a confirmed parent guard and a
-green two-host CI run at the report commit.
+**Exit gate:** Architect `ACCEPT` at a specific commit, plus Owner approval of the exact
+source pin and of the open material configuration decisions. Green tests alone do not close
+U00.
 
-### U01 — First extraction slice
 
-Not started. Blocked on: U00 acceptance, and the Owner's explicit decisions on the open
-architecture forks recorded in `.documents/Architecture/source-inventory.md` §11 —
-`presentationSiteCode` fate, `siteMode` fate, locale set, content-root shape, and the
-generated-vs-committed asset boundary.
+### U01 — Independent codebase and reliable baseline
 
-**Exit gate:** a minimal, genuinely buildable single-Entity runtime with real tests, and
-an accepted write ledger that names every extracted path before any source moves.
+Not started. Blocked on U00 acceptance.
 
-### U02 — Content ingestion and authoring path
+Scope: extract a **buildable, testable Foundation-derived Next.js / TypeScript source
+baseline** into this independent repository against the Owner-approved source pin, and
+establish that the independent codebase builds and its baseline checks pass.
+
+U01 is a **baseline** stage. It does **not** remove the Hub/Spoke domain, and it does
+**not** deliver public routing or metadata parity — those belong to U02 and U03.
+
+**Exit gate:** an accepted extraction ledger naming every path before any source moves, a
+genuinely buildable baseline with real tests, and a recorded dependency set.
+
+### U02 — Remove Hub/Spoke domain and establish single-Entity authority
 
 Not started. Blocked on U01 exit.
 
-**Exit gate:** one Entity's content can be authored and validated without any Hub/Spoke
-machinery.
+Scope: remove the Hub/Spoke domain model and establish Uno's single-Entity authority,
+including explicit refusal of a **zero-Entity** and a **two-Entity** configuration.
+Spoke-owned publication identity and multi-publisher ownership are removed here.
 
-### U03 — Presentation and locale routing
+**Exit gate:** one Entity is the only admissible topology, with refusal tests proving that
+zero and two Entities are rejected.
+
+### U03 — Public routing, content and metadata parity
 
 Not started. Blocked on U02 exit, and on the Owner's accepted route schema.
 
-**Exit gate:** the approved canonical address, optional base path and declared locales
-serve correctly, with `canonicalLocaleTag` kept distinct from `localePathKey`.
+Scope: public routing, content and metadata parity — canonical addresses, an optional base
+path, Page and locale behaviour, and visibility. `canonicalLocaleTag` remains distinct from
+`localePathKey`.
 
-### U04 — Contact and provider integration
+**Exit gate:** the approved route schema serves correctly, with declared locales and correct
+visibility behaviour.
+
+### U04 — One owner, one presentation shell
 
 Not started. Blocked on U03 exit.
 
-**Exit gate:** a provider-neutral path with explicit secret handling, no credential in
-the repository, and a recorded licence review for any contact module.
+Scope: one owner and **one** presentation shell — assets, responsive navigation and
+accessibility.
 
-### U05 — Hardening and accessibility
+**Exit gate:** the single presentation shell meets the agreed responsive and accessibility
+criteria.
+
+### U05 — Retain appropriate website functionality
 
 Not started. Blocked on U04 exit.
 
-**Exit gate:** the agreed quality gates run clean on both hosts.
+Scope: retain appropriate website functionality, including **safe contact** and explicitly
+approved integrations.
 
-### U06 — Release and installation capability
+**Exit gate:** the approved functionality works with explicit secret handling, no credential
+in the repository, and a recorded licence review for any integration.
+
+### U06 — Clean-room setup, upgrade and distribution
 
 Not started. Blocked on U05 exit. Upstream `scripts/release/**` and
-`scripts/installation/**` are **not** copied before this stage; Uno's own release and
-installation capability remains a future obligation here, not something deleted
-permanently.
+`scripts/installation/**` are **not** copied before this stage; Uno's own clean-room setup,
+upgrade and distribution capability is a future obligation here, not something permanently
+deleted.
 
-**Exit gate:** a reproducible release artefact and a documented installation path.
+**Exit gate:** a reproducible clean-room setup, a documented upgrade path and a
+distributable artefact.
 
-### U07 — Independent product readiness
+### U07 — Full independent review and Owner-controlled first release
 
 Not started. Blocked on U06 exit.
 
-**Exit gate:** the Owner's acceptance criteria for a standalone product are met, and the
-rights review for any assets, branding, prose and third-party content is closed.
+Scope: a full independent review, followed by the Owner-controlled first release.
+
+**Exit gate:** the independent review is closed and the Owner authorises the first release.
+
 
 ---
 
