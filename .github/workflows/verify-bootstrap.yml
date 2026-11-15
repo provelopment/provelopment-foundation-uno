@@ -34,6 +34,12 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Verify Owner-frozen governance files (positive and refusal)
+        shell: bash
+        run: |
+          node --test tests/governance-docs.test.mjs
+          node scripts/verify-governance-docs.mjs
+
       - name: Bootstrap tests (positive and refusal)
         run: node --test tests/bootstrap.test.mjs
 

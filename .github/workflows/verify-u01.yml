@@ -48,6 +48,12 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Verify Owner-frozen governance files (positive and refusal)
+        shell: bash
+        run: |
+          node --test tests/governance-docs.test.mjs
+          node scripts/verify-governance-docs.mjs
+
       - name: Report tool versions
         run: |
           node --version
