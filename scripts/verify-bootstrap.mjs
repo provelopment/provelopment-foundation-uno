@@ -17,7 +17,7 @@
  *   import { validateBootstrap } from './scripts/verify-bootstrap.mjs'
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -27,7 +27,11 @@ export const REQUIRED_FILES = Object.freeze([
   'AGENTS.md',
   'LICENSE',
   '.gitignore',
+  '.documents/SOP/sop-implementation.md',
   '.documents/Architecture/source-inventory.md',
+  '.documents/WIP/plan-roadmap.md',
+  '.documents/WIP/plan-next.md',
+  '.documents/WIP/plan-outlook.md',
   '.github/workflows/verify-bootstrap.yml',
   'tests/bootstrap.test.mjs',
 ]);
@@ -40,13 +44,46 @@ export const WORK_ORDER_FILE = 'workorder-active.md';
 export const WORK_ORDER_IGNORE_PATH = '.documents/WIP/workorder-active.md';
 
 /**
+ * The three public planning slots that must be tracked.
+ *
+ * The fourth WIP slot is the private ACTIVE order. It must never be *required*: it does not
+ * exist in a hosted CI checkout and must never be published. This validator therefore never
+ * requires it and never reads its body.
+ */
+export const PUBLIC_PLAN_SLOTS = Object.freeze([
+  '.documents/WIP/plan-roadmap.md',
+  '.documents/WIP/plan-next.md',
+  '.documents/WIP/plan-outlook.md',
+]);
+
+/** The complete, closed set of entries permitted in `.documents/WIP/`. */
+const ALLOWED_WIP_ENTRIES = new Set([
+  'plan-roadmap.md',
+  'plan-next.md',
+  'plan-outlook.md',
+  WORK_ORDER_FILE,
+]);
+
+/** Distinct diagnostics for the local SOP and the tracked planning slots. */
+const REQUIRED_FILE_MESSAGES = new Map([
+  ['.documents/SOP/sop-implementation.md', 'missing or empty local implementation SOP'],
+  ['.documents/WIP/plan-roadmap.md', 'missing or empty tracked planning slot'],
+  ['.documents/WIP/plan-next.md', 'missing or empty tracked planning slot'],
+  ['.documents/WIP/plan-outlook.md', 'missing or empty tracked planning slot'],
+]);
+
+/**
  * Public prose that must never carry secrets or a machine-specific private path.
  * Scoped to published documents, where a leak would realistically occur.
  */
 export const PUBLIC_DOCUMENTS = Object.freeze([
   'README.md',
   'AGENTS.md',
+  '.documents/SOP/sop-implementation.md',
   '.documents/Architecture/source-inventory.md',
+  '.documents/WIP/plan-roadmap.md',
+  '.documents/WIP/plan-next.md',
+  '.documents/WIP/plan-outlook.md',
   '.documents/Reports/execution-report.md',
 ]);
 
@@ -159,7 +196,10 @@ export function validateBootstrap(root) {
   // --- 1. Required files exist, are ordinary files, and are non-empty ----------
   for (const rel of REQUIRED_FILES) {
     if (!isNonEmptyFile(at(rel))) {
-      issues.push(`missing, not a regular file, or empty: ${rel}`);
+      const specific = REQUIRED_FILE_MESSAGES.get(rel);
+      issues.push(
+        specific ? `${specific}: ${rel}` : `missing, not a regular file, or empty: ${rel}`,
+      );
     }
   }
 
@@ -200,6 +240,12 @@ export function validateBootstrap(root) {
         `.gitignore must exclude the exact Owner work order path (${WORK_ORDER_IGNORE_PATH})`,
       );
     }
+    if (rules.includes('.documents/WIP')) {
+      issues.push(
+        'the entire .documents/WIP directory must not be ignored: ' +
+          'only the private work order is screened, the three plan-*.md slots must stay trackable',
+      );
+    }
     if (!rules.includes('.temp')) {
       issues.push('.gitignore must exclude .temp (agent task scratch)');
     }
@@ -230,6 +276,28 @@ export function validateBootstrap(root) {
     }
   }
 
+  // --- 8. Exactly four WIP slots, and nothing else ----------------------------
+  // The private ACTIVE order is permitted here but never required and never read: a hosted
+  // CI checkout legitimately contains only the three public plan files. No allowlist
+  // exceptions are granted for any other file or subdirectory.
+  const wipDir = at('.documents/WIP');
+  if (existsSync(wipDir)) {
+    let entries = [];
+    try {
+      entries = readdirSync(wipDir);
+    } catch {
+      issues.push('.documents/WIP exists but is not readable');
+    }
+    for (const name of entries) {
+      if (!ALLOWED_WIP_ENTRIES.has(name)) {
+        issues.push(
+          'unexpected entry in .documents/WIP (only plan-roadmap.md, plan-next.md, ' +
+            `plan-outlook.md and the private ${WORK_ORDER_FILE} are permitted): ${name}`,
+        );
+      }
+    }
+  }
+
   return issues;
 }
 
@@ -240,7 +308,7 @@ export function main(root = process.cwd()) {
     process.stdout.write(
       'verify-bootstrap: OK - ' +
         `${REQUIRED_FILES.length} required files present, licence verified, ` +
-        'private authority screened, no Hub/Spoke data, ' +
+        'four-slot WIP discipline intact, private authority screened, no Hub/Spoke data, ' +
         'no credential or private-path leaks.\n',
     );
     return 0;

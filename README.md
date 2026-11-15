@@ -23,6 +23,7 @@ extraction inventory, and a verified bootstrap scaffold — and nothing else:
 - ❌ **no working website**, no build, no dev server
 - ❌ **no release and no deployment**, no production configuration, no DNS
 - ✅ documents, an extraction inventory / U01 plan, and a bootstrap verifier with tests
+- ✅ a self-contained implementation SOP, a four-slot WIP discipline and one execution report
 
 The Uno runtime is **not implemented yet**. Nothing here runs a website; this is a
 project bootstrap, not a product and not a v1 release.
@@ -85,28 +86,55 @@ Important caveats, stated plainly:
 | Path | Purpose |
 | --- | --- |
 | `README.md` | This orientation document. |
-| `AGENTS.md` | Public repo entry point and repo-local working rules. |
+| `AGENTS.md` | Self-contained public entry point: roles, boundary and repo-local working rules. |
 | `LICENSE` | Complete, unmodified Apache License 2.0. |
+| `.documents/SOP/sop-implementation.md` | Self-contained implementation agent SOP, usable without a Drive connector. |
 | `.documents/Architecture/source-inventory.md` | Source-verified extraction inventory and U01 handoff. |
-| `.documents/Reports/execution-report.md` | U00 execution evidence report. |
+| `.documents/WIP/plan-roadmap.md` | Unfinished stages `U00–U07` and their exit gates. |
+| `.documents/WIP/plan-next.md` | The single next authorised item — header-only while none is authorised. |
+| `.documents/WIP/plan-outlook.md` | Optional ideas. Never a requirement. |
+| `.documents/Reports/execution-report.md` | The single execution evidence report, overwritten each run. |
 | `scripts/verify-bootstrap.mjs` | Dependency-free bootstrap validator. |
 | `tests/bootstrap.test.mjs` | Dependency-free positive/refusal bootstrap tests. |
 | `.github/workflows/verify-bootstrap.yml` | Two-host read-only bootstrap verification CI. |
 
+## Working in this repository
+
+Start with `AGENTS.md`, then read `.documents/SOP/sop-implementation.md` in full.
+
+`.documents/WIP/` holds exactly **four** slots, and nothing else:
+
+| Slot | Visibility | Meaning |
+| --- | --- | --- |
+| `workorder-active.md` | private, ignored, untracked | The Owner-authorised order for the current stage. Read-only after installation. Never published. |
+| `plan-roadmap.md` | public, tracked | Unfinished stages and exit gates. Never an acceptance record. |
+| `plan-next.md` | public, tracked | The single next authorised item. |
+| `plan-outlook.md` | public, tracked | Optional ideas. |
+
+A root-level `workorder-active.md` is **never** a valid order. Exactly **one** report
+exists and each real run overwrites it, including a run that stopped or failed.
+
+Work begins only under an Owner-installed work order plus an explicit Owner activation for
+that stage. A plan file, a milestone, a green CI run or this README is never an
+authorisation.
+
 ## Verifying the scaffold
+
 
 Two dependency-free commands. Node.js 24 is used; **no packages are installed and no
 lockfile exists at U00**.
 
 ```sh
+node --check scripts/verify-bootstrap.mjs
 node --test tests/bootstrap.test.mjs
 node scripts/verify-bootstrap.mjs
 ```
 
 - `node --test tests/bootstrap.test.mjs` runs the bootstrap tests: a complete minimal
-  fixture must produce zero issues, and each specific defect (missing licence, missing
+  fixture must produce zero issues, and each specific defect — missing licence, missing
   work-order ignore rule, a stray Hub/Spoke deployment file, missing README, missing
-  AGENTS) must be refused.
+  AGENTS, a missing local SOP, a missing planning slot, an over-broad WIP ignore rule and
+  an unexpected WIP entry — must be refused with its own diagnostic.
 - `node scripts/verify-bootstrap.mjs` validates **this actual checkout** and exits
   non-zero with diagnostics if the scaffold is wrong.
 

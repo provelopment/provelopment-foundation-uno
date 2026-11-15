@@ -5,12 +5,14 @@
 # products that later stages will produce. An ignore rule screens a path from Git; it
 # never deletes, moves or rewrites a file.
 
-# --- Owner-installed work order: PRIVATE, never published -------------------
-# The governing work order is installed by the Owner in the project root. It is
-# read-only to implementation agents and must never appear in git ls-files or in a
-# pushed commit. The whole WIP folder is screened so no order draft can escape.
+# --- Owner-authorized work order: PRIVATE, never published -------------------
+# Private Owner authority — exclude this single file, never the whole WIP directory.
+# The governing work order lives at the canonical WIP path and is read-only to
+# implementation agents. It must never appear in `git ls-files` or in a pushed commit.
 /.documents/WIP/workorder-active.md
-/.documents/WIP/
+# DO NOT add `/.documents/WIP/` here. That would screen the entire directory and the
+# three public `plan-*.md` slots must stay trackable. Only the ACTIVE file is private.
+# A root-level `/workorder-active.md` is never a valid order, so it stays screened too.
 /workorder-active.md
 
 # --- Agent task scratch and disposable local evidence ----------------------

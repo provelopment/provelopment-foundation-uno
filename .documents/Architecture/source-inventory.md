@@ -508,3 +508,56 @@ This inventory is **evidence and analysis**, produced read-only, and is **not**:
 
 U00 copies exactly one upstream file: `LICENSE`, byte-for-byte, proven by git blob
 equality. Nothing else.
+
+## 13. Chief Architect R01 review — U01 scope clarifications
+
+This section records the Architect's review of the **earlier U01 proposal**. It clarifies
+what is *upstream Foundation behaviour* and what is *Owner-approved Uno product
+behaviour*. It preserves the source-observed tables above unchanged and it implements no
+U01 contract.
+
+**Separation of the two categories.** The following upstream mechanisms are **reference
+behaviour to remove or adapt**, and are explicitly **not** Uno requirements: the
+Spoke-owned `EfsRuntimeSpokeIdentity`, `publicationOwnedBy`, the multi-binding host/prefix
+schema, `presentationSiteCode`, and `siteMode: open | closed`.
+
+**Uno v1 shape.** Foundation Uno v1 has **one Entity, one selected public Site, one
+configured canonical address with an optional base path, and no second publisher**. Any
+prior U01 proposal that assumed a multi-publication topology is superseded by this shape.
+
+**Test proposals that are not accepted.** The previously proposed U01 tests asserting
+nested or sibling **multi-publication prefix-collision** behaviour are **not accepted Uno
+tests**. The U01 proposal is replaced by:
+
+- single configured host / base-path admission,
+- refusal of an invalid alias-to-canonical collision,
+- refusal of an unknown host,
+- refusal of any extra Entity,
+
+and these are adopted **only when the Owner accepts the exact Uno route schema**. Until
+then they remain proposals.
+
+**Locale behaviour must not be over-asserted.** Do not assert any of the following as Uno
+behaviour:
+
+- an implicit `en-US` alias mapping to `en`,
+- an unconditional fallback locale,
+- Solo's region-qualified-only locale policy,
+- case-sensitive Page rules.
+
+Keep `canonicalLocaleTag` **distinct** from `localePathKey` — they are different concepts
+and must not be collapsed. Test only declared and Owner-approved locale behaviour.
+
+**Release and installation.** Upstream `scripts/release/**` and `scripts/installation/**`
+are **not copied in U01**, but Uno's own separate release/installation capability remains a
+**future U06 obligation** — it is deferred, not permanently deleted.
+
+**Still required before any code moves.** U01's actual extraction ledger, its exact
+dependency set and its two-host/browser gates must be **accepted separately** before any
+source is copied. Rights in assets, branding, product prose and
+`modules/connect/LICENSE-CONNECT.md` remain subject to source and licence review.
+
+**Status.** This is a clarification of an earlier proposal, not an implementation of any
+U01 contract. The remaining architecture options in §11 stay **open**: no option may be
+chosen by an implementation agent's inference, and the source-evidence facts recorded
+earlier in this document must not be rewritten to fit a decision.

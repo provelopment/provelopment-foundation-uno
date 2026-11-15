@@ -25,18 +25,24 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** All fixtures live here, inside the ignored task-scratch directory. */
 const FIXTURE_BASE = join(REPO_ROOT, '.temp', 'bootstrap-tests');
 
-/** A complete, minimal, valid U00 scaffold. */
+/** A complete, minimal, valid U00 scaffold, including the four WIP slots. */
 const VALID_FILES = {
   'README.md': '# Foundation Uno\n\nThe Uno runtime is not implemented yet.\n',
   'AGENTS.md':
     '# AGENTS.md\n\n' +
     'Canonical documents: https://drive.google.com/drive/folders/1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0\n' +
-    'The physical order is workorder-active.md in the project root.\n',
+    'Read .documents/SOP/sop-implementation.md before anything else.\n' +
+    'The only valid order path is .documents/WIP/workorder-active.md.\n',
   LICENSE:
     '\n                                 Apache License\n' +
     '                           Version 2.0, January 2004\n',
   '.gitignore': '/.documents/WIP/workorder-active.md\n/workorder-active.md\n/.temp/\n',
+  '.documents/SOP/sop-implementation.md':
+    '# Local implementation SOP\n\n1. One Entity only.\n2. Write only inside the root.\n',
   '.documents/Architecture/source-inventory.md': '# Source inventory\n\nU00 fixture.\n',
+  '.documents/WIP/plan-roadmap.md': '# Roadmap\n\nU00 is open.\n',
+  '.documents/WIP/plan-next.md': '# Foundation Uno — Next\n',
+  '.documents/WIP/plan-outlook.md': '# Outlook\n\nIdeas only, never requirements.\n',
   '.github/workflows/verify-bootstrap.yml':
     'name: Uno Bootstrap Verify\non:\n  push:\n    branches: [main]\npermissions:\n  contents: read\n',
   'tests/bootstrap.test.mjs': '// fixture placeholder for the bootstrap test file\n',
@@ -211,4 +217,46 @@ test('a non-existent root is reported rather than thrown', () => {
   const issues = validateBootstrap(join(FIXTURE_BASE, 'does-not-exist'));
   assert.equal(issues.length, 1);
   assert.ok(issues[0].includes('does not exist'), issues[0]);
+});
+
+test('a missing local implementation SOP is refused', () => {
+  const root = makeFixture('no-sop', { omit: ['.documents/SOP/sop-implementation.md'] });
+  const issues = validateBootstrap(root);
+  assert.ok(
+    issues.some((i) => i.includes('local implementation SOP')),
+    `expected a missing-SOP diagnostic, got: ${JSON.stringify(issues)}`,
+  );
+});
+
+test('a missing tracked planning slot is refused', () => {
+  const root = makeFixture('no-roadmap', { omit: ['.documents/WIP/plan-roadmap.md'] });
+  const issues = validateBootstrap(root);
+  assert.ok(
+    issues.some((i) => i.includes('tracked planning slot') && i.includes('plan-roadmap.md')),
+    `expected a missing-plan diagnostic, got: ${JSON.stringify(issues)}`,
+  );
+});
+
+test('an over-broad .gitignore that screens the whole WIP directory is refused', () => {
+  const root = makeFixture('wip-dir-ignored', {
+    override: {
+      '.gitignore': '/.documents/WIP/workorder-active.md\n/.documents/WIP/\n/.temp/\n',
+    },
+  });
+  const issues = validateBootstrap(root);
+  assert.ok(
+    issues.some((i) => i.includes('entire .documents/WIP directory must not be ignored')),
+    `expected a whole-directory ignore refusal, got: ${JSON.stringify(issues)}`,
+  );
+});
+
+test('an unexpected extra WIP entry is refused', () => {
+  const root = makeFixture('extra-wip-entry', {
+    extra: { '.documents/WIP/scratch-notes.md': '# notes\n' },
+  });
+  const issues = validateBootstrap(root);
+  assert.ok(
+    issues.some((i) => i.includes('unexpected entry in .documents/WIP')),
+    `expected an extra-WIP-entry refusal, got: ${JSON.stringify(issues)}`,
+  );
 });
