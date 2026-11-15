@@ -561,3 +561,118 @@ source is copied. Rights in assets, branding, product prose and
 U01 contract. The remaining architecture options in §11 stay **open**: no option may be
 chosen by an implementation agent's inference, and the source-evidence facts recorded
 earlier in this document must not be rewritten to fit a decision.
+---
+
+# U01 source-adoption and U02-U07 handoff ledger (2026-11-15)
+
+Order `UNO-WO-005 / R01`. Appended; the U00 audit above is preserved verbatim as historical
+evidence.
+
+**This appendix supersedes two obsolete U00 claims:** that no runtime source had moved into
+this repository, and that bare-locale behaviour was proposed. Both are now out of date: a
+bounded source kernel exists, and Uno admits a bare language ONLY through an explicit
+declared full-locale mapping.
+
+- Uno input/head for this ledger: `4f8cd53b90354032ccb29e54176c20bc667624f5`
+- Pinned upstream source: GEO-03 `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, read only through
+  `git cat-file` from committed objects. The dirty local worktree was never read.
+- No local dirty-file hash, and no hash of any unpublished file, is authority here.
+
+## Classification of adopted code
+
+`KEEP` = copied bytes with upstream blob identity · `ADAPT` = retained pure algorithm, revised
+comments/semantics · `REWRITE` = new Uno-owned file informed by upstream · `ADDITIONAL` =
+Uno-authored, no upstream counterpart · `DEFER` / `REJECT` = recorded decisions.
+
+| Uno path | Class | Upstream evidence | Upstream bytes | Uno dependencies | Note |
+| --- | --- | --- | ---: | --- | --- |
+| `src/core/efs/identity.ts` | KEEP | blob `7e6f8e0a4f0b9ba7b90f66c44205ff67befb7d20` | 4,439 | none | Only file in Uno carrying upstream Git blob identity |
+| `src/core/page-content.ts` | ADAPT | blob `49014ecbe5152244ffb40eceee56359f0b9d55d1` | 3,896 | none | Slug grammar retained; Site/country runtime selectors NOT adopted; non-string guard added before matching |
+| `src/core/page-route-path.ts` | ADAPT | blob `aed10f713c148b4190dcf744015d051cce8851ce` | 7,406 | `./page-content` | Pure algorithms and caps retained; `/ww`, Site code and country folder removed from prose and semantics |
+| `src/core/efs/uno-locales.ts` | REWRITE | informed by blob `3cbe1dbe3b684c5cfc79d1df7e5fc5a61db3c24f` | 15,109 | none | Region REQUIRED; explicit mapping only. Upstream preference-prefix selection and script-only qualification deliberately excluded |
+| `src/app/layout.tsx`, `page.tsx`, `not-found.tsx`, `globals.css` | ADDITIONAL | none | - | `next`, `react` | Uno-authored non-indexable technical placeholder |
+| `scripts/verify-u01-http.mjs` | ADDITIONAL | none | - | Node built-ins only | Loopback production HTTP proof |
+| `tests/unit/efs-identity.test.ts`, `page-route-path.test.ts`, `uno-locales.test.ts` | ADDITIONAL | upstream test blob `9edb01de6a42d5d989c82113e207dff6e8af91f9` for ROUTE behaviour evidence only | 6,035 | `vitest` | Uno-authored fixtures; no upstream test file copied |
+| `tests/architecture/u01-boundaries.test.mjs` | ADDITIONAL | none | - | `node:test` | Boundary/refusal scanner with negative fixtures |
+| `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `eslint.config.mjs`, `next.config.ts`, `.github/workflows/verify-u01.yml` | ADDITIONAL | none | - | pinned exact versions | Freshly resolved Uno-only lock; Foundation lock NOT copied |## Foundation Page section preservation matrix (17 rows)
+
+Read-only review of the two pinned Page composer blobs: `src/core/page-document.ts`
+(`a12d964c43626c6313a621bf628f5cc24b65d444`) and
+`src/components/site/page-document-content.tsx` (`fc35a52d6cfc5f114e50470e8286a89916cde801`).
+Shared authored fields: `...headingFields`, optional `surface` (`plain` / `muted` / `bordered`) and
+optional `align` (`start` / `center`) where noted. **Nothing in this matrix is implemented in
+Uno.** Ownership is primarily U04; `contactForm` delivery is U05.
+
+| # | Section | Observed authored contract | Observed renderer | Candidate Uno module | Stage | Unimplemented acceptance test |
+| ---: | --- | --- | --- | --- | --- | --- |
+| 1 | `hero` | type, optional `eyebrow`, `lede`, `actions`, `support`; align, surface | `HeroSection` | `hero` module | U04 | renders eyebrow+lede+support; actions resolve; exactly one page h1 |
+| 2 | `prose` | heading fields, required `body` (markdown); align, surface | `ProseSection` | `prose` module | U04 | markdown body renders sanitised; heading level follows section order |
+| 3 | `media` | heading fields, `image`, optional `caption`, `position` (`start` / `end`); surface | `MediaSection` | `media` module | U04 | image + caption + position render; no external provider request |
+| 4 | `gallery` | heading fields, `items`, `itemColumns` (2/3/4); surface | `GallerySection` | `gallery` module | U04 | N items in declared column count; responsive reflow |
+| 5 | `actions` | heading fields, required `actions`; align, surface | `ActionsSection` | `actions` module | U04 | primary/secondary/link variants render; unresolvable target degrades to label |
+| 6 | `callout` | heading fields, `body`, `tone` (`note` / `info` / `warning`); align, surface | `CalloutSection` | `callout` module | U04 | each tone distinguishable and announced accessibly |
+| 7 | `cards` | heading fields, `items`, `itemColumns`; surface | `CardsSection` | `cards` module | U04 | card grid renders items and columns |
+| 8 | `features` | heading fields, `items`, `itemColumns`; surface | `FeaturesSection` | `features` module | U04 | feature rows render without a second h1 |
+| 9 | `columns` | heading fields, `items` (2-3), `ratio` (`equal` / `start-wide` / `end-wide`); surface | `ColumnsSection` | `columns` module | U04 | 2-3 columns with declared ratio; stacks on narrow viewport |
+| 10 | `steps` | heading fields, `items` (max 12); surface | `StepsSection` | `steps` module | U04 | ordered steps render; 13 items refused at authoring |
+| 11 | `stats` | heading fields, `items` (max `PAGE_MAX_STATS`); surface | `StatsSection` | `stats` module | U04 | stats render as a definition-style list; overflow refused |
+| 12 | `quote` | `body`, optional `attribution`, `role`; align, surface | `QuoteSection` | `quote` module | U04 | quote/attribution render inside `blockquote` with `cite` semantics |
+| 13 | `table` | heading fields, `columns` (1..max labels), `rows` (each row must match column count), optional `caption`; surface | `TableSection` | `table` module | U04 | mismatched row/column count refused; caption associated with the table |
+| 14 | `faq` | heading fields, `items`; surface | `FaqSection` | `faq` module | U04 | question/answer pairs render; keyboard-expandable if disclosure UI is chosen (**OPEN**) |
+| 15 | `list` | heading fields, `items`, optional `ordered`; surface | `ListSection` | `list` module | U04 | ordered vs unordered honoured; nested lists refused or defined (**OPEN**) |
+| 16 | `divider` | type only | `DividerSection` (no locale/link resolver) | `divider` module | U04 | renders a separator with no heading and no focusable content |
+| 17 | `contactForm` | type plus `formRef` (intent only: `[a-z0-9][a-z0-9-]*`, max 64) | rendered by the CALLER behind an authorization seam; draws nothing when unauthorized | `contact-form` boundary only | U05 | absent authorization renders nothing; delivery, secrets and provider choice are U05 (**OPEN**) |
+
+Ambiguity is marked `OPEN` rather than claimed as parity. No row asserts an implemented Uno
+module, and none is silently deferred without a recorded acceptance test.## 22 A1 capability contracts (Owner-approved targets, NOT implemented)
+
+R01 requires 22 capability contracts: **4 layout · 8 content · 4 media · 2 design ·
+4 interaction**. The canonical Solo-reference identifiers are **not supplied in R01**, and
+Solo source is explicitly out of scope for this order, so each row records the Uno-side
+target capability and marks the upstream identifier `OPEN` for Architect confirmation. No row
+is an implemented module, and no count here asserts "39 independent modules".
+
+| # | Cat. | Uno target capability contract | Upstream Solo ID | Status |
+| --- | --- | --- | --- | --- |
+| 1 | Layout | Responsive page shell: container, vertical rhythm, max line length | `OPEN` | not implemented |
+| 2 | Layout | Site header with navigation landmarks and skip link | `OPEN` | not implemented |
+| 3 | Layout | Site footer with secondary navigation and legal links | `OPEN` | not implemented |
+| 4 | Layout | Section/grid system honouring 2-4 declared item columns | `OPEN` | not implemented |
+| 5 | Content | Page title, eyebrow and lede | `OPEN` | not implemented |
+| 6 | Content | Rich prose (markdown body) with heading discipline | `OPEN` | not implemented |
+| 7 | Content | Ordered and unordered lists | `OPEN` | not implemented |
+| 8 | Content | Data table with caption and aligned rows | `OPEN` | not implemented |
+| 9 | Content | FAQ / disclosure groups | `OPEN` | not implemented |
+| 10 | Content | Cards and feature grids | `OPEN` | not implemented |
+| 11 | Content | Steps / process sequence | `OPEN` | not implemented |
+| 12 | Content | Stats or metric highlights | `OPEN` | not implemented |
+| 13 | Media | Single image with caption and start/end position | `OPEN` | not implemented |
+| 14 | Media | Gallery with declared column count | `OPEN` | not implemented |
+| 15 | Media | Media-and-text composition | `OPEN` | not implemented |
+| 16 | Media | Video or third-party embed | `OPEN` | **OPEN** - rights and provider are unreviewed; likely `REJECT` or U05-gated |
+| 17 | Design | Theme tokens, typography scale and colour scheme | `OPEN` | not implemented |
+| 18 | Design | Surface/tone variants (`plain` / `muted` / `bordered`) | `OPEN` | not implemented |
+| 19 | Interaction | Navigation behaviour and current-page indication | `OPEN` | not implemented |
+| 20 | Interaction | Contact action / form seam with authorization | `OPEN` | not implemented (U05) |
+| 21 | Interaction | Link and action target resolution | `OPEN` | not implemented |
+| 22 | Interaction | Keyboard and focus accessibility contract | `OPEN` | not implemented |
+
+## Later-stage owned obligations (handoff)
+
+- **U02** - one-Entity EFS manifest and cardinality, with refusal of zero and two Entities;
+  five-level additive public/internal properties; typed phone.
+- **U03** - JSON/Markdown declared sources with valid-JSON precedence; full AND short locale
+  routing; canonical base and aliases; unlisted/SEO behaviour; real public HTTP.
+- **U04** - the full 22 module capability tests and actual 17-section parity; responsive shell;
+  assets.
+- **U05** - optional safe actions and provider adapters, with Foundation's Connect excluded
+  absent a separate licence.
+- **U06** - installation, upgrade and release.
+- **U07** - browser, accessibility, security, rights and independent release gate.
+
+## Rights
+
+Apache-2.0 source only, subject to review. Branded images, product data, default analytics and
+Foundation's separate Connect module are excluded; no licence or right is inferred for any
+other path. Solo Rust source was **not** read for this ledger; its capability names are Owner
+approved contracts, not imported code.

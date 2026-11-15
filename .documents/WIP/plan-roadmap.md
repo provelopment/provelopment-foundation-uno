@@ -20,46 +20,29 @@ sequence and must not be re-scoped by an implementation agent.
 
 ### U00 — Safe foundation, independent repository and extraction contract
 
-**State: open.** U00 is a *foundation and contract* stage: it establishes an independent
-repository, a verified scaffold, a read-only extraction inventory and an explicit
-extraction contract. It is **not** the acceptance point for any runtime.
-
-**Evidence already reported or verified inside this stage** — recorded in the single
-execution report, and awaiting Architect verification rather than assumed:
-
-| Evidence | Status |
-| --- | --- |
-| Private work order at exactly `.documents/WIP/workorder-active.md`, with no root-level alternative anywhere in the checkout | reported and verified locally |
-| Parent workspace guard: an anchored ignore rule reported from the parent's **own root** ignore file, with a preserved local parent commit | reported and verified locally — the parent commit is **local only**; it was neither pushed nor remotely verified |
-| Four-slot WIP discipline and exactly one overwritten report | reported and verified |
-| Self-contained local implementation SOP plus an offline `AGENTS.md` | reported for Architect review |
-| Two-host hosted bootstrap tests green at the published report commit | reported for Architect verification |
-
-**Remaining requirements before U00 can be accepted:**
-
-| # | Requirement | Owner |
-| --- | --- | --- |
-| 1 | Architect `ACCEPT` of the published execution report at an exact commit | Chief Master Architect |
-| 2 | Owner approval of the **exact source pin** used for extraction | Owner |
-| 3 | Owner approval of the **material configuration decisions** left open in `.documents/Architecture/source-inventory.md` §11 | Owner |
-
-**Exit gate:** Architect `ACCEPT` at a specific commit, plus Owner approval of the exact
-source pin and of the open material configuration decisions. Green tests alone do not close
-U00.
-
+**State: closed by explicit Owner activation.** The Owner closed U00 by the activation that
+authorised the bounded U01 commencement. This entry is a one-line record only: U00 is no
+longer a remaining stage and its requirements are not restated here.
 
 ### U01 — Independent codebase and reliable baseline
 
 **State: IN PROGRESS — bounded technical baseline. NOT accepted, and NOT U01 completion.**
 
-The Owner closed `U00` by explicit activation and authorised this restricted first U01 slice.
-Delivered so far: a real App Router runtime with a non-indexable technical placeholder at `/`,
+The Owner closed `U00` by explicit activation and authorised the bounded U01 sequence.
+Delivered so far: a real App Router runtime with a non-indexable technical placeholder at `/`;
 one pure `src/core/efs/identity.ts` copied verbatim from GEO-03
-`c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, an Uno-only exact dependency lock, focused unit
-and architecture-refusal tests, and a two-host U01 workflow beside the unchanged U00 one.
+`c05c55ea61b5347cf5032211dd0bf37f2cc5083c`; an adapted pure authoring kernel
+(`src/core/page-content.ts`, `src/core/page-route-path.ts`); a new Uno-owned locale policy
+(`src/core/efs/uno-locales.ts`) requiring an authored language **and region** with explicit
+short-language mappings only; an Uno-only exact dependency lock; focused unit and
+architecture-refusal tests; a loopback production HTTP proof; a source-adoption ledger with a
+17-row section matrix and 22 capability contracts; and two-host CI beside the unchanged U00
+workflow.
 
-Still outstanding for U01: the full baseline extraction ledger against the approved source
-pin, module parity, and Architect `ACCEPT` plus Owner authorisation of any stage exit.
+Still outstanding for U01: full module parity with the Foundation Page composer, real public
+routing/locale behaviour, and independent stage-exit review. **U01 stays OPEN** until the
+Architect's `ACCEPT` and an explicit Owner stage decision.
+
 
 
 Scope: extract a **buildable, testable Foundation-derived Next.js / TypeScript source

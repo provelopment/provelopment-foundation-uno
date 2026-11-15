@@ -43,6 +43,41 @@ export const APP_FORBIDDEN_MARKERS = Object.freeze([
   'deployment/',
 ]);
 
+/**
+ * Legacy Foundation address/locale machinery that must never re-enter Uno `src/core` code.
+ * Checked against CODE ONLY (comments stripped), so provenance prose such as "there is no
+ * `/ww` segment" cannot create a false violation.
+ */
+export const LEGACY_ADDRESS_MARKERS = Object.freeze([
+  '/ww/',
+  'siteCode',
+  'countryCode',
+  'geoIp',
+  'geo-ip',
+  'acceptLanguagePrefix',
+  'preferencePrefixMatch',
+]);
+
+/** The exact authored `src/core` kernel this baseline declares. */
+export const CORE_AUTHORED_FILES = Object.freeze([
+  'src/core/efs/identity.ts',
+  'src/core/efs/uno-locales.ts',
+  'src/core/page-content.ts',
+  'src/core/page-route-path.ts',
+]);
+
+/**
+ * Strip block and line comments so marker scanning sees executable code only.
+ * A lexical approximation, deliberately simple: this is a boundary test, not a parser.
+ */
+export function stripComments(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/(^|[^:])\/\/.*$/, '$1'))
+    .join('\n');
+}
+
 const SPECIFIER_RE = /(?:from\s*|require\s*\(\s*|import\s*)['"]([^'"]+)['"]/g;
 
 function specifiersOf(source) {
@@ -79,6 +114,12 @@ export function scanSources(files) {
       for (const specifier of specifiersOf(content)) {
         if (isForbiddenCoreSpecifier(specifier)) {
           violations.push(`${normalised}: src/core must stay pure but imports "${specifier}"`);
+        }
+      }
+      const code = stripComments(content);
+      for (const marker of LEGACY_ADDRESS_MARKERS) {
+        if (code.includes(marker)) {
+          violations.push(`${normalised}: src/core must not reintroduce legacy "${marker}"`);
         }
       }
     }
@@ -273,7 +314,50 @@ test('README and AGENTS label U01 truthfully as a technical baseline', () => {
   }
 });
 
-test('the repository carries exactly one copied Foundation source file', () => {
+test('the authored core kernel is exactly the declared file set', () => {
   const core = readTree('src/core', 'src/core');
-  assert.deepEqual(Object.keys(core), ['src/core/efs/identity.ts']);
+  assert.deepEqual(Object.keys(core).sort(), [...CORE_AUTHORED_FILES].sort());
+});
+
+test('only the identity codec is a verbatim copy; the kernel declares adaptation', () => {
+  const core = readTree('src/core', 'src/core');
+
+  for (const path of [
+    'src/core/page-content.ts',
+    'src/core/page-route-path.ts',
+    'src/core/efs/uno-locales.ts',
+  ]) {
+    assert.match(core[path], /ADAPTED|NEW UNO-OWNED ADAPTATION/i, `${path} must declare provenance`);
+    assert.match(
+      core[path],
+      /not a byte-for-byte copy|NOT a copy/i,
+      `${path} must state that it is not a verbatim copy`,
+    );
+  }
+
+  // The upstream codec keeps its own contract text and is never relabelled as an adaptation.
+  assert.doesNotMatch(core['src/core/efs/identity.ts'], /ADAPTED for Uno/i);
+});
+
+test('the kernel refuses legacy address machinery in code but not in provenance prose', () => {
+  // Provenance prose that mentions the rejected shape must NOT trip the scanner.
+  assert.deepEqual(
+    scanSources({
+      'src/core/notes.ts':
+        '/** there is no `/ww/` segment and no siteCode, countryCode or geoIp here */\nexport const x = 1;\n',
+    }),
+    [],
+  );
+
+  // The same markers in executable code must be refused.
+  for (const source of [
+    'export const siteCode = "ww";\n',
+    'export const path = "/ww/" + locale;\n',
+    'export const countryCode = header.slice(0, 2);\n',
+    'export const geoIp = lookupCountry;\n',
+  ]) {
+    const violations = scanSources({ 'src/core/legacy.ts': source });
+    assert.equal(violations.length, 1, source);
+    assert.match(violations[0], /legacy/);
+  }
 });

@@ -151,10 +151,13 @@ placeholder at `/`, one pure `src/core/efs/identity.ts` copied verbatim from GEO
 an Uno-only exact dependency lock, focused unit and architecture-refusal tests, and two-host
 CI alongside the unchanged U00 bootstrap workflow.
 
-This is a **technical baseline**, not a published Uno website and not U01 completion. There are
-**no P01–P08 website features**, no published Site, no Page starter, no routing or locale
-authority, no content model, no presentation shell, no contact delivery, no analytics, no
-Connect module, and **no release and no deployment**.
+This is a **technical baseline**, not a published Uno website and not U01 completion. It now
+includes a pure authoring kernel (content-slug and relative route-path contracts), a new
+Uno-owned locale policy requiring an authored language **and region** with explicit
+short-language mappings only, and a source-adoption ledger. There are **no P01–P08 website
+features**, no published Site, no Page starter, no routing or locale authority, no content
+model, no presentation shell, no contact delivery, no analytics, no Connect module, and **no
+release and no deployment**.
 
 `U00` and `U01` stay distinct: U00 is the governance and extraction contract; this is its
 bounded first technical slice. **No stage is self-accepted.** An Agent `COMPLETE` is not an
@@ -205,6 +208,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:http
 ```
 
 The U00 commands verify the **scaffold**; the U01 commands verify a real build and real tests.

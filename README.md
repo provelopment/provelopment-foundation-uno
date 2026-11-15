@@ -24,8 +24,17 @@ The repository now carries a **real, independent Next.js / TypeScript runtime** 
 - ✅ one audited pure module copied verbatim from the pinned upstream commit —
   `src/core/efs/identity.ts` (GEO-03 `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, Git blob
   `7e6f8e0a4f0b9ba7b90f66c44205ff67befb7d20`)
-- ✅ a newly generated Uno-only dependency lock, focused unit tests and architecture
-  refusal tests, and two-host CI (the unchanged U00 bootstrap workflow plus the new U01 one)
+- ✅ a pure authoring kernel adapted from the same pinned commit — `src/core/page-content.ts`
+  (the one content-slug rule) and `src/core/page-route-path.ts` (relative route paths, max
+  4 segments / 160 chars) — with no Site code, country folder or `/ww` segment
+- ✅ a new Uno-owned locale policy, `src/core/efs/uno-locales.ts`, that requires an authored
+  language **and region** and resolves a short language only through an explicit declared
+  mapping — no geo, host, country or prefix inference
+- ✅ a source-adoption ledger with a 17-row Foundation section matrix and 22 capability
+  contracts that are **targets, not implemented modules**
+- ✅ a newly generated Uno-only dependency lock, focused unit tests, architecture refusal
+  tests, a loopback production HTTP proof, and two-host CI (the unchanged U00 bootstrap
+  workflow plus the U01 one)
 
 It is **not** a website and **not** an EFS implementation:
 
@@ -153,8 +162,9 @@ pnpm build      # real production build
 pnpm start      # serve the built placeholder
 pnpm lint       # eslint .
 pnpm typecheck  # tsc --noEmit
-pnpm test       # focused EntityID codec tests (vitest)
+pnpm test       # unit tests (vitest, all of tests/unit)
 pnpm test:architecture   # U01 boundary / refusal tests (node:test)
+pnpm test:http           # real production HTTP proof on loopback (build first)
 pnpm test:bootstrap      # the unchanged U00 governance gate
 ```
 
