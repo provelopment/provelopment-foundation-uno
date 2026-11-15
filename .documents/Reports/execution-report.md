@@ -218,13 +218,32 @@ gate was loosened. New high/critical or runtime exposure would have been a STOP;
 | No hidden Spoke, geo or provider authority (negative fixtures) | `PASS` |
 | Source rights and 17/22 parity stated truthfully | `PASS` - ledger appended, ambiguity marked OPEN |
 | Reproducible baseline, zero new packages, no lock change | `PASS` |
-| Real cross-host technical HTTP | local `PASS`; hosted recorded in the report-only follow-up |
+| Real cross-host technical HTTP | `PASS` - local 21/21 assertions, plus both hosted hosts at `3f68367...` (section 13) |
 | Vulnerability accuracy | `PASS` - one moderate dev-tool advisory disclosed |
 | Published only in authorized scope | `PASS` locally; independent verification pending |
 | Truthful stage status | U01 OPEN; no website or release claim |
 
 ## 12. Status
 
-**Local execution: COMPLETE.** Exact product-commit and hosted run evidence, plus the final
-report blob, are recorded in the single authorised report-only follow-up commit. `U01` remains
-**OPEN**; an agent `COMPLETE` is not an Architect `ACCEPT`.
+**Local execution: COMPLETE.** Product commit `3f68367e07337558534f188efb457226a8de7229` and its hosted evidence are recorded in section 13 and were observed before this report-only commit. `U01` remains **OPEN**; an agent `COMPLETE` is not an Architect `ACCEPT`.
+
+## 13. Hosted CI at the product commit `3f68367e07337558534f188efb457226a8de7229`
+
+Both workflows were triggered by the permitted push and both completed `success` on both
+hosts at exactly that commit:
+
+| Workflow | Run | Hosts | Observed steps |
+| --- | --- | --- | --- |
+| `Uno Bootstrap Verify` (existing, unchanged) | `43732188062` - https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43732188062 | `ubuntu-24.04` success, `windows-2025` success | bootstrap tests and scaffold validation `success` |
+| `Verify U01 baseline` (expanded) | `43732188045` - https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43732188045 | `ubuntu-24.04` success, `windows-2025` success | frozen install, bootstrap gate, architecture, lint, typecheck, unit tests, production build, and `Run production HTTP (technical placeholder)` - every step `success` on BOTH hosts |
+
+**Evidence basis.** Run conclusions and per-step conclusions were read from the GitHub
+Actions API at that exact SHA, so the real cross-host production HTTP proof is observed on
+Windows and Ubuntu rather than inferred. Job log TEXT could not be downloaded: the logs
+endpoint returns HTTP 403 without an authenticated token, and no credential may be introduced
+for this run, so log-level readback is `UNVERIFIED` while the step-level results above are
+observed. No check was rerun, skipped, loosened or bypassed.
+
+This report-only commit is pushed inside the same work order. The two workflows must pass
+again at the report-only head; that final-head result is returned in the completion handoff
+and is deliberately NOT asserted here in advance.
