@@ -1,0 +1,41 @@
+name: Uno Bootstrap Verify
+
+# Bootstrap verification only. This workflow proves the U00 scaffold is intact; it does
+# NOT build, test or deploy a Next.js application, because no application exists at U00.
+#
+# Least privilege: the token can read the repository and nothing else.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+
+    steps:
+      # Pinned to immutable full commits, matching the versions observed in the upstream
+      # Foundation CI. No floating or mutable major-version tags.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # actions/checkout v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # actions/setup-node v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Bootstrap tests (positive and refusal)
+        run: node --test tests/bootstrap.test.mjs
+
+      - name: Validate bootstrap scaffold
+        run: node scripts/verify-bootstrap.mjs

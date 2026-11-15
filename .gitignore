@@ -1,0 +1,56 @@
+# Foundation Uno — publication hygiene.
+#
+# At U00 there is no application and no build output. These rules exist to keep the
+# PUBLIC repository free of private authority, task scratch, credentials and build
+# products that later stages will produce. An ignore rule screens a path from Git; it
+# never deletes, moves or rewrites a file.
+
+# --- Owner-installed work order: PRIVATE, never published -------------------
+# The governing work order is installed by the Owner in the project root. It is
+# read-only to implementation agents and must never appear in git ls-files or in a
+# pushed commit. The whole WIP folder is screened so no order draft can escape.
+/.documents/WIP/workorder-active.md
+/.documents/WIP/
+/workorder-active.md
+
+# --- Agent task scratch and disposable local evidence ----------------------
+/.temp/
+
+# --- Node.js / pnpm / Next.js build products ------------------------------
+/node_modules/
+/.pnpm-store/
+/.next/
+/out/
+/build/
+/dist/
+*.tsbuildinfo
+next-env.d.ts
+/.vercel/
+
+# --- Task logs, transient files and local diagnostics ---------------------
+*.log
+/tmp/
+*.tmp
+
+# --- Credentials, keys and environment -----------------------------------
+.env
+.env.*
+!.env.example
+/.npmrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa*
+id_ed25519*
+*.keystore
+
+# --- OS and editor noise -------------------------------------------------
+Thumbs.db
+ehthumbs.db
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

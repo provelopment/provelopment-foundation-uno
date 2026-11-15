@@ -1,0 +1,37 @@
+# Foundation Uno — text normalisation.
+#
+# Every authored text file in this repository uses LF. Line endings are normalised on
+# commit so Windows and Linux checkouts produce identical content and identical diffs.
+
+* text=auto
+
+# Authored text surfaces: force LF everywhere, including on Windows.
+*.md         text eol=lf
+*.mjs        text eol=lf
+*.cjs        text eol=lf
+*.js         text eol=lf
+*.ts         text eol=lf
+*.tsx        text eol=lf
+*.json       text eol=lf
+*.yml        text eol=lf
+*.yaml       text eol=lf
+*.css        text eol=lf
+.gitignore   text eol=lf
+.gitattributes text eol=lf
+LICENSE      text eol=lf
+
+# Binary assets: never diff or convert. U00 ships none; declared so a later stage
+# cannot accidentally corrupt an image or font through line-ending translation.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.avif  binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.pdf   binary
+*.zip   binary
