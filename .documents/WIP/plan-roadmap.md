@@ -50,7 +50,17 @@ U00.
 
 ### U01 — Independent codebase and reliable baseline
 
-Not started. Blocked on U00 acceptance.
+**State: IN PROGRESS — bounded technical baseline. NOT accepted, and NOT U01 completion.**
+
+The Owner closed `U00` by explicit activation and authorised this restricted first U01 slice.
+Delivered so far: a real App Router runtime with a non-indexable technical placeholder at `/`,
+one pure `src/core/efs/identity.ts` copied verbatim from GEO-03
+`c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, an Uno-only exact dependency lock, focused unit
+and architecture-refusal tests, and a two-host U01 workflow beside the unchanged U00 one.
+
+Still outstanding for U01: the full baseline extraction ledger against the approved source
+pin, module parity, and Architect `ACCEPT` plus Owner authorisation of any stage exit.
+
 
 Scope: extract a **buildable, testable Foundation-derived Next.js / TypeScript source
 baseline** into this independent repository against the Owner-approved source pin, and

@@ -14,23 +14,32 @@ publishes that Entity's Facets, Sites and Pages.
 
 ---
 
-## Project stage: U00 — bootstrap only
+## Project stage: U01 — technical baseline (not a website)
 
-This repository is at **stage U00**. It contains project governance, a source
-extraction inventory, and a verified bootstrap scaffold — and nothing else:
+The repository now carries a **real, independent Next.js / TypeScript runtime** at a
+**bounded U01 technical baseline**. It is deliberately minimal:
 
-- ❌ **no Uno runtime** — there is no `src/`, no Next.js app, no `package.json`
-- ❌ **no working website**, no build, no dev server
-- ❌ **no release and no deployment**, no production configuration, no DNS
-- ✅ documents, an extraction inventory / U01 plan, and a bootstrap verifier with tests
-- ✅ a self-contained implementation SOP, a four-slot WIP discipline and one execution report
+- ✅ a Next.js App Router placeholder at `/` — semantic, accessible and **non-indexable**
+  (`noindex,nofollow`), with **no** fabricated Entity, Site, Facet, Page or slug
+- ✅ one audited pure module copied verbatim from the pinned upstream commit —
+  `src/core/efs/identity.ts` (GEO-03 `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, Git blob
+  `7e6f8e0a4f0b9ba7b90f66c44205ff67befb7d20`)
+- ✅ a newly generated Uno-only dependency lock, focused unit tests and architecture
+  refusal tests, and two-host CI (the unchanged U00 bootstrap workflow plus the new U01 one)
 
-The Uno runtime is **not implemented yet**. Nothing here runs a website; this is a
-project bootstrap, not a product and not a v1 release.
+It is **not** a website and **not** an EFS implementation:
 
-There is therefore deliberately **no `pnpm install` or `pnpm build` instruction** in
-this README. There is no application to install or build. A later stage introduces the
-runtime together with real, tested commands — not before.
+- ❌ no P01–P08 website features, no published Site, no Page starter, no three-Page content
+- ❌ no routing or locale authority, no content model, no presentation shell, no contact
+  delivery, no analytics, no Connect module, no third-party provider request
+- ❌ no release, no deployment, no production configuration and no DNS
+
+The authored public Uno A1 website is not implemented yet.
+
+`U00` is the governance and extraction-contract stage; `U01` is this bounded technical
+baseline. **Neither stage is self-accepted.** A stage closes only on an Architect `ACCEPT`
+of a published report plus Owner authorisation, and this baseline is not U01 completion.
+
 
 ---
 
@@ -132,8 +141,27 @@ authorisation.
 ## Verifying the scaffold
 
 
-Two dependency-free commands. Node.js 24 is used; **no packages are installed and no
-lockfile exists at U00**.
+## Commands
+
+Requires **Node.js 24** and **pnpm 11.6.0** (declared as `packageManager`). Install with the
+frozen lockfile; the direct dependency set is exact — no ranges.
+
+```sh
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm dev        # Next.js dev server (placeholder only)
+pnpm build      # real production build
+pnpm start      # serve the built placeholder
+pnpm lint       # eslint .
+pnpm typecheck  # tsc --noEmit
+pnpm test       # focused EntityID codec tests (vitest)
+pnpm test:architecture   # U01 boundary / refusal tests (node:test)
+pnpm test:bootstrap      # the unchanged U00 governance gate
+```
+
+Two dependency-free commands, plus a syntax check, remain the U00 governance gate. Node.js
+24 is used; the U01 dependency lock is committed and installed from it — U00 itself shipped
+no packages and no lockfile.
+
 
 ```sh
 node --check scripts/verify-bootstrap.mjs
@@ -167,8 +195,11 @@ The canonical stage sequence `U00–U07` is recorded in
 - **U03 — public routing, content and metadata parity** (canonical addresses, optional base
   path, Page/locale behaviour and visibility).
 
-**There is still no usable Uno website.** No `src/`, no Next.js app, no build, no dev
-server and no deployment exist at this stage; nothing in this repository serves a page.
+**There is still no usable Uno website.** A technical Next.js baseline now exists — `src/`,
+a build and a dev server — but it serves one non-indexable placeholder: no P01–P08 feature,
+no published Site, no Page routing, no locale representation and no deployment exist, and
+nothing in this repository is a public Uno website.
+
 
 No stage is authorised by this repository, this README, the roadmap, a green CI run or the
 presence of the scaffold. Each stage proceeds only under an Owner-issued work order. See

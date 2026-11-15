@@ -143,15 +143,23 @@ anything that widens that scope needs an Owner decision first, not a pull reques
 
 ## Current stage
 
-**U00 — safe foundation, independent repository and extraction contract.** Governance
-documents, a source-verified extraction inventory, a self-contained local SOP, the four-slot
-WIP discipline and a dependency-free bootstrap verifier with positive and refusal tests.
+**U01 — independent codebase and reliable baseline (bounded technical baseline).** The Owner
+closed `U00` by explicit activation and authorised a restricted U01 commencement. What exists
+now is a real but deliberately minimal Next.js / TypeScript runtime: a non-indexable technical
+placeholder at `/`, one pure `src/core/efs/identity.ts` copied verbatim from GEO-03
+`c05c55ea61b5347cf5032211dd0bf37f2cc5083c` (Git blob `7e6f8e0a4f0b9ba7b90f66c44205ff67befb7d20`),
+an Uno-only exact dependency lock, focused unit and architecture-refusal tests, and two-host
+CI alongside the unchanged U00 bootstrap workflow.
 
-There is **no Uno runtime, no build, no release and no deployment** yet, and this
-repository's presence is **not** authorisation for the next stage. U00 is **not accepted**.
-Acceptance requires an Architect `ACCEPT` of a published execution report at an exact
-commit, **and** Owner approval of the exact source pin and of the material configuration
-decisions left open in the source inventory. Green tests alone do not close U00.
+This is a **technical baseline**, not a published Uno website and not U01 completion. There are
+**no P01–P08 website features**, no published Site, no Page starter, no routing or locale
+authority, no content model, no presentation shell, no contact delivery, no analytics, no
+Connect module, and **no release and no deployment**.
+
+`U00` and `U01` stay distinct: U00 is the governance and extraction contract; this is its
+bounded first technical slice. **No stage is self-accepted.** An Agent `COMPLETE` is not an
+Architect `ACCEPT`, and only the Owner may close a stage.
+
 
 The **canonical** stage sequence `U00–U07`, with each stage's scope and exit gate, is
 `.documents/WIP/plan-roadmap.md`. An offline agent must follow that file and must not
@@ -176,7 +184,9 @@ Before editing anything, confirm all of the following and stop on any mismatch:
   file — a match reported from a nested file inside this repository is a false positive,
 - protected references and the tracked-path ledger are unchanged.
 
-## Verifying the scaffold
+## Verifying the baseline
+
+The **U00 governance gate** is dependency-free and unchanged:
 
 ```sh
 node --check scripts/verify-bootstrap.mjs
@@ -184,7 +194,19 @@ node --test tests/bootstrap.test.mjs
 node scripts/verify-bootstrap.mjs
 ```
 
-Two dependency-free commands, plus a syntax check. No packages are installed at U00 and
-no lockfile exists. These commands verify the **scaffold**, not a runtime: there is no
-application to build, so a build, TypeScript compile or browser check is NOT APPLICABLE
-here and must never be reported as passing.
+The **U01 runtime gates** need Node.js 24 and pnpm 11.6.0, use the committed lock and the
+exact direct dependency set, and are the same commands the hosted workflow runs:
+
+```sh
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm test:bootstrap
+pnpm test:architecture
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+The U00 commands verify the **scaffold**; the U01 commands verify a real build and real tests.
+Do not describe the U00 validator as evidence about runtime behaviour, never report a check as
+passing when it did not run, and never weaken, skip or loosening a check to manufacture green.

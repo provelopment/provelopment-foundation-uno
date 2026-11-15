@@ -1,0 +1,75 @@
+/*
+ * Foundation Uno — U01 technical baseline styles.
+ *
+ * Small, dependency-free, accessible and responsive. No brand asset, webfont, external
+ * request or provider stylesheet is loaded here.
+ */
+
+:root {
+  color-scheme: light dark;
+  --uno-background: #ffffff;
+  --uno-foreground: #14181f;
+  --uno-muted: #4a5262;
+  --uno-border: #d8dde6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --uno-background: #11151c;
+    --uno-foreground: #f2f5f9;
+    --uno-muted: #aeb6c4;
+    --uno-border: #2c333f;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--uno-background);
+  color: var(--uno-foreground);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.uno-baseline {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+.uno-baseline h1 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.uno-baseline p {
+  margin: 0 0 0.75rem;
+  max-width: 60ch;
+  color: var(--uno-muted);
+}
+
+.uno-baseline a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+.uno-baseline a:focus-visible {
+  outline: 2px solid var(--uno-foreground);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
