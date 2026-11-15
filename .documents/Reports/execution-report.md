@@ -1,387 +1,376 @@
 # Foundation Uno — U00 Execution Report
 
-**Order:** `UNO-WO-001` · **Edition:** `R01`
+**Order:** `UNO-WO-001` · **Edition:** `R03`
 **Execution date:** 2026-11-15
 **Execution role:** Implementation Agent
 **Review role:** Chief Master Architect (read-only GitHub)
-**Outcome:** `COMPLETE` — with three recorded `REVISE` / `UNVERIFIED` items (§3)
+**Outcome:** `COMPLETE`
 
 ---
 
-## 1. Root identity, repository state and remotes
+## 1. Authorisation and order installation
+
+**Sanitized Owner handoff identifier:** Owner activation `UNO-WO-001 / R03` (2026-11-15),
+delegating exactly two bounded bootstrap operations — one verbatim R03 installation at the
+canonical path, and the narrow parent `.gitignore` repair with an isolated local parent
+commit. No other authority was granted.
 
 | Fact | Value |
 | --- | --- |
-| Project root | `<UNO_ROOT>` (single physical directory in the Owner's workspace) |
-| Root type | Ordinary directory — **not** a reparse point, junction or symlink; `LinkType` empty, `Target` empty |
-| Ancestors inspected | drive root, `Users`, user profile, `Documents`, workspace parent — all ordinary directories, no reparse points |
-| WSL path check | reachable from the WSL distro only as a Windows-mount path (`/mnt/...`) resolving back to the same filesystem; no symlink into a protected location |
-| Pre-existing root contents | exactly one file: the Owner-installed `workorder-active.md` (26,104 bytes, SHA-256 `4DB1540A…6790F99B`). Left byte-identical and untracked. |
-| Branch | `main` |
-| Start state | **no Git repository** (uninitialized) — hence no start commit to record |
-| Scaffold commit (full SHA) | `11eb0c50ff37da2796cc16dda763a541822313c6` |
-| Report commit (full SHA) | recorded in §9 — this commit supersedes the scaffold SHA as the reported head |
-| Worktrees | 1 (this checkout only) — verified with `git worktree list` |
-| Remotes | exactly **1**, named `origin`, `https://github.com/provelopment/provelopment-foundation-uno.git` |
-| Tracked files | 9 (§4) |
-| Protected Foundation repository as a remote | **never** — no second remote was ever added |
+| Canonical order path (repo-relative) | `.documents/WIP/workorder-active.md` |
+| Edition / status present | `R03`, `OWNER-ISSUED` |
+| Order size / SHA-256 | 35,150 bytes / `AE16EF8C3A5A1AB8B01FA2E341999B16F41E2BB00E0D27F049B93D4BFFF81FF5` |
+| Prior state verified | `R02`, 27,194 bytes, SHA-256 `0EE142ED…F858CB5` — matches the R03 §2A.2 expectation exactly |
+| Root-level alternate order | **none** — no `workorder-active.md` at the repository root |
+| Duplicate order copies | none; exactly one order file in the whole tree |
 
-`.gitignore` screens `/workorder-active.md`, `/.documents/WIP/` and `/.temp/`;
-`git ls-files` contains no work-order path.
+The canonical file had already been replaced with the authorised R03 bytes in the Owner
+workspace before this session began. Its identity was verified by ID, edition, status,
+exact byte size and full SHA-256 — satisfying the R03 §2A.3 requirements. The agent
+therefore performed **no rewrite of the order**: reinstalling byte-identical content is a
+no-op that could only add encoding risk to an already verified file. The installation
+requirement is met by that byte-exact verification, and the deviation is recorded here
+rather than concealed.
 
----
+The private order remains ignored, untracked and unpublished. Its body is not reproduced.
 
-## 2. Source identity
+## 2. Preflight (read-only, before any write)
 
-### 2.1 Foundation upstream (read-only)
+| Check | Result |
+| --- | --- |
+| Physical root | ordinary directory; resolves to the expected path — not a reparse point, junction or symlink |
+| Ancestors | drive root, `Users`, user profile, `Documents`, workspace parent — all ordinary directories, no reparse points |
+| Entries inside root | no reparse points at the top level |
+| Worktrees | exactly one `git worktree` entry; exactly one checkout |
+| Branch / HEAD | `main` at `1ae2899a456585c4ec4d5268f1111f80ebae66c7` — exact match to the order |
+| Remotes | exactly one: `origin` → the independent Uno repository. Foundation is not a remote. |
+| Tracked tree | 10 files, clean (`git status --porcelain` empty) |
+| Parent identity | workspace root; `origin` → the parent `provelopment-root` repository; `main` at `2548cc7…` |
+| Parent ignore guard — before | **ABSENT** — no rule in the parent's own root `.gitignore` |
+| Parent index — before | nothing staged |
+| Parent hooks | no active hooks; no `core.hooksPath` override |
+| Foundation template reference | read-only; `main` = `origin/main` = `fa599973…`; checked-out HEAD was on its own unrelated dirty branch — preserved untouched |
+| Canonical Drive documents | **not read** — no Drive connector available in this environment (see §9) |
+
+### 2.1 A verified trap: nested-`.gitignore` false positive
+
+Before the guard existed, `git check-ignore -v -- 00.foundation-uno/` in the parent
+returned **exit 0**, citing a nested `.gitignore` *inside* the Uno checkout rather than the
+parent's own root file. Taken at face value, that would have looked like an effective guard
+and could have masked the very defect this order exists to repair.
+
+Four independent probes proved the guard was genuinely absent:
+
+| Probe | Result |
+| --- | --- |
+| Parent root `.gitignore` searched for `uno` | no matching rule |
+| `git check-ignore -- 00.foundation-uno` (no trailing slash) | exit 1 — **not** ignored |
+| `git check-ignore -- 00.foundation-uno/README.md` | exit 1 — **not** ignored |
+| Parent `git status` | `?? 00.foundation-uno/` — untracked |
+
+`AGENTS.md` and the local SOP now both record that a match reported from a nested file is a
+**false positive**, and that an effective guard must be reported from the parent's own root
+ignore file.
+
+## 3. Parent-repository repair (§2A) — the one authorised parent write
+
+Performed exactly as bounded: one anchored ignore rule appended to the parent root
+`.gitignore`, and one isolated local parent commit. Nothing else in the parent was touched,
+and **nothing was pushed**.
+
+### 3.1 Pre-edit state captured
 
 | Fact | Value |
 | --- | --- |
-| Repository | `provelopment/provelopment-foundation` (public) |
-| `main` at analysis time | `fa599973a88ff77f6a8e012f3266c3c139b52c17` |
-| Commit date | 2026-10-29T06:43:45Z |
-| Baseline candidate in the order | `fa599973a88ff77f6a8e012f3266c3c139b52c17` |
-| Candidate vs live `main` | **IDENTICAL** — no discrepancy |
-| Files at that ref | 867 |
-| Open PRs | #273 (draft, GEO-03 reference-publication migration) and #274 (draft, GEO-04 country-code retirement) — neither merged, neither used as a source |
+| Parent `.gitignore` — type | regular tracked file, **not** a symlink or reparse point |
+| Worktree size / SHA-256 | 7,581 bytes / `02989AC7…433C6D` |
+| `HEAD:.gitignore` blob / size | `23afd71cb8c3c9480a695e17f694794c81cf2516` / 7,421 bytes (LF) |
+| Working-vs-HEAD diff | exactly one line: `+/00.foundation-agency/` (Owner-owned, uncommitted) |
+| Index mode | `100644` |
+| Line endings | worktree CRLF (137 CRLF), `core.autocrlf=true` |
 
-### 2.2 Local template (read-only reference)
+### 3.2 The edit — byte-preserving append
+
+The rule was appended to the working file as raw bytes, never through a text rewrite:
+
+| Assertion | Result |
+| --- | --- |
+| Size change | 7,581 → 7,602 bytes (+21 = 19-char rule + CRLF) |
+| Prefix byte-identical to the original | **true**, checked byte by byte |
+| Appended suffix | `/00.foundation-uno/` + CRLF — exactly one line |
+| New worktree SHA-256 | `7C830DD9…6C743` (= original + one rule) |
+
+### 3.3 Staging from `HEAD:` content, never from the working file
+
+A short task-owned helper staged the rule **from the `HEAD` blob in memory**, so the Owner's
+uncommitted `/00.foundation-agency/` hunk could not be captured. No `git add -A` and no
+plain `git add .gitignore` was used.
+
+| Assertion enforced by the helper | Result |
+| --- | --- |
+| Parent index clean before staging | true (nothing staged) |
+| Rule not already in `HEAD` | true |
+| Agency text absent from `HEAD`, from the desired blob, and from the staged blob | true in all three |
+| Desired blob preserves every `HEAD` byte | true |
+| Blob written | `23afd71c…` (7,421 B) → `dfab1a2a…` (7,441 B) = **+20 bytes exactly** |
+| `git diff --cached --name-only` | exactly `.gitignore` |
+| Staged blob equals `HEAD` + the one rule | true |
+
+The helper was deleted immediately after use.
+
+### 3.4 The isolated local parent commit
 
 | Fact | Value |
 | --- | --- |
-| Is a Git checkout | yes |
-| `main` ref | `fa599973a88ff77f6a8e012f3266c3c139b52c17` — **equals GitHub `main`** |
-| `origin/main` | `fa599973a88ff77f6a8e012f3266c3c139b52c17` |
-| **Checked-out HEAD** | `8789a450525d44dc8f60ea572ad84fcf64f2ace5` |
-| Branch | `feat/foundation-geo-04-legacy-retirement` (= PR #274's unmerged head) |
-| Dirty state | **DIRTY** — 3 modified, 2 untracked files |
-| Remote | `origin → …/provelopment-foundation.git` |
-| Worktrees | 1 |
+| Message | `chore(workspace): ignore independent Uno checkout` |
+| Old parent HEAD | `2548cc7153f026456bded6f76a2d5d74a567a24e` |
+| New parent HEAD | `e17fd9601b4fc40be7af77caf4b255bd115b12b8` |
+| Files in commit | `.gitignore` only |
+| Commit diff | one added line: `+/00.foundation-uno/` |
+| Pushed | **no** |
 
-**Recorded discrepancy:** the template's *object database* agrees with GitHub `main`,
-but its *working tree* does not. It sits one commit away on an unmerged draft-PR branch,
-with uncommitted edits. File-level fingerprints from that tree therefore describe
-`8789a45` + local edits, **not** `fa599973`. The inventory was consequently built from
-committed objects at `fa599973` (`git ls-tree`, `git cat-file`, `git rev-parse <ref>:<path>`),
-never from the working tree, and no checkout/reset/clean/stash/fetch/index-write was
-performed against the template.
+### 3.5 Post-repair verification
 
-`LICENSE` is the one bounded file that is byte-identical between `main` and the dirty
-branch, which is why it was the only file copied.
+| Assertion | Result |
+| --- | --- |
+| Guard effective from the **parent root** | `.gitignore:138:/00.foundation-uno/` → exit 0 |
+| `?? 00.foundation-uno/` in parent status | **gone** |
+| Committed `.gitignore` blob | `dfab1a2a…`, 7,441 bytes — old HEAD plus one rule |
+| Owner `/00.foundation-agency/` line | still present in the working file, byte-identical, **still uncommitted** |
+| Remaining working diff vs new HEAD | `+/00.foundation-agency/` only |
+| Parent worktrees | still exactly one checkout |
+| Parent remote unchanged | `origin/main` = `1f688d6…` — untouched by this run |
+| Local parent commits ahead of `origin/main` | 2 — one pre-existing, plus this one |
 
----
+The parent remains intentionally dirty because of Owner-owned Agency work. That dirty state
+is expected and was preserved, not erased.
 
-## 3. Reference integrity and the three open items
+## 4. Uno write ledger actually executed
 
-### 3.1 Reference integrity — before and after
+Starting head `1ae2899a456585c4ec4d5268f1111f80ebae66c7`. One code/docs commit on `main`
+produced **10 files changed, 641 insertions, 32 deletions**. No file outside this ledger was
+touched.
 
-| Reference | Before | After | Verdict |
-| --- | --- | --- | --- |
-| Foundation template checkout | HEAD `8789a45…`, branch `feat/foundation-geo-04-legacy-retirement`, 5 dirty entries | HEAD `8789a45…`, same branch, **same 5 dirty entries** | **UNCHANGED** |
-| Workspace parent repository (`provelopment-root`) | HEAD `2548cc7…` | HEAD `2548cc7…` | **UNCHANGED** |
-| GitHub Foundation repository | `main` @ `fa599973…` | untouched; no write operation performed | **UNCHANGED** |
-| Owner-installed work order | 26,104 bytes, SHA-256 `4DB1540A…F99B` | same bytes, untracked, ignored | **UNCHANGED** |
+| Path | Change |
+| --- | --- |
+| `AGENTS.md` | Expanded to a self-contained offline entry point: roles, read-first list, four-slot map, one-report rule, honest Drive-read status, start gate |
+| `README.md` | U00 status refreshed; four-slot map, local SOP and report added to the orientation |
+| `.gitignore` | Narrowed: screens the **single** ACTIVE file only. `/.documents/WIP/` **removed** so the three plans are trackable |
+| `.documents/SOP/sop-implementation.md` | **created** — self-contained 12-section implementation SOP |
+| `.documents/WIP/plan-roadmap.md` | **created** — unfinished `U00–U07` stages and exit gates; U00 explicitly left open |
+| `.documents/WIP/plan-next.md` | **created** — identifying header only, zero candidate entries |
+| `.documents/WIP/plan-outlook.md` | **created** — optional ideas slot, no requirements |
+| `.documents/Architecture/source-inventory.md` | §13 added: Architect U01 scope clarifications, preserving all source-observed tables |
+| `scripts/verify-bootstrap.mjs` | Extended: four new required files, distinct diagnostics, WIP inventory guard, whole-directory ignore refusal, widened public-document scan |
+| `tests/bootstrap.test.mjs` | Extended fixture plus four new refusal tests |
 
-No generator, build, install, checkout, reset, clean, index write, cache, hook or fetch
-was run inside any Foundation reference. No clone or worktree was created anywhere.
+Deliberately **not** touched: `LICENSE`, `.gitattributes`,
+`.github/workflows/verify-bootstrap.yml`, the private ACTIVE order, any `src/**`, any package
+manifest, assets, Foundation references, and every other repository.
 
-### 3.2 Open items for Architect acknowledgement
+### 4.1 Four-slot discipline proven by real Git state
 
-**A. Work order physical path differs from the order text — `REVISE`.**
-The order states the file resides at `<UNO_ROOT>/.documents/WIP/workorder-active.md`. It
-does not. It resides at `<UNO_ROOT>/workorder-active.md`. Content was verified to match
-the Owner's activation exactly — ID `UNO-WO-001`, Edition `R01`, Status `OWNER-ISSUED`,
-SHA-256 `4DB1540A90C232F74C584D488F4CE43ACC5113DA627945DA6C947E4A6790F99B`, 260 lines.
-The order was honoured as authority. **Mitigation applied:** `.gitignore` screens *both*
-the specified path and the actual path, so the private order cannot be published from
-either location. **Owner action requested:** confirm the intended location.
+| Assertion | Result |
+| --- | --- |
+| `git ls-files .documents/WIP` | exactly `plan-next.md`, `plan-outlook.md`, `plan-roadmap.md` |
+| ACTIVE order ignored | `git check-ignore -q` → exit 0 |
+| ACTIVE order tracked | `git ls-files --error-unmatch` → non-zero (not tracked) |
+| ACTIVE order staged | never; absent from every `git diff --cached --name-only` |
+| Three plans ignored | `git check-ignore -q` → exit 1 for each (correctly **not** ignored) |
+| Files in `.documents/WIP` on disk | exactly four entries |
 
-**B. The workspace parent repository does not screen this project — `REVISE`.**
-`<UNO_ROOT>` is nested inside the workspace parent repository `provelopment-root`
-(remote `…/provelopment-root.git`, HEAD `2548cc7…`). Every sibling subproject has an
-anchored `.gitignore` rule there; this one does not. `git status` in the parent reports
-`?? 00.foundation-uno/` — untracked and unscreened. A stray `git add -A` in the parent
-could therefore add a gitlink for this directory. The preflight requirement "verify the
-parent checkout will not track Uno" is **not satisfiable** as installed. I did **not**
-modify the parent repository: that is outside this order's ledger and explicitly
-forbidden. **Owner action requested:** add an anchored `/00.foundation-uno/` rule to the
-parent `.gitignore`.
+### 4.2 Protected reference integrity
 
-**C. Canonical Drive documentation not read — `UNVERIFIED`.**
-The canonical Uno documentation folder (`1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0`) was not
-readable: no Google Drive connection is available to this agent. Per the order, the
-explicit order scope governed instead and no architectural content was invented. The
-Drive documents were **not** mirrored into this repository. **Action:** Architect
-confirmation that the Drive set is unchanged and that §11 of the inventory matches it.
+| Asset | Result |
+| --- | --- |
+| `LICENSE` blob | `d645695673349e3947e8e5ae42332d0ac3164cd7` — **unchanged**, identical to upstream |
+| `.gitattributes` | unmodified |
+| `.github/workflows/verify-bootstrap.yml` | unmodified |
+| Foundation template | unmodified; still on its own branch, HEAD `8789a45…`, dirty file count unchanged |
+| Foundation GitHub `main` | unchanged at `fa599973a88ff77f6a8e012f3266c3c139b52c17` |
+| Parent repository | one `.gitignore` rule and one local commit only; not pushed |
 
----
+## 5. Local verification — both hosts, before any push
 
-## 4. Files created and publication review
+### 5.1 Windows 11
 
-Nine files were staged and committed. All others in the root are ignored.
+Runtime actually used: **Node v24.22.1**, npm 11.19.1, git 2.56.0.windows.3.
 
-| File | Bytes (git) | Purpose |
-| --- | --- | --- |
-| `README.md` | 5,863 | Truthful public orientation; states the runtime is **not implemented yet** |
-| `AGENTS.md` | 4,363 | Public repo entry point; canonical Drive links and repo-local rules |
-| `LICENSE` | 11,358 | Complete, unmodified Apache-2.0 |
-| `.gitignore` | 1,403 | Private authority, task scratch, credentials, build products |
-| `.gitattributes` | 984 | `text=auto` plus explicit LF for authored text |
-| `.documents/Architecture/source-inventory.md` | 43,491 | Source-verified U01 extraction matrix |
-| `.documents/Reports/execution-report.md` | this file | U00 evidence (report commit) |
-| `scripts/verify-bootstrap.mjs` | 8,991 | Dependency-free bootstrap validator |
-| `tests/bootstrap.test.mjs` | 8,101 | 15 positive/refusal tests |
-| `.github/workflows/verify-bootstrap.yml` | 1,244 | Two-host read-only bootstrap CI |
+| Command | Result |
+| --- | --- |
+| `node --check scripts/verify-bootstrap.mjs` | exit 0 |
+| `node --test tests/bootstrap.test.mjs` | **19 tests, 19 pass, 0 fail, 0 skipped, 0 todo, 0 cancelled** (≈492 ms) |
+| `node scripts/verify-bootstrap.mjs` | exit 0 — “11 required files present … four-slot WIP discipline intact” |
+| `git diff --check` | exit 0 |
+| `git diff --cached --check` | exit 0 |
 
-### 4.1 Publication review performed before commit
+### 5.2 WSL Ubuntu 26.04
 
-- `git diff --cached --name-only` → exactly the nine paths above.
-- `git diff --cached --check` → clean (exit 0) after removing three end-of-file blank
-  lines flagged on the first pass.
-- `git ls-files` → contains **no** work-order path; `git check-ignore` confirms
-  `workorder-active.md` and `.temp/` are ignored.
-- Staged-content credential/private-path scan (AWS key id, GitHub token shapes,
-  fine-grained PAT, Slack token, PEM private-key header, JWT, Windows user-profile path,
-  WSL Windows-mount path) → **0 hits** after two self-inflicted hits were removed:
-  the validator's own detector pattern and a fabricated sample token in a test were both
-  rewritten to be assembled at runtime, so no token-shaped literal exists in the
-  repository.
-- Remote tree read back from the GitHub API after push → exactly the nine paths, no
-  work-order file, no `.temp/`.
+Runtime actually used: **Node v26.13.0**. No `node` was on `PATH` in this distro; the
+nvm-managed runtime was invoked by absolute path. This is a **cross-major** runtime and is
+recorded as such — it is **not** a Node 24 substitute, and the authoritative Node 24 matrix
+is the hosted CI (§7).
 
-### 4.2 Licence review
+| Command | Result |
+| --- | --- |
+| `node --check scripts/verify-bootstrap.mjs` | OK |
+| `node --test tests/bootstrap.test.mjs` | **19 tests, 19 pass, 0 fail, 0 skipped, 0 todo, 0 cancelled** (≈3.58 s) |
+| `node scripts/verify-bootstrap.mjs` | OK — same 11-file / four-slot result |
 
-`LICENSE` was copied byte-for-byte from the read-only source via a raw byte stream (no
-text translation). Proof of identity: the repository's index/blob hash for `LICENSE` is
-`d645695673349e3947e8e5ae42332d0ac3164cd7`, **identical** to the upstream blob at
-`fa599973`. Size 11,358 bytes, LF-only, SHA-256 `CFC7749B…523D30`. It is the complete
-Apache License 2.0 text including the `APPENDIX` boilerplate, with the standard
-`Copyright [yyyy] [name of copyright owner]` placeholder — no copyright holder was
-invented and no `NOTICE` file was created.
+### 5.3 Failures, skips, warnings — stated plainly
 
----
+- **Test failures: 0. Skips: 0. Todos: 0.**
+- **Warnings:** informational CRLF-normalisation notices from `core.autocrlf=true`
+  while Git inspected the worktree. They are benign and no content was changed by them.
+- **Two self-inflicted issues, both caught and fixed before the commit:**
+  1. A trailing blank line at end-of-file in four edited files was reported by
+     `git diff --check` (exit 2). Each file was trimmed to a single terminating newline and
+     both checks were re-run to exit 0.
+  2. One attempt to launch the WSL checks failed on PowerShell nested-quote interpolation.
+     It was re-run through a temporary LF-terminated script, which succeeded. It had no
+     repository effect and the script was removed.
+- **Not applicable, never reported as passing:** `pnpm install`, TypeScript compile, Next.js
+  build and browser checks — there is no application at U00.
 
-## 5. Windows 11 — focused, negative and CLI tests
+## 6. Validator and test coverage
 
-Environment: Windows 11, native Node.js **v24.22.1** (matching the `node: 24.x` engine
-observed upstream), run from `<UNO_ROOT>`.
+`scripts/verify-bootstrap.mjs` gained:
 
-| # | Command | Result |
-| --- | --- | --- |
-| 1 | `node --check scripts/verify-bootstrap.mjs` | pass — no syntax error |
-| 2 | `node --test tests/bootstrap.test.mjs` | **15 tests, 15 pass, 0 fail, 0 skipped, 0 cancelled** |
-| 3 | `node scripts/verify-bootstrap.mjs` | `verify-bootstrap: OK - 7 required files present, licence verified, private authority screened, no Hub/Spoke data, no credential or private-path leaks.` (exit 0) |
-| 4 | `git diff --cached --check` | exit 0, clean (after removing 3 EOF blank lines) |
-| 5 | `git check-ignore -v workorder-active.md` | matches `.gitignore:14:/workorder-active.md` |
-| 6 | `git check-ignore -v .documents/WIP/workorder-active.md` | matches `.gitignore:13:/.documents/WIP/` |
-| 7 | `git check-ignore -v .temp/U00/pkg.json` | matches `.gitignore:17:/.temp/` |
-| 8 | `git status --short` | clean (only intentionally ignored work order and `.temp/`) |
+- four additional required files: the local SOP and the three public planning slots;
+- **distinct** diagnostics — “missing or empty local implementation SOP” and “missing or
+  empty tracked planning slot” — instead of one generic message;
+- a WIP inventory guard: if `.documents/WIP` exists, only the three plan files and the
+  private order may be present. Any other file or subdirectory fails;
+- an explicit refusal of a `.gitignore` that screens the whole `.documents/WIP` directory;
+- a widened public-document scan covering the SOP and the three plans.
 
-### 5.1 The 15 tests, by name and direction
+Critically, the private ACTIVE order is **never required and never read**. A hosted CI
+checkout legitimately contains only the three plan files, and both environments pass —
+proving the CI path does not depend on a private file.
 
-Positive: (1) a complete minimal scaffold is accepted with zero issues;
-(2) the real Uno root passes the same validation.
+`tests/bootstrap.test.mjs`: the disposable fixture now materialises the four new files with
+public-safe content, and four genuine refusal tests were added — missing SOP, missing
+planning slot, whole-directory WIP ignore, and an unexpected extra WIP entry.
 
-Refusal: (3) missing `LICENSE`; (4) a non-Apache licence; (5) missing work-order ignore
-pattern; (6) missing `.temp` ignore pattern; (7) stray `deployment/spokes.json`;
-(8) missing `README.md`; (9) a README claiming a working website; (10) missing
-`AGENTS.md`; (11) `AGENTS.md` without the canonical documentation reference; (12) an
-empty required file; (13) a credential in a published document; (14) a machine-specific
-private path in a published document; (15) a non-existent root reported rather than
-thrown.
+| Suite | Result |
+| --- | --- |
+| Original 15 U00 tests | preserved, assertions unchanged, all pass |
+| Real-root validation test | passes (with the private order present locally) |
+| New refusal tests | 4 added, all pass |
+| **Total** | **19 tests, 19 pass** on both local hosts and both CI jobs |
 
-All fixtures were created under `<UNO_ROOT>/.temp/bootstrap-tests/` and removed by the
-suite's `after()` hook. Verified afterwards: the fixture directory no longer exists.
+The validator remains a **U00 scaffold validator**. It has not been reclassified as a
+future U01 product acceptance gate, and it must be refactored under a later Owner-issued
+U01 order before any source extraction.
 
-### 5.2 Failures and skips
-
-No test failures and no skipped tests on Windows. Two implementation defects were found
-and fixed during the run, and are recorded rather than hidden:
-
-1. An editing mistake truncated two lines of `gitignoreRules()`, producing
-   `SyntaxError: Unexpected token 'export'`. Fixed before any commit.
-2. `git diff --cached --check` flagged three end-of-file blank lines. Removed; re-verified.
-
----
-
-## 6. WSL Ubuntu 26.04 — tests
-
-**RUN.** Distro `Ubuntu 26.04.1 LTS` (WSL2), executing in the mapped root under the
-Windows-mount path for `<UNO_ROOT>` — the *same single* Uno checkout, not a copy.
-
-| # | Command | Result |
-| --- | --- | --- |
-| 1 | `node --test tests/bootstrap.test.mjs` | **15 tests, 15 pass, 0 fail, 0 skipped** |
-| 2 | `node scripts/verify-bootstrap.mjs` | `verify-bootstrap: OK - …` (exit 0) |
-| 3 | `git status --porcelain` | staged/clean as expected; no foreign files |
-
-**Deviation recorded:** the WSL distro's default `PATH` has no `node`. A Node runtime is
-present only via `nvm` at `~/.nvm/versions/node/v26.13.0/bin/node`, and that binary was
-invoked by absolute path. **It is Node v26.13.0, not v24** — so the WSL run is a
-cross-major extra data point, **not** a substitute for the pinned Node 24 verification.
-Node 24 was verified natively on Windows and by hosted CI on both `ubuntu-24.04` and
-`windows-2025`. All WSL output and scratch stayed inside `<UNO_ROOT>/.temp/`; nothing was
-written to another repository.
-
----
-
-## 7. GitHub target
+## 7. Hosted CI
 
 | Fact | Value |
 | --- | --- |
-| Repository URL | <https://github.com/provelopment/provelopment-foundation-uno> |
-| Visibility | **PUBLIC** (`isPrivate: false`, `visibility: PUBLIC`) |
-| Owner / name | `provelopment` / `provelopment-foundation-uno` |
-| Default branch | `main` |
-| Branches | `main` only — no additional branch was created |
-| Remote `main` HEAD | `11eb0c50ff37da2796cc16dda763a541822313c6` — **equal to the pushed local HEAD** |
-| Local `origin` | `https://github.com/provelopment/provelopment-foundation-uno.git` (sole remote) |
-| Creation command | `gh repo create provelopment/provelopment-foundation-uno --public --source=. --remote=origin --push` |
-| Pre-creation collision check | repo absent (GraphQL "Could not resolve to a Repository") |
-| Fork / template copy used | **no** — a fresh repository with a root commit, no Foundation history |
-| Repository settings changed after creation | **none** (no secrets, no DNS, no provider integration, no release, no tag, no PR) |
+| Workflow | `Uno Bootstrap Verify` (`.github/workflows/verify-bootstrap.yml`, unmodified) |
+| Run | `43686478795` |
+| Head | `075baf6e89fabf91daf90c907e86f5eba39842fe` |
+| `verify (windows-2025)` | **success** — every step green |
+| `verify (ubuntu-24.04)` | **success** — every step green |
+| Node | 24 on both jobs (the authoritative matrix) |
+| URL | <https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43686478795> |
 
----
+Both jobs ran `node --test tests/bootstrap.test.mjs` (19/19) and
+`node scripts/verify-bootstrap.mjs` (OK, 11 files) on a checkout that does **not** contain
+the private order.
 
-## 8. Hosted CI
+This report is published by one further report-only commit on `main`. That commit triggers
+the identical workflow on the same two hosts; because a commit cannot contain its own SHA,
+its exact SHA and both job results are reported in the chat handoff that accompanies this
+publication.
+
+## 8. Upstream pin, licence and rights
 
 | Fact | Value |
 | --- | --- |
-| Workflow | `Uno Bootstrap Verify` (`.github/workflows/verify-bootstrap.yml`) |
-| Run URL | <https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43682320187> |
-| Head SHA for that run | `11eb0c50ff37da2796cc16dda763a541822313c6` |
-| Run status / conclusion | `completed` / **`success`** |
-| Job 1 | `verify (ubuntu-24.04)` — **success** |
-| Job 2 | `verify (windows-2025)` — **success** |
-| Permissions | `contents: read` only |
-| Action pins | `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1), `actions/setup-node@820762786026740c76f36085b0efc47a31fe5020` (v7.0.0) |
-| Pin verification | both full SHAs resolved via read-only GitHub API; both are tagged releases (v7.0.1 / v7.0.0), not branches |
-| `persist-credentials` | `false` on checkout |
-| Node in CI | `'24'` |
-| What it proves | the **scaffold** is intact. It is **not** a Next.js build, and proves nothing about runtime behaviour. |
+| Upstream pin | `provelopment/provelopment-foundation` at committed `fa599973a88ff77f6a8e012f3266c3c139b52c17` — unchanged |
+| Local template `main` / `origin/main` | both `fa599973…` — agrees with the pin |
+| Local template checked-out HEAD | `8789a45…` on its own unmerged branch, dirty — **preserved read-only**, never used as evidence |
+| `LICENSE` | Apache-2.0, blob `d6456956…`, byte-identical to upstream — **unchanged by this run** |
+| Files copied from upstream in R03 | **none** |
 
-No check was disabled, skipped or marked `continue-on-error`. No red run was hidden.
+Rights findings are unchanged and still open: brand assets, product prose, third-party icon
+sets and the separate connect-module licence remain subject to provenance and licence review
+before any reuse. Apache-2.0 grants software rights, not trademark rights. Nothing from any
+of those categories was copied.
 
----
+## 9. Canonical Drive documentation — honestly `UNVERIFIED`
 
-## 9. Report commit
+The seven canonical Uno documents (`AGENTS.md`, `SOP-ARCHITECT.md`, `SOP-IMPLEMENTATION.md`,
+`README.md`, `PLAN.md`, `BLUEPRINT.md`, `WIP.md`) live in the Architect-maintained Drive
+folder and were **not read**: this environment has no Drive connector. No claim is made
+about their content, and none of their content is reproduced here. `AGENTS.md` states this
+limitation openly, and the local SOP is written to be self-sufficient precisely because the
+Drive records are unavailable to an offline agent.
 
-This report is published by an in-scope, report-only follow-up commit on `main`, as the
-order directs, and is itself subject to the same two-host bootstrap verification.
+The Architect alone maintains those documents.
 
-- Scaffold commit: `11eb0c50ff37da2796cc16dda763a541822313c6` — verified green at
-  run `43682320187`.
-- **Final reported head:** the tip of `main` after this report commit. It is the commit
-  that carries this file; its exact SHA is the repository's `main` head
-  (<https://github.com/provelopment/provelopment-foundation-uno>) and the head of the
-  second `Uno Bootstrap Verify` run. It is deliberately *not* the scaffold SHA above.
-- No file outside the allowlisted ledger was touched by this commit.
+## 10. Cleanup and containment
 
----
-
-## 10. Inventory summary — source-to-Uno decisions and U01 dependencies
-
-Full matrix: [`.documents/Architecture/source-inventory.md`](../Architecture/source-inventory.md).
-Against ref `fa599973`.
-
-| Decision | Count | Representative modules |
-| --- | --- | --- |
-| `KEEP` | 5 | `src/core/efs/{properties,identity,locales}.ts`, `src/core/page-document.ts`, `LICENSE` |
-| `ADAPT` | 13 groups | `src/core/efs/{publication,discovery}.ts`, `src/core/ui/**`, `src/application/**`, `src/app/**`, `src/config/**` (non-Spoke), `src/adapters/**` (content/maps/markdown/contact), `src/components/**`, page/site primitives, dictionaries, page JSON/Markdown loaders, `package.json`, `next.config.ts` |
-| `DELETE` | 11 groups | `src/core/spoke/**`, all 14 `spoke-*` config modules, `deployment/spokes/**` (154 files), `deployment/spokes.json`, `deployment/tests/**`, the second-entity capsule, `src/core/foundation-installation/**`, `src/core/foundation-release/**`, `scripts/release/**`, `scripts/installation/**`, `.github/agent-reports/**`, upstream product manuals |
-| `REPLACE` | 4 | `deployment/efs/manifest.json` (one Entity), `pnpm-lock.yaml`, `README.md`, `.github/workflows/ci.yml` |
-| `FURTHER AUDIT` | 9 groups | `ARCHITECTURE.md`, 19 `src/core` domain primitives, `modules/connect/**`, the analytics adapter, the generated `public/**` boundary, country-code/CI-scope scripts, the `tests/**` matrix |
-
-### 10.1 The five structural facts that will decide U01
-
-1. **Content model already matches.** `PROPERTY_LEVELS = ["entity","facet","site","page","representation"]`
-   is exactly Uno's chain — keep it.
-2. **Publication ownership is Spoke-typed.** `EfsRuntimeSpokeIdentity` and
-   `publicationOwnedBy(publication, spoke)` make the Spoke a *parameter of the ownership
-   API*. Deleting `src/core/spoke/**` is not enough; the ownership layer must be rewritten.
-3. **The presentation-site bridge.** `spokeId` + `presentationSiteCode` + `siteMode`
-   (`closed`/`open`) + `defaultSiteId` is how a host/prefix selects a Site. With one Entity
-   this must be re-derived, not copied.
-4. **Owner-scoped asset loading has a generated boundary.** `owner-assets` routes depend on
-   Spoke + Site + a generated catalog; `postinstall`/`build` can write into `public/`.
-   Committed artefact vs generator is unresolved.
-5. **Locale case-normalisation is two functions, not one.** `canonicalLocaleTag` (output)
-   and `localePathKey` (lookup) must not be collapsed.
-
-### 10.2 U01 dependencies that must be settled first
-
-The ten Owner architecture decisions in inventory §11, of which the four blocking ones
-are: `presentationSiteCode` fate, `siteMode` fate, content-root shape, and the
-generated-vs-committed asset boundary.
-
----
-
-## 11. Security, brand and provenance issues
-
-| Issue | Severity | Current handling |
-| --- | --- | --- |
-| Private work order could be published | high | `.gitignore` screens both candidate paths; `git ls-files` contains none; remote tree verified |
-| Machine-specific private paths in public files | medium | `verify-bootstrap.mjs` refuses them in published documents; this report uses `<UNO_ROOT>` |
-| Credential-shaped literals in the repository | medium | two self-inflicted hits removed; validator and test assemble patterns at runtime; scan now reports 0 hits |
-| Provelopment brand assets (`logo.svg`, `favicon.svg` in the entity capsule) | high | **not copied**; flagged for rights review — Apache-2.0 does not grant trademark rights |
-| Upstream product prose (EN/DE) | medium | **not copied**; provenance review required per text |
-| `modules/connect/LICENSE-CONNECT.md` is a separate licence | medium | flagged `FURTHER AUDIT`; not reused |
-| No upstream `NOTICE` exists | low | no `NOTICE` invented; no third-party rights asserted |
-| Live deployment hostname inside `deployment/spokes.json` | medium | **not copied**; the file is actively refused by the validator |
-
-### 11.1 Owner / Architect decisions still required
-
-1. Confirm the intended physical location of `workorder-active.md` (§3.2 A).
-2. Authorise an anchored `/00.foundation-uno/` rule in the parent `.gitignore` (§3.2 B).
-3. Confirm the canonical Drive documentation set is unchanged and matches inventory §11
-   (§3.2 C).
-4. Rule on the four blocking architecture decisions in §10.2 before U01 writes any code.
-5. Confirm the rights position for brand assets, upstream prose and the Connect module
-   before any of them is copied.
-
----
-
-## 12. Cleanup and final state
-
-| Item | State |
+| Item | Result |
 | --- | --- |
-| Task-owned `.temp/` scratch | **removed** — `<UNO_ROOT>/.temp/` held only this task's evidence copies and the WSL helper script |
-| Test fixtures | removed by the suite's own `after()` hook; verified absent |
-| Retained material | the Owner-installed `workorder-active.md` (Owner-controlled, ignored, untracked) |
-| `git status --porcelain` | clean apart from the intentionally ignored work order and `.temp/` |
-| Tracked files | 10 after this report commit (nine scaffold files plus this report) |
-| Worktrees | 1 |
-| Remotes | 1 (`origin` → the Uno repository) |
-| Foundation references | unchanged (§3.1) |
-| Repository settings | untouched since creation |
+| Task-owned scratch | `.temp/` used only; the staging helper and WSL verification script were deleted after use |
+| Retained scratch | none |
+| `.temp/` contents at hand-off | only disposable files, all Git-ignored |
+| Working checkouts | exactly **one** Uno checkout, one worktree; no second clone, fork, branch or nested repository |
+| Uno working tree | clean after the code commit |
+| Parent repository | not pushed; Owner-owned Agency edit preserved |
+| U01 / merge / release / deploy | **none performed** |
 
----
+## 11. Remaining Owner architecture decisions
 
-## 13. Limitations and next task recommendation
+These are unresolved by design and were **not** decided by inference. U01 cannot begin until
+the Owner accepts them (inventory §11):
 
-### 13.1 Limitations — stated plainly
+1. `presentationSiteCode` fate — alias, per-binding selector, or removed.
+2. `siteMode: open | closed` fate — kept, collapsed, or deleted.
+3. Locale set — one, two, or configurable.
+4. Content-root shape — EFS-style tree or a flatter Uno-owned shape.
+5. Generated-vs-committed asset boundary.
+6. Connect dependency — external pin, minimal vendored path, or none.
+7. Analytics — provider-neutral interface or none.
+8. Dependency/version pinning versus upstream's exact pins.
+9. `src/core` breadth — which audited domain primitives are actually needed.
+10. Test strategy — port upstream suites or write a fresh minimal suite.
 
-- This repository contains **no Uno runtime**. There is no Next.js app, no `src/`, no
-  `package.json`, no build, no dev server, no release and no deployment. The green CI
-  proves a governance scaffold, not website behaviour.
-- The canonical Drive documentation was **not read** (§3.2 C).
-- Upstream Foundation CI was **not executed**; no claim is made that it is green.
-- The local template is **not** at `main` and is dirty (§2.2); all content claims are
-  against committed objects at `fa599973`.
-- WSL validation used Node **v26.13.0**; Node 24 was validated on Windows natively and in
-  hosted CI on both runners.
-- Runner image internals were not audited; only observed job conclusions are reported.
-- No GitHub secret-scanning alert state was inspected beyond the staged-content scan in
-  §4.1.
+Also open for the Owner: whether to push the local parent commit to the parent's remote. This
+run deliberately left it local.
 
-### 13.2 Recommendation
+## 12. Acceptance matrix
 
-**Next task: U01 — first extraction slice**, scoped by inventory §7 and tested by
-inventory §8, and **only after** the decisions in §11.1 are resolved.
+| Contract | Mark | Evidence |
+| --- | --- | --- |
+| Existing real-root and all 15 original U00 bootstrap tests | `PASS` | 15 original assertions unchanged; 19/19 green on both local hosts and both CI jobs (§5, §6, §7) |
+| New local SOP and three planning slots | `PASS` | Four files created, all validated in fixtures and in the real root (§4) |
+| Missing SOP refused in its own test | `PASS` | Dedicated refusal test with its own diagnostic (§6) |
+| Missing planning file refused in its own test | `PASS` | Dedicated refusal test naming `plan-roadmap.md` (§6) |
+| `.gitignore` ignoring all of WIP refused | `PASS` | Dedicated refusal test; validator also refuses the pattern in the real root (§6) |
+| Extra WIP file/subdirectory refused | `PASS` | Dedicated refusal test plus inventory guard (§6) |
+| Owner ACTIVE ignored, three plans tracked | `PASS` | Verified by real `git ls-files`, `check-ignore` and `ls-files --error-unmatch` (§4.1) |
+| Alternate root order / wrong R03 path | `PASS` | No root-level order exists; canonical R03 verified by hash. §2A was the one authorised exception to the earlier missing-guard stop (§1, §3) |
+| Parent guard effective from the parent root | `PASS` | `.gitignore:138`, exit 0, `??` entry gone; local commit recorded (§3.5) |
+| `origin` only Uno, one worktree, clean final tree | `PASS` | Single remote and single worktree; clean tree after commit (§2, §10) |
+| Foundation source/template unmodified by this agent | `PASS` | Template HEAD, branch and dirty count unchanged; `main` still `fa599973…` (§4.2, §8) |
+| Parent changed only by the isolated `.gitignore` rule | `PASS` | One line, one commit, no push; Agency hunk byte-identical and uncommitted (§3) |
+| Actual Uno website / Next build / TypeScript / browser | `NOT APPLICABLE` | No application exists at U00; never reported as passing (§5.3) |
+| Canonical Drive documents read and reconciled | `UNVERIFIED` | No Drive connector in this environment (§9) |
 
-This recommendation is **not** an implementation authorisation. U01 begins only under a
-new Owner-issued work order, and it must repeat the preflight: verify the source pin, the
-root, the remotes and the reference integrity before writing a single file.
+## 13. Outcome
 
-No merge, no release and no deployment was performed or is proposed. The work stops here
-for independent Chief Master Architect review.
+**`COMPLETE`.**
+
+The parent guard that blocked R02 is now installed and verified from the parent's own root
+ignore file, with a preserved, unpushed, single-rule local commit. The Uno repository at
+`1ae2899…` was preserved and corrected with a four-slot WIP discipline, a self-contained
+local implementation SOP, a strengthened `AGENTS.md`, a corrected public-versus-upstream
+inventory clarification, and a validator plus test suite that enforces all of it on both
+hosts.
+
+Nothing was merged, released or deployed; U01 was not started; the private order was never
+staged or published; the Foundation reference, the parent beyond the one authorised rule, and
+every sibling repository are intact.
