@@ -1,297 +1,385 @@
-# Foundation Uno — U00 Execution Report
+# UNO-WO-002 / R01 — READ-ONLY WIP INVENTORY
 
-**Order:** `UNO-WO-001` · **Edition:** `R03`
-**Architect disposition applied:** `REVISE` — narrowly scoped documentation alignment
+**Order:** `UNO-WO-002` · **Edition:** `R01` · **Type:** read-only audit (AUDIT ONLY)
 **Execution date:** 2026-11-15
-**Execution role:** Implementation Agent
-**Review role:** Chief Master Architect (read-only GitHub)
+**Execution role:** Foundation Uno Implementation Agent
+**Review role:** Chief Master Architect (independent evidence review)
 **Outcome:** `COMPLETE`
+
+> This is **evidence**, not source approval. It is not an implementation, a branch, a commit,
+> a product test, U00 closure, a U01 extraction pin, a release or a deployment. Every path
+> below is a **review candidate** only. Definitive KEEP / ADAPT / REWRITE / DEFER / REJECT
+> decisions belong to the Architect's consolidated review with the Owner.
+
+Paths are recorded **symbolically** — `<UNO_ROOT>`, `<FOUNDATION_REF>`, `<PARENT>`. No
+physical personal path is published here, and no private order bytes, raw source excerpt,
+diff hunk or credential is reproduced.
 
 ---
 
-## 1. Authorisation, order identity and disposition
-
-**Sanitized Owner handoff identifier:** Owner activation `UNO-WO-001 / R03` (2026-11-15),
-delegating exactly two bounded bootstrap operations — one verbatim R03 installation at the
-canonical path, and the narrow parent `.gitignore` repair with an isolated local parent
-commit.
+## 1. Authorisation and order identity
 
 | Fact | Value |
 | --- | --- |
-| Canonical order path (repo-relative) | `.documents/WIP/workorder-active.md` |
-| Edition / status | `R03`, `OWNER-ISSUED` |
-| Order size / SHA-256 | 35,150 bytes / `AE16EF8C3A5A1AB8B01FA2E341999B16F41E2BB00E0D27F049B93D4BFFF81FF5` |
-| Order modified in this pass | **no** — hash and size re-verified identical before and after |
-| Root-level alternate order | **none** |
-| Duplicate order copies | none |
-| Architect disposition this pass | `REVISE`: align three public documents to the canonical plan |
+| Order ID / edition | `UNO-WO-002 / R01` |
+| Owner activation wording | separate Owner activation naming exactly `UNO-WO-002 / R01`, AUDIT ONLY |
+| Installed order path (symbolic) | `<UNO_ROOT>/.documents/WIP/workorder-active.md` |
+| Installed order SHA-256 (observed) | `EFCE92543630DB8A6D3EA78C4A594BB675C00865C0D1EE0C9AA6838D8C51E5CC` |
+| Required SHA-256 | identical — **exact match** |
+| Order size | 18,922 bytes |
+| Order tracked / ignored | **untracked**; ignored via `.gitignore:12` |
+| Order modified by this run | **no** |
+| Root-level alternate order | **absent** |
 
-The Architect's `REVISE` reviewed head `38e59b4ce54bded7e629ee076062f2e431e9bae7`, verified
-both hosted jobs at that head, confirmed 19/19 tests per runner, and directed that the
-successful R03 implementation and the reported local parent repair be preserved. The sole
-remaining defect was a conflict between the public operating documentation and the
-canonical Uno project plan. This pass corrects **only** that conflict.
+The order was read in full (§1–§8) before any action. Its write ledger contains exactly two
+locations: the single report at `<UNO_ROOT>/.documents/Reports/execution-report.md` and
+metadata-only scratch at `<UNO_ROOT>/.temp/uno-wo-002/`. Nothing else in this run was writable.
 
-## 2. Preflight for this pass (read-only, before any write)
+## 2. Environment identity
 
-Expected starting head was `38e59b4ce54bded7e629ee076062f2e431e9bae7`; observed exactly that.
+| Role | Resolution | Integrity |
+| --- | --- | --- |
+| Uno sole working checkout | `<UNO_ROOT>` | ordinary directory chain; no reparse point, junction or symlink in any ancestor |
+| Protected Foundation reference | `<FOUNDATION_REF>` | ordinary directory chain; **distinct** physical directory from Uno; real `.git` **directory** (not a gitfile) |
+| Parent Provelopment checkout | `<PARENT>` | read-only in this run |
+| Containment | Uno is not inside the reference; the reference is not inside Uno | confirmed both directions |
+
+## 3. Preflight results
 
 | Check | Result |
 | --- | --- |
-| Physical root / ancestors | ordinary directories; no reparse point, junction or symlink anywhere in the ancestry |
-| Worktrees | exactly one checkout, exactly one worktree |
-| Branch / HEAD | `main` at `38e59b4…` — exact expected match |
-| Working tree | clean before the pass |
-| Remotes | exactly one: `origin` → the independent Uno repository |
-| Active order | `R03`, hash and size re-verified unchanged |
-| WIP directory | exactly four entries |
-| Parent guard | `.gitignore:138:/00.foundation-uno/` reported from the **parent root** → exit 0 |
-| Parent HEAD | `e17fd96…` — unchanged since R03's repair |
-| Parent `origin/main` | `1f688d6…` — unchanged; the parent commit was **not** pushed |
-| Owner Agency hunk | still present in the parent working file, uncommitted |
-| Foundation template | read-only; `main` and `origin/main` still `fa599973…`; own dirty branch preserved |
-| Canonical Drive documents | **not read** — no Drive connector (§9) |
+| Owner activation names `UNO-WO-002 / R01` | `PASS` |
+| Installed order SHA-256 matches required bytes | `PASS` — `EFCE9254…8C51E5CC` |
+| Local Uno `main` HEAD is exactly `b067b6519fab69dfc3d3e2fcb8e33884b5ff8078` | `PASS` |
+| `origin/main` at the same revision | `PASS` |
+| Exactly one remote, being Uno only | `PASS` |
+| Exactly one Uno worktree | `PASS` |
+| Uno worktree clean before the run | `PASS` |
+| No root-level alternate ACTIVE, no duplicate report | `PASS` |
+| Parent anchored `/00.foundation-uno/` guard, **from the parent's own root** | `PASS` — `.gitignore:138`, exit 0 |
+| Parent guard not treated as a nested-file false positive | `PASS` — rule read from the parent root file |
+| Parent working content still carries the Owner's separate agency entry | `PASS` — uncommitted, untouched |
+| Foundation is a separate valid Git working tree with no linkage to Uno | `PASS` |
+| Reference dirty state treated as **expected**, never repaired | `PASS` |
+| Read operations run with optional locks disabled and fsmonitor/untracked-cache off | `PASS` |
+| No task ledger competing with the four WIP slots | `PASS` |
 
-## 3. The `REVISE` correction actually applied
+Public `AGENTS.md`, the local SOP, the private order, the report slot and the four WIP file
+names were read as the order requires. Foundation was **not** edited, staged, reset, cleaned,
+fetched, built, tested or formatted.
 
-Three public documents were corrected. Nothing else was touched.
-
-### 3.1 `.documents/WIP/plan-roadmap.md` — canonical sequence restored
-
-| Stage | Corrected title and scope |
-| --- | --- |
-| U00 | Safe foundation, independent repository and extraction contract |
-| U01 | Independent codebase and reliable baseline, extracted from Foundation's Next.js / TypeScript source |
-| U02 | Remove Hub/Spoke domain and establish single-Entity authority, including zero/two-Entity refusal |
-| U03 | Public routing, content and metadata parity — canonical addresses, Page/locale behaviour and visibility |
-| U04 | One owner, one presentation shell — assets, responsive navigation and accessibility |
-| U05 | Retain appropriate website functionality — safe contact and explicitly approved integrations |
-| U06 | Clean-room setup, upgrade and distribution |
-| U07 | Full independent review and Owner-controlled first release |
-
-The two conflicting assignments were **removed**: contact is no longer placed in U04, and
-general hardening is no longer placed in U05.
-
-**U00 was restructured** to separate evidence from requirements. Reported or locally verified
-evidence is listed as evidence and left to the Architect to verify; the remaining requirements
-are recorded as Architect `ACCEPT` at an exact commit **plus** Owner approval of the exact
-source pin **and** of the material configuration decisions left open in the source inventory.
-The file states that green tests alone do not close U00.
-
-**No claim of remote verification or a push of the parent commit appears anywhere** — the
-parent commit is recorded as local only, neither pushed nor remotely verified.
-
-### 3.2 `README.md` — seven canonical documents and correct stage boundaries
-
-- All **seven** canonical Drive documents are now listed explicitly, including
-  `SOP-IMPLEMENTATION.md`, which was previously missing.
-- **U01** is described as the independently buildable Foundation-derived source **baseline**.
-- The complete single-Entity / Spoke-domain cutover is reserved for **U02**.
-- Public routing, content and metadata parity are reserved for **U03**.
-- The README continues to state that **no usable Uno website exists yet**: no `src/`, no
-  Next.js app, no build, no dev server and no deployment.
-
-### 3.3 `AGENTS.md` — consumed exception and no inferred permission
-
-- A new section, **“One-time Owner exception — consumed”**, states that the Owner normally
-  controls physical work-order installation, and that for `UNO-WO-001 / R03` only, two
-  narrowly bounded actions were delegated: the single exact-byte order installation and the
-  narrowly bounded parent-repository repair.
-- It states plainly that the exception **has been consumed**, and that it grants no standing
-  parent writes, no further work-order installations, and **no permission to push, tag or
-  release the parent repository**.
-- The offline agent is directed to `.documents/WIP/plan-roadmap.md` as the **canonical**
-  `U00–U07` sequence, must not substitute its own stage names or re-scope a stage, and
-  **cannot infer implementation permission from any planning file** — nor from the document
-  itself, a green CI run, or the scaffold's existence.
-- Rules 3 and 5 now cross-reference the consumed exception, and the U00 description names the
-  stage correctly and lists its two outstanding approval requirements.
-
-## 4. Write ledger for this pass
-
-Starting head `38e59b4ce54bded7e629ee076062f2e431e9bae7`. One code/docs commit produced
-**3 files changed, 159 insertions, 63 deletions**.
-
-| Path | Change |
-| --- | --- |
-| `.documents/WIP/plan-roadmap.md` | `U00–U07` aligned to the canonical sequence; U00 split into evidence versus remaining requirements |
-| `README.md` | Seven canonical Drive documents listed; U01/U02/U03 boundaries corrected; “no usable website yet” retained |
-| `AGENTS.md` | Consumed one-time exception recorded; canonical roadmap mandated; no-permission-from-planning-files rule added |
-
-**Explicitly not modified in this pass:** the active work order, the local SOP
-(`.documents/SOP/sop-implementation.md`), `scripts/verify-bootstrap.mjs`,
-`tests/bootstrap.test.mjs`, `.documents/Architecture/source-inventory.md`, `LICENSE`,
-`.gitattributes`, `.github/workflows/verify-bootstrap.yml`, the parent repository, and every
-Foundation source and sibling repository.
-
-### 4.1 Four-slot discipline still enforced by real Git state
-
-| Assertion | Result |
-| --- | --- |
-| `git ls-files .documents/WIP` | exactly `plan-next.md`, `plan-outlook.md`, `plan-roadmap.md` |
-| ACTIVE order ignored / not tracked | `check-ignore -q` exit 0; `ls-files --error-unmatch` non-zero |
-| ACTIVE order staged | never |
-| Files in `.documents/WIP` on disk | exactly four entries |
-| No private file in the published tree | confirmed by tree listing |
-
-## 5. Local verification — both hosts, before the push
-
-### 5.1 Windows 11, Node v24.22.1
-
-| Command | Result |
-| --- | --- |
-| `node --check scripts/verify-bootstrap.mjs` | exit 0 |
-| `node --test tests/bootstrap.test.mjs` | **19 tests, 19 pass, 0 fail, 0 skipped, 0 todo** |
-| `node scripts/verify-bootstrap.mjs` | exit 0 — “11 required files … four-slot WIP discipline intact” |
-| `git diff --check` | exit 0 |
-| `git diff --cached --check` | exit 0 |
-
-### 5.2 WSL Ubuntu 26.04, Node v26.13.0
-
-No `node` was on `PATH` in this distro; the nvm runtime was invoked by absolute path. This is
-a **cross-major** runtime and is recorded as such — it is not a Node 24 substitute.
-
-| Command | Result |
-| --- | --- |
-| `node --check scripts/verify-bootstrap.mjs` | OK |
-| `node --test tests/bootstrap.test.mjs` | **19 tests, 19 pass, 0 fail, 0 skipped** |
-| `node scripts/verify-bootstrap.mjs` | OK — same 11-file / four-slot result |
-
-### 5.3 Failures, skips and warnings
-
-- **Test failures: 0. Skips: 0. Todos: 0.**
-- **Warnings:** none beyond the previously documented informational CRLF notices from
-  `core.autocrlf=true`, which change no content.
-- **Staged-content safety:** the staged allowlist was inspected and confirmed as exactly the
-  three intended files; a private-path scan and a credential-shaped scan over the staged diff
-  both returned clean.
-- **Not applicable, never reported as passing:** `pnpm install`, TypeScript compile, Next.js
-  build and browser checks — there is no application at U00.
-
-## 6. Hosted CI
+## 4. Foundation baseline fingerprint
 
 | Fact | Value |
 | --- | --- |
-| Workflow | `Uno Bootstrap Verify` — unmodified |
-| Code/docs commit | `c5eb4f01131b6dc9af95346b4e36a8ed4e2f723d` |
-| Run | `43700007030` |
-| `verify (windows-2025)` | **success** |
-| `verify (ubuntu-24.04)` | **success** |
-| URL | <https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43700007030> |
+| HEAD | `8789a450525d44dc8f60ea572ad84fcf64f2ace5` |
+| Branch | `feat/foundation-geo-04-legacy-retirement` |
+| Remotes | 1 |
+| Porcelain entries (before) | **5** |
+| Staged entries | **0** |
+| Tracked modified | **3** |
+| Untracked | **2** |
+| Working-tree path | verified privately as a distinct physical directory; recorded symbolically only |
+| `.git/index` last-write | 2026-11-04T03:45:08Z — predates this run and unchanged by it |
 
-Both jobs ran `node --test tests/bootstrap.test.mjs` (19/19) and
-`node scripts/verify-bootstrap.mjs` (OK, 11 files) on a checkout with no private order
-present.
+Total candidates: **5**, against a cap of 200 changed/untracked paths. Cap not approached.
 
-This report is published by one further report-only commit under the existing exception.
-Because a commit cannot contain its own SHA, the **final** commit and both job results at
-that final head are reported in the chat handoff accompanying this publication.
+### 4.1 Candidate paths, sizes and SHA-256 (sanitized; all non-secret source/tests)
 
-## 7. Parent and reference integrity
+| # | Category | Relative path | Bytes | SHA-256 (prefix) |
+| --- | --- | --- | --- | --- |
+| 1 | tracked modified | `src/app/[[...segments]]/server-composition.tsx` | 88,886 | `ABFDD3084906B2F9…` |
+| 2 | tracked modified | `tests/browser/matrix.mjs` | 508,254 | `1C3F2422F3C942BC…` |
+| 3 | tracked modified | `tests/unit/efs-context-nav-links.test.tsx` | 11,305 | `F7A9B05AEBA24C34…` |
+| 4 | untracked | `tests/architecture/efs-connect-method-icon-contract.test.ts` | 3,688 | `A1E7A3F9A664C152…` |
+| 5 | untracked | `tests/architecture/efs-shell-aside-contract.test.ts` | 4,567 | `9F03374B08E7F286…` |
 
-**The parent repository was not edited and not pushed in this pass.** It remains exactly as
-it was left by the authorised R03 repair.
+Unstaged line volume (`--numstat`, counts only, no hunks):
 
-| Fact | Value |
-| --- | --- |
-| Parent HEAD | `e17fd9601b4fc40be7af77caf4b255bd115b12b8` — unchanged |
-| Parent commit message | `chore(workspace): ignore independent Uno checkout` |
-| Parent commit contents | `.gitignore` only, one added line: `+/00.foundation-uno/` |
-| Parent `origin/main` | `1f688d6…` — unchanged; the commit is **local only** |
-| Guard effective from parent root | `.gitignore:138:/00.foundation-uno/` → exit 0 |
-| Owner `/00.foundation-agency/` hunk | preserved byte-identically, still uncommitted |
-| Foundation template | unmodified; `main` = `origin/main` = `fa599973…`; own dirty branch untouched |
-| Foundation GitHub pin | `fa599973a88ff77f6a8e012f3266c3c139b52c17` — unchanged |
-| Sibling repositories (including Solo) | untouched |
-
-The parent commit was **never pushed** and was **not** remotely verified — this report does
-not claim otherwise.
-
-## 8. Upstream pin, licence and rights
-
-| Fact | Value |
-| --- | --- |
-| Upstream pin | `provelopment/provelopment-foundation` at committed `fa599973a88ff77f6a8e012f3266c3c139b52c17` |
-| `LICENSE` | Apache-2.0, blob `d645695673349e3947e8e5ae42332d0ac3164cd7` — **unchanged** |
-| Files copied from upstream in R03 | **none** |
-
-Rights findings are unchanged and remain open: brand assets, product prose, third-party icon
-sets and the separate connect-module licence require provenance and licence review before any
-reuse. Apache-2.0 grants software rights, not trademark rights. Nothing in those categories was
-copied.
-
-## 9. Canonical Drive documentation — honestly `UNVERIFIED`
-
-The seven canonical Uno documents (`AGENTS.md`, `SOP-ARCHITECT.md`, `SOP-IMPLEMENTATION.md`,
-`README.md`, `PLAN.md`, `BLUEPRINT.md`, `WIP.md`) live in the Architect-maintained Drive folder
-and were **not read**: this environment has no Drive connector. No claim is made about their
-content, and none of it is reproduced here.
-
-This is precisely why the `REVISE` mattered: the public roadmap had drifted from the canonical
-plan. The corrected stage sequence in this pass is the one the Architect supplied in the review
-disposition, not a reconstruction from an unread source.
-
-## 10. Cleanup and containment
-
-| Item | Result |
-| --- | --- |
-| Task-owned scratch | `.temp/` used for the WSL verification script only, then removed |
-| Retained scratch | none |
-| Uno working tree after the code/docs commit | clean |
-| Checkouts | exactly one Uno checkout, one worktree; no second clone, fork, branch or nested repo |
-| U01 / merge / release / deploy | **none performed** |
-
-## 11. Remaining Owner architecture decisions
-
-Unresolved by design and not decided by inference. U01 cannot begin until the Owner accepts
-them (source inventory §11): `presentationSiteCode` fate; `siteMode` fate; locale set;
-content-root shape; generated-versus-committed asset boundary; Connect dependency; analytics;
-dependency/version pinning; `src/core` breadth; and the test strategy.
-
-U00 additionally requires Owner approval of the **exact source pin** and of these material
-configuration decisions before the stage can close.
-
-Also open for the Owner: whether to push the local parent commit to the parent's remote. Every
-R03 pass deliberately left it local.
-
-## 12. Acceptance matrix — REVISE disposition
-
-| Contract | Mark | Evidence |
+| Path | Added | Removed |
 | --- | --- | --- |
-| `U00–U07` match the canonical stage sequence exactly | `PASS` | Titles and scopes rewritten to the Architect's list (§3.1) |
-| Conflicting assignments removed (contact in U04, hardening in U05) | `PASS` | Contact now sits in U05; accessibility in U04; no general-hardening stage (§3.1) |
-| U00 distinguishes completed evidence from remaining requirements | `PASS` | Two separate tables: evidence, then three approval requirements (§3.1) |
-| No claim that the parent commit was pushed or remotely verified | `PASS` | Stated as local only in §3.1 and §7 |
-| README lists all seven canonical Drive documents incl. `SOP-IMPLEMENTATION.md` | `PASS` | Numbered list of seven (§3.2) |
-| README: U01 = buildable Foundation-derived baseline; cutover to U02; routing to U03 | `PASS` | Explicit stage boundaries (§3.2) |
-| README still states no usable Uno website exists | `PASS` | Retained and restated (§3.2) |
-| AGENTS records the one-time exception as **consumed** | `PASS` | Dedicated section (§3.3) |
-| AGENTS: no standing parent writes / no further order installs / no parent push | `PASS` | Enumerated prohibitions (§3.3) |
-| AGENTS directs offline agent to the canonical roadmap; no permission inferred from planning files | `PASS` | Read-first item 3 and current-stage section (§3.3) |
-| Active order, local SOP, validator, tests, source inventory unmodified | `PASS` | Only three files changed (§4) |
-| Parent repository not edited or pushed | `PASS` | Parent HEAD and `origin/main` unchanged (§7) |
-| Foundation and sibling repositories untouched | `PASS` | Template HEAD, branch and pin unchanged (§7) |
-| Local gates: syntax, 19/19 tests, validator, `git diff --check` | `PASS` | All exit 0 on Windows; 19/19 also on WSL (§5) |
-| Staged allowlist exactly the three intended documents; no secrets or private paths | `PASS` | Allowlist inspected; private-path and credential scans clean (§5.3) |
-| Both hosted jobs green on the code/docs commit | `PASS` | Run `43700007030`, windows + ubuntu success (§6) |
-| Both hosted jobs green at the **final** report head | see chat handoff | Reported with the final SHA after publication (§6) |
-| Canonical Drive documents read and reconciled | `UNVERIFIED` | No Drive connector (§9) |
-| Actual Uno website / Next build / TypeScript / browser | `NOT APPLICABLE` | No application at U00 (§5.3) |
+| `src/app/[[...segments]]/server-composition.tsx` | 42 | 1 |
+| `tests/browser/matrix.mjs` | 170 | 19 |
+| `tests/unit/efs-context-nav-links.test.tsx` | 6 | 0 |
 
-## 13. Outcome
+Items counted as **excluded / sensitive** without inspection: `.env*`, keys and tokens,
+`.git` object and index internals (Git metadata read only through safe read-only commands),
+credentials, customer data, personal documents, `node_modules`, `.next`, ignored caches,
+build artifacts and unknown binary or untracked documents. No such item was read, hashed or
+enumerated.
+
+## 5. Committed-object availability and lineage
+
+All three commits exist **locally**. **Nothing was fetched.** `UNAVAILABLE` does not apply.
+
+| Role | Commit | Type | Local |
+| --- | --- | --- | --- |
+| Selected reference (GEO-03), curated WIP — *not* import authority | `c05c55ea61b5347cf5032211dd0bf37f2cc5083c` | commit | available |
+| Released comparison (historical main baseline) | `fa599973a88ff77f6a8e012f3266c3c139b52c17` | commit | available |
+| Unfinished candidate (GEO-04, this dirty working tree) | `8789a450525d44dc8f60ea572ad84fcf64f2ace5` | commit | available |
+
+Proven committed relationships (read-only ancestry tests):
+
+| Relationship | Result |
+| --- | --- |
+| `fa599973` is an ancestor of `8789a450` | **yes** (rc 0) |
+| `c05c55ea` is an ancestor of `8789a450` | **yes** (rc 0) |
+| `8789a450` is an ancestor of `c05c55ea` | **no** (rc 1) |
+| merge-base of `fa599973` and `c05c55ea` | `fa599973` — GEO-03 descends from the released baseline |
+| Commits `fa599973..8789a450` | 33 |
+| Commits `c05c55ea..8789a450` | 19 |
+| Commits `8789a450..c05c55ea` | 0 |
+| Files changed `fa599973` → `8789a450` | 251 |
+
+So the working tree is **ahead of both** reference points: GEO-03 is 19 commits behind, and the
+released baseline is 33 behind. The dirty HEAD is **not** a published baseline and carries
+work that neither curated reference contains.
+
+### 5.1 Distribution of the 251 changes from the released baseline
+
+Concentrated in tests and multi-tenant deployment data: `tests/unit` 48, `deployment/spokes`
+28, `tests/fixtures` 25, `src/app` 23, `tests/browser` 17, `deployment/tests` 16,
+`src/components` 16, `deployment/efs` 15, `tests/architecture` 14, `tests/integration` 13,
+`src/core` 11, `tests/support` 9, `src/config` 6.
+
+### 5.2 Eligible-group coverage at HEAD (file counts)
+
+| Group | Files | Note |
+| --- | --- | --- |
+| `src/core/efs` | 8 | discovery, identity, locales, opening-schedule, properties, property-contract, public-facts, publication |
+| `src/core/page-document` | 1 | `src/core/page-document.ts` present |
+| `src/adapters/content` | 8 | authoring-page, authoring-source-discovery, efs-content, frontmatter, json-page, page-availability, page-link-integrity, page-sources |
+| `src/app` | 32 | includes the Spoke-bound render graph |
+| `src/components/site` | 40 | presentation shell |
+| `src/config` | 39 | includes 14 `spoke-*` / hub modules |
+| `deployment/efs` | 19 | 2 capsule directories |
+| `scripts` | 18 | |
+| `tests` | 353 | full suite size |
+
+## 6. Reviewed candidate families and relevance against the approved filters
+
+Reviewed within cap: **14 files** (limit 20), each inspected transiently at ≤60 relevant
+lines. **No raw excerpt is persisted.** Findings are paraphrased.
+
+### 6.1 Filter-by-filter result
+
+| # | Approved architectural filter | Verdict | Evidence summary |
+| --- | --- | --- | --- |
+| 1 | one-Entity EFS graph, one selected public Site, explicit source declarations | **CONFLICT / REVIEW** | Explicit declarations exist and are strong, but the graph is shaped for **many** tenants (§6.2) |
+| 2 | canonical URL and real full locale incl. `en → en-001` | **SUPPORTS** | Leaf-only localization; canonical BCP 47 case vs lowercase path key kept distinct; `en-001` documented as a valid regional key and *not* a worldwide Site identity |
+| 3 | five-level additive public/private properties with `contact.phone` | **SUPPORTS** | Typed property contract over a generic five-level cascade; string-fact keys are exactly `brand.name`, `contact.name`, `contact.email`, `contact.phone`; malformed declarations refused before serving |
+| 4 | versioned typed safe modules, all 22 targets, 17-family parity | **PARTIAL / UNVERIFIED** | Safe typed module discipline is real and framework-free; the 22-target and 17-family counts were **not** verified in this pass |
+| 5 | effective localized JSON-body-only unlisted visibility | **SUPPORTS** | Sitemap derives from one effective binding; only `public` is advertised; `unlisted` is served but never advertised; visibility is carried by the **representation's source**, not the Page |
+| 6 | neutral rights-safe authored/generated assets | **REVIEW** | Assets exist and are SVG, but provenance of the icon library and brand marks is **not** established here |
+| 7 | provider-disabled-by-default; Connect reuse needs separate Uno rights | **REVIEW / BLOCKER** | Analytics dependency is present; Connect is a separately licensed private module (§7) |
+
+### 6.2 The one-Entity conflict, stated precisely
+
+The local WIP is architecturally **multi-tenant**, not single-Entity. Three independent
+observations:
+
+1. `src/core/spoke/model.ts` defines **four** containers that are deliberately not collapsed —
+   a Spoke Hub coordinating Spokes, a Spoke as a domain boundary, a Site Hub as an internal
+   grouping (type `Hub`), and a Site as Foundation's own context — plus a `legacy` / `explicit`
+   declaration switch.
+2. `src/core/spoke/` carries 13 modules including hostname resolution, hub membership, site
+   ownership, coherence and collection logic; `src/config/` carries 14 further `spoke-*` / hub
+   modules.
+3. `src/app/[[...segments]]/server-composition.tsx` binds the whole server render graph to an
+   explicit `SpokeRuntimeContext` selected per request at the boundary.
+
+This is exactly the surface **U02** must remove. It is also why U01 must be treated as a
+baseline stage and not as a hidden cutover: importing this tree as-is would import the
+Hub/Spoke domain.
+
+### 6.3 Single-Site and publication shape
+
+`publication.ts` is favourable and worth preserving conceptually: a public URL is built from a
+binding's **authored public base**, never from an EntityID, SiteID, inherited website/contact
+URL, `site.url`, source directory or hostname inference. A binding selects one Facet and a
+declared set of eligible Sites, with whole-segment prefix claims that fail closed on duplicate,
+ambiguous, nested or unclaimed routes. A `closed` / `open` Site mode exists — this is the
+`siteMode` decision item and it is **live code**, not a stub.
+
+### 6.4 Deployment fixture shape (classification only)
+
+| Signal | Value |
+| --- | --- |
+| `deployment/efs/manifest.json` top-level keys | `entities`, `publications` |
+| Entities declared | **8** |
+| `deployment/spokes.json` keys | `spokes`, `inspectionSpoke`, `inspectionHosts` |
+| Spokes declared | **8** |
+| Capsule directories present | **2** (`…0001` foundation, `…0002` germany) |
+
+Eight declared tenants against two materialised capsules. The authored fixture is
+multi-tenant; the content on disk covers two. Relevant to U02's zero/two-Entity refusal, and a
+reason not to adopt the fixture shape wholesale.
+
+### 6.5 Locale and page-document findings worth carrying forward
+
+- Locale resolution order is explicit-only: a valid explicit locale wins exactly; otherwise a
+  valid visitor cookie, then a supported `Accept-Language` preference, then the declared
+  default. **No** geo-IP, location or Site-name inference, and no synthesized, extended,
+  truncated or inferred locale.
+- Publication **qualification** is deliberately separate from tag **syntax** — a valid tag can
+  still be unfit to name a published representation, and the module never repairs one into
+  qualification. A missing translation yields a truthful temporary redirect to the real
+  representation or a 404 — never a phantom `hreflang`, canonical tag or content-language.
+- The declarative page document is data-only: no JavaScript, expressions, imports, JSX,
+  author-supplied component names, `eval`, event handlers, raw HTML, `style`, class names,
+  pixel values or unclassified URLs; one schema; an **undeclared property is refused, not
+  ignored**, so a typo fails the build naming the file.
+- The JSON page reader reads `<content-root>/pages/json/<locale>/<route-path>.json`, treats
+  nothing as optional except `description`, distinguishes syntax from schema errors, is pure,
+  and never renders, resolves a locale or touches the filesystem.
+
+### 6.6 The five dirty candidates
+
+| # | Path | What it appears to be | Note |
+| --- | --- | --- | --- |
+| 1 | `src/app/[[...segments]]/server-composition.tsx` | Spoke-context render graph; the modification moves composition facts off module-global state onto the rendering context | Touches the **U02 removal surface**; +42/−1 |
+| 2 | `tests/browser/matrix.mjs` | Large browser matrix suite | +170/−19; the exact delta was **not** reconstructed (raw hunks prohibited) |
+| 3 | `tests/unit/efs-context-nav-links.test.tsx` | Unit test for context nav links | +6/−0 |
+| 4 | `tests/architecture/efs-connect-method-icon-contract.test.ts` | New **source-shape** contract test reading `src/` text and asserting on exported function bodies | Untracked; asserts source text, does not import the module |
+| 5 | `tests/architecture/efs-shell-aside-contract.test.ts` | New source-shape contract test of the same style | Untracked |
+
+Candidates 4 and 5 are notable as *technique*: they read source files as text from the process
+working directory and assert on function bodies. Such tests are brittle against refactors and
+would need re-basing under Uno's own layout — a review decision, not an adoption recommendation.
+
+## 7. Rights, licence and dependency blockers
+
+| Item | Finding |
+| --- | --- |
+| Repository licence | Foundation carries an Apache-2.0 `LICENSE`; Apache-2.0 grants **software** rights, not trademark rights |
+| Connect module | `modules/connect/LICENSE-CONNECT.md` is an explicit **separate licence record**, not the repository licence. Source is carried from the private `provelopment-module-connect` at a pinned release and commit, as a 49-file subtree verified by a local script |
+| Consequence | Connect source cannot be reused in Uno on the repository notice alone; **separately negotiated Uno rights are required**. This is a blocker, not a formality |
+| Brand assets | `favicon.svg` / `logo.svg` per capsule are brand marks; neutrality is **not** established |
+| Icon library | A large SVG icon set under a per-Spoke content assets tree; provenance and licence status **UNVERIFIED** |
+| Product prose | Authored page content exists per capsule and locale; reuse requires a provenance review |
+| Analytics | `@vercel/analytics` is a declared runtime dependency — a provider decision that conflicts with a strict provider-disabled-by-default stance unless deliberately approved |
+| Runtime dependencies | `next 16.4.2`, `react` / `react-dom 19.2.9`, `zod 4.6.7`, `marked`, `sanitize-html`, `@vercel/analytics` — 7 runtime, 11 dev. Pinning policy remains an Owner decision |
+
+## 8. Historical evidence — labelled `HISTORICAL`, not re-run
+
+This audit ran **no** tests, builds, typecheck, lint or browser suite, and therefore makes **no**
+claim about current green or red status.
+
+| Evidence | Status |
+| --- | --- |
+| GEO-04 prior browser / validation red | `HISTORICAL` — asserted by the order and prior reports; **not independently verified** in this pass |
+| Released baseline `fa599973` was the published main line | `HISTORICAL` |
+| `tests` tree contains 353 files at HEAD | `VERIFIED` — tree listing only, not executed |
+
+## 9. Before/after no-write check on the protected reference
+
+Taken at the end of the audit and compared with the preflight baseline. **No source, index or
+history object was touched to obtain either reading.**
+
+| Signal | Before | After | Match |
+| --- | --- | --- | --- |
+| HEAD | `8789a450…64f2ace5` | `8789a450…64f2ace5` | **yes** |
+| Branch | `feat/foundation-geo-04-legacy-retirement` | same | **yes** |
+| Porcelain entries | 5 | 5 | **yes** |
+| Staged | 0 | 0 | **yes** |
+| `src/app/[[...segments]]/server-composition.tsx` | `ABFDD3084906B2F9…` | `ABFDD3084906B2F9…` | **yes** |
+| `tests/browser/matrix.mjs` | `1C3F2422F3C942BC…` | `1C3F2422F3C942BC…` | **yes** |
+| `tests/unit/efs-context-nav-links.test.tsx` | `F7A9B05AEBA24C34…` | `F7A9B05AEBA24C34…` | **yes** |
+| `tests/architecture/efs-connect-method-icon-contract.test.ts` | `A1E7A3F9A664C152…` | `A1E7A3F9A664C152…` | **yes** |
+| `tests/architecture/efs-shell-aside-contract.test.ts` | `9F03374B08E7F286…` | `9F03374B08E7F286…` | **yes** |
+| `.git/index` last-write | 2026-11-04T03:45:08Z | same | **yes** |
+
+**Result: `PASS`.** The Foundation reference is byte-preserved and status-identical. Its dirty
+state was observed, never repaired.
+
+## 10. Acceptance matrix
+
+| Requirement | Mark | Evidence |
+| --- | --- | --- |
+| Physical root and junction confinement, Uno and reference distinct | `PASS` | No reparse point in either ancestry; distinct toplevels and git-dirs; real `.git` directory (§2) |
+| Owner order identity and handoff | `PASS` | SHA-256 exact match to the required bytes; untracked and ignored; unmodified (§1) |
+| Uno HEAD / origin / worktree identity | `PASS` | `b067b65…` on `main`, one remote, one worktree, clean (§3) |
+| Parent guard recorded from the parent's own root | `PASS` | `.gitignore:138`, not a nested-file false positive (§3) |
+| Reference read-only integrity | `PASS` | Before/after identical, index mtime unchanged (§9) |
+| Candidate cap and coverage | `PASS` | 5 of 200 paths; 14 of 20 reviewed files; ≤60 lines each (§4, §6) |
+| Secret and privacy redaction | `PASS` | No secret read, hashed or enumerated; no raw excerpt, diff hunk or physical path persisted (§4, §6) |
+| Committed object availability for all three SHAs | `PASS` | All present locally; nothing fetched (§5) |
+| Source / blob hash evidence | `PASS` | Five file SHA-256 values plus sizes, stable across the run (§4.1, §9) |
+| Rights and dependency evidence | `PASS` | Separate Connect licence record identified as a blocker; dependency set recorded (§7) |
+| No external writes | `PASS` | No GitHub, provider, package-manager or deployment operation (§12) |
+| Scratch cleanup | `PASS` | `.temp/uno-wo-002/` removed; only task-owned metadata existed (§11) |
+| Prohibited mutations (source, index, history, parent, siblings) | `PASS` | Nothing staged, committed, pushed, reset, cleaned or fetched anywhere |
+| Product tests / build / runtime proof | `NOT APPLICABLE` | Read-only inventory; explicitly out of scope |
+
+## 11. Scratch and report disposition
+
+| Item | Disposition |
+| --- | --- |
+| `.temp/uno-wo-002/inventory.json` | metadata only (order hash, HEADs, counts, hash prefixes); **removed at the end of the run** |
+| `.temp/uno-wo-002/` directory | **removed** |
+| `.documents/Reports/execution-report.md` | overwritten **once** with this sanitized report |
+| Report Git state | **modified, not staged, not committed, not pushed** — an authorised known local modification for the next separately issued order |
+
+Per the order, the report is deliberately **not** published: no commit, no push, and the
+standing report-only push exception was **not** invoked.
+
+## 12. Boundaries honoured
+
+No checkout, switch, reset, clean, add, stage, commit, tag, push, hook, patch, install,
+typecheck, lint, unit test, browser test, build, serve, generator, formatter, package manager or
+fetch ran anywhere. No script from the protected tree was executed. No source was copied into
+Uno. No GitHub, credential, provider, release or deployment operation occurred. The parent and
+every sibling repository were read-only. U00 was not closed and U01 was not begun.
+
+## 13. Review candidates for the Architect — no disposition assigned
+
+Offered as evidence only, in the order the Architect may wish to examine them:
+
+1. **`src/core/efs/property-contract.ts` + `properties.ts`** — the five-level cascade and
+   `contact.phone` string-fact contract. Directly matches filter 3.
+2. **`src/core/efs/locales.ts`** — leaf-only localization, canonical-vs-path key split,
+   `en-001` semantics, no inference. Matches filter 2.
+3. **`src/core/efs/publication.ts`** — explicit bindings and the `closed` / `open` Site mode.
+   Matches filters 1 and 2; carries the live `siteMode` decision.
+4. **`src/core/efs/discovery.ts`** — sitemap-from-one-binding, `public` vs `unlisted`, and
+   per-representation visibility. Matches filter 5.
+5. **`src/core/page-document.ts` + `src/adapters/content/json-page.ts`** — data-only page
+   document and its validated reader. Matches filters 4 and 5.
+6. **`src/adapters/content/page-availability.ts`, `page-sources.ts`, `page-link-integrity.ts`**
+   — identified but **not** body-reviewed within the cap; content `UNVERIFIED`.
+7. **`src/core/spoke/**` and the 14 `spoke-*` config modules** — the surface U02 must remove.
+   Listed for **scoping**, not for adoption.
+8. **`tests/architecture/` source-shape contract tests** — technique noted; re-basing needed.
+
+## 14. Unresolved risks and unknowns
+
+| # | Risk / unknown | Mark |
+| --- | --- | --- |
+| 1 | The 22 safe-module targets and 17-family parity were **not** enumerated; filter 4 is only partially evidenced | `UNVERIFIED` |
+| 2 | Asset provenance (brand marks, icon library, prose) is not established; rights review outstanding | `UNVERIFIED` |
+| 3 | Connect reuse requires separately negotiated Uno rights — an Owner decision, not an engineering one | `BLOCKER` |
+| 4 | The exact content delta of `tests/browser/matrix.mjs` (+170/−19) and the other dirty files was not reconstructed, because raw hunks are prohibited | `UNVERIFIED` (by design) |
+| 5 | 8 declared entities / 8 spokes against 2 materialised capsules leaves the fixture's intended topology ambiguous | `REVIEW` |
+| 6 | No green or red status is claimed for anything; GEO-04's red state is historical only | `HISTORICAL` |
+| 7 | `page-availability.ts`, `page-sources.ts`, `page-link-integrity.ts`, `efs-content.ts` and other eligible files were listed but not body-reviewed | `UNVERIFIED` |
+| 8 | Files excluded as sensitive or as caches were counted, never opened, so their content is unknown by intent | `NOT APPLICABLE` |
+| 9 | Canonical Drive documents were not consulted in this run — no Drive connector exists in this environment | `UNVERIFIED` |
+
+## 15. Outcome
 
 **`COMPLETE`.**
 
-The `REVISE` defect is corrected. The public roadmap now carries the canonical `U00–U07`
-sequence with the conflicting assignments removed; U00 separates reported evidence from its
-three remaining approval requirements and claims nothing about a parent push. The README lists
-all seven canonical documents and draws the U01/U02/U03 boundaries correctly while continuing
-to state that no usable website exists. `AGENTS.md` records the one-time Owner exception as
-consumed, forbids any standing parent write or further order installation, and blocks an
-offline agent from inferring work from a planning file.
+A bounded, reproducible, non-destructive inventory of the protected Foundation WIP checkout was
+produced: physical identity, branch/HEAD/status, five sanitized candidates with sizes and
+SHA-256, all three committed-object relationships proven from local objects, narrowly reviewed
+non-secret families mapped against the seven approved architectural filters, rights and
+dependency blockers, and a before/after no-write proof showing the reference is byte-preserved.
 
-The previously accepted implementation — the four-slot WIP discipline, the local SOP, the
-validator and its 19 passing tests, the source inventory, the parent guard and its local
-commit — is preserved untouched. Nothing was merged, released or deployed, U01 was not
-started, the private order was never staged or published, and the parent, Foundation and every
-sibling repository remain intact.
+The dominant finding is that the local WIP is **multi-tenant by construction** — four Hub/Spoke
+containers, 13 Spoke core modules, 14 Spoke config modules and a Spoke-bound render graph — which
+is precisely the U02 removal surface, and the reason this tree cannot be adopted as a U01
+baseline wholesale.
+
+**No disposition is assigned. This report does not close U00, does not authorise U01, and does
+not constitute acceptance.** The Architect's consolidated evidence review, and a separately
+Owner-installed and activated U01 order after that, come next.
