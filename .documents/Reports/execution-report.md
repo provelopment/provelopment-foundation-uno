@@ -5,7 +5,7 @@
 **Execution role:** Foundation Uno Implementation Agent
 **Independent review:** Chief Master Architect — everything below is agent-reported until reproduced
 **Owner authority:** explicit activation naming `UNO-WO-004 / R02`, closing `U00` and approving the restricted U01 source/toolchain scope
-**Local outcome:** `COMPLETE` · **Hosted CI at the product commit:** verified in the report-only follow-up commit
+**Local outcome:** `COMPLETE` · **Hosted CI at the product commit:** verified — both workflows passed on both hosts (see §13)
 
 > Evidence only. This is not Architect `ACCEPT`, does not close `U01`, and authorises no
 > release or deployment. `U02–U07` are untouched.
@@ -211,7 +211,7 @@ non-indexable; unknown paths return an ordinary 404 with no implicit Site or loc
 | (e) minimal dependency lock plus reproducible install | `PASS` locally; hosted reproduction pending |
 | (f) real Next production build and noindex HTTP checks locally | `PASS` |
 | (g) positive/refusal and strict architecture tests | `PASS` — 19 + 9 + 19 |
-| (h) Windows **and** Ubuntu Node 24 bootstrap and U01 workflows at the final SHA | recorded in the report-only follow-up commit |
+| (h) Windows **and** Ubuntu Node 24 bootstrap and U01 workflows at the final SHA | `PASS` at `cc01b183a54f926c592767874a95f83b3255347c` — both workflows, both hosts |
 | (i) final report, public commits, no ACTIVE/secret/asset/provider leakage | `PASS` locally; independent verification pending |
 
 ## 12. Status
@@ -220,3 +220,23 @@ non-indexable; unknown paths return an ordinary 404 with no implicit Site or loc
 SHAs and the public URLs are recorded in the single report-only follow-up commit authorised
 by this order. `U01` remains **OPEN**. Architect review and Owner stage closure are required;
 an agent `COMPLETE` is not an `ACCEPT`.
+## 13. Hosted CI at the product commit `cc01b183a54f926c592767874a95f83b3255347c`
+
+Both workflows were triggered naturally by the permitted push and both completed `success`
+on both hosts at exactly that commit:
+
+| Workflow | Run | Hosts | Steps |
+| --- | --- | --- | --- |
+| `Uno Bootstrap Verify` (existing, unchanged) | `43728296399` — https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43728296399 | `ubuntu-24.04` success, `windows-2025` success | checkout, Node 24, bootstrap tests, scaffold validation — all `success` |
+| `Verify U01 baseline` (new) | `43728296358` — https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43728296358 | `ubuntu-24.04` success, `windows-2025` success | pnpm 11.6.0, Node 24, tool versions, frozen install, bootstrap gate, architecture, lint, typecheck, unit tests, production build — all `success` |
+
+**Evidence basis.** Run conclusions and **per-step conclusions** were read from the GitHub
+Actions API at that exact commit, so each named check is individually observed rather than
+inferred from an overall badge. Job **log text** could not be downloaded: the logs endpoint
+returns HTTP 403 without an authenticated token, and no credential may be introduced for
+this run. Log-level readback is therefore `UNVERIFIED`; the step-level results above are
+observed. No check was rerun, skipped, loosened or bypassed.
+
+This report-only commit is pushed within the same work order. The two workflows must pass
+again at the new report-only head; that result is confirmed in the completion handoff and is
+**not** asserted here in advance.
