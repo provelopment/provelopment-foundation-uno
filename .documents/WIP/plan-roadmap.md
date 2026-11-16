@@ -60,7 +60,9 @@ genuinely buildable baseline with real tests, and a recorded dependency set.
 
 ### U02 — Remove Hub/Spoke domain and establish single-Entity authority
 
-**State: IN PROGRESS — single-Entity authored graph declared, validated and tested.**
+**State: CLOSED — closed by the Owner's explicit activation of `UNO-WO-019 / R01`, after the
+independent acceptance of `UNO-WO-018 / R01`.** The closure record is the Owner's, not the
+Implementation Agent's: no self-acceptance is claimed here.
 
 Scope: remove the Hub/Spoke domain model and establish Uno's single-Entity authority,
 including explicit refusal of a **zero-Entity** and a **two-Entity** configuration.
@@ -69,13 +71,30 @@ Spoke-owned publication identity and multi-publisher ownership are removed here.
 **Exit gate:** one Entity is the only admissible topology, with refusal tests proving that
 zero and two Entities are rejected.
 
+**Established at closure:** one Entity (`e_7a3knkx60eacyhca7a0cr1k6e1`) as the only admissible
+cardinality; an optional typed five-level property contract (`brand.name`, `contact.name`,
+`contact.email`, `contact.phone`) with deterministic nearest-ancestor inheritance, explicit `null`
+suppression and exact-code refusals; and one explicit, non-serving selected-Site declaration
+(`foundation` / `main`) validated against the manifest with no array-first fallback. No Hub, Spoke,
+second Entity, host binding or publisher authority exists in the authored graph.
+
 ### U03 — Public routing, content and metadata parity
 
-Not started. Blocked on U02 exit, and on the Owner's accepted route schema.
+**State: IN PROGRESS — the Owner has explicitly accepted the first pure canonical candidate-address
+schema (`UNO-WO-019 / R01` §3). Nothing is served, published, indexed or redirected.**
 
 Scope: public routing, content and metadata parity — canonical addresses, an optional base
 path, Page and locale behaviour, and visibility. `canonicalLocaleTag` remains distinct from
 `localePathKey`.
+
+**Completed checkpoint:** a pure candidate-address index and byte-exact matcher
+(`src/core/efs/uno-route-address.ts`) for the selected Site only — `/<lowercase-full-locale>` for the
+reserved Home declaration, `/<lowercase-full-locale>/<relative-route>` otherwise, with exact-path
+matching and closed refusals. The live `/` page and every existing 404 are unchanged.
+
+**Still outstanding:** physical source confinement and reading, document parsing, per-Page visibility
+and publication controls, safe HTTP integration and error behaviour, metadata/SEO including canonical
+advertising and `hreflang`, and any optional base path. Each requires a later bounded Owner order.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct
 visibility behaviour.

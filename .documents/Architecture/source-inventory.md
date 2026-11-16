@@ -1081,3 +1081,60 @@ unchanged by this order.
 architecture boundaries 16/16 with both new pure paths on the exact allowlist, plus the full unchanged
 U01 gate set (HTTP 103, readiness fixtures 66, readiness 100, brand/copy 29, security 16, Vitest unit
 suite, build, lint and audit).
+
+## U03 canonical candidate-address adoption (UNO-WO-019 / R01)
+
+**Scope.** One pure, Uno-owned candidate-address contract: the index of addresses the one selected
+Site *could* eventually serve, and a byte-exact matcher over that index. It prepares public routing and
+**serves nothing**. The Owner separately closed U02 and opened U03 by explicit activation; this
+section records only the code and its provenance.
+
+**Source anchor and provenance.** `src/core/efs/uno-route-address.ts` is **NEW UNO-OWNED** code. It
+imports only Uno's own pure contracts — `validateUnoManifestGraph`, `validateUnoSiteSelection`,
+`localePathKey`, `canonicalLocaleTag`, `localeTagIssue`, `pageRoutePath` and `HOME_CONTENT_SLUG` — and
+no Foundation, Solo, Node built-in, framework, adapter or content-parsing source. The Foundation
+repository remains a read-only reference from earlier stages; no upstream byte runs here.
+
+**Schema (Owner-approved in `UNO-WO-019 / R01` §3).** One Entity `e_7a3knkx60eacyhca7a0cr1k6e1` and the
+one explicitly selected Site from `deployment/uno.config.json` (`foundation` / `main`). The authored
+full language-and-region locale stays the identity; the **path key** is that whole locale lowercased
+through `localePathKey`. `localePathKey` and `canonicalLocaleTag` are deliberately different values for
+different purposes: the former is URL spelling only (`de-de`), the latter is the authored spelling kept
+for future metadata (`de-DE`). No short-language mapping, implicit fallback, host binding, Site prefix
+or Facet segment is added.
+
+**Home rule.** The reserved declaration `id: "home"` with route `["home"]` proposes
+`/<locale-path-key>` (currently `/en-001`) and suppresses the literal `home` segment; no
+`/en-001/home` alias exists. Any other Page proposes `/<locale-path-key>/<relative-route>`, e.g.
+`/de-de/offers/web-design`, with at most four relative segments (`pageRoutePath`), a locale path key of
+at most 64 characters and a whole pathname bounded to 240 ASCII characters.
+
+**Matching and purity.** Exact string equality only: one leading slash, lowercase content-slug
+segments, no query, fragment, percent escape, backslash, scheme, doubled or trailing slash, and no
+visitor IP, cookie, `Accept-Language`, geolocation or inferred locale. Candidate order is a code-point
+comparator, never locale collation. Every accepted result is freshly copied and deeply frozen; caller
+data is never mutated; hostile manifest, selection or pathname input is refused without reading
+properties or echoing values.
+
+**Closed refusals.** `route:manifest-invalid`, `route:selection-invalid`, `route:invalid-pathname`,
+`route:unmatched`, `route:unreadable` and `route:duplicate-address`, plus three narrowly justified
+literals (`route:invalid-route`, `route:invalid-locale`, `route:pathname-too-long`). Four of these are
+defensive guards that no *validated* input can reach, because the graph refuses the underlying defect
+first (duplicate Page route, duplicate locale key, malformed route, non-canonical locale, or an
+over-long derived path); the tests prove those earlier exact refusals instead of asserting an
+unreachable candidate.
+
+**Non-publication boundary.** No `src/app` file imports this module; no App Router segment, middleware,
+rewrite, redirect, metadata alternate, sitemap or `robots.txt` endpoint is created; the live `/` page,
+its professional copy, the black emblem, the favicon, the CSS, Analytics and `noindex, nofollow,
+nocache` are unchanged; and `/en-001`, `/en`, `/en-001/home`, `/robots.txt`, `/sitemap.xml` and every
+other non-existent path keep their existing 404 responses.
+
+**Deferred (not part of this increment).** Physical source confinement and reading, document parsing,
+per-Page visibility and publication controls, safe HTTP integration and error behaviour, metadata/SEO
+including canonical advertising and `hreflang`, and any optional base path. A candidate address in this
+index is never publication authority.
+
+**Evidence.** 61 focused cases in `tests/unit/efs-uno-route-address.test.ts` (49 of them refusal cases),
+the exact kernel list in `tests/architecture/u01-boundaries.test.mjs` extended by this one pure path,
+and the unchanged U01 gates including `pnpm test:http` at 103 checks with its six 404 refusals.
