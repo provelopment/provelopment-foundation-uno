@@ -1,203 +1,162 @@
-# UNO-WO-013 / R01 — U02 authored EFS graph, committed Home source, closed validator
+# UNO-WO-014 / R01 — Node 26, dependency audit and the one approved analytics integration
 
-**Order:** `UNO-WO-013 / R01` · FINAL — EXECUTE (Owner-activated) · **Executed:** 2026-11-16
-**Workstream:** U02 — single-Entity EFS authority; authoring topology only
-**Result:** **COMPLETE for this order's scope** — a real committed graph, a real committed Markdown
-source, and executable refusal validation. This is **not** a route, a public Site, a release or a
-deployment.
-**Stages:** the Owner **closed U01** (formal stages **1 / 8 → 2 / 8**) and **opened U02**. U02 is **IN
-PROGRESS**; U03–U07 not started. Formal closure is recorded by the Architect from the Owner's direct
-authority, never by this report.
-**Scorecard:** earned milestone score stands at **24.00%**; the Owner separately reports the English
-demo live, but there is **no URL or independent live check in the GitHub record**, so the separate
-**0.50 pp** live-verification credit remains **unearned**. The U02 **1.25-point** first authored-graph
-milestone may only be recorded after independent acceptance of this report — nothing is claimed here.
-**Provider:** **zero** Vercel actions by the Agent. No CLI, login, API, project, setting, credential,
-deployment or URL was touched or invented.
+**Order:** `UNO-WO-014 / R01` · FINAL — EXECUTE (Owner-activated) · **Executed:** 2026-11-16
+**Stage:** U01 **CLOSED**, **U02 OPEN** (this order is a production-hardening correction inside U02; it
+does not close U02 and adds no route, locale or publication).
+**Result:** Node 26 qualification, a blocking high/critical audit gate and the official Vercel Analytics
+source integration are **committed and green on both hosts**. The provider-side runtime and dashboard
+facts are **UNVERIFIED**, because no Vercel read tool was reachable from this session.
+**Provider write actions by the Agent: ZERO.** No project setting, Analytics toggle, redeploy, promotion,
+alias, secret, domain or protection change was made, and no provider credential was read or stored.
 
-## 1. Lineage, ledger and authorization facts
+## 1. Findings matrix
+
+| Fact | Status | Evidence |
+| --- | --- | --- |
+| `NODE26_PACKAGE_CI_VERIFIED` | **PASS** | `engines.node: "26.x"`, `@types/node` `26.6.6`, both workflows set Node 26 then **assert** it in-job; that step is `success` on ubuntu-24.04 and windows-2025 at `32e16c9`; local gates ran on Node **v26.13.1** |
+| `VERCEL_NODE26_RUNTIME_VERIFIED` | **UNVERIFIED** | The Vercel MCP server was not connected this session (`No connection found for server: mcpVercel`), so no post-correction build log could be read. A pushed revision is not provider-runtime proof |
+| `VERCEL_OLD_NODE_WARNING` | **UNVERIFIED** | Only the pre-correction deployment `dpl_A3Y5V5znUxAcd1H6wZEZXpPMTR7a` was ever observed warning twice that `engines.node: 24.x` overrode the project's `26.x` choice. The new build's log must confirm it is gone |
+| `SECURITY_AUDIT_HIGH_CRITICAL` | **ZERO** | `pnpm audit` full graph: high 0, critical 0, moderate 1 (dev-only, §4); `pnpm audit --prod`: **0**; blocking CI gate `pnpm audit --audit-level high` exits 0 |
+| `ANALYTICS_SOURCE_INTEGRATION` | **PASS** | `@vercel/analytics@2.0.1` (MIT) direct dependency; one `@vercel/analytics/next` import and one `<Analytics />` render inside `<body>`; build green with 3 static pages; 16 security-floor cases and 51 readiness fixtures assert the placement and refuse every deviation |
+| `VERCEL_WEB_ANALYTICS_DASHBOARD_ENABLED` | **UNVERIFIED** | No provider read access. Owner action: Uno project → Analytics → Enable |
+| `ANALYTICS_LIVE_EVENTS` | **UNVERIFIED** | No visitor requests were made to manufacture metrics, and no analytics read was available |
+| `VERCEL_RECOMMENDATION_1..3` | **UNVERIFIED ×3** | Project metadata and build-event feeds were unreachable, so the three labels cannot be quoted. Owner dashboard text or a screenshot is required |
+| `GIT_AUTODEPLOY_EFFECT` | **UNVERIFIED** | Two `main` pushes were made under explicit consent (`65d97f2 → 32e16c9`, then this report). Which deployment serves production, at which SHA, could not be read |
+| `PROVIDER_WRITE_ACTIONS_BY_AGENT` | **ZERO** | No write tool invoked; the only permitted side effect is the Git-linked build caused by the authorized pushes |
+| `STAGE` | U01 CLOSED, U02 **OPEN** | No U02 closure, no new locale, no route, no publication |
+
+## 2. Lineage and the twelve-path ledger
 
 | Item | Value |
 | --- | --- |
-| Active order | `UNO-WO-013 / R01`, 25,432 bytes, SHA-256 `f977c78a55584225fa1c881b6f4baa78f283fd32c2eb55c158de3292ecd5e527` (identity only; the private body is not reproduced) |
-| Required start / product parent | `db46a090490f4829ed92d4721526a5158ffdcd9f` — verified equal to `origin/main` before writing |
-| **Product commit** | **`ac0d674037d5be0159c4b2637361b4a68fc0fa63`** — seven ledger paths, direct child of the start |
-| **Report commit** | the report-only child of the product commit; its SHA is in the Owner handback because a report cannot contain its own commit |
+| Active order | `UNO-WO-014 / R01`, 24,561 bytes, SHA-256 `8f7e11927711a888cbb95e6de17ec1eab750b987c230ff1c39f132a2baf38734` (identity only; the private body is not reproduced) |
+| Required start / product parent | `65d97f296e1be7ee8e1eb4b088f4b197e0a39a9d` — verified equal to `origin/main` before writing |
+| **Product commit** | **`32e16c90e20656d0d8a33c8c7f0f94b5a47447e6`** — twelve ledger paths, direct child of the start |
+| **Report commit** | the report-only child of the product commit; its SHA is in the Owner handback, because a report cannot contain its own commit |
 
-Owner authorization, as verified non-secret facts: **U01 closure = YES**; **U02 opening = YES**;
-**approved stale-roadmap reconciliation = YES** (routing, locale serving and metadata → U03;
-presentation plus module/family parity → U04); **approved exact manifest schema = YES**; **approved
-demo EntityID `e_7a3knkx60eacyhca7a0cr1k6e1` = YES**; **automated Vercel deployment from `main`
-disabled for this order = YES**. The Agent made no provider call to verify that last fact and did not
-attempt to.
+Owner authorizations, verified as non-secret facts: **Node 26 migration = YES**; **dependency security
+audit = YES**; **`@vercel/analytics` 2.0.1 source integration = YES**;
+**`AUTHORIZE_GIT_PUSH_TRIGGERED_PRODUCTION_DEPLOYMENTS=YES`** for exactly the two commits of this order;
+**read-only Vercel inspection of the named Uno project = YES**; **provider writes = NO**.
 
-| # | Path | Op | Purpose |
+| # | Path | Op | Blob at product head |
 | --- | --- | --- | --- |
-| 1 | `deployment/efs/manifest.json` | CREATE | One demo authored topology in the exact closed schema |
-| 2 | `deployment/efs/content/home.en-001.md` | CREATE | Original English Home authoring source (not served) |
-| 3 | `src/core/efs/manifest-graph.ts` | CREATE | Pure, fail-closed graph validator |
-| 4 | `tests/unit/efs-manifest-graph.test.ts` | CREATE | 62 acceptance, refusal and hostile-input cases |
-| 5 | `tests/architecture/u01-boundaries.test.mjs` | EDIT | Added `src/core/efs/manifest-graph.ts` to `CORE_AUTHORED_FILES` only |
-| 6 | `.documents/WIP/plan-roadmap.md` | EDIT | Owner-authorized U01 closure, U02 IN PROGRESS, stale sentence reconciled |
-| 7 | `.documents/Architecture/source-inventory.md` | EDIT | One U02 adoption note with the four pinned upstream blobs |
+| 1 | `package.json` | EDIT | `1ef27f69d7adbb99b355bd65deef219988c9f377` (1,129 B) |
+| 2 | `pnpm-lock.yaml` | EDIT | regenerated with pinned pnpm 11.6.0 |
+| 3 | `.github/workflows/verify-bootstrap.yml` | EDIT | Node 26 + blocking runtime assertion |
+| 4 | `.github/workflows/verify-u01.yml` | EDIT | `10f8811dcf0c0e54940456b205660925d51f2cb5` (4,344 B) |
+| 5 | `src/app/layout.tsx` | EDIT | `a71737a4aa3c143e6a09731dd263831b05f7acaa` (1,904 B) |
+| 6 | `tests/architecture/u01-boundaries.test.mjs` | EDIT | narrow allowlist + negatives; Node 26 expectation |
+| 7 | `scripts/verify-vercel-readiness.mjs` | EDIT | Node 26 + analytics + workflow gates — **80 checks** |
+| 8 | `tests/deployment/verify-vercel-readiness.test.mjs` | EDIT | Node 26 fixtures + analytics negatives — **51 tests** |
+| 9 | `scripts/verify-u01-http.mjs` | EDIT | **57** loopback assertions, six 404 refusals |
+| 10 | `.documents/Deployment/vercel-manual-handoff.md` | EDIT | Node 26, pnpm 11 observed, auto-deploy and Analytics split |
+| 11 | `.documents/Architecture/source-inventory.md` | EDIT | one `UNO-WO-014 / R01` adoption note |
+| 12 | `tests/deployment/node26-security-floor.test.mjs` | CREATE | `4df7910bae6a243d285d3f3f18fca45570261044` (12,426 B), **16 cases** |
 
-Unchanged and re-verified by Git blob at the product commit: `src/app/page.tsx`
-`7b7c883b3d3c92edfbfefd1f0614a192ed1814fc`, `src/app/layout.tsx`
-`012f28c58ebdfb0bdda48cf7c80d147d1ff5ab98`, `src/app/globals.css`, `src/app/not-found.tsx`,
-`scripts/verify-u01-http.mjs` `6c9f4b1ab191c5883a8216389ff5f595ba87ca55`, `src/core/efs/identity.ts`
-`7e6f8e0a4f0b9ba7b90f66c44205ff67befb7d20`, `src/core/efs/uno-locales.ts`
-`d4ac7a72d09647564a4f40d2632d2eb958f1fe5f`, `src/core/page-content.ts`
-`de80f6129c61ec00ced1b71ba0ac9e2e616d819a`, `src/core/page-route-path.ts`
-`4a39d98a8c2380a9d772ff5f12119546350cecfe`, `src/core/page-authoring-policy.ts`,
-`src/application/resolve-declared-page-source.ts`, `package.json`, `pnpm-lock.yaml`, `next.config.ts`,
-`tsconfig.json`, `.gitignore`, `.vercelignore`, both workflows, `AGENTS.md`, `README.md` and the local
-SOP. No `deployment/uno.config.json`, no `deployment/site.config.json`, no `public/**`, no new script or
-workflow.
+Unchanged by blob at the product head: `src/app/page.tsx` `7b7c883b…`, `src/app/globals.css`,
+`src/app/not-found.tsx`, `deployment/efs/manifest.json` `b077520f…`,
+`deployment/efs/content/home.en-001.md` `1b062fb3…`, `src/core/efs/manifest-graph.ts` `753709ee…`,
+`tests/unit/efs-manifest-graph.test.ts` `805d1191…`, `src/core/**`, `src/application/**`,
+`scripts/verify-governance-docs.mjs`, `tests/governance-docs.test.mjs`, `AGENTS.md`, `README.md`, the
+local SOP, `tsconfig.json`, `next.config.ts`, `eslint.config.mjs`, `.gitignore`, `.vercelignore`. The
+frozen-bytes governance verifier passed before and after the edit — the authoritative proof for the
+frozen documents. No `vercel.json`, no `deployment/uno.config.json`, no third workflow, no new route.
 
-**Privacy:** the private ACTIVE is untracked and ignored; no `.env`, token, credential or personal
-detail exists in the tree or in this report; nothing outside this repository was written.
-
-## 2. What was actually committed
-
-**Manifest** — `deployment/efs/manifest.json`, Git blob `b077520f0a05e2e8da54f8d8be02a15660011993`
-(767 bytes). Its complete authored shape:
-
-```text
-entities[1]
-  └─ id: e_7a3knkx60eacyhca7a0cr1k6e1        (Owner-approved demo EntityID)
-     facets[1]
-       └─ id: "foundation"
-          sites[1]
-            └─ id: "main"
-               pages[1]
-                 └─ id: "home", route: ["home"]
-                    representations[1]
-                      └─ locale: "en-001"
-                         sources[1]
-                           └─ kind: "markdown",
-                              path: "deployment/efs/content/home.en-001.md"
-```
-
-Source ownership is explicit and single: one authored Entity owns one Facet, which owns one Site, which
-owns one Page, which owns one `en-001` representation, which declares exactly one candidate — the
-Markdown file named above. There is no second owner, no publication binding, no host, no base path, no
-selected public Site and no locale beyond `en-001`.
-
-**Source content** — `deployment/efs/content/home.en-001.md`, Git blob
-`1b062fb36a7ed7efab2d40b0b9a91371167497d4` (2,085 bytes). Original English prose describing the
-one-Entity direction, what exists today, what is planned, and what the file is **not**. No raw HTML, no
-image, no URL, no tracking, no contact promise, no publication claim and no metadata block granting
-visibility. It is not a copy of the JSX page and is not served by any route.
-
-**Validator** — `src/core/efs/manifest-graph.ts`, Git blob
-`753709ee8d586a0073540dd52bc74b753b8a8cfc` (20,734 bytes).
-
-- `validateUnoManifestGraph(input: unknown)` returns `{ accepted: true, graph }` — a deep-cloned,
-  deeply frozen graph — or `{ accepted: false, reason }` with **no partial graph**.
-- Exported types: `UnoManifestGraph`, `UnoManifestEntity`, `UnoManifestFacet`, `UnoManifestSite`,
-  `UnoManifestPage`, `UnoManifestRepresentation`, `UnoManifestSource`, `UnoManifestSourceKind`,
-  `UnoManifestRefusal`, `UnoManifestValidationResult`.
-- Exported data: `REFUSAL_REASONS` (25 closed literals), `MANIFEST_CONTENT_ROOT` (`deployment/efs/content/`),
-  `MANIFEST_GRAPH_LIMITS` (1 Entity; 8 Facets; 8 Sites; 64 Pages; 16 representations; 2 candidates;
-  4 route segments; 240-character path; 512 total candidates).
-- Reuses Uno's own contracts — `isEntityId`, `isContentSlug`, `HOME_CONTENT_SLUG`, `pageRoutePath`,
-  `localeTagIssue`, `canonicalLocaleTag` — and adds no alternative regex spelling of any of them.
-- Purity: no `fs`, `process`, environment, clock, network, adapter, Next.js, React or Node built-in; no
-  import of the JSON manifest or the Markdown source; importing the module executes nothing.
-
-**Tests** — `tests/unit/efs-manifest-graph.test.ts`, Git blob
-`805d11912ea96afcd4afff82bd643a5daa102066` (21,889 bytes), 62 named cases in eight groups:
-committed graph (4), entity cardinality (5), closed shape at every level (12), identifiers (6),
-authoring routes (9), authored locales (4), declared source candidates (12), hostile and oversized input
-(10).
-
-## 3. Refusal semantics, proven rather than asserted
-
-Every refusal is one closed literal, so a diagnostic can never echo an authored value, a path or a
-caller message. Categories and the exact assertions that prove them:
-
-| Category | Refused examples (each asserted by exact code) |
-| --- | --- |
-| Cardinality | zero Entities, two Entities (`entity:cardinality`) |
-| Shape | missing/extra fields at root, facet, site, page, representation and source; empty facets, pages, representations and sources; a non-array children collection; a non-object node; a `null` root |
-| Unsupported field | `properties`, `visibility`, `published`, `public`, `publicSite`, `publication`, `publications`, `spokeId`, `spokes`, `host`, `basePath`, `aliases`, per-source `state` |
-| Identity | `b_` prefix, upper-cased EntityID, `Foundation` facet slug, duplicate facet/site/page ids |
-| Route | non-array, empty, five segments, smuggled separator, `..`, duplicate route under distinct ids, `home` id away from `["home"]`, `["home"]` claimed by another id — and the positive distinct nested `offers/home` |
-| Locale | bare `en`, `EN-001`, `en_001`, duplicate locale in one page |
-| Source | unknown kind, kind/suffix mismatch, traversal, absolute path, backslash, query, hidden segment, percent-encoding, duplicate kind, duplicate path across the manifest, three candidates |
-| Hostile input | accessor (getter invoked **0** times), symbol key, hostile prototype, throwing `ownKeys` trap with no message leakage, oversized facet list, non-mutation, determinism, deep freeze, no publication/host/URL authority in the result, closed-vocabulary check |
-
-The two positive controls that stop this from being an always-refusing scanner: the committed manifest
-validates, and a graph with an additional nested `offers/home` page plus a declared JSON candidate
-validates.
-
-## 4. Local gates (Windows, Node v24.22.1, pnpm 11.6.0, Next.js 16.4.2)
+## 3. Local gates (Node v26.13.1, pnpm 11.6.0, Next.js 16.4.2)
 
 | Gate | Result |
 | --- | --- |
-| `pnpm install --frozen-lockfile --ignore-scripts` | PASS — up to date, exit 0 |
-| `node --test tests/governance-docs.test.mjs` | PASS — **6 / 6** |
-| `node scripts/verify-governance-docs.mjs` | PASS — frozen bytes match |
-| `pnpm test:bootstrap` | PASS — **19 / 19** |
-| `pnpm test:architecture` (with the added core file) | PASS — **12 / 12** |
-| `pnpm lint` | PASS — exit 0, no findings |
-| `pnpm typecheck` | PASS — exit 0 |
-| `pnpm test` | PASS — **229 / 229** in 8 files (167 prior + **62 new**) |
-| `pnpm build` | PASS — exit 0, **3 static pages**, unchanged routes |
-| `pnpm test:http` | PASS — **51 passed, 0 failed** over real loopback HTTP |
-| `node --test tests/deployment/verify-vercel-readiness.test.mjs` | PASS — **44 / 44** |
-| `node scripts/verify-vercel-readiness.mjs` | PASS — **70 checks, 0 failed**, `VERCEL_NOT_DEPLOYED_BY_AGENT` |
+| `pnpm install --frozen-lockfile --ignore-scripts` | PASS — exit 0, 30 s |
+| Governance verifier + `tests/governance-docs.test.mjs` | PASS — frozen bytes; **6 / 6** |
+| `tests/bootstrap.test.mjs` + verifier | PASS — **19 / 19** |
+| `pnpm test:architecture` | PASS — **16 / 16** (was 12) |
+| `pnpm lint` | PASS — exit 0 |
+| `pnpm typecheck` | PASS — exit 0, `@types/node` 26.6.6 |
+| `pnpm test` (Vitest) | PASS — **229 / 229** in 8 files, unchanged count |
+| `pnpm build` | PASS — exit 0, **3 static pages** |
+| `pnpm test:http` | PASS — **57 / 57** (was 51), six 404 refusals |
+| Readiness fixtures | PASS — **51 / 51** (was 44) |
+| Readiness CLI | PASS — **80 checks, 0 failed** (was 70) |
+| `tests/deployment/node26-security-floor.test.mjs` | PASS — **16 / 16**, six synthetic negatives |
+| `pnpm audit --audit-level high` | PASS — exit 0, zero high/critical |
 
-Nothing was skipped, softened or made tolerant of failure; no test was deleted to accommodate the new
-code, and the architecture scanner now covers the new core file rather than exempting it.
+Nothing was skipped, softened or bypassed. The new security-floor gate refuses a Node 24 engine, a
+drifted analytics pin, a Node-24 workflow, a `|| true` bypass, a sub-floor resolution and a duplicated
+render — each by its own named assertion, so an always-green scanner cannot pass it.
 
-## 5. Exact-head hosted evidence
+## 4. Dependency audit — exact results
 
-**Product head `ac0d674037d5be0159c4b2637361b4a68fc0fa63`** — four jobs, all green:
+| Invocation | Exit | Result |
+| --- | --- | --- |
+| `pnpm audit --json` (full graph) | 1 (any-severity exit) | info 0 · low 0 · **moderate 1** · high **0** · critical **0** |
+| `pnpm audit --prod --json` | 0 | **0 vulnerabilities** |
+| `pnpm audit --audit-level high` (the CI gate) | **0** | 1 moderate reported, no high/critical, step passes without suppression |
 
-| Workflow | Run | ubuntu-24.04 | windows-2025 | Steps / non-success |
+The single moderate finding, classified rather than ignored:
+
+- **GHSA-g3hv-75wg-m249** (advisory `1244623`), `minimatch@10.2.6`, range `>=7.0.0 <11.0.1`, patched
+  `>=11.0.1`. Title: denial of service via glob-parts amplification.
+- **Scope:** development only. Its full path is
+  `eslint-config-next → eslint-import-resolver-typescript / eslint-plugin-import → @typescript-eslint/* → minimatch`.
+  It is not in the production graph, not in the Next.js build output and not reachable from the served
+  page, which has no user-supplied glob input.
+- **Patch feasibility:** the only fix is `minimatch@11`, a major bump forced upward through
+  `@typescript-eslint`, which is not a direct Uno dependency. An override would be a wider, unproven
+  change than this ledger permits, so it is **not** applied here; it is proposed as a separate bounded
+  dependency-refresh order once the upstream toolchain ships a compatible range.
+
+## 5. Warning and recommendation assessment
+
+| Warning class | Assessment | Action taken |
+| --- | --- | --- |
+| Vercel `engines.node` overrides the project Node version (observed twice in the pre-correction log) | **Real, and a genuine provider-vs-source mismatch.** One warning repeated once per build phase, not two vulnerabilities | Fixed at source: `engines.node` is now `26.x` and agrees with the project setting. Post-correction log confirmation is **UNVERIFIED** (no provider read) |
+| Historical CI pnpm v10 shim-layout notice | Runner/toolchain housekeeping, **not** a production vulnerability | Gone by construction: every workflow now installs pnpm 11.6.0 via the pinned action and Node 26; no such notice appeared in local runs |
+| "Missing Next build cache" | Provider cache miss, **not** a defect and not security relevant | No action; caching is a provider setting the Agent may not change |
+| Windows Node `DEP0190` deprecation in earlier runner output | Runtime deprecation notice from the CI image, **not** proven production risk | Not observed locally on Node 26; hosted log text is **UNVERIFIED** (403 to this client) |
+| Three Owner-reported Vercel recommendations | **UNVERIFIED** — the project read endpoint and build-event feed were unreachable this session, so their labels cannot be quoted or classified | Recorded as `REC_01..03 = UNVERIFIED — Owner dashboard text/screenshot required`. Any recommendation that needs a project-setting change is an Owner action |
+
+No warning above is claimed as cured, and none is silently downgraded.
+
+## 6. Provider evidence — what could and could not be read
+
+- **Reads attempted:** the Vercel MCP server for the named project, team and deployments.
+- **Result:** `No connection found for server: mcpVercel` — the server was not connected in this session,
+  so **no** project metadata, deployment, build event, log line, domain or recommendation was observed by
+  the Agent for this order.
+- **Consequence:** `VERCEL_NODE26_RUNTIME_VERIFIED`, `VERCEL_OLD_NODE_WARNING`,
+  `VERCEL_WEB_ANALYTICS_DASHBOARD_ENABLED`, `ANALYTICS_LIVE_EVENTS`, `GIT_AUTODEPLOY_EFFECT` and all three
+  recommendations are **UNVERIFIED**. CI success alone is not used as a provider-runtime claim.
+- **What is known from the order's own pinned evidence** (pre-correction, quoted only as such): the
+  project `prj_cdVYLTxxVR5dwnthFyVRgNOcdaGu` in team `team_Zf6yEXTnzNd5KsklCp5FtKRu` served
+  `dpl_A3Y5V5znUxAcd1H6wZEZXpPMTR7a` at `65d97f2`, `READY`, production, and its build log installed
+  `pnpm v11.6.0`, built Next 16.4.2 and produced three static pages while warning about the Node mismatch.
+
+## 7. Exact-head hosted evidence
+
+| Head | Workflow | ubuntu-24.04 | windows-2025 | Steps / non-success |
 | --- | --- | --- | --- | --- |
-| Uno Bootstrap Verify | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43833524306 | success | success | 9 / **0** each |
-| Verify U01 baseline | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43833524104 | success | success | 20 / **0** each |
+| `32e16c9` (product) | Uno Bootstrap Verify `43840530391` | success | success | 10 / **0** each |
+| `32e16c9` (product) | Verify U01 baseline `43840530416` | success | success | 23 / **0** each |
 
-On Ubuntu the steps `Unit tests`, `Run production HTTP (English demonstration)`,
-`Deployment readiness fixtures (offline, in-memory)` and
-`Deployment readiness (offline; VERCEL_NOT_DEPLOYED_BY_AGENT)` are individually observed `success`, so
-the new 62-case suite really ran on a hosted host — not only locally. The final report-only head repeats
-both workflows on both hosts; its four run identities and eight job conclusions are stated in the Owner
-handback. **Job log text is `UNVERIFIED`**: the logs endpoint returned 403 to this client, so no log line
-is quoted and only job/step conclusions are claimed as PASS.
+On Ubuntu the steps `Assert Node 26 runtime`, `Node 26 and dependency security floors`,
+`Dependency audit (high and critical must be zero)`, `Unit tests`, the production HTTP run and both
+readiness steps are individually `success`; the same jobs are `success` on Windows. The report-only head
+repeats all four jobs and its identities are stated in the Owner handback. **Job log text remains
+`UNVERIFIED`** (403 to this client); only job and step conclusions are claimed.
 
-## 6. What this deliberately did not do
+## 8. Remaining obligations and request
 
-- **No route, no serving, no reader.** The Home Markdown is a declared source only; nothing parses or
-  renders it, and `src/app/**` is byte-identical.
-- **No public Site selection.** One Site exists in the authoring graph; selecting which Site is public is
-  a later `deployment/uno.config.json` decision and no such file exists.
-- **No new locale.** `en-001` is the only authored locale; `/en`, `/en-001`, `/about`, `/robots.txt` and
-  `/sitemap.xml` still return real 404s.
-- **No provider action of any kind.** No Vercel CLI, login, API, project, inspection, setting, domain,
-  protection change, credential, deployment or URL. The Owner's reported live demo is recorded as an
-  **Owner statement only**: the GitHub record contains no URL and no independent live observation, so
-  this report asserts no live status.
-- **No release, tag, branch merge, force push or stage closure.** No package, lockfile, workflow, Next
-  config, governance file or planning slot beyond the one authorized roadmap correction was changed.
+- **Owner:** enable Uno project → Analytics if you want collection (`VERCEL_WEB_ANALYTICS_...`), and read
+  the new production build log to confirm effective Node 26 and that the mismatch warning is gone. Provide
+  the three recommendation labels if you want them classified.
+- **U02 (still open):** the additive typed `properties` vocabulary and the selected public Site in
+  `deployment/uno.config.json`; U03 owns readers, confinement, locale routing and publication.
+- **Proposed:** a separate bounded dependency-refresh order for `minimatch@11` once the ESLint toolchain
+  supports it — no override is smuggled in here.
 
-## 7. Remaining obligations (not this order)
-
-- **U02 (still open):** the additive typed `properties` vocabulary, once the Owner approves exact fields,
-  and the separately configured selected public Site in `deployment/uno.config.json`. This first manifest
-  has no `properties` field by design, and any undeclared property is refused rather than ignored.
-- **U03:** real path confinement and readers, Markdown/JSON parsing, locale routing, page visibility and
-  SEO metadata parity, and the publication decision.
-- **U04:** the presentation shell and the 22 capability/17 family parity work.
-- **U05–U07:** unchanged in scope and dependency order.
-
-## 8. Requested decision
-
-Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`** on this exact bounded U02
-order: seven product paths, a real committed graph and Markdown source, a pure closed validator with
-proven refusals, 62 new cases, all existing gates intact, and both hosts green at the product head.
-
-This report does not self-accept, does not close U02, does not claim the U02 milestone score and does not
-assert any provider state.
+Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`** on this bounded order:
+twelve product paths, Node 26 and its blocking runtime assertion on both hosts, a zero high/critical
+audit with one honestly classified dev-only moderate, one narrowly allowlisted analytics integration,
+the visitor page and EFS graph untouched, and every provider fact that could not be read marked
+`UNVERIFIED` rather than guessed.
