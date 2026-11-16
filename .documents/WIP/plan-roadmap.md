@@ -26,38 +26,41 @@ longer a remaining stage and its requirements are not restated here.
 
 ### U01 — Independent codebase and reliable baseline
 
-**State: IN PROGRESS — bounded technical baseline. NOT accepted, and NOT U01 completion.**
+**State: CLOSED by explicit Owner activation (formal stage 2 of 8).**
 
 The Owner closed `U00` by explicit activation and authorised the bounded U01 sequence.
-Delivered so far: a real App Router runtime with a non-indexable technical placeholder at `/`;
-one pure `src/core/efs/identity.ts` copied verbatim from GEO-03
-`c05c55ea61b5347cf5032211dd0bf37f2cc5083c`; an adapted pure authoring kernel
-(`src/core/page-content.ts`, `src/core/page-route-path.ts`); a new Uno-owned locale policy
-(`src/core/efs/uno-locales.ts`) requiring an authored language **and region** with explicit
-short-language mappings only; an Uno-only exact dependency lock; focused unit and
+Delivered: a real App Router runtime with a non-indexable technical placeholder at `/`, later
+replaced by the accepted English informational demonstration; one pure `src/core/efs/identity.ts`
+copied verbatim from GEO-03 `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`; an adapted pure
+authoring kernel (`src/core/page-content.ts`, `src/core/page-route-path.ts`); a new Uno-owned
+locale policy (`src/core/efs/uno-locales.ts`) requiring an authored language **and region** with
+explicit short-language mappings only; an Uno-only exact dependency lock; focused unit and
 architecture-refusal tests; a loopback production HTTP proof; a source-adoption ledger with a
 17-row section matrix and 22 capability contracts; and two-host CI beside the unchanged U00
 workflow.
 
-Still outstanding for U01: full module parity with the Foundation Page composer, real public
-routing/locale behaviour, and independent stage-exit review. **U01 stays OPEN** until the
-Architect's `ACCEPT` and an explicit Owner stage decision.
-
-
+**Stage-exit correction (Owner-authorized, `UNO-WO-013 / R01`).** The exit gate below — an
+accepted extraction ledger naming every path, a genuinely buildable baseline with real tests,
+and a recorded dependency set — was met and independently reviewed, so U01 now closes there.
+An earlier sentence in this file listed "full module parity with the Foundation Page composer"
+and "real public routing/locale behaviour" as unfinished U01 work. That was inconsistent with
+the stage assignment in this same roadmap and is corrected here: **routing, locale serving,
+content reading and metadata parity belong to U03**, and **presentation shell plus module and
+family parity belong to U04**. Neither is a U01 obligation.
 
 Scope: extract a **buildable, testable Foundation-derived Next.js / TypeScript source
 baseline** into this independent repository against the Owner-approved source pin, and
 establish that the independent codebase builds and its baseline checks pass.
 
-U01 is a **baseline** stage. It does **not** remove the Hub/Spoke domain, and it does
-**not** deliver public routing or metadata parity — those belong to U02 and U03.
+U01 is a **baseline** stage. It does **not** remove the Hub/Spoke domain — that belongs to U02 —
+and it does **not** deliver public routing, locale serving or metadata parity, which belong to U03.
 
 **Exit gate:** an accepted extraction ledger naming every path before any source moves, a
 genuinely buildable baseline with real tests, and a recorded dependency set.
 
 ### U02 — Remove Hub/Spoke domain and establish single-Entity authority
 
-Not started. Blocked on U01 exit.
+**State: IN PROGRESS — single-Entity authored graph declared, validated and tested.**
 
 Scope: remove the Hub/Spoke domain model and establish Uno's single-Entity authority,
 including explicit refusal of a **zero-Entity** and a **two-Entity** configuration.
@@ -114,7 +117,6 @@ Not started. Blocked on U06 exit.
 Scope: a full independent review, followed by the Owner-controlled first release.
 
 **Exit gate:** the independent review is closed and the Owner authorises the first release.
-
 
 ---
 

@@ -1,0 +1,34 @@
+{
+  "entities": [
+    {
+      "id": "e_7a3knkx60eacyhca7a0cr1k6e1",
+      "facets": [
+        {
+          "id": "foundation",
+          "sites": [
+            {
+              "id": "main",
+              "pages": [
+                {
+                  "id": "home",
+                  "route": ["home"],
+                  "representations": [
+                    {
+                      "locale": "en-001",
+                      "sources": [
+                        {
+                          "kind": "markdown",
+                          "path": "deployment/efs/content/home.en-001.md"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

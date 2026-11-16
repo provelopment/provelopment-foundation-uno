@@ -873,3 +873,34 @@ configuration, not an access-protection state and not a live site. Provider-spec
 EFS Home Page, not an EFS Site publication, and not evidence that the 22 modules render or the 17
 capability families have been migrated; `/en`, `/en-001`, `/about`, `/robots.txt` and `/sitemap.xml`
 remain 404 by design, and the pre-publication `noindex, nofollow` policy is unchanged.
+
+## U02 authored graph adoption (UNO-WO-013 / R01)
+
+**Upstream reference (read-only committed blobs only, GEO-03 `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`).**
+Each pin was re-read at that commit before writing; all four blob IDs and byte counts matched.
+
+| Pinned path | Git blob | Bytes | Decision |
+| --- | --- | ---: | --- |
+| `deployment/efs/manifest.json` | `074736c2578eda1abc3df8df02752158a4f5f938` | 11,607 | **ADAPT topology idea only.** Its two Entities, `publications`, Spoke bindings, hosts and geo fields are rejected |
+| `src/config/efs/manifest.ts` | `e4f578fd4be3c393483f851867f605e5d216cb64` | 24,124 | **REWRITE** as an original pure Uno graph validator; no upstream filesystem or Hub/Spoke logic is imported |
+| `src/core/efs/publication.ts` | `cc451462ded0ded1f3394c2fcbbd73e420e9a14f` | 25,840 | **DEFER** — the binding/provider/host/alias address model is not adopted |
+| `src/core/page-document.ts` | `a12d964c43626c6313a621bf628f5cc24b65d444` | 45,106 | **DEFER** — the full document schema and section rendering belong to a later stage |
+
+**New on-repo material (authoring only).** `deployment/efs/manifest.json` declares exactly one
+demo Entity (`e_7a3knkx60eacyhca7a0cr1k6e1`) → one Facet (`foundation`) → one Site (`main`) → one
+Home Page (`home`, route `["home"]`) → one `en-001` representation → one Markdown candidate
+(`deployment/efs/content/home.en-001.md`, real committed English source). `src/core/efs/manifest-graph.ts`
+is the closed, fail-closed validator: `validateUnoManifestGraph(input: unknown)` returns a deep-cloned,
+deeply frozen graph or one reason from `REFUSAL_REASONS`; it reads only own data properties, never
+invokes a getter, and performs no file, network or process access. `tests/unit/efs-manifest-graph.test.ts`
+proves acceptance of the committed graph plus targeted refusals, and re-reads the committed Markdown.
+
+**Deliberately not introduced.** No route, public Site selection, locale route, reader, JSON parser,
+Markdown renderer or sanitiser, manifest filesystem reader, host, base path, SEO metadata, provider
+binding or release claim. `src/app/page.tsx` and the served output are unchanged, so an accepted graph
+is authorship evidence, never publication authority.
+
+**Handoffs.** U02 continues with additive typed `properties` (once an exact vocabulary is approved) and
+the separately configured selected public Site in `deployment/uno.config.json`; U03 owns path
+confinement, content readers, locale routing, visibility/SEO and the publication decision; U04 owns the
+presentation shell and module/family parity.
