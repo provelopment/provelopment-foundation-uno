@@ -1,71 +1,90 @@
-# UNO-WO-015 / R01 — approved public copy and the Uno network-one mark
+# UNO-WO-016 / R01 — official network emblem and benefits-led public copy
 
-**Order:** `UNO-WO-015 / R01` · FINAL — EXECUTE (Owner-activated) · **Executed:** 2026-11-16
-**Stage:** U01 **CLOSED**, **U02 OPEN**. This is a bounded correction of the already-deployed
-informational demo — not U02 exit, not content-route activation, not release, not SEO approval.
-**Result:** the Owner-approved visitor copy, metadata, header mark and favicon are committed; every
-local gate and both-host CI are green. Provider-side deployment state is **UNVERIFIED**, because no
-Vercel tool exists in this session.
+**Order:** `UNO-WO-016 / R01` · FINAL — EXECUTE (Owner-activated) · **Executed:** 2026-11-16
+**Stage:** U00 and U01 **CLOSED**, **U02 OPEN**. This is a bounded communications and visual-identity
+correction; it closes no stage, publishes no EFS Page, adds no route or locale and authorizes no release.
 **Provider write actions by the Agent: ZERO.** The only provider-visible effect is the Git-linked
-production build triggered by the two authorized `main` pushes.
+production build caused by the authorized `main` pushes.
 
-## 1. Status
+## 1. Deviation disclosed up front — two product commits, not one
+
+The order specifies one product commit. This run produced **two**, and the reason is recorded rather
+than smoothed over:
+
+| Commit | Result | Detail |
+| --- | --- | --- |
+| `cadddc8cf077f6598779771a6df2e9e6e56d7333` | **Windows hosted job failed** | Exactly the ten ledger paths. Ubuntu passed; on `windows-2025` the step `Brand and copy contract` failed |
+| `75e1d1e8fd4f1995abd0b20ae61052fe79c9d9d1` | **All four jobs green** | Same ten paths, three of them corrected: the verifiers now hash the **LF-canonical** vector form |
+
+**Cause.** The repository stores `public/uno-logo.svg` with LF (8,250 bytes, the pinned digest). A
+Windows checkout with `core.autocrlf` delivers the *same content* with CRLF, so a byte count and digest
+computed over the raw working file only matched on LF checkouts. The test, not the asset, was at fault.
+
+**Fix.** `scripts/verify-u01-http.mjs`, `scripts/verify-vercel-readiness.mjs` and
+`tests/deployment/uno-brand-copy.test.mjs` normalise CRLF to LF before hashing the vector. No assertion,
+threshold or path was removed or weakened, and the committed blob is unchanged. The fix was proven
+locally by converting both assets to CRLF, rebuilding and re-running all three verifiers (readiness 99,
+brand 24, HTTP 101 — all green), then restoring LF and repeating.
+
+**Consequence for release history.** The push of `cadddc8` triggered one automatic production build of a
+commit whose Windows CI job was red for a test-portability defect; its page and asset bytes were the
+approved ones, and its Linux job was green. The corrected `75e1d1e` is the head this report describes.
+The Architect may treat the two-commit shape as a scope deviation; it is reported, not hidden.
+
+## 2. Status
 
 | Fact | Status | Evidence |
 | --- | --- | --- |
-| `COPY_APPROVED_TEXT` | **PASS** | The exact copy sentences ordered by the Owner are rendered by the real production server; 95 HTTP assertions, 93 readiness checks, 59 fixtures and 17 brand/copy tests agree |
-| `RETIRED_CLAIMS_REMOVED` | **PASS** | `A1`, `P05`, "technical placeholder", "not deployed", "no live deployment", "no manifest", "only the smallest pure primitives", "not a finished website", "no publication" are absent from visible copy and each is refused by a named test |
-| `BRAND_MARK_INSTALLED` | **PASS** | `public/uno-logo.svg` and `src/app/icon.svg` are the same blob `4228d20b16585b4d8807e5e3c392c27ad4dafa0d`, 1,730 bytes, SHA-256 `19759bc29d887401dd42550304e22dc625cbd5be936f5f93d2b9fde938010162` |
-| `FAVICON_HEADER_PARITY` | **PASS** | Identical bytes on disk, identical served bodies, and an App Router `<link rel="icon" href="/icon.svg?…" type="image/svg+xml">` |
-| `DESIGN_PRESERVED` | **PASS** | No colour token changed; only three layout declarations added; the brand/copy test refuses a recoloured token |
-| `ANALYTICS_PRESERVED` | **PASS** | One `@vercel/analytics/next` import and one `<Analytics />` remain in the root layout |
-| `ROBOTS_POLICY_PRESERVED` | **PASS** | `noindex`, `nofollow`, `nocache` served; no canonical, hreflang or sitemap |
-| `LOCAL_GATES` | **PASS** | §3 |
-| `HOSTED_CI` | **PASS** | Both heads, both hosts, eight green jobs — §5 |
-| `VERCEL_DEPLOYMENT_READ_ONLY` | **UNVERIFIED** | The Vercel tools are not available in this session (`AI_NoSuchToolError`); no deployment, log or dashboard fact was read |
-| `WEB_ANALYTICS_COLLECTION` | **UNVERIFIED** | Owner-enabled per the order; collected events cannot be read by the Agent |
-| `BROWSER_RENDER_OR_AXE` | **UNVERIFIED** | No automated visual or accessibility audit was run; the SVG was checked structurally, not by screenshot |
+| `OFFICIAL_VECTOR_INSTALLED` | **PASS** | Both targets are blob `a9990629…`, 8,250 bytes, SHA-256 `de749e41347a043691b3dd82ced90a2d53f80c240993057388cdfaee20a0a568`; green `#1f6f6b` network, enlarged charcoal `#36454f` numeral, `2048` canvas |
+| `BENEFITS_COPY_PUBLISHED` | **PASS** | Page source is 9,335 bytes, SHA-256 `d86fdcf6e3d3be85b577ac4fded6e08e954f8db6f481b196df1bfe6834943876`; served HTML carries every approved sentence |
+| `TWO_ILLUSTRATIVE_EXAMPLES` | **PASS** | `Example: a community organisation` and `Example: a service provider with regional audiences`, each with three benefits and an explicit "not existing customers" note |
+| `DESIGN_PRESERVED` | **PASS** | `src/app/globals.css` blob `8d9268c4…` unchanged; palette, dark mode, breakpoints, focus and reduced-motion intact |
+| `LINT_WARNING_REMOVED` | **PASS** | `pnpm lint` exits 0 with **zero warnings**; `next/image` plus `unoptimized` replaces the `<img>` rule violation |
+| `FAVICON_HEADER_PARITY` | **PASS** | Identical bytes on disk, identical served bodies, digest matches |
+| `ANALYTICS_AND_ROBOTS` | **PASS** | One `@vercel/analytics/next` import and one `<Analytics />`; `noindex`, `nofollow`, `nocache` |
+| `LOCAL_GATES` | **PASS** | §4 |
+| `HOSTED_CI` | **PASS at the corrected head** | §6 |
+| `VERCEL_DEPLOYMENT_READ_ONLY` | **UNVERIFIED** | The Vercel tools are absent from this session; no deployment or log was read |
 | `PROVIDER_WRITE_ACTIONS_BY_AGENT` | **ZERO** | No provider write tool was called |
-| `STAGE` | U01 CLOSED, U02 **OPEN** | No stage closure, no new route, no new locale |
+| `STAGE` | U01 CLOSED, U02 **OPEN** | No stage closure, no new route or locale |
 
-## 2. Lineage and the twelve-path ledger
+## 3. Lineage and the closed ledger
 
 | Item | Value |
 | --- | --- |
-| Active order | `UNO-WO-015 / R01`, 22,388 bytes, SHA-256 `772539f6bc36aafaf7e36ef0ed5b7ea4e39d1964063c7348805e5850e957cc0b` (identity only; the private body is not reproduced) |
-| Required start / product parent | `a3f46031d94f01cf23821aa1625fcdbb1a34c7af` — verified equal to `origin/main` before writing |
-| **Product commit** | **`65494abff45569a8934687e71f884ef2269ba8a9`** — twelve ledger paths |
-| **Report commit** | the report-only child of the product commit; its SHA is in the Owner handback, because a report cannot contain its own commit |
+| Active order | `UNO-WO-016 / R01`, 34,515 bytes, SHA-256 `c3902097e266624cdf656c47b88905ca0e3cb14b9b4d65b79d2655453ed4a8fb` (identity only) |
+| Required start | `317845a8957fb5df0c5419a22fdfce1ff03f541b` — verified equal to `origin/main` before writing; its page, layout, asset and CSS blobs all matched the order's pins |
+| Product attempt 1 | `cadddc8cf077f6598779771a6df2e9e6e56d7333` (ten paths; the Windows brand step failed) |
+| **Product head** | **`75e1d1e8fd4f1995abd0b20ae61052fe79c9d9d1`** (ten paths after correction) |
+| **Report commit** | the report-only child of the product head; its SHA is in the Owner handback |
 
-Owner authorizations, verified as non-secret facts: approved professional English copy = **YES**; the
-original green network-one SVG as the Uno mark = **YES**, with the Owner's explicit understanding that
-it is **not** verified as the official Provelopment logo; layout, colour scheme, responsive design and
-accessibility preserved; the same SVG for the visible logo **and** the favicon;
-`AUTHORIZE_GIT_PUSH_TRIGGERED_PRODUCTION_DEPLOYMENTS=YES` for exactly these two commits; read-only
-Vercel inspection permitted; **no direct Vercel change**, no Analytics disablement, no Drive access.
+Owner authorizations, verified as non-secret facts: the revised benefits copy = **YES**; the official
+Provelopment network-derived emblem with the larger charcoal numeral = **YES**, with both SVG and page
+source supplied inside the order; the identical asset for header and favicon = **YES**; design, green
+colour, responsiveness, accessibility, Analytics and security controls preserved;
+`AUTHORIZE_GIT_PUSH_TRIGGERED_PRODUCTION_DEPLOYMENTS=YES` for these commits; read-only Vercel inspection
+permitted; **no direct provider change**; no Drive access.
 
-| # | Path | Op | Result at product head |
+| # | Path | Op | Result at the product head |
 | --- | --- | --- | --- |
-| 1 | `src/app/page.tsx` | EDIT | approved copy; one `h1`; skip link; `#main`, `#how-it-is-organized`, `#status`, `#explore`; five-level list; two status cards; two GitHub anchors |
-| 2 | `src/app/layout.tsx` | EDIT | title and description only — the diff is exactly those two strings |
-| 3 | `src/app/globals.css` | EDIT | `.uno-brand` becomes an inline flex row; `.uno-brand__mark` fixed at 1.875rem; `.uno-brand__name` line height |
-| 4 | `public/uno-logo.svg` | CREATE | the §3 vector, byte for byte |
-| 5 | `src/app/icon.svg` | CREATE | same blob as path 4 |
-| 6 | `scripts/verify-u01-http.mjs` | EDIT | **95** real-HTTP checks (was 57), six 404 refusals, analytics rules kept |
-| 7 | `scripts/verify-vercel-readiness.mjs` | EDIT | **93** checks (was 80), including brand assets and copy |
-| 8 | `tests/deployment/verify-vercel-readiness.test.mjs` | EDIT | **59** tests (was 51), eight new copy/brand regressions |
-| 9 | `tests/deployment/uno-brand-copy.test.mjs` | CREATE | **17** tests, five synthetic negatives |
-| 10 | `.github/workflows/verify-u01.yml` | EDIT | one added blocking step `Brand and copy contract`; all previous steps, permissions and triggers kept |
-| 11 | `.documents/Architecture/source-inventory.md` | EDIT | one labelled `UNO-WO-015 / R01` note |
-| 12 | `.documents/Brand/uno-mark-provenance.md` | CREATE | provenance, colour references, parity rule, master-replacement procedure |
+| 1 | `public/uno-logo.svg` | OVERWRITE | the §3 vector verbatim, 8,250 bytes |
+| 2 | `src/app/icon.svg` | OVERWRITE | identical blob |
+| 3 | `src/app/page.tsx` | OVERWRITE | the §4 TSX verbatim, 9,335 bytes |
+| 4 | `src/app/layout.tsx` | EDIT | title and description only; the diff is exactly those two strings |
+| 5 | `scripts/verify-u01-http.mjs` | EDIT | 101 served checks, including digest, geometry and copy |
+| 6 | `scripts/verify-vercel-readiness.mjs` | EDIT | 99 checks, including the pinned digest and palette |
+| 7 | `tests/deployment/verify-vercel-readiness.test.mjs` | EDIT | 64 fixtures |
+| 8 | `tests/deployment/uno-brand-copy.test.mjs` | EDIT | 24 tests, eleven synthetic negatives |
+| 9 | `.documents/Brand/uno-mark-provenance.md` | EDIT | official-source provenance, digests, charcoal choice, parity |
+| 10 | `.documents/Architecture/source-inventory.md` | EDIT | one bounded `UNO-WO-016 / R01` note |
 
-Untouched by this order: `package.json`, `pnpm-lock.yaml`, `deployment/efs/manifest.json`
-(`b077520f…`), `deployment/efs/content/home.en-001.md` (`1b062fb3…`), `src/core/**`,
-`src/application/**`, `src/app/not-found.tsx`, `next.config.ts`, `tsconfig.json`, `.vercelignore`,
-`AGENTS.md`, `README.md`, the local SOP and both governance test files. The frozen-bytes governance
-verifier passed immediately before the commit.
+Untouched: `src/app/globals.css` (`8d9268c448dfa5a0a25bb14657ca450396efe59d`), `deployment/efs/manifest.json` (`b077520f…`),
+`deployment/efs/content/home.en-001.md` (`1b062fb3…`), `package.json`, `pnpm-lock.yaml`, both workflows,
+`next.config.ts`, `tsconfig.json`, `.vercelignore`, `src/core/**`, `src/application/**`, `AGENTS.md`,
+`README.md`, the local SOP and its governance tests. The frozen-bytes verifier passed before the commit.
 
-## 3. Local gates (Node v26.13.1, pnpm 11.6.0, Next.js 16.4.2, Windows 11)
+
+## 4. Local gates (Node v26.13.1, pnpm 11.6.0, Next.js 16.4.2, Windows 11)
 
 | Gate | Result |
 | --- | --- |
@@ -73,80 +92,81 @@ verifier passed immediately before the commit.
 | Governance verifier + `tests/governance-docs.test.mjs` | PASS — frozen bytes; **6 / 6** |
 | `tests/bootstrap.test.mjs` | PASS — **19 / 19** |
 | `pnpm test:architecture` | PASS — **16 / 16** |
-| `pnpm lint` | PASS — exit 0, **0 errors, 1 warning** (disclosed in §7) |
+| `pnpm lint` | PASS — exit 0, **0 errors, 0 warnings** (the previous `@next/next/no-img-element` warning is gone) |
 | `pnpm typecheck` | PASS — exit 0 |
 | `pnpm test` (Vitest) | PASS — **229 / 229** in 8 files |
 | `pnpm build` | PASS — **4 static routes**, including the App Router icon route |
-| `pnpm test:http` | PASS — **95 / 95**, six 404 refusals |
-| Readiness fixtures | PASS — **59 / 59** |
-| Readiness CLI | PASS — **93 checks, 0 failed** |
+| `pnpm test:http` | PASS — **101 / 101**, six 404 refusals |
+| Readiness fixtures | PASS — **64 / 64** |
+| Readiness CLI | PASS — **99 checks, 0 failed** |
 | `tests/deployment/node26-security-floor.test.mjs` | PASS — **16 / 16** |
-| `tests/deployment/uno-brand-copy.test.mjs` | PASS — **17 / 17**, five synthetic negatives |
-| `pnpm audit --audit-level high` | PASS — exit 0; **0 high, 0 critical**; the documented dev-only moderate `minimatch` advisory (GHSA-g3hv-75wg-m249) is unchanged by this order |
+| `tests/deployment/uno-brand-copy.test.mjs` | PASS — **24 / 24**, eleven synthetic negatives |
+| `pnpm audit --audit-level high` | PASS — exit 0; **0 high, 0 critical**; the dev-only moderate `minimatch` advisory (GHSA-g3hv-75wg-m249) is unchanged and is **not** reclassified as fixed |
 
-Nothing was skipped, softened or bypassed. The brand/copy step is blocking in CI, and its negatives
-prove that a drifted heading, a reintroduced retired claim, an SVG handler, a divergent favicon and a
-recoloured token are each refused by name.
+The vector hashing was additionally exercised under CRLF working-tree files (readiness 99, brand 24,
+HTTP 101 all green) to reproduce and close the hosted Windows failure described in §1.
 
-## 4. Actual served evidence (real `next start` on loopback, no mocks)
+## 5. Actual served evidence (real `next start` on loopback, no mocks)
 
 | Evidence | Served value |
 | --- | --- |
-| Metadata title | `Foundation Uno \| A focused website foundation by Provelopment` |
-| Meta description | `Explore Foundation Uno, a live, open-source single-page demonstration of a website foundation designed around one organization and developed by Provelopment.` |
-| `h1` | `Foundation Uno — a focused foundation for the web` |
+| Metadata title | `Foundation Uno \| One organisation. One connected digital presence.` |
+| Meta description | `Foundation Uno by Provelopment will give organisations clear ownership, structured content, reliable publishing and intentionally authored regional editions. Explore the live single-page example.` |
+| `h1` | `One organisation. One connected digital presence.` |
 | Eyebrow | `A Provelopment initiative · Open source · Next.js + TypeScript` |
-| Hero note | `You are viewing a live, single-page example of Foundation Uno. The wider content-publishing system is being developed in stages.` |
-| Footer | `Foundation Uno is a Provelopment initiative. A live, open-source demonstration of a focused, single-owner website foundation. © 2026 Provelopment.` |
-| GitHub anchors | exactly **2**: `Explore the source on GitHub`, `View Foundation Uno on GitHub` |
-| Header mark | `<img class="uno-brand__mark" src="/uno-logo.svg" alt="Foundation Uno" width="30" height="30"/>` |
+| Hero note | `This is the live single-page introduction to Foundation Uno. The examples below illustrate the experience its complete publishing foundation will deliver.` |
+| Feature headings | `One Entity`, `Purposeful Facets`, `Deliberate Sites`, `Reliable Pages`, `Thoughtful regional editions` |
+| Example labels | `Example: a community organisation`, `Example: a service provider with regional audiences` |
+| Footer | `© 2026 Provelopment. Foundation Uno is an open-source website foundation and a Provelopment initiative. This is its live single-page demonstration.` |
+| GitHub anchors | exactly **2**, both the approved repository URL |
+| Header mark | `<img alt="Foundation Uno" loading="lazy" width="30" height="30" … class="uno-brand__mark" src="/uno-logo.svg"/>` — no `/_next/image`, no `srcSet` |
 | Favicon | `<link rel="icon" href="/icon.svg?icon.…svg" sizes="any" type="image/svg+xml"/>` |
-| Brand routes | `/uno-logo.svg` **200** `image/svg+xml` 1,730 B; `/icon.svg` **200** `image/svg+xml` 1,730 B; bodies **identical** |
-| Robots | `noindex`, `nofollow`, `nocache`; no canonical, no hreflang, no sitemap |
+| Brand routes | `/uno-logo.svg` and `/icon.svg` both **200** `image/svg+xml`, identical bodies, digest `de749e41…` |
+| Robots | `noindex`, `nofollow`, `nocache`; no canonical, hreflang or sitemap |
 | Analytics | the approved integration is unchanged; off-Vercel the provider script is legitimately absent |
 
 
-## 5. Exact-head hosted evidence — eight green jobs
+## 6. Exact-head hosted evidence
 
 | Head | Workflow | ubuntu-24.04 | windows-2025 | Steps / non-success |
 | --- | --- | --- | --- | --- |
-| `65494ab` (product) | Uno Bootstrap Verify `43849181132` | success | success | 10 / **0** each |
-| `65494ab` (product) | Verify U01 baseline `43849181179` | success | success | 24 / **0** each |
+| `cadddc8` (attempt 1) | Uno Bootstrap Verify `43855099531` | success | success | 10 / **0** |
+| `cadddc8` (attempt 1) | Verify U01 baseline `43855099608` | success | **failure** | 24; the Windows step `Brand and copy contract` failed |
+| **`75e1d1e`** (product head) | Uno Bootstrap Verify `43855546598` | success | success | 10 / **0** each |
+| **`75e1d1e`** (product head) | Verify U01 baseline `43855546397` | success | success | 24 / **0** each |
 
-On Ubuntu the new step `Brand and copy contract` is `success`, alongside `Assert Node 26 runtime`,
-`Node 26 and dependency security floors`, `Dependency audit (high and critical must be zero)`, unit,
-build, production HTTP and both readiness steps; the same jobs are `success` on Windows. The
+On Windows at the product head, `Assert Node 26 runtime`, `Node 26 and dependency security floors`,
+`Brand and copy contract`, `Dependency audit (high and critical must be zero)`, unit tests, production
+build, production HTTP and both readiness steps are individually `success`; Ubuntu matches. The
 report-only head repeats all four jobs and its identities are stated in the Owner handback. **Job log
 text remains `UNVERIFIED`** (the API returned 403 to this client); only job and step conclusions are
 claimed.
 
-## 6. Provider evidence — what could not be read
+## 7. Provider evidence — what could not be read
 
 - **Attempted:** read-only inspection of the named Uno project, its team and its deployments.
-- **Result:** the Vercel tools are not registered in this session at all — the call was rejected with
-  `AI_NoSuchToolError: Model tried to call unavailable tool 'mcpVercel__list_deployments'`. No
-  deployment, build log, effective runtime, analytics state or recommendation was observed.
-- **Consequence:** the production SHA serving `uno.provelopment.com`, its READY status, Web Analytics
-  collection and any provider recommendation are **UNVERIFIED**. CI success is not used as a substitute
-  for provider proof.
-- **Known from the order's own pinned evidence, quoted only as such:** the starting `a3f4603` was a
-  READY production deployment of `uno.provelopment.com`, its build events no longer repeated the Node 24
-  override warning, and the Owner reports Web Analytics enabled. None of that is an Agent observation.
+- **Result:** the Vercel tools are not registered in this session, so no deployment, build log,
+  effective runtime, analytics state or recommendation was observed.
+- **Consequence:** which commit currently serves `uno.provelopment.com`, its READY status, Web
+  Analytics collection and any provider recommendation are **UNVERIFIED**. CI success is not used as a
+  substitute for provider proof, and no claim is made that the live site already shows this copy.
+- The automated pushes themselves are the only provider-visible effect, and they were authorized.
 
-## 7. Warnings and honest non-claims
+## 8. Warnings and honest non-claims
 
 | Item | Disposition |
 | --- | --- |
-| `@next/next/no-img-element` lint warning in `src/app/page.tsx` | **Disclosed, deliberate.** The order requires a plain `<img src="/uno-logo.svg">` with no new asset pipeline; `next/image` would add an optimizer surface this order does not authorize. Lint exits 0 with 0 errors |
-| Dev-only `minimatch` moderate advisory | Unchanged by this order; the production graph remains at **0** vulnerabilities. Not downgraded and not silenced |
-| Visual or accessibility audit | **UNVERIFIED** — no screenshot and no axe run; the mark was validated structurally (viewBox, palette, keyline, no active content) rather than visually |
-| Production deployment of these commits | **UNVERIFIED** — two `main` pushes occurred under the Owner's explicit consent, so two automatic production builds were most likely triggered, but which SHA serves production could not be read |
-| Trademark status of the mark | An **original Uno concept**, expressly **not** verified as the official Provelopment logo; the provenance file states this and forbids presenting it as official artwork |
+| Lint warning from the previous order | **Resolved** by `next/image` + `unoptimized`; lint now exits 0 with zero warnings, and no rule was suppressed |
+| Dev-only `minimatch` moderate advisory | Unchanged, not waived, not recast as fixed; production graph remains at **0** vulnerabilities |
+| Two product commits instead of one | **Disclosed** in §1 with the failing run, the cause and the corrected head |
+| Visual or accessibility audit | **UNVERIFIED** — no screenshot and no axe run; the vector was validated structurally (viewBox, palette, 11 paths, no active content, digest) |
+| Production deployment of these commits | **UNVERIFIED** — pushes occurred under explicit consent; the serving SHA could not be read |
+| Trademark status | The vector derives from the Owner-supplied official emblem, but this report makes no trademark claim and no filing |
 
-## 8. Request
+## 9. Request
 
-Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`** on this bounded order:
-twelve product paths, the approved copy rendered by a real production server, one byte-identical vector
-serving both the header and the favicon, unchanged colour scheme and structure, every previous gate
-retained, eight green hosted jobs, and each provider fact that could not be read marked `UNVERIFIED`
-rather than guessed.
+Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`**: the official
+network-derived emblem with the enlarged charcoal numeral serving both the header and the favicon, the
+benefits-led copy with two labelled illustrative examples, the untouched design and security posture,
+every previous gate retained and strengthened, four green hosted jobs at the corrected head — and, stated
+plainly rather than buried, the two-commit shape and the Windows test-portability failure that caused it.
