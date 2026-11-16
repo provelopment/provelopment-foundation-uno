@@ -1021,3 +1021,63 @@ replacement procedure are recorded in `.documents/Brand/uno-mark-provenance.md`.
 byte parity and the vector digest; the readiness verifier runs 99 checks including the pinned vector
 digest, geometry and palette; the readiness fixtures carry 64 cases; and the brand/copy suite carries 24
 tests with eleven synthetic negatives.
+
+## U02 typed-property and selected-Site adoption (UNO-WO-018 / R01)
+
+**Scope.** One bounded U02 increment: a five-level typed-property contract and one explicit
+selected-Site *declaration*. Neither capability publishes anything, opens a route, selects a host or
+alters the live page. U01 stays CLOSED and U02 stays OPEN.
+
+**Source pins (read-only).** Foundation `provelopment/provelopment-foundation` at
+`c05c55ea61b5347cf5032211dd0bf37f2cc5083c`: `src/core/efs/properties.ts` blob
+`c0b6346e720e1d57315a4d583ae8cd2ce92203ee` (five-level nearest-explicit cascade) and
+`src/core/efs/property-contract.ts` blob `f45ec31b6e61f83b90dde1067f32e6a748633c43` (typed string
+facts).
+
+**Adaptation decisions.** `src/core/efs/properties.ts` is a **REWRITE**: the nearest-ancestor idea is
+retained, but the upstream Spoke bindings, generalized property values, IANA timezone data,
+opening-hours models, rendering code and file I/O are absent, and no upstream byte or blob identity is
+carried. `src/core/efs/uno-config.ts` is **NEW UNO-OWNED** code with no upstream counterpart. Neither
+module imports Node, a framework, a provider or an adapter; both are pure validators over caller data.
+
+**Typed-property contract.** The closed authored vocabulary is `brand.name`, `contact.name`,
+`contact.email`, `contact.phone` only, accepted at exactly Entity, Facet, Site, Page and representation
+level. A declaration is `{ value }` or `{ value, public }` with a Unicode-trimmed non-blank string of
+at most 240 UTF-16 code units; literal `null` is the only suppression marker; omission inherits;
+`public` defaults to `false` and is authorship metadata only. Unknown keys, unknown descriptor fields,
+non-strings, blank or over-long values, non-boolean flags, symbol keys, accessors (never invoked),
+non-plain prototypes, throwing Proxy traps and `__proto__` pollution attempts are refused with one
+closed literal code. The cascade walks a caller-supplied contiguous ancestry in the fixed order, keeps
+the origin level and identifier, returns a freshly owned deep-frozen result, never searches the
+manifest for nearby identifiers and never crosses a sibling Facet, Site, Page or representation.
+
+**Selected-Site declaration.** `deployment/uno.config.json` is the Owner-approved 140-byte LF document
+`{ version: 1, entityId: "e_7a3knkx60eacyhca7a0cr1k6e1", selectedSite: { facetId: "foundation",
+siteId: "main" } }` (SHA-256 `794672a4…d426`). `src/core/efs/uno-config.ts` validates it against a
+caller-supplied manifest, refusing an invalid manifest before any Site is considered, an Entity
+mismatch, an unknown Facet or Site, a Site owned by another Facet, ambiguous Site ownership across
+Facets, malformed identifiers, extra authority fields (`publication`, `host`, `basePath`, `bindings`,
+`spokeId`, `release`, `canonical`, `analytics`) and hostile objects. There is no array-first fallback
+and no default.
+
+**Graph change.** `src/core/efs/manifest-graph.ts` now accepts an optional `properties` bag at exactly
+the five owner tiers, validating each through the typed contract and adding the frozen declarations to
+the accepted graph while leaving untouched nodes byte-identical. Its own-data snapshots were hardened
+to null-prototype records so a supported property key can never reach a prototype setter. Every
+pre-existing topology, source, route, locale and cardinality refusal is retained.
+
+**Committed data.** `deployment/efs/manifest.json` adds exactly one Entity-level declaration,
+`brand.name = "Foundation Uno"` with `public: false`, and no other value changed. That declaration is
+inherited by the whole chain and is **not** rendered on `/`.
+
+**Non-publication boundary.** No `src/app` file imports the config, the property resolver or the
+manifest; no route, locale, sitemap, `robots.txt`, metadata alternate, host binding or Vercel setting is
+created; the public page remains the same black-emblem informational landing page. The black `#000000`
+numeral approved in `UNO-WO-017 / R01` supersedes the charcoal value recorded in the previous section
+of this inventory; the asset, copy, CSS, Analytics and `noindex, nofollow, nocache` controls are
+unchanged by this order.
+
+**Evidence.** 44 typed-property cases, 24 selected-Site cases, 16 added graph cases (78 in that file),
+architecture boundaries 16/16 with both new pure paths on the exact allowlist, plus the full unchanged
+U01 gate set (HTTP 103, readiness fixtures 66, readiness 100, brand/copy 29, security 16, Vitest unit
+suite, build, lint and audit).

@@ -175,6 +175,8 @@ export const LEGACY_ADDRESS_MARKERS = Object.freeze([
 export const CORE_AUTHORED_FILES = Object.freeze([
   'src/core/efs/identity.ts',
   'src/core/efs/manifest-graph.ts',
+  'src/core/efs/properties.ts',
+  'src/core/efs/uno-config.ts',
   'src/core/efs/uno-locales.ts',
   'src/core/modules/capability-registry.ts',
   'src/core/page-authoring-policy.ts',

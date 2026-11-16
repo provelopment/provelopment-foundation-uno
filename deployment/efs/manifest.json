@@ -2,6 +2,12 @@
   "entities": [
     {
       "id": "e_7a3knkx60eacyhca7a0cr1k6e1",
+      "properties": {
+        "brand.name": {
+          "value": "Foundation Uno",
+          "public": false
+        }
+      },
       "facets": [
         {
           "id": "foundation",

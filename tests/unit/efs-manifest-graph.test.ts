@@ -9,6 +9,7 @@ import {
   validateUnoManifestGraph,
   type UnoManifestRefusal,
 } from "../../src/core/efs/manifest-graph";
+import { resolveUnoProperties } from "../../src/core/efs/properties";
 
 /**
  * U02 authored-graph tests (`UNO-WO-013 / R01`).
@@ -233,7 +234,9 @@ describe("entity cardinality", () => {
 describe("closed shape at every level", () => {
   it("refuses an extra field on a facet", () => {
     const graph = authoredGraph();
-    setField(facetOf(graph), "properties", {});
+    // `properties` is now a supported optional tier field (UNO-WO-018); the closed-shape refusal is
+    // proved with a field that remains unauthorized at every tier.
+    setField(facetOf(graph), "publication", "live");
     expectRefused(graph, "shape:unsupported-field");
   });
 
@@ -649,5 +652,224 @@ describe("hostile and oversized input", () => {
       if (result.accepted) continue;
       expect(REFUSAL_REASONS).toContain(result.reason);
     }
+  });
+});
+
+// --- U02 typed properties at the five owner tiers (UNO-WO-018 / R01) -------------------
+
+/** The committed manifest as mutable data, so one tier can be annotated per case. */
+function committed(): MutableGraph {
+  return JSON.parse(readFileSync(MANIFEST_URL, "utf8")) as MutableGraph;
+}
+
+/** The committed topology with the Entity property bag removed. */
+function manifestWithoutProperties(): MutableGraph {
+  const graph = JSON.parse(readFileSync(MANIFEST_URL, "utf8")) as MutableGraph;
+  delete (entityOf(graph) as MutableEntity & { properties?: unknown }).properties;
+  return graph;
+}
+
+/**
+ * One ancestry link, omitting the `properties` key when the tier authors no bag.
+ *
+ * The omission matters: an explicitly present `properties: undefined` is *not* the same thing as an
+ * absent declaration, and the resolver refuses it rather than reading it as "nothing authored".
+ */
+function link(
+  level: string,
+  id: string,
+  properties: unknown,
+): { level: string; id: string; properties?: unknown } {
+  return properties === undefined ? { level, id } : { level, id, properties };
+}
+
+describe("optional typed properties at the five owner tiers", () => {
+  it("exposes the committed Entity brand.name declaration and freezes it", () => {
+    const result = validateUnoManifestGraph(committed());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    const entity = result.graph.entities[0];
+    expect(entity?.properties?.["brand.name"]).toEqual({ value: "Foundation Uno", public: false });
+    expect(Object.isFrozen(entity?.properties)).toBe(true);
+    expect(Object.isFrozen(entity?.properties?.["brand.name"])).toBe(true);
+  });
+
+  it("accepts a valid declaration at every one of the five levels", () => {
+    const tiers: [string, (graph: MutableGraph) => object][] = [
+      ["entity", entityOf],
+      ["facet", facetOf],
+      ["site", siteOf],
+      ["page", pageOf],
+      ["representation", representationOf],
+    ];
+    for (const [level, nodeOf] of tiers) {
+      const graph = committed();
+      setField(nodeOf(graph), "properties", { "brand.name": { value: `Brand ${level}` } });
+      const result = validateUnoManifestGraph(graph);
+      expect(result.accepted, `level ${level} must be accepted`).toBe(true);
+    }
+  });
+
+  it("preserves the exact previous node shape when no properties are authored", () => {
+    const result = validateUnoManifestGraph(manifestWithoutProperties());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    const entity = result.graph.entities[0];
+    expect(entity === undefined ? undefined : "properties" in entity).toBe(false);
+  });
+
+  it("refuses a non-string property value", () => {
+    const graph = committed();
+    setField(entityOf(graph), "properties", { "brand.name": { value: 7 } });
+    expectRefused(graph, "property:invalid-declaration");
+  });
+
+  it("refuses an unknown property key", () => {
+    const graph = committed();
+    setField(entityOf(graph), "properties", { timezone: { value: "UTC" } });
+    expectRefused(graph, "property:unknown-key");
+  });
+
+  it("refuses a property bag that is not an object", () => {
+    const graph = committed();
+    setField(siteOf(graph), "properties", ["brand.name"]);
+    expectRefused(graph, "property:invalid-bag");
+  });
+
+  it("refuses an unknown field inside a declaration", () => {
+    const graph = committed();
+    setField(pageOf(graph), "properties", { "brand.name": { value: "x", isPublic: true } });
+    expectRefused(graph, "property:invalid-declaration");
+  });
+
+  it("refuses a __proto__ property key without polluting Object.prototype", () => {
+    const graph = committed();
+    setField(facetOf(graph), "properties", JSON.parse('{"__proto__": {"value": "polluted"}}'));
+    expectRefused(graph, "property:unknown-key");
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it("refuses an accessor in a property bag without invoking it", () => {
+    let reads = 0;
+    const graph = committed();
+    setField(representationOf(graph), "properties", {
+      "brand.name": {
+        get value(): string {
+          reads += 1;
+          return "x";
+        },
+      },
+    });
+    expectRefused(graph, "input:unreadable");
+    expect(reads).toBe(0);
+  });
+});
+
+
+describe("property inheritance over the validated graph", () => {
+  it("inherits the Entity declaration down the committed chain", () => {
+    const validated = validateUnoManifestGraph(committed());
+    expect(validated.accepted).toBe(true);
+    if (!validated.accepted) return;
+    const entity = validated.graph.entities[0];
+    const facet = entity?.facets[0];
+    const site = facet?.sites[0];
+    const page = site?.pages[0];
+    const representation = page?.representations[0];
+    expect(entity && facet && site && page && representation).toBeTruthy();
+    if (!entity || !facet || !site || !page || !representation) return;
+
+    const resolved = resolveUnoProperties([
+      link("entity", entity.id, entity.properties),
+      link("facet", facet.id, facet.properties),
+      link("site", site.id, site.properties),
+      link("page", page.id, page.properties),
+      link("representation", representation.locale, representation.properties),
+    ]);
+    expect(resolved.accepted).toBe(true);
+    if (!resolved.accepted) return;
+    const resolution = resolved.resolved.properties["brand.name"];
+    expect(resolution?.value).toBe("Foundation Uno");
+    expect(resolution?.status).toBe("inherited");
+    expect(resolution?.origin).toEqual({ level: "entity", id: entity.id });
+  });
+
+  it("suppresses the inherited Entity value from a descendant tier", () => {
+    const graph = committed();
+    setField(siteOf(graph), "properties", { "brand.name": { value: null } });
+    const validated = validateUnoManifestGraph(graph);
+    expect(validated.accepted).toBe(true);
+    if (!validated.accepted) return;
+    const entity = validated.graph.entities[0];
+    const facet = entity?.facets[0];
+    const site = facet?.sites[0];
+    if (!entity || !facet || !site) return;
+
+    const resolved = resolveUnoProperties([
+      link("entity", entity.id, entity.properties),
+      link("facet", facet.id, facet.properties),
+      link("site", site.id, site.properties),
+    ]);
+    expect(resolved.accepted).toBe(true);
+    if (!resolved.accepted) return;
+    expect(resolved.resolved.properties["brand.name"]?.status).toBe("suppressed");
+    expect(resolved.resolved.properties["brand.name"]?.value).toBeNull();
+  });
+
+  it("lets a Page override an inherited value without touching the Site", () => {
+    const graph = committed();
+    setField(pageOf(graph), "properties", { "brand.name": { value: "Page brand" } });
+    const validated = validateUnoManifestGraph(graph);
+    expect(validated.accepted).toBe(true);
+    if (!validated.accepted) return;
+    const entity = validated.graph.entities[0];
+    const facet = entity?.facets[0];
+    const site = facet?.sites[0];
+    const page = site?.pages[0];
+    if (!entity || !facet || !site || !page) return;
+
+    const atPage = resolveUnoProperties([
+      link("entity", entity.id, entity.properties),
+      link("facet", facet.id, facet.properties),
+      link("site", site.id, site.properties),
+      link("page", page.id, page.properties),
+    ]);
+    const atSite = resolveUnoProperties([
+      link("entity", entity.id, entity.properties),
+      link("facet", facet.id, facet.properties),
+      link("site", site.id, site.properties),
+    ]);
+    expect(atPage.accepted).toBe(true);
+    expect(atSite.accepted).toBe(true);
+    if (!atPage.accepted || !atSite.accepted) return;
+    expect(atPage.resolved.properties["brand.name"]?.value).toBe("Page brand");
+    expect(atPage.resolved.properties["brand.name"]?.status).toBe("declared");
+    expect(atSite.resolved.properties["brand.name"]?.value).toBe("Foundation Uno");
+  });
+
+  it("still refuses a zero-Entity graph that declares properties", () => {
+    expectRefused({ entities: [] }, "entity:cardinality");
+  });
+
+  it("still refuses a two-Entity graph that declares properties", () => {
+    const graph = committed();
+    graph.entities.push(copy(entityOf(graph)));
+    expectRefused(graph, "entity:cardinality");
+  });
+
+  it("keeps a topology refusal when a property bag is also present", () => {
+    const graph = committed();
+    setField(siteOf(graph), "host", "example.invalid");
+    expectRefused(graph, "shape:unsupported-field");
+  });
+
+  it("keeps the duplicate source refusal when a property bag is present", () => {
+    const graph = committed();
+    setField(entityOf(graph), "properties", { "contact.name": { value: "Front Desk" } });
+    setField(representationOf(graph), "sources", [
+      { kind: "markdown", path: HOME_PATH },
+      { kind: "json", path: HOME_PATH },
+    ]);
+    expectRefused(graph, "source:invalid-path");
   });
 });

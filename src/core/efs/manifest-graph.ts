@@ -29,6 +29,7 @@
 import { HOME_CONTENT_SLUG, isContentSlug } from "../page-content";
 import { PAGE_ROUTE_PATH_MAX_SEGMENTS, pageRoutePath } from "../page-route-path";
 import { isEntityId } from "./identity";
+import { validateUnoPropertyBag, type UnoPropertyBag, type UnoPropertyRefusal } from "./properties";
 import { canonicalLocaleTag, localeTagIssue } from "./uno-locales";
 
 /** The only source candidate kinds this increment declares. */
@@ -44,6 +45,7 @@ export interface UnoManifestSource {
 export interface UnoManifestRepresentation {
   readonly locale: string;
   readonly sources: readonly UnoManifestSource[];
+  readonly properties?: UnoPropertyBag;
 }
 
 /** One authored Page: its authoring id, its authoring route segments and its representations. */
@@ -51,24 +53,28 @@ export interface UnoManifestPage {
   readonly id: string;
   readonly route: readonly string[];
   readonly representations: readonly UnoManifestRepresentation[];
+  readonly properties?: UnoPropertyBag;
 }
 
 /** One authored Site inside a Facet. */
 export interface UnoManifestSite {
   readonly id: string;
   readonly pages: readonly UnoManifestPage[];
+  readonly properties?: UnoPropertyBag;
 }
 
 /** One authored Facet inside the single Entity. */
 export interface UnoManifestFacet {
   readonly id: string;
   readonly sites: readonly UnoManifestSite[];
+  readonly properties?: UnoPropertyBag;
 }
 
 /** The single authored Entity. */
 export interface UnoManifestEntity {
   readonly id: string;
   readonly facets: readonly UnoManifestFacet[];
+  readonly properties?: UnoPropertyBag;
 }
 
 /** The validated, deep-cloned, deeply frozen authored graph. */
@@ -105,7 +111,10 @@ export type UnoManifestRefusal =
   | "source:invalid-path"
   | "source:unsafe-path"
   | "source:duplicate-kind"
-  | "source:duplicate-path";
+  | "source:duplicate-path"
+  | "property:invalid-bag"
+  | "property:unknown-key"
+  | "property:invalid-declaration";
 
 /** The closed refusal vocabulary as data, for callers that must enumerate or document it. */
 export const REFUSAL_REASONS: readonly UnoManifestRefusal[] = Object.freeze([
@@ -134,6 +143,9 @@ export const REFUSAL_REASONS: readonly UnoManifestRefusal[] = Object.freeze([
   "source:unsafe-path",
   "source:duplicate-kind",
   "source:duplicate-path",
+  "property:invalid-bag",
+  "property:unknown-key",
+  "property:invalid-declaration",
 ]);
 
 /** A tagged result: a validated graph, or one closed reason and no partial graph. */
@@ -180,7 +192,7 @@ function ownData(value: unknown): DataRecord | null {
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) throw new HostileInput();
   if (Object.getOwnPropertySymbols(value).length > 0) throw new HostileInput();
-  const copy: Record<string, unknown> = {};
+  const copy = Object.create(null) as Record<string, unknown>;
   for (const key of Object.keys(value)) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor === undefined || !("value" in descriptor)) throw new HostileInput();
@@ -210,6 +222,46 @@ function collectionIssue(value: unknown, max: number): UnoManifestRefusal | null
   if (value.length === 0) return "shape:empty-collection";
   if (value.length > max) return "shape:too-many";
   return null;
+}
+
+/**
+ * Map one typed-property refusal onto this graph's own closed vocabulary.
+ *
+ * The two vocabularies stay separate on purpose: `properties.ts` owns the property contract and
+ * this module owns topology, so a caller of the graph sees one graph code and a caller of the
+ * property contract sees one property code. Neither reason echoes an authored value.
+ */
+function propertyRefusal(reason: UnoPropertyRefusal): UnoManifestRefusal {
+  if (reason === "property:unreadable") return "input:unreadable";
+  if (reason === "property:unknown-key") return "property:unknown-key";
+  if (reason === "property:invalid-bag" || reason === "property:too-many-keys") {
+    return "property:invalid-bag";
+  }
+  return "property:invalid-declaration";
+}
+
+/**
+ * Read the **optional** `properties` bag of one ownership tier.
+ *
+ * Absent means "no properties authored here" and yields no field at all, so an untouched node keeps
+ * its exact previous shape. Present means the bag must pass the typed contract; a failure is a
+ * refusal, never a partially accepted bag.
+ */
+function readProperties(record: DataRecord): Step<UnoPropertyBag | undefined> {
+  if (!Object.prototype.hasOwnProperty.call(record, "properties")) return { ok: true, value: undefined };
+  const validated = validateUnoPropertyBag(record.properties);
+  if (!validated.accepted) return { ok: false, reason: propertyRefusal(validated.reason) };
+  if (Object.keys(validated.bag).length === 0) return { ok: true, value: undefined };
+  return { ok: true, value: validated.bag };
+}
+
+/** Attach an authored bag to a validated node, leaving the node untouched when none was authored. */
+function withProperties<T extends object>(
+  base: T,
+  properties: UnoPropertyBag | undefined,
+): T & { readonly properties?: UnoPropertyBag } {
+  if (properties === undefined) return base;
+  return { ...base, properties } as T & { readonly properties?: UnoPropertyBag };
 }
 
 /** Deep-freeze the validated clone so no caller can later rewrite accepted authority. */
@@ -299,8 +351,11 @@ function analyzeGraph(input: unknown): UnoManifestValidationResult {
   for (const rawEntity of entityValue as readonly unknown[]) {
     const entity = ownData(rawEntity);
     if (entity === null) return refuse("shape:not-an-object");
-    const entityShape = shapeIssue(entity, ["id", "facets"]);
+    const entityShape = shapeIssue(entity, ["id", "facets"], ["properties"]);
     if (entityShape) return refuse(entityShape);
+
+    const entityProperties = readProperties(entity);
+    if (!entityProperties.ok) return refuse(entityProperties.reason);
 
     const entityId = entity.id;
     if (!isEntityId(entityId)) return refuse("entity:invalid-id");
@@ -316,8 +371,11 @@ function analyzeGraph(input: unknown): UnoManifestValidationResult {
     for (const rawFacet of facetValue as readonly unknown[]) {
       const facet = ownData(rawFacet);
       if (facet === null) return refuse("shape:not-an-object");
-      const facetShape = shapeIssue(facet, ["id", "sites"]);
+      const facetShape = shapeIssue(facet, ["id", "sites"], ["properties"]);
       if (facetShape) return refuse(facetShape);
+
+      const facetProperties = readProperties(facet);
+      if (!facetProperties.ok) return refuse(facetProperties.reason);
 
       const facetId = facet.id;
       if (!isContentSlug(facetId)) return refuse("facet:invalid-id");
@@ -333,8 +391,11 @@ function analyzeGraph(input: unknown): UnoManifestValidationResult {
       for (const rawSite of siteValue as readonly unknown[]) {
         const site = ownData(rawSite);
         if (site === null) return refuse("shape:not-an-object");
-        const siteShape = shapeIssue(site, ["id", "pages"]);
+        const siteShape = shapeIssue(site, ["id", "pages"], ["properties"]);
         if (siteShape) return refuse(siteShape);
+
+        const siteProperties = readProperties(site);
+        if (!siteProperties.ok) return refuse(siteProperties.reason);
 
         const siteId = site.id;
         if (!isContentSlug(siteId)) return refuse("site:invalid-id");
@@ -354,13 +415,13 @@ function analyzeGraph(input: unknown): UnoManifestValidationResult {
           pages.push(page.value);
         }
 
-        sites.push(Object.freeze({ id: siteId, pages: Object.freeze(pages) }));
+        sites.push(Object.freeze(withProperties({ id: siteId, pages: Object.freeze(pages) }, siteProperties.value)));
       }
 
-      facets.push(Object.freeze({ id: facetId, sites: Object.freeze(sites) }));
+      facets.push(Object.freeze(withProperties({ id: facetId, sites: Object.freeze(sites) }, facetProperties.value)));
     }
 
-    entities.push(Object.freeze({ id: entityId, facets: Object.freeze(facets) }));
+    entities.push(Object.freeze(withProperties({ id: entityId, facets: Object.freeze(facets) }, entityProperties.value)));
   }
 
   return Object.freeze({
@@ -386,8 +447,11 @@ function readPage(
 ): Step<UnoManifestPage> {
   const page = ownData(raw);
   if (page === null) return { ok: false, reason: "shape:not-an-object" };
-  const shape = shapeIssue(page, ["id", "route", "representations"]);
+  const shape = shapeIssue(page, ["id", "route", "representations"], ["properties"]);
   if (shape) return { ok: false, reason: shape };
+
+  const pageProperties = readProperties(page);
+  if (!pageProperties.ok) return pageProperties;
 
   const id = page.id;
   if (!isContentSlug(id)) return { ok: false, reason: "page:invalid-id" };
@@ -436,11 +500,14 @@ function readPage(
 
   return {
     ok: true,
-    value: {
-      id,
-      route: Object.freeze(segments.slice()),
-      representations: Object.freeze(representations),
-    },
+    value: withProperties(
+      {
+        id,
+        route: Object.freeze(segments.slice()),
+        representations: Object.freeze(representations),
+      },
+      pageProperties.value,
+    ),
   };
 }
 
@@ -455,8 +522,11 @@ function readRepresentation(
 ): Step<UnoManifestRepresentation> {
   const representation = ownData(raw);
   if (representation === null) return { ok: false, reason: "shape:not-an-object" };
-  const shape = shapeIssue(representation, ["locale", "sources"]);
+  const shape = shapeIssue(representation, ["locale", "sources"], ["properties"]);
   if (shape) return { ok: false, reason: shape };
+
+  const representationProperties = readProperties(representation);
+  if (!representationProperties.ok) return representationProperties;
 
   const locale = representation.locale;
   if (localeTagIssue(locale) !== null) return { ok: false, reason: "representation:invalid-locale" };
@@ -488,7 +558,10 @@ function readRepresentation(
 
   seenLocales.add(locale);
 
-  return { ok: true, value: { locale, sources: Object.freeze(sources) } };
+  return {
+    ok: true,
+    value: withProperties({ locale, sources: Object.freeze(sources) }, representationProperties.value),
+  };
 }
 
 /**
