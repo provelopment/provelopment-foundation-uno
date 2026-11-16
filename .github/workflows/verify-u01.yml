@@ -80,6 +80,12 @@ jobs:
         run: node --test tests/deployment/node26-security-floor.test.mjs
         shell: bash
 
+      # Blocking brand and copy gate (UNO-WO-015 / R01): exact visitor copy, retired-claim
+      # refusals, SVG validity/sanitisation and header/favicon byte parity.
+      - name: Brand and copy contract
+        run: node --test tests/deployment/uno-brand-copy.test.mjs
+        shell: bash
+
       # Blocking registry-backed audit gate. A HIGH or CRITICAL advisory fails this job; the
       # command is never suffixed with a success-forcing fallback, and no advisory is suppressed.
       - name: Dependency audit (high and critical must be zero)

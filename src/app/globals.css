@@ -147,10 +147,25 @@ ol {
 }
 
 .uno-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* The Uno mark is a single static SVG: fixed intrinsic size, no background, no filter. */
+.uno-brand__mark {
+  display: block;
+  inline-size: 1.875rem;
+  block-size: 1.875rem;
+  flex: none;
+}
+
+.uno-brand__name {
+  line-height: 1.2;
 }
 
 .uno-nav ul {

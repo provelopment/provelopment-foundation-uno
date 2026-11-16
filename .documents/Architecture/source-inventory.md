@@ -943,3 +943,46 @@ is still refused, and each refusal has a synthetic negative fixture in the archi
 domain, secret or protection change; no new route, locale, Site selection, `deployment/uno.config.json`,
 workflow, provider token or release. U02 remains open and its manifest, Home Markdown and graph
 validator are untouched.
+
+## UNO-WO-015 / R01 — public copy and the Uno network-one mark
+
+**Sourced page copy.** `src/app/page.tsx` now carries the Owner-approved visitor copy: an eyebrow
+naming the initiative and stack, the headline "Foundation Uno — a focused foundation for the web", the
+hero lead, the two approved calls to action, the live single-page disclosure, the three section
+headings ("A clear structure for everything you publish", "Working today. Designed to grow.",
+"Explore the source"), five architecture descriptions, five "Available today" bullets, four "In
+development" bullets, the approved source link and note, and the footer. Structure is unchanged: one
+`h1`, the skip link, `#main`, `#how-it-is-organized`, `#status`, `#explore`, the ordered architecture
+list, two status cards and exactly two approved GitHub anchors. Retired and false claims — `A1`,
+`P05`, "technical placeholder", "not deployed", "no live deployment", "no manifest", "only the smallest
+pure primitives", "not a finished website", "no publication" — are refused by tests rather than by
+memory.
+
+**Truthfulness boundary.** The copy states the live single-page demonstration, the validated
+single-Entity content graph with an authored English Home source, and the tested primitives as facts,
+and states that content-driven publishing and locale-aware routes are forthcoming. It never claims the
+EFS runtime is serving or that a locale route exists; the readiness verifier keeps a closed
+`page:fabricated-publication` refusal for exactly those claims while permitting the Owner-verified fact
+that this informational page is deployed.
+
+**Added assets.** `public/uno-logo.svg` (header mark) and `src/app/icon.svg` (App Router favicon) are
+the same 1,730 bytes, SHA-256
+`19759bc29d887401dd42550304e22dc625cbd5be936f5f93d2b9fde938010162`, reproducing the order's §3 vector
+exactly. The mark is an **original Uno concept** in the existing palette (`#1f6f6b` network,
+`#101620` numeral, `#ffffff` keyline); it is not asserted to be official Provelopment artwork. Its
+provenance, colour references and master-replacement procedure are recorded in
+`.documents/Brand/uno-mark-provenance.md`.
+
+**Design preservation.** `src/app/globals.css` gains only three declarations of layout for the mark
+(`.uno-brand` becomes an inline flex row with a fixed-size image, `.uno-brand__name` sets a line
+height). Every colour token, contrast preference, responsive breakpoint, focus rule and reduced-motion
+rule is unchanged, and the brand/copy test refuses a recoloured token or a removed logo rule.
+
+**Evidence.** `scripts/verify-u01-http.mjs` asserts the approved copy and both brand routes over a real
+production server (95 checks), `scripts/verify-vercel-readiness.mjs` adds brand and copy checks (92
+checks), `tests/deployment/verify-vercel-readiness.test.mjs` adds eight copy/brand regressions (59
+tests) and `tests/deployment/uno-brand-copy.test.mjs` adds seventeen committed-input tests including
+five synthetic negatives. Both new steps run on Ubuntu and Windows.
+
+**Boundaries.** No dependency, lockfile, workflow permission, provider setting, route, locale, EFS
+manifest, authored Home Markdown, release or stage closure was touched by this increment.

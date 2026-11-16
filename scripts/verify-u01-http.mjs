@@ -21,7 +21,7 @@
  */
 
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -32,10 +32,74 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 
 const SOURCE_URL = "https://github.com/provelopment/provelopment-foundation-uno";
-const EXPECTED_TITLE = "Foundation Uno — a single-Entity website foundation";
-const OBSOLETE_SENTENCE = "U01 technical baseline — the authored public Site is not configured.";
-const DISCLOSURE =
-  "English demonstration — full authored Site publication is not yet enabled.";
+const EXPECTED_TITLE = "Foundation Uno | A focused website foundation by Provelopment";
+const EXPECTED_DESCRIPTION =
+  "Explore Foundation Uno, a live, open-source single-page demonstration of a website foundation designed around one organization and developed by Provelopment.";
+const EYEBROW = "A Provelopment initiative · Open source · Next.js + TypeScript";
+const HERO_HEADING = "Foundation Uno — a focused foundation for the web";
+const HERO_LEAD =
+  "Foundation Uno is a working, open-source website demonstration from Provelopment, designed around a simple principle: one organization, one clear ownership model. Its foundation brings together structured content, modern web technology and a deliberate approach to extending what a website can do.";
+const HERO_NOTE =
+  "You are viewing a live, single-page example of Foundation Uno. The wider content-publishing system is being developed in stages.";
+const ARCHITECTURE_HEADING = "A clear structure for everything you publish";
+const ARCHITECTURE_INTRO =
+  "Uno organizes a website around one accountable owner. Content can be arranged into distinct areas, websites, pages and authored language versions without introducing competing ownership models.";
+const ARCHITECTURE_NOTE =
+  "The single-Entity content structure and an English Home source are already defined and validated in the codebase. Content-driven publishing and locale-aware routes are forthcoming.";
+const PROGRESS_HEADING = "Working today. Designed to grow.";
+const PROGRESS_INTRO =
+  "This deployed page demonstrates Uno's current web foundation. The next capabilities are being added with explicit contracts, automated tests and clear ownership.";
+const SOURCE_HEADING = "Explore the source";
+const SOURCE_INTRO =
+  "Foundation Uno is developed in the open. Review the implementation, tests and architecture in its GitHub repository, and follow how the foundation evolves.";
+const SOURCE_LINK_TEXT = "View Foundation Uno on GitHub";
+const SOURCE_NOTE =
+  "The page you are viewing is a self-contained demonstration; the authored content engine will power more of the experience as development continues.";
+const FOOTER_COPY =
+  "Foundation Uno is a Provelopment initiative. A live, open-source demonstration of a focused, single-owner website foundation. © 2026 Provelopment.";
+const LEVEL_DESCRIPTIONS = Object.freeze([
+  ["Entity", "The single organization that owns the website and its content."],
+  ["Facets", "Distinct areas of the organization's work, organized under the same owner."],
+  [
+    "Sites",
+    "Individual web presences with clearly defined responsibilities and a deliberate publication choice.",
+  ],
+  [
+    "Pages",
+    "Structured content with explicit sources, designed to support reliable publishing as the platform grows.",
+  ],
+  [
+    "Localized representations",
+    "Language-and-region-specific content authored intentionally, rather than inferred from a visitor's location.",
+  ],
+]);
+const AVAILABLE_BULLETS = Object.freeze([
+  "A live, responsive single-page website built with Next.js, React and TypeScript.",
+  "A validated single-Entity content graph with an authored English Home source.",
+  "Tested rules for content identity, safe URLs, source selection and authored locale declarations.",
+  "Automated checks across Windows and Linux, including production HTTP and dependency-security tests.",
+  "Publicly reviewable source code released under the Apache-2.0 licence.",
+]);
+const IN_DEVELOPMENT_BULLETS = Object.freeze([
+  "Serving authored JSON and Markdown content through the website.",
+  "Locale-aware page addresses, visibility controls and publication metadata.",
+  "A wider library of layouts, content and interactive components.",
+  "Reproducible setup, upgrades and release workflows for independent installations.",
+]);
+const OBSOLETE_PHRASES = Object.freeze([
+  "A1",
+  "P05",
+  "technical placeholder",
+  "not deployed",
+  "no live deployment",
+  "no manifest",
+  "only the smallest pure primitives",
+  "not a finished website",
+  "no publication",
+]);
+const RETIRED_DISCLOSURE = "English demonstration — full authored Site publication is not yet enabled.";
+const LOGO_SRC = "/uno-logo.svg";
+const ICON_SRC = "/icon.svg";
 const REFUSED_PATHS = Object.freeze([
   "/en",
   "/en-001",
@@ -157,90 +221,91 @@ function checkHomePage(home) {
 
   check("/ carries exactly one h1", headings.length === 1, `found ${headings.length}`);
   const heroTitle = textOf(headings[0] ?? "");
-  check("the h1 names Foundation Uno", /Foundat?ion Uno/i.test(heroTitle), heroTitle);
+  check("the h1 is the approved headline", heroTitle === HERO_HEADING, heroTitle);
+  check("the served title is the approved metadata title", title === EXPECTED_TITLE, title);
   check(
-    "the h1 describes the single-Entity foundation direction",
-    /single-entity/i.test(heroTitle) && /foundation/i.test(heroTitle),
-    heroTitle,
-  );
-
-  check("the served title reflects the demonstration page", title.includes(EXPECTED_TITLE), title);
-  check("the served title is not the obsolete placeholder", !/technical baseline/i.test(title));
-  check(
-    "the meta description is present and truthful",
-    /Foundat?ion Uno/i.test(description) && /one Entity/i.test(description),
+    "the served meta description is the approved description",
+    description === EXPECTED_DESCRIPTION,
     description,
   );
+  check("the eyebrow is the approved copy", text.includes(EYEBROW));
+  check("the hero lead is the approved copy", text.includes(HERO_LEAD));
+  check("the primary call to action is the approved copy", text.includes("Explore the source on GitHub"));
+  check("the secondary call to action is the approved copy", text.includes("See the progress"));
+  check("the hero note is the approved copy", text.includes(HERO_NOTE));
+
+  check("the architecture heading is the approved copy", text.includes(ARCHITECTURE_HEADING));
+  check("the architecture intro is the approved copy", text.includes(ARCHITECTURE_INTRO));
+  for (const [name, description] of LEVEL_DESCRIPTIONS) {
+    check("the " + name + " description is the approved copy", text.includes(description), name);
+  }
+  check("the architecture note is the approved copy", text.includes(ARCHITECTURE_NOTE));
   check(
-    "the meta description is not the obsolete placeholder",
-    description.length > 0 && !/authored public Site is not configured/i.test(description),
+    "the architecture list names all five levels",
+    ["Entity", "Facets", "Sites", "Pages", "Localized representations"].every((level) =>
+      text.includes(level),
+    ),
   );
 
-  check("the obsolete placeholder sentence is gone", !text.includes(OBSOLETE_SENTENCE));
+  check("the progress heading is the approved copy", text.includes(PROGRESS_HEADING));
+  check("the progress intro is the approved copy", text.includes(PROGRESS_INTRO));
+  check('the "Available today" column is present', text.includes("Available today"));
+  check('the "In development" column is present', text.includes("In development"));
+  for (const bullet of AVAILABLE_BULLETS) {
+    check('an "Available today" bullet is the approved copy', text.includes(bullet), bullet.slice(0, 40));
+  }
+  for (const bullet of IN_DEVELOPMENT_BULLETS) {
+    check('an "In development" bullet is the approved copy', text.includes(bullet), bullet.slice(0, 40));
+  }
   check(
-    "the introduction names the Apache-2.0 Next.js and TypeScript foundation",
-    text.includes("Apache-2.0") && text.includes("Next.js") && text.includes("TypeScript"),
-  );
-  check("the introduction is built around one Entity", /one Entity/i.test(text));
-  check(
-    "the introduction mentions Facets, Sites, Pages and locales",
-    text.includes("Facets") && text.includes("Sites") && text.includes("Pages") &&
-      text.includes("locales"),
+    "each status column carries a real list",
+    (raw.match(/<h3>Available today<\/h3>\s*<ul>[\s\S]*?<\/ul>/i)?.[0].match(/<li>/g) ?? []).length >= 5 &&
+      (raw.match(/<h3>In development<\/h3>\s*<ul>[\s\S]*?<\/ul>/i)?.[0].match(/<li>/g) ?? []).length >= 4,
   );
 
-  check('the "How it is organized" section is present', text.includes("How it is organized"));
-  check(
-    "the planned model names all four contract levels",
-    text.includes("Entity") && text.includes("Facets") && text.includes("Sites") &&
-      text.includes("Pages") && /localized representations/i.test(text),
-  );
-  check(
-    "the planned model names region-qualified locales rather than guessed ones",
-    /region-qualified locales/i.test(text) && /en-001/.test(text) && /never guessed/i.test(text),
-  );
-  check("the model is labelled as a planned contract", /planned contract/i.test(text));
+  check("the source heading is the approved copy", text.includes(SOURCE_HEADING));
+  check("the source intro is the approved copy", text.includes(SOURCE_INTRO));
+  check("the source link text is the approved copy", text.includes(SOURCE_LINK_TEXT));
+  check("the source note is the approved copy", text.includes(SOURCE_NOTE));
+  check("the footer is the approved copy", text.includes(FOOTER_COPY));
 
-  check('the "What works today" column is present', text.includes("What works today"));
-  check("the \"What's next\" column is present", text.includes("What's next"));
+  for (const phrase of OBSOLETE_PHRASES) {
+    check('no obsolete or false phrase "' + phrase + '" is visible', !text.includes(phrase));
+  }
+  check("the retired disclosure sentence is gone", !text.includes(RETIRED_DISCLOSURE));
   check(
-    "each status column carries a real list of items",
-    (raw.match(/<h3>What works today<\/h3>\s*<ul>[\s\S]*?<\/ul>/i)?.[0].match(/<li>/g) ?? [])
-      .length >= 4 &&
-      (
-        raw.match(/<h3>What(?:&rsquo;|&#x27;|&#39;|[\u2018\u2019'])s next<\/h3>\s*<ul>[\s\S]*?<\/ul>/i)?.[0]
-          .match(/<li>/g) ?? []
-      ).length >= 4,
-  );
-  check(
-    "the page states that Uno is a foundation, not a finished website",
-    /not a finished website/i.test(text),
-  );
-  check(
-    "the informational-demo disclosure is visible",
-    text.includes(DISCLOSURE),
-  );
-  check(
-    "the page makes no publication or live-site claim",
-    !/(?:\bis|\bare|\bnow)\s+(?:live|published)\b|deployed at|\blive (?:site|website)\b|\blaunched\b|published (?:website|Uno website|demonstration site)/i.test(
+    "the page does not claim the EFS content runtime is live",
+    !/content engine (?:is|are) (?:live|serving)|EFS (?:publication|runtime) is live|locale routes are live|authored Site is published/i.test(
       text,
     ),
-    "publication claim",
+  );
+
+  check(
+    "the brand row shows the approved mark",
+    raw.includes('src="' + LOGO_SRC + '"') && raw.includes('alt="Foundation Uno"'),
+  );
+  check(
+    "the mark is a static SVG image element",
+    new RegExp('<img[^>]+src="' + LOGO_SRC + '"[^>]*>').test(raw),
+  );
+  check(
+    "the favicon is served from the App Router icon route",
+    /<link[^>]+rel="icon"[^>]+href="\/icon\.svg/.test(raw) && /type="image\/svg\+xml"/.test(raw),
   );
 
   check(
     "the source link points at the one public Uno repository",
-    raw.includes(`href="${SOURCE_URL}"`),
+    raw.includes('href="' + SOURCE_URL + '"'),
   );
   check(
-    "the source link has readable link text",
-    /<a[^>]+href="https:\/\/github\.com\/provelopment\/provelopment-foundation-uno"[^>]*>[\s\S]{0,80}?(Explore the code|repository on GitHub)/i.test(
-      raw,
-    ),
+    "both approved GitHub source anchors are present",
+    (raw.match(new RegExp('href="' + SOURCE_URL + '"', "g")) ?? []).length === 2,
+    (raw.match(new RegExp('href="' + SOURCE_URL + '"', "g")) ?? []).length + " anchors",
   );
   check(
-    "the source link is the only absolute link on the page",
+    "the only absolute links are the two approved repository anchors",
     (raw.match(/href="https?:\/\//g) ?? []).length === 2,
-    `${(raw.match(/href="https?:\/\//g) ?? []).length} absolute links`,
+    (raw.match(/href="https?:\/\//g) ?? []).length + " absolute links",
   );
 
   const anchors = [...raw.matchAll(/<a\b[^>]*href="#([^"]+)"/g)].map((match) => match[1]);
@@ -353,6 +418,31 @@ async function main() {
 
     const home = await fetchText(`${base}/`);
     checkHomePage(home);
+
+    // --- Brand assets over real HTTP --------------------------------------------------
+    const logo = await fetchText(base + LOGO_SRC);
+    const icon = await fetchText(base + ICON_SRC);
+    check(LOGO_SRC + " returns 200", logo.status === 200, "status " + logo.status);
+    check(LOGO_SRC + " is served as SVG", /image\/svg\+xml/i.test(logo.contentType), logo.contentType);
+    check(ICON_SRC + " returns 200", icon.status === 200, "status " + icon.status);
+    check(ICON_SRC + " is served as SVG", /image\/svg\+xml/i.test(icon.contentType), icon.contentType);
+    check(
+      "the header mark and the favicon are byte-identical",
+      logo.body === icon.body && logo.body.length > 0,
+      logo.body.length + " vs " + icon.body.length + " bytes",
+    );
+    check(
+      "the served mark is the committed vector",
+      logo.body === readFileSync("public/uno-logo.svg", "utf8"),
+    );
+    check(
+      "the served mark carries no script, handler or remote reference",
+      !/<script|<foreignObject|<image|xlink:href|\son[a-z]+=/i.test(logo.body),
+    );
+    check(
+      "the served mark keeps the approved palette",
+      logo.body.includes("#1f6f6b") && logo.body.includes("#101620"),
+    );
 
     // Every declared refusal must stay a real 404: not a redirect, not invisible content.
     for (const path of REFUSED_PATHS) {

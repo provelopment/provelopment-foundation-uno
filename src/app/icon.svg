@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Foundation Uno proposed network-one mark</title>
+  <desc id="desc">An original green network of connected nodes with a prominent contrasting black numeral one. Concept only; not verified as the official Provelopment mark.</desc>
+  <!-- Original dot-network concept. Replace with the licensed master mark if supplied. -->
+  <g fill="none" stroke="#1f6f6b" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" opacity=".88">
+    <path d="M17 34 40 18 65 26 91 14 111 35 98 58 115 83 94 111 66 105 42 116 17 96 29 72 12 52 17 34Z"/>
+    <path d="M17 34 45 48 65 26 76 54 98 58 87 83 115 83M45 48 29 72 56 87 42 116M29 72 12 52 45 48M56 87 87 83 94 111 66 105 56 87M91 14 76 54 111 35M65 26 91 14M98 58 111 35"/>
+  </g>
+  <g fill="#1f6f6b">
+    <circle cx="17" cy="34" r="6.5"/><circle cx="40" cy="18" r="5.2"/>
+    <circle cx="65" cy="26" r="6"/><circle cx="91" cy="14" r="5.4"/>
+    <circle cx="111" cy="35" r="6"/><circle cx="98" cy="58" r="5.8"/>
+    <circle cx="115" cy="83" r="6"/><circle cx="94" cy="111" r="6.5"/>
+    <circle cx="66" cy="105" r="4.5"/><circle cx="42" cy="116" r="5.8"/>
+    <circle cx="17" cy="96" r="5.4"/><circle cx="29" cy="72" r="6"/>
+    <circle cx="12" cy="52" r="4.3"/><circle cx="45" cy="48" r="5.7"/>
+    <circle cx="76" cy="54" r="5"/><circle cx="56" cy="87" r="6"/>
+    <circle cx="87" cy="83" r="5"/>
+  </g>
+  <!-- White keyline keeps the numeral distinct from the network at favicon sizes. -->
+  <path d="M53 45 70 32 79 32 79 100 57 100 57 59 53 62Z" fill="#101620" stroke="#ffffff" stroke-width="7" stroke-linejoin="round" paint-order="stroke fill"/>
+</svg>

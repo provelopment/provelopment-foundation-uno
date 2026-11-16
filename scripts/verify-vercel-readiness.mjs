@@ -41,6 +41,8 @@ export const SNAPSHOT_KEYS = Object.freeze([
   'nextConfig',
   'page',
   'layout',
+  'logo',
+  'icon',
   'gitignore',
   'vercelignore',
   'u01Workflow',
@@ -53,6 +55,8 @@ export const SNAPSHOT_FILES = Object.freeze({
   nextConfig: 'next.config.ts',
   page: 'src/app/page.tsx',
   layout: 'src/app/layout.tsx',
+  logo: 'public/uno-logo.svg',
+  icon: 'src/app/icon.svg',
   gitignore: '.gitignore',
   vercelignore: '.vercelignore',
   u01Workflow: '.github/workflows/verify-u01.yml',
@@ -60,6 +64,31 @@ export const SNAPSHOT_FILES = Object.freeze({
 
 /** The approved public source link; the page may carry exactly this one external URL. */
 const SOURCE_URL = 'https://github.com/provelopment/provelopment-foundation-uno';
+
+/** Approved visitor-facing copy (UNO-WO-015 / R01). Compared literally, never fuzzily. */
+const HERO_HEADING = 'Foundation Uno — a focused foundation for the web';
+const HERO_LEAD =
+  'Foundation Uno is a working, open-source website demonstration from Provelopment';
+const HERO_NOTE = 'You are viewing a live, single-page example of Foundation Uno.';
+const FOOTER_COPY =
+  'Foundation Uno is a Provelopment initiative. A live, open-source demonstration of a';
+const META_TITLE = 'Foundation Uno | A focused website foundation by Provelopment';
+
+/** Visible phrases that would resurrect a retired or false status claim. */
+const RETIRED_COPY = Object.freeze([
+  'A1',
+  'P05',
+  'not deployed',
+  'no live deployment',
+  'no manifest',
+  'only the smallest pure primitives',
+  'not a finished website',
+  'no publication',
+]);
+
+/** Brand asset rules: one vector, approved palette, no active content. */
+const LOGO_PATH = '/uno-logo.svg';
+const LOGO_ACTIVE_CONTENT = /<script|<foreignObject|<image|xlink:href|\son[a-z]+\s*=/i;
 
 /** Exact dependency pins the accepted baseline ships, including the one approved provider. */
 const EXPECTED_DEPENDENCIES = Object.freeze({
@@ -86,12 +115,15 @@ const UNAPPROVED_ANALYTICS_PACKAGES = Object.freeze([
   'matomo',
 ]);
 
-/** Claims that would turn a not-deployed repository into a false success message. */
+/** Claims that would turn the live demo page into a false publication claim. */
 const FABRICATION_MARKERS = Object.freeze([
   'PUBLIC_PREVIEW_READY',
   'VERCEL_DEPLOYED',
   'VERCEL_BUILD_PASSED',
   'is a published Site',
+  'EFS publication is live',
+  'content engine is live',
+  'locale routes are live',
 ]);
 
 /** Patterns that would make a `.vercelignore` hide the build inputs themselves. */
@@ -138,11 +170,24 @@ export const REASONS = Object.freeze([
   'page:missing',
   'page:obsolete-placeholder',
   'page:missing-heading',
+  'page:hero-heading',
+  'page:hero-lead',
+  'page:footer-copy',
+  'page:brand-mark',
+  'page:brand-alt',
+  'page:retired-claim',
   'page:missing-title-copy',
   'page:missing-disclosure',
   'page:source-link',
+  'page:source-url-once',
   'page:unauthorized-external-url',
   'page:fabricated-publication',
+  'brand:logo-missing',
+  'brand:logo-not-svg',
+  'brand:logo-viewbox',
+  'brand:logo-palette',
+  'brand:logo-unsafe',
+  'brand:favicon-parity',
   'layout:missing',
   'layout:lang',
   'layout:index-guard',
@@ -186,6 +231,7 @@ export const REASONS = Object.freeze([
   'workflow:no-node26',
   'workflow:no-security-floor',
   'workflow:no-audit-gate',
+  'workflow:no-brand-test',
   'workflow:permissions',
   'workflow:bypass',
   'workflow:provider-command',
@@ -240,6 +286,14 @@ function countOf(text, needle) {
   return text.split(needle).length - 1;
 }
 
+/**
+ * Remove JSX/TS block and line comments so a lexical copy check judges what a visitor could
+ * read, not what a maintainer wrote beside it.
+ */
+function stripComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|\s)\/\/[^\n]*/g, ' ');
+}
+
 /** Non-comment, non-blank lines of a dotfile-style ignore list. */
 function ignorePatterns(text) {
   return text
@@ -277,7 +331,7 @@ export function analyzeReadiness(snapshot) {
     expect(false, read.reason);
     return finish(checks, reasons);
   }
-  const { packageJson, lockfile, nextConfig, page, layout, gitignore, vercelignore, u01Workflow } =
+  const { packageJson, lockfile, nextConfig, page, layout, logo, icon, gitignore, vercelignore, u01Workflow } =
     read.fields;
 
   // --- 1. package.json: the pinned private Apache-2.0 Node 24 / pnpm 11 / Next 16 shape ---
@@ -351,18 +405,37 @@ export function analyzeReadiness(snapshot) {
   expect(!/technical placeholder|runtime is not implemented yet/i.test(pageText),
     'page:obsolete-placeholder');
   expect(/<h1[\s>]/.test(pageText), 'page:missing-heading');
-  expect(pageText.includes('Foundation Uno — a single-Entity website foundation'),
-    'page:missing-title-copy');
-  expect(pageText.includes('English demonstration'), 'page:missing-disclosure');
-  const sourceLinks = countOf(pageText, SOURCE_URL);
-  expect(sourceLinks === 1, 'page:source-link');
+  expect(pageText.includes(HERO_HEADING), 'page:hero-heading');
+  expect(pageText.includes(HERO_LEAD), 'page:hero-lead');
+  expect(pageText.includes(HERO_NOTE), 'page:missing-disclosure');
+  expect(pageText.includes(FOOTER_COPY), 'page:footer-copy');
+  expect(pageText.includes(`src="${LOGO_PATH}"`), 'page:brand-mark');
+  expect(pageText.includes('alt="Foundation Uno"'), 'page:brand-alt');
+  const sourceLinks = countOf(pageText, 'href={SOURCE_URL}');
+  expect(sourceLinks === 2, 'page:source-link');
+  expect(countOf(pageText, SOURCE_URL) === 1, 'page:source-url-once');
   const httpsCount = countOf(pageText, 'https://');
   const httpCount = countOf(pageText, 'http://');
   expect(httpsCount === 1 && httpCount === 0, 'page:unauthorized-external-url');
+  const pageCopy = stripComments(pageText);
   expect(
-    !FABRICATION_MARKERS.some((marker) => pageText.includes(marker)),
+    !FABRICATION_MARKERS.some((marker) => pageCopy.includes(marker)),
     'page:fabricated-publication',
   );
+  expect(
+    !RETIRED_COPY.some((phrase) => pageCopy.includes(phrase)),
+    'page:retired-claim',
+  );
+
+  // --- 4b. Brand assets: one vector, identical favicon, no active content --------------
+  const logoText = logo.trim();
+  const iconText = icon.trim();
+  expect(logoText.length > 0, 'brand:logo-missing');
+  expect(/^<svg[\s>]/.test(logoText) && logoText.endsWith('</svg>'), 'brand:logo-not-svg');
+  expect(/viewBox="0 0 128 128"/.test(logoText), 'brand:logo-viewbox');
+  expect(logoText.includes('#1f6f6b') && logoText.includes('#101620'), 'brand:logo-palette');
+  expect(!LOGO_ACTIVE_CONTENT.test(logoText), 'brand:logo-unsafe');
+  expect(iconText === logoText, 'brand:favicon-parity');
 
   // --- 5. Language and robots guards in the root layout --------------------------------
   const layoutText = layout.trim();
@@ -371,8 +444,11 @@ export function analyzeReadiness(snapshot) {
   expect(/index:\s*false/.test(layoutText), 'layout:index-guard');
   expect(/follow:\s*false/.test(layoutText), 'layout:follow-guard');
   expect(/nocache:\s*true/.test(layoutText), 'layout:nocache-guard');
-  expect(/title:\s*'[^']*Foundation Uno[^']*'/.test(layoutText), 'layout:title');
-  expect(layoutText.includes('English demonstration of Foundation Uno'), 'layout:description');
+  expect(layoutText.includes(`title: '${META_TITLE}'`), 'layout:title');
+  expect(
+    layoutText.includes('a live, open-source single-page demonstration'),
+    'layout:description',
+  );
   expect(!/alternates\s*:/.test(layoutText), 'layout:canonical-or-hreflang');
 
   // --- 5b. Exactly one approved analytics integration, rendered once -------------------
@@ -450,6 +526,10 @@ export function analyzeReadiness(snapshot) {
     'workflow:no-security-floor',
   );
   expect(/pnpm audit --audit-level high/.test(workflowText), 'workflow:no-audit-gate');
+  expect(
+    workflowText.includes('tests/deployment/uno-brand-copy.test.mjs'),
+    'workflow:no-brand-test',
+  );
   expect(
     /contents:\s*read/.test(workflowText) && !/contents:\s*write/.test(workflowText),
     'workflow:permissions',

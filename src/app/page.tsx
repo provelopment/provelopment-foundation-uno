@@ -1,11 +1,12 @@
 /**
- * Foundation Uno — English informational demonstration homepage.
+ * Foundation Uno — public single-page demonstration homepage.
  *
- * This is the visitor-facing introduction to the project, not the P05 authored EFS Home Page and
- * not a published Uno Site. It is static server-rendered HTML: no client component, no fetch, no
- * manifest, no module renderer and no route authority are involved. The page states plainly what
- * exists as tested GitHub code today versus what is still an intention, and it carries the
- * pre-publication `noindex, nofollow` policy set in the root layout.
+ * This is the visitor-facing introduction to the project. It is static server-rendered HTML: no
+ * client component, no fetch, no manifest read and no route authority. The copy describes what is
+ * true today — a live single-page demonstration, a validated single-Entity content graph with an
+ * authored English Home source, and tested primitives — while stating plainly that content-driven
+ * publishing and locale-aware routes are still in development. The authored EFS Home source is not
+ * served by this route, and the root layout keeps the project's `noindex, nofollow` policy.
  */
 const SOURCE_URL = 'https://github.com/provelopment/provelopment-foundation-uno';
 
@@ -18,17 +19,26 @@ export default function Page() {
 
       <header className="uno-header">
         <div className="uno-shell uno-header__row">
-          <p className="uno-brand">Foundation Uno</p>
+          <p className="uno-brand">
+            <img
+              className="uno-brand__mark"
+              src="/uno-logo.svg"
+              alt="Foundation Uno"
+              width={30}
+              height={30}
+            />
+            <span className="uno-brand__name">Foundation Uno</span>
+          </p>
           <nav className="uno-nav" aria-label="On this page">
             <ul>
               <li>
-                <a href="#how-it-is-organized">How it is organized</a>
+                <a href="#how-it-is-organized">Architecture</a>
               </li>
               <li>
-                <a href="#status">Status</a>
+                <a href="#status">Progress</a>
               </li>
               <li>
-                <a href="#explore">Explore the code</a>
+                <a href="#explore">Source code</a>
               </li>
             </ul>
           </nav>
@@ -38,26 +48,27 @@ export default function Page() {
       <main id="main">
         <section className="uno-hero" aria-labelledby="hero-title">
           <div className="uno-shell">
-            <p className="uno-eyebrow">Independent · Apache-2.0 · Next.js + TypeScript</p>
+            <p className="uno-eyebrow">A Provelopment initiative · Open source · Next.js + TypeScript</p>
             <h1 id="hero-title" className="uno-hero__title">
-              Foundation Uno — a single-Entity website foundation
+              Foundation Uno — a focused foundation for the web
             </h1>
             <p className="uno-hero__lede">
-              Foundation Uno is an independent Apache-2.0 Next.js and TypeScript website
-              foundation built around <strong>one Entity</strong>: a single owner whose Facets,
-              Sites, Pages and explicitly authored, region-qualified locales stay in one coherent
-              and reviewable structure.
+              Foundation Uno is a working, open-source website demonstration from Provelopment,
+              designed around a simple principle: one organization, one clear ownership model. Its
+              foundation brings together structured content, modern web technology and a deliberate
+              approach to extending what a website can do.
             </p>
             <div className="uno-actions">
               <a className="uno-button" href={SOURCE_URL} rel="noreferrer">
-                Explore the code on GitHub
+                Explore the source on GitHub
               </a>
               <a className="uno-button uno-button--quiet" href="#status">
-                See what works today
+                See the progress
               </a>
             </div>
             <p className="uno-note">
-              English demonstration — full authored Site publication is not yet enabled.
+              You are viewing a live, single-page example of Foundation Uno. The wider
+              content-publishing system is being developed in stages.
             </p>
           </div>
         </section>
@@ -68,89 +79,85 @@ export default function Page() {
           aria-labelledby="organized-title"
         >
           <div className="uno-shell">
-            <h2 id="organized-title">How it is organized</h2>
+            <h2 id="organized-title">A clear structure for everything you publish</h2>
             <p className="uno-section__lede">
-              One owner, four levels above it. This is the planned contract the foundation is
-              being built toward: today only the smallest pure primitives for it exist as tested
-              code.
+              Uno organizes a website around one accountable owner. Content can be arranged into
+              distinct areas, websites, pages and authored language versions without introducing
+              competing ownership models.
             </p>
             <ol className="uno-stack">
               <li>
                 <h3>Entity</h3>
-                <p>Exactly one owner of the installation, and the only publisher in it.</p>
+                <p>The single organization that owns the website and its content.</p>
               </li>
               <li>
                 <h3>Facets</h3>
-                <p>Named areas of that owner&rsquo;s presence, each with a single purpose.</p>
+                <p>Distinct areas of the organization&apos;s work, organized under the same owner.</p>
               </li>
               <li>
                 <h3>Sites</h3>
-                <p>Exactly one public Site is selected at a time; no fan-out and no hidden publisher.</p>
+                <p>
+                  Individual web presences with clearly defined responsibilities and a deliberate
+                  publication choice.
+                </p>
               </li>
               <li>
                 <h3>Pages</h3>
                 <p>
-                  Authored content, written as JSON or Markdown, with one declared source answering
-                  for each Page representation.
+                  Structured content with explicit sources, designed to support reliable publishing
+                  as the platform grows.
                 </p>
               </li>
               <li>
                 <h3>Localized representations</h3>
                 <p>
-                  Explicitly authored, region-qualified locales such as en-001 — never guessed from
-                  a browser header, a cookie or a visitor&rsquo;s address.
+                  Language-and-region-specific content authored intentionally, rather than inferred
+                  from a visitor&apos;s location.
                 </p>
               </li>
             </ol>
             <p className="uno-note uno-note--inline">
-              Planned contract, not a working publication: no manifest, reader, route authority or
-              module renderer for it is implemented yet.
+              The single-Entity content structure and an English Home source are already defined and
+              validated in the codebase. Content-driven publishing and locale-aware routes are
+              forthcoming.
             </p>
           </div>
         </section>
-
         <section id="status" className="uno-section" aria-labelledby="status-title">
           <div className="uno-shell">
-            <h2 id="status-title">What works today and what comes next</h2>
+            <h2 id="status-title">Working today. Designed to grow.</h2>
             <p className="uno-section__lede">
-              Uno is an engineering foundation, not a finished website. This split is the honest
-              boundary between the two.
+              This deployed page demonstrates Uno&apos;s current web foundation. The next
+              capabilities are being added with explicit contracts, automated tests and clear
+              ownership.
             </p>
             <div className="uno-grid">
               <article className="uno-card">
-                <h3>What works today</h3>
+                <h3>Available today</h3>
                 <ul>
                   <li>
-                    A reproducible Next.js 16 and React 19 TypeScript baseline that builds and
-                    serves, verified on Ubuntu and Windows CI.
+                    A live, responsive single-page website built with Next.js, React and TypeScript.
+                  </li>
+                  <li>A validated single-Entity content graph with an authored English Home source.</li>
+                  <li>
+                    Tested rules for content identity, safe URLs, source selection and authored
+                    locale declarations.
                   </li>
                   <li>
-                    Pure, unit-tested identity, content-slug, route-path and author-URL safety
-                    primitives.
+                    Automated checks across Windows and Linux, including production HTTP and
+                    dependency-security tests.
                   </li>
-                  <li>
-                    A tested declared-source policy, plus an application resolver that delegates
-                    every precedence decision to it.
-                  </li>
-                  <li>
-                    Architecture tests that refuse framework, adapter and Node I/O imports in the
-                    pure and application layers.
-                  </li>
-                  <li>Apache-2.0 licensing and two-host GitHub Actions on every push.</li>
+                  <li>Publicly reviewable source code released under the Apache-2.0 licence.</li>
                 </ul>
               </article>
               <article className="uno-card">
-                <h3>What&rsquo;s next</h3>
+                <h3>In development</h3>
                 <ul>
-                  <li>An EFS manifest with source ownership and confined readers.</li>
+                  <li>Serving authored JSON and Markdown content through the website.</li>
+                  <li>Locale-aware page addresses, visibility controls and publication metadata.</li>
+                  <li>A wider library of layouts, content and interactive components.</li>
                   <li>
-                    Authored page rendering and the 22-module presentation system across the 17
-                    capability families.
-                  </li>
-                  <li>Region-qualified locale routing and public route authority.</li>
-                  <li>
-                    A publication decision, a deliberate release and an Owner-controlled
-                    deployment.
+                    Reproducible setup, upgrades and release workflows for independent installations.
                   </li>
                 </ul>
               </article>
@@ -160,19 +167,19 @@ export default function Page() {
 
         <section id="explore" className="uno-section" aria-labelledby="explore-title">
           <div className="uno-shell">
-            <h2 id="explore-title">Explore the code</h2>
+            <h2 id="explore-title">Explore the source</h2>
             <p className="uno-section__lede">
-              Everything described above is public, reviewable source with its own tests and
-              continuous verification. The repository is the record of progress.
+              Foundation Uno is developed in the open. Review the implementation, tests and
+              architecture in its GitHub repository, and follow how the foundation evolves.
             </p>
             <p>
               <a className="uno-link" href={SOURCE_URL} rel="noreferrer">
-                Read the Foundation Uno repository on GitHub
+                View Foundation Uno on GitHub
               </a>
             </p>
             <p className="uno-note uno-note--inline">
-              This page is an English informational demonstration. It is not an authored EFS Site,
-              it serves no locale route, and full authored Site publication is not yet enabled.
+              The page you are viewing is a self-contained demonstration; the authored content engine
+              will power more of the experience as development continues.
             </p>
           </div>
         </section>
@@ -181,9 +188,8 @@ export default function Page() {
       <footer className="uno-footer">
         <div className="uno-shell">
           <p>
-            Foundation Uno — an English demonstration page. The authored public A1 website is not
-            implemented yet: there is no published Site, no locale route, no release and no live
-            deployment behind this address.
+            Foundation Uno is a Provelopment initiative. A live, open-source demonstration of a
+            focused, single-owner website foundation. © 2026 Provelopment.
           </p>
         </div>
       </footer>

@@ -52,18 +52,34 @@ function validSnapshot() {
 
   const page = [
     '<div className="uno-page">',
-    '  <h1>Foundation Uno — a single-Entity website foundation</h1>',
-    '  <p className="uno-note">English demonstration — full authored Site publication is not yet enabled.</p>',
-    `  <a href="${SOURCE_URL}">Read the Foundation Uno repository on GitHub</a>`,
+    '  <p className="uno-brand">',
+    '    <img className="uno-brand__mark" src="/uno-logo.svg" alt="Foundation Uno" width={30} height={30} />',
+    '    <span className="uno-brand__name">Foundation Uno</span>',
+    '  </p>',
+    '  <h1>Foundation Uno — a focused foundation for the web</h1>',
+    '  <p>Foundation Uno is a working, open-source website demonstration from Provelopment, designed around one organization.</p>',
+    '  <p>You are viewing a live, single-page example of Foundation Uno. The wider content-publishing system is being developed in stages.</p>',
+    '  <p>Foundation Uno is a Provelopment initiative. A live, open-source demonstration of a focused, single-owner website foundation. © 2026 Provelopment.</p>',
+    '  <a href={SOURCE_URL}>Explore the source on GitHub</a>',
+    '  <a href={SOURCE_URL}>View Foundation Uno on GitHub</a>',
+    `  const SOURCE_URL = '${SOURCE_URL}';`,
     '</div>',
+    '',
+  ].join('\n');
+
+  const logoSvg = [
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img">',
+    '  <g fill="#1f6f6b"><circle cx="17" cy="34" r="6.5"/></g>',
+    '  <path d="M53 45 70 32 79 32 79 100 57 100 57 59 53 62Z" fill="#101620" stroke="#ffffff" stroke-width="7"/>',
+    '</svg>',
     '',
   ].join('\n');
 
   const layout = [
     "import { Analytics } from '@vercel/analytics/next';",
     'export const metadata = {',
-    "  title: 'Foundation Uno — a single-Entity website foundation',",
-    "  description: 'English demonstration of Foundation Uno, an independent Apache-2.0 Next.js foundation.',",
+    "  title: 'Foundation Uno | A focused website foundation by Provelopment',",
+    "  description: 'Explore Foundation Uno, a live, open-source single-page demonstration of a website foundation.',",
     '  robots: { index: false, follow: false, nocache: true },',
     '};',
     '',
@@ -121,6 +137,8 @@ function validSnapshot() {
     '        run: pnpm install --frozen-lockfile --ignore-scripts',
     '      - name: Node 26 and dependency security floors',
     '        run: node --test tests/deployment/node26-security-floor.test.mjs',
+    '      - name: Brand and copy contract',
+    '        run: node --test tests/deployment/uno-brand-copy.test.mjs',
     '      - name: Dependency audit (high and critical must be zero)',
     '        run: pnpm audit --audit-level high',
     '      - name: Bootstrap governance gate',
@@ -150,6 +168,8 @@ function validSnapshot() {
     nextConfig,
     page,
     layout,
+    logo: logoSvg,
+    icon: logoSvg,
     gitignore,
     vercelignore,
     u01Workflow,
@@ -160,6 +180,14 @@ function validSnapshot() {
 function withChange(key, mutate) {
   const snapshot = { ...validSnapshot() };
   snapshot[key] = mutate(snapshot[key]);
+  return snapshot;
+}
+
+/** Mutate the header mark and the favicon together, as an asset revision would. */
+function withAssets(mutate) {
+  const snapshot = { ...validSnapshot() };
+  snapshot.logo = mutate(snapshot.logo);
+  snapshot.icon = mutate(snapshot.icon);
   return snapshot;
 }
 
@@ -300,13 +328,15 @@ test('refuses a page without a real heading', () => {
   assertRefused(analyzeReadiness(snapshot), 'page:missing-heading');
 });
 
-test('refuses a page that drops the English demonstration disclosure', () => {
-  const snapshot = withChange('page', (text) => text.replace('English demonstration', 'Welcome'));
+test('refuses a page that drops the live single-page disclosure', () => {
+  const snapshot = withChange('page', (text) =>
+    text.replace('You are viewing a live, single-page example of Foundation Uno.', 'Welcome.'),
+  );
   assertRefused(analyzeReadiness(snapshot), 'page:missing-disclosure');
 });
 
-test('refuses a page that loses the single approved source link', () => {
-  const snapshot = withChange('page', (text) => text.split(SOURCE_URL).join('https://example.invalid/uno'));
+test('refuses a page that loses the approved source anchors', () => {
+  const snapshot = withChange('page', (text) => text.replaceAll('href={SOURCE_URL}', 'href="/local"'));
   const result = analyzeReadiness(snapshot);
   assert.equal(result.accepted, false);
   assert.deepEqual(result.reasons, ['page:source-link']);
@@ -511,3 +541,57 @@ function assertRefused(result, code) {
   assert.deepEqual(result.reasons, [code]);
   assert.equal(result.checks > 0, true, 'a refusal must be the product of executed checks');
 }
+
+// --- UNO-WO-015 / R01: copy and brand regressions ------------------------------------
+
+test('refuses a retired status claim in the page copy', () => {
+  const snapshot = withChange('page', (text) => `${text}<p>This page is not deployed.</p>\n`);
+  assertRefused(analyzeReadiness(snapshot), 'page:retired-claim');
+});
+
+test('refuses a drifted hero heading', () => {
+  const snapshot = withChange('page', (text) =>
+    text.replace(
+      'Foundation Uno — a focused foundation for the web',
+      'Foundation Uno — a single-Entity website foundation',
+    ),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'page:hero-heading');
+});
+
+test('refuses a missing brand mark in the header', () => {
+  const snapshot = withChange('page', (text) => text.replace('src="/uno-logo.svg"', 'src="/logo.png"'));
+  assertRefused(analyzeReadiness(snapshot), 'page:brand-mark');
+});
+
+test('refuses a logo carrying active content', () => {
+  const snapshot = withAssets((text) => text.replace('</svg>', '<script>alert(1)</script></svg>'));
+  assertRefused(analyzeReadiness(snapshot), 'brand:logo-unsafe');
+});
+
+test('refuses a favicon that is not byte-identical to the header mark', () => {
+  const snapshot = withChange('icon', (text) => text.replace('r="6.5"', 'r="7"'));
+  assertRefused(analyzeReadiness(snapshot), 'brand:favicon-parity');
+});
+
+test('refuses a logo without the approved palette', () => {
+  const snapshot = withAssets((text) => text.replaceAll('#1f6f6b', '#ff0000'));
+  assertRefused(analyzeReadiness(snapshot), 'brand:logo-palette');
+});
+
+test('refuses a page claiming the EFS content runtime is live', () => {
+  const snapshot = withChange('page', (text) =>
+    text.replace(
+      '<p>You are viewing a live, single-page example of Foundation Uno.',
+      '<p>EFS publication is live and locale routes are live.<p>You are viewing a live, single-page example of Foundation Uno.',
+    ),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'page:fabricated-publication');
+});
+
+test('refuses a workflow without the blocking brand and copy step', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text.replace('node --test tests/deployment/uno-brand-copy.test.mjs', 'echo skipped'),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-brand-test');
+});

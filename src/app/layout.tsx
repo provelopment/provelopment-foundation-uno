@@ -21,9 +21,9 @@ import './globals.css';
  * relaxed metadata is introduced, and the page itself stays unchanged.
  */
 export const metadata: Metadata = {
-  title: 'Foundation Uno — a single-Entity website foundation',
+  title: 'Foundation Uno | A focused website foundation by Provelopment',
   description:
-    'English demonstration of Foundation Uno, an independent Apache-2.0 Next.js and TypeScript website foundation built for one Entity. Full authored Site publication is not yet enabled.',
+    'Explore Foundation Uno, a live, open-source single-page demonstration of a website foundation designed around one organization and developed by Provelopment.',
   robots: {
     index: false,
     follow: false,
