@@ -228,6 +228,7 @@ export const CORE_AUTHORED_FILES = Object.freeze([
   'src/core/efs/uno-route-address.ts',
   'src/core/efs/uno-page-header.ts',
   'src/core/efs/uno-discovery-policy.ts',
+  'src/core/efs/uno-canonical-base.ts',
   'src/core/efs/uno-locales.ts',
   'src/core/modules/capability-registry.ts',
   'src/core/page-authoring-policy.ts',
@@ -914,6 +915,50 @@ test('the scanner refuses injected Node, framework and adapter imports in the cl
   }
   assert.deepEqual(
     scanSources({ [DISCOVERY_SOURCE]: "import { isPageRoutePath } from '../page-route-path';\nexport const ok = isPageRoutePath;\n" }),
+    [],
+  );
+});
+
+// --- U03 canonical base boundary (UNO-WO-023 / R01) -----------------------------
+
+const CANONICAL_BASE_SOURCE = 'src/core/efs/uno-canonical-base.ts';
+
+test('the canonical-base validator is registered, pure and unreachable from the app layer', () => {
+  assert.equal(Object.keys(authoredSources()).includes(CANONICAL_BASE_SOURCE), true);
+  assert.equal(CORE_AUTHORED_FILES.includes(CANONICAL_BASE_SOURCE), true);
+
+  const source = readFileSync(resolve(ROOT, CANONICAL_BASE_SOURCE), 'utf8');
+  assert.deepEqual(scanSources({ [CANONICAL_BASE_SOURCE]: source }), []);
+
+  // It reuses the authored slug rule rather than inventing a second path grammar.
+  assert.match(stripComments(source), /isContentSlug/);
+
+  // No runtime power of its own: no Node, framework, adapter, provider, environment or network access.
+  const executable = stripComments(source);
+  for (const forbidden of ['node:', 'next/', 'react', '/adapters/', 'process.env', 'fetch(']) {
+    assert.equal(executable.includes(forbidden), false, `the validator must not gain ${forbidden}`);
+  }
+
+  // Validating a base is not serving it: no app-layer source may consume it in this order.
+  for (const [path, body] of Object.entries(readTree('src/app', 'src/app'))) {
+    assert.equal(body.includes('uno-canonical-base'), false, `${path} must not import the validator`);
+  }
+});
+
+test('the scanner refuses injected Node, framework, adapter and provider imports in the validator', () => {
+  const injected = [
+    ["import { readFileSync } from 'node:fs';", 'Node I/O'],
+    ["import { headers } from 'next/headers';", 'framework'],
+    ["import { createElement } from 'react';", 'React'],
+    ["import { loadUnoCandidateSource } from '../adapters/efs/uno-confined-source-reader';", 'adapter'],
+    ["import { send } from '@/adapters/providers/notification';", 'provider adapter'],
+  ];
+  for (const [line, label] of injected) {
+    const violations = scanSources({ [CANONICAL_BASE_SOURCE]: `${line}\nexport const x = 1;\n` });
+    assert.equal(violations.length, 1, `${label} must be refused inside ${CANONICAL_BASE_SOURCE}`);
+  }
+  assert.deepEqual(
+    scanSources({ [CANONICAL_BASE_SOURCE]: "import { isContentSlug } from '../page-content';\nexport const ok = isContentSlug;\n" }),
     [],
   );
 });

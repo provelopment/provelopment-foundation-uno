@@ -1223,6 +1223,35 @@ no markup; Markdown must begin with one `# ` heading and is always `public`; rep
 projection proves a Page is routed, public or indexable.
 
 
+## U03 canonical base validation (UNO-WO-023 / R01)
+
+**Mapping.** `src/core/efs/uno-canonical-base.ts` (pure core) validates one *proposed* Owner-declared
+canonical HTTP(S) base as `{canonical, aliases}` and returns either `{accepted: true, canonical: {origin,
+pathPrefix}, aliases: [...]}` or one closed refusal code. It is a building block for a future single-Site
+configuration; it reads, writes and activates nothing.
+
+**Rules.** HTTPS with lowercase DNS labels only; plain HTTP only for the exact loopback hosts with an optional
+explicit port; 1..255 ASCII bytes; no credentials, query, fragment, percent escape, backslash, Unicode,
+control, whitespace or trailing slash; an optional prefix of 1..8 lowercase content-slug segments (max 160
+characters) reusing `isContentSlug`; at most eight distinct aliases with no self-alias, duplicate or
+whole-segment origin overlap. The platform `URL` parser only *confirms* the accepted spelling — any
+normalization it would perform is a refusal, and a bare-origin root is read as an empty prefix.
+
+**Rights and provenance.** Original **Uno-owned** implementation, class **NEW / ABSTRACT DESIGN**; no upstream
+source, fixture, schema or prose is copied. The historical Foundation GEO-03 commit `c05c55ea…` is read-only
+design context for the *idea* of an absolute base, never an import or a write permission. No dependency,
+asset, workflow or schema was added; the 17-family / 22-ID capability mapping is unchanged.
+
+**Omitted powers.** No production domain selection, no `deployment/uno.config.json` migration, no second
+configuration authority, no Site or Page publication, no route, redirect, canonical tag, sitemap, robots or
+`hreflang` emission, no locale interpretation, no DNS or TLS claim, no provider access and no access control.
+`validateUnoSiteSelection`, the manifest graph, the locale matcher, the Page-header projector and the
+discoverability classifier remain untouched and authoritative in their own scopes.
+
+**Limitations.** Validation proves only that a declaration is well-formed, unambiguous and lexically safe. It
+does not prove any origin is reachable, owned by Uno, approved by the Owner, deployed, indexed or serving a
+Page, and an accepted alias authorises no redirect.
+
 ## U03 discoverability intent (UNO-WO-022 / R01)
 
 **Mapping.** `src/core/efs/uno-discovery-policy.ts` (pure core) classifies the discoverability **intent** of
