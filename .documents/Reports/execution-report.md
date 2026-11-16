@@ -1,181 +1,159 @@
-# UNO-WO-011 / R01 — English informational homepage at `/` with production HTTP proof
+# UNO-WO-012 / R01 — STOPPED before any Vercel action: the activation does not name a scope
 
-**Order / disposition:** `UNO-WO-011 / R01` · FINAL — EXECUTE · **Executed:** 2026-11-16
-**Private ACTIVE:** `.documents/WIP/workorder-active.md` — matching private installation and the Owner's separate activation were both checked before any write; ACTIVE content, digest and size are withheld from this report
-**Starting Uno `main`:** `833611297fe5f26d245f73189000dad0c13fbd3b` · **Product head:** `5323439f90d5dd1543bde15e0f06f287b0271d51`
-**Stage:** U01 — English informational demonstration · **U01 remains OPEN**, formal closed stages **1 / 8**
-**Disposition requested:** Chief Master Architect `ACCEPT / REVISE / STOP`
+**Order / edition:** `UNO-WO-012 / R01` · FINAL — EXECUTE · **Executed:** 2026-11-16
+**Result:** **`STOPPED`** — no deployment, no Vercel project, no live URL, **no progress credit**
+**Starting Uno `main`:** `3b642e12648c4c43b39542aec4d5be0ff41f2b59` (verified equal to `origin/main`)
+**Earned scorecard:** **23.75% → 23.75% (unchanged)** · formal stages **1 / 8** · **U01 remains OPEN**
+**Disposition requested:** Chief Master Architect `ACCEPT` / `REVISE` / `STOP` on this STOP decision
 
-## 1. What a visitor now receives at `GET /`
+## 1. Why this run stopped, in the order's own terms
 
-The served production document is 17,665 bytes of static HTML, built by the pinned Next 16.4.2 toolchain and
-verified over real loopback HTTP. Its outline:
+The order makes two of its own conditions mandatory before any provider action, and **both fail**.
 
-| Served element | Actual value |
+**(a) The activation does not supply `VERCEL_SCOPE`.** §2 states that the Owner activation **MUST**
+supply `VERCEL_SCOPE` as "exact Vercel personal/team scope slug selected by the Owner. **No default and
+no guessing**", and that "**an unfilled placeholder is not an activation**". The received activation
+carries the literal, unreplaced template token
+
+```text
+VERCEL_SCOPE=<REPLACE WITH EXACT OWNER-SELECTED SCOPE>
+```
+
+alongside three genuinely specified fields (`VERCEL_DEMO_PROJECT=provelopment-foundation-uno-demo`,
+`PUBLIC_UNPROTECTED_PREVIEW=YES`, `CREATE_PROJECT_IF_ABSENT=YES`). §6 step 1 then instructs: "If
+Vercel target cannot be identified exactly, **STOP without attempting a deployment**." Picking a scope
+from anything else — a CLI session, a default, a plausible team name — would be exactly the guessing
+the order forbids. **No scope was selected, and no project was created, adopted or inspected.**
+
+**(b) No Owner-authenticated Vercel channel exists on the execution machine.** §2 permits only "the
+Owner-authenticated Vercel environment, tool or CLI already made available to the Implementation
+Agent", forbids asking for a token in chat or printing environment values, and concludes: "If such a
+safe Vercel deployment channel is unavailable, **STOP with a factual GitHub report**." A read-only
+probe found:
+
+| Probe | Observation |
 | --- | --- |
-| `<html>` | `lang="en"` — the demonstration page language, never the authored locale id |
-| `<title>` | `Foundation Uno — a single-Entity website foundation` |
-| meta description | `English demonstration of Foundation Uno, an independent Apache-2.0 Next.js and TypeScript website foundation built for one Entity. Full authored Site publication is not yet enabled.` |
-| meta robots | `noindex, nofollow, nocache` (pre-publication policy preserved) |
-| `h1` (exactly one) | `Foundation Uno — a single-Entity website foundation` |
-| `h2` order | `How it is organized` → `What works today and what comes next` → `Explore the code` |
-| `h3` order | `Entity`, `Facets`, `Sites`, `Pages`, `Localized representations`, `What works today`, `What's next` |
-| anchor targets | `#main`, `#hero-title`, `#how-it-is-organized`, `#organized-title`, `#status`, `#status-title`, `#explore`, `#explore-title` — all seven in-page links resolve |
-| external links | exactly two, both `https://github.com/provelopment/provelopment-foundation-uno`, with readable text |
+| `vercel` CLI on `PATH` | present (a locally installed binary; no version or identity was queried) |
+| `VERCEL_TOKEN` | **not set** (presence checked as a boolean; no value read or printed) |
+| `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` / `VERCEL_SCOPE` | **not set** |
+| any other `VERCEL*` environment variable | none |
+| repository `.vercel` link directory | absent |
+| user-level Vercel CLI config directory | absent |
 
-**Content map.** A hero states that Uno is an independent Apache-2.0 Next.js/TypeScript foundation
-built around **one Entity**; a numbered "How it is organized" panel presents
-`Entity → Facets → Sites → Pages → localized representations` and labels it a **planned contract**,
-including that locales such as `en-001` are explicitly authored and never guessed; a two-column split
-separates **What works today** (reproducible baseline, pure tested primitives, declared-source policy
-and application resolver, architecture refusals, two-host CI, Apache-2.0) from **What's next** (EFS
-manifest and confined readers, authored rendering and the 22-module / 17-family presentation system,
-locale routing and route authority, publication, release, Owner-controlled deployment); an
-"Explore the code" section links the one public repository. A visible disclosure reads
-**"English demonstration — full authored Site publication is not yet enabled."**
+There is therefore no authenticated scope, team, or project identity to act under. Installing or
+authenticating tooling, or fetching a token through chat, is explicitly prohibited by §2. I did not run
+an authentication probe that would have written CLI state into the user profile, because task-owned
+state belongs inside the verified Uno root.
 
-**Honest boundary.** This is an informational demonstration surface. It is **not** the P05 authored
-EFS Home Page, **not** a validated one-Entity publication, and **not** evidence that modules render or
-that any family has been migrated. It does not claim a published Site, a live site or a deployment.
+Because (a) is a defect in the **activation** rather than a provider failure, no partial deliverable
+could rescue the run: the required output is an unauthenticated public HTTPS URL, and no legal target
+for it exists.
 
-## 2. Ledger — six product paths plus one report path
+## 2. Ledger — nothing authorized was created; only this report changed
 
-| # | Path | Operation | What changed |
+| # | Path | Operation in order | Actual status |
 | --- | --- | --- | --- |
-| 1 | `src/app/page.tsx` | EDIT | Sentence-only placeholder replaced by the full static English page: skip link, header nav, hero, planned-contract stack, status split, source section, footer disclosure |
-| 2 | `src/app/layout.tsx` | EDIT | Truthful demonstration `title`/`description`; `lang="en"` retained; `noindex, nofollow, nocache` and `googleBot` policy unchanged; no canonical or alternate invented |
-| 3 | `src/app/globals.css` | EDIT | Original dependency-free styling: light/dark tokens, `focus-visible` ring, `prefers-reduced-motion` and `prefers-contrast`, card/stack rhythm, one-column collapse below 34rem |
-| 4 | `src/app/not-found.tsx` | EDIT | Ordinary 404 restored to accurate copy with a link to the demonstration homepage; no implied publication |
-| 5 | `scripts/verify-u01-http.mjs` | EDIT | Placeholder assertions replaced by **51 counted production-HTTP assertions**; bounded loopback lifecycle, readiness, real `fetch`, teardown and port-release checks preserved |
-| 6 | `.documents/Architecture/source-inventory.md` | EDIT | One appended, titled U01 English-demonstration adoption/boundary note with an explicit non-claims paragraph |
-| 7 | `.documents/Reports/execution-report.md` | OVERWRITE | This report only, in its own single-path commit; its own SHA is not predicted here |
+| 1 | `.vercelignore` | CREATE | **NOT CREATED** — payload exclusion is only meaningful for an authorized upload |
+| 2 | `scripts/verify-vercel-demo.mjs` | CREATE | **NOT CREATED** — a live verifier with no live target would be dead weight |
+| 3 | `tests/deployment/verify-vercel-demo.test.mjs` | CREATE | **NOT CREATED** |
+| 4 | `.github/workflows/verify-vercel-demo.yml` | CREATE | **NOT CREATED** — no live check is authorized to run, and a workflow that can only ever print `NOT_APPLICABLE` would be noise, not evidence |
+| 5 | `.documents/Architecture/source-inventory.md` | EDIT narrowly | **NOT EDITED** — the note is meant to describe a controlled public preview that does not exist |
+| 6 | `.documents/Reports/execution-report.md` | OVERWRITE once | **OVERWRITTEN** with this STOPPED report, as the single record for the run |
 
-Product commit `5323439…`: exactly paths 1–6, **+845/−94**, direct parent `8336112…`, non-force
-fast-forward push. No other tracked path, dependency, asset, font, image, manifest, workflow, lockfile,
-config or governance file changed.
+The repository is otherwise byte-identical to `3b642e1…`: no source, page, CSS, core, application, test
+baseline, workflow, dependency, lockfile, Next config, governance file or planning slot was touched, and
+no `.vercel` link data was created. This report is a **report-only** commit and its direct parent is the
+required starting commit.
 
-## 3. The production HTTP gate — what it actually proves
+## 3. Preflight that did pass
 
-`pnpm test:http` starts the built application with the pinned local Next CLI on `127.0.0.1` and an
-ephemeral port, waits for readiness, issues real `fetch` requests, then stops that exact child and
-confirms the port is released. **51 assertions pass, 0 fail** — up from 21, and no earlier safety check
-was dropped.
+Independently verified before deciding to stop:
 
-**Grouped coverage (51):** 1 readiness · 4 document identity (`200`, `text/html`, `lang="en"`, exactly
-one `h1`) · 3 `h1`/title truthfulness · 2 served description checks · 1 obsolete-sentence absence ·
-3 introduction facts (Apache-2.0 + Next.js + TypeScript, one Entity, Facets/Sites/Pages/locales) ·
-4 planned-contract checks (section, four levels + localized representations, region-qualified `en-001`
-never guessed, labelled planned) · 4 status-split checks (both columns, real lists of ≥4 items each,
-"not a finished website") · 1 visible disclosure · 1 no-publication-claim negative · 3 source-link
-checks (exact URL, readable text, and it is the only absolute link) · 1 anchor-integrity check (7 links,
-0 broken) · 2 robots directives · 7 absent-fabrication markers (`canonical`, `hreflang`, `sitemap`,
-`analytics`, `googletagmanager`, `@vercel`, `modules/connect`) · 1 no-external-subresource check ·
-1 substance check · **six 404 refusals** (`/en`, `/en-001`, `/about`, `/does-not-exist-9f3`,
-`/robots.txt`, `/sitemap.xml`) · 3 404-page checks (homepage link, stale copy gone, no publication
-language) · 1 server-stayed-up · 1 port-released.
+- **Private ACTIVE:** present at the canonical ignored path, **not** tracked and **not** staged; its
+  exact bytes and digest were compared with the Owner's stated values and **matched**. The bytes and
+  digest are withheld from this report.
+- **Git authority:** `HEAD` = `origin/main` = `3b642e12648c4c43b39542aec4d5be0ff41f2b59`; branch `main`;
+  exactly one remote (`provelopment/provelopment-foundation-uno`); one checkout and one worktree; clean
+  tree and index; no merge, rebase, cherry-pick, bisect or index-lock residue; parent workspace guard
+  intact; Foundation and Solo untouched by me.
+- **Reviewed source is the accepted source:** the order's pinned blobs match `HEAD` exactly —
+  `src/app/page.tsx` `7b7c883b3d3c92edfbfefd1f0614a192ed1814fc`, `src/app/layout.tsx`
+  `012f28c58ebdfb0bdda48cf7c80d147d1ff5ab98`, `scripts/verify-u01-http.mjs`
+  `6c9f4b1ab191c5883a8216389ff5f595ba87ca55`. Nothing had drifted since the accepted `UNO-WO-011`
+  product commit, so no rework of the page was needed or attempted.
+- **Toolchain:** Node v24.22.1, pnpm 11.6.0, Next 16.4.2 — the same pinned versions as the accepted run.
 
-**Negative assertions are not decorative.** The old placeholder would fail three of them. A throwaway
-in-memory proof (no tracked file) applied the same expressions to the superseded markup and reported
-`DETECTED` for: obsolete-sentence detection, missing single-Entity `h1`, stale 404 copy, and 404
-publication language — `negatives-non-vacuous=true`. A regression to the old page, to `/en` routing or
-to premature metadata therefore fails this gate rather than passing silently.
+**Gates were not re-executed** in this run because **no file they cover changed**; re-running them would
+have produced numbers this report could only describe as re-runs over unchanged code. The accepted
+evidence at this exact head stands. I make no claim of a fresh local pass beyond the preflight checks
+listed here.
 
-## 4. Local verification
+## 4. Vercel state — nothing was touched
 
-Node v24.22.1, pnpm 11.6.0, Next 16.4.2, React 19.2.9; frozen lockfile unchanged.
-
-| Gate | Result |
+| Item | State |
 | --- | --- |
-| `pnpm install --frozen-lockfile --ignore-scripts` | `PASS` — up to date |
-| `node scripts/verify-governance-docs.mjs` | `PASS` — frozen bytes match |
-| `node --test tests/governance-docs.test.mjs` | `PASS` — 6 / 6 |
-| `pnpm test:bootstrap` | `PASS` — 19 / 19 |
-| `pnpm test:architecture` | `PASS` — 12 / 12 |
-| `pnpm lint` | `PASS` — exit 0 |
-| `pnpm typecheck` | `PASS` — exit 0 |
-| `pnpm test` (Vitest) | `PASS` — 167 / 167 retained |
-| `pnpm build` | `PASS` — 3 / 3 static pages, `/` prerendered |
-| `pnpm test:http` | `PASS` — **51 / 51**, up from 21 |
-| Local WSL | `UNVERIFIED` — not attempted |
-| Browser render, screenshot, axe/a11y scan | **NOT APPLICABLE / NOT EXECUTED** — this order is GitHub-only; no browser or a11y tool ran, and nothing here claims one did |
-| Vercel preview, production URL, live HTTP to a deployed host | **NOT APPLICABLE** — no deployment exists or is authorized |
+| Vercel scope used | **none** — the required field was an unfilled placeholder |
+| Vercel project created / adopted | **none** — no project name was reserved, cloned, linked or inspected |
+| Deployment | **none** — no build was submitted, no deployment ID exists |
+| Public HTTPS URL | **none** — no `*.vercel.app` address exists or is claimed anywhere in this report |
+| Git integration / auto-deploy | not enabled, not modified |
+| Production promotion, alias, custom domain, DNS | not performed |
+| Team-wide protection, SSO, billing, members, audit settings | not read or changed |
+| Secrets / environment variables | none created, read or printed |
+| Account identity | not authenticated, not probed, not disclosed |
 
-**Warnings, disclosed.** The CI workflow step is still named "Run production HTTP (technical
-placeholder)"; workflows are outside this ledger and were not edited, so the label is stale while the
-command it runs is the new 51-assertion gate. pnpm prints a cosmetic version notice. One trailing blank
-line was removed from five files and line endings normalised before committing, with
-`git diff --check` and `git diff --cached --check` clean. `DEP0190`, Next cache notices and pnpm
-shim-layout warnings were not observed on this machine.
+No `PUBLIC_PREVIEW_READY` marker is present in this report, and no stand-in URL is offered: a
+placeholder or guessed destination would be the fabrication the order explicitly forbids.
 
-## 5. Exact-head hosted verification
+## 5. Hosted evidence at the required starting head
 
-Both unchanged workflows ran on both operating systems at the product head `5323439…`.
+The two unchanged Uno workflows are already green at this exact commit — the same head this run started
+from and did not alter:
 
 | Workflow | Run | ubuntu-24.04 | windows-2025 | Steps / non-success |
 | --- | --- | --- | --- | --- |
-| Uno Bootstrap Verify | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43821721955 | success | success | 9 / **0** |
-| Verify U01 baseline | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43821721896 | success | success | 18 / **0** |
+| Uno Bootstrap Verify | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43822075296 | success | success | 9 / **0** |
+| Verify U01 baseline | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43822075419 | success | success | 18 / **0** |
 
-Each run reported `completed/success` with `head_sha` `5323439…`. Job and step conclusions were read
-per host and confirm the pipeline actually exercised this change: `Architecture boundaries`,
-`Production build` and `Run production HTTP` all `success` on **Windows 2025** and **Ubuntu 24.04** —
-i.e. the 51-assertion production gate passed in hosted CI on both platforms, not only locally.
-**Full log text is `UNVERIFIED`:** the logs endpoint was not readable to this client, so no log line is
-quoted. No workflow was edited, rerun, cancelled or retried. Both workflows also run at the
-report-only head; those run identities are given in the handback for this order, since this report
-cannot contain its own commit SHA.
+The report-only head produced by this run triggers the same two workflows again; their identities are
+stated in the Owner handback for this order, because this report cannot contain its own commit SHA. The
+live-verification workflow that this order would have added **does not exist**, so no live job is claimed
+as passing, skipped or `NOT_APPLICABLE` evidence. Job **log text remains `UNVERIFIED`**: the logs
+endpoint was not readable to this client, so no log line is quoted.
 
-## 6. Security, privacy, rights and cleanup
+## 6. Scorecard and non-claims
 
-- **Frozen governance untouched and still verified:** `AGENTS.md`, `README.md` and
-  `.documents/SOP/sop-implementation.md` are byte-identical; `verify-governance-docs.mjs` passes and the
-  governance test count is unchanged at 6. No planning slot, workflow, lockfile, `package.json`,
-  `next.config.ts`, `tsconfig.json`, `src/core/**`, `src/application/**`, `deployment/**` or `public/**`
-  path changed.
-- **Pre-publication state preserved:** `noindex, nofollow, nocache` remain; the six declared paths still
-  return real 404s (never a redirect); no canonical, `hreflang`, sitemap, analytics, tag manager,
-  provider marker, middleware, `route.ts`, `robots.ts` or `sitemap.ts` was added.
-- **No external surface:** the page is static HTML/CSS with zero external subresources, zero client
-  fetch, zero environment-driven display and no contact form; the only outbound references are two
-  ordinary links to the public Uno repository. Light and dark both remain readable; motion is limited
-  to a preference-gated smooth scroll; focus is always visible.
-- **Privacy:** no ACTIVE byte or digest, no machine path, no credential, no token, no Vercel project or
-  provider detail and no personal datum appears in this report or any changed file. ACTIVE stayed
-  ignored, untracked and unstaged throughout.
-- **Rights:** all page copy and CSS are original Uno-authored work. No Foundation trademark, imagery,
-  demo copy, testimonial, Connect asset, third-party font, icon or dependency was copied or added.
-- **External state:** no Vercel or provider action of any kind was taken; no deployment, preview,
-  promotion, domain, secret or release exists from this run. Foundation `8789a45…`, Solo and the parent
-  workspace were read-only and unwritten.
-- **Cleanup:** build output stayed in ignored Uno paths; the only scratch was a `.temp/uno-wo-011-r01/`
-  directory (one empty hooks dir plus the throwaway negative proof), removed after use; no listener or
-  server was left running and the loopback port release is asserted by the gate itself.
-
-## 7. Progress measurement (milestone credit)
-
-| Item | Before | After |
+| Item | Before | After this run |
 | --- | --- | --- |
 | U00 (Owner-closed) | 12.50 | 12.50 |
-| U01 outcomes 1–8 | 8 × 1.25 = 10.00 | 10.00 |
-| **U01 outcome 9** — visitor-useful English page at `/`, CSS/accessibility, ≥25 production HTTP proofs | 0.00 | **1.25** |
-| U01 outcome 10 — full stage exit | 0.00 | 0.00 (not authorized) |
+| U01 outcomes 1–8 (accepted) | 10.00 | 10.00 |
+| U01 accepted English homepage (WO-011) | 1.25 | 1.25 |
+| **This order's refinement** — 0.75 public externally verified demo / 0.50 retained for U01 exit | 0.00 | **0.00 — not earned** |
 | U02–U07 | 0.00 | 0.00 |
-| **Earned total** | **22.50%** | **23.75%** |
-| Formal closed stages | 1 / 8 | **1 / 8 — U01 remains OPEN** |
+| **Earned total** | **23.75%** | **23.75% — unchanged** |
+| Formal closed stages | 1 / 8 | **1 / 8 — U01 OPEN** |
 
-The claimed increment is earned only by the delivered page, styling and real production HTTP evidence.
-It is **not** a proportion of hours, an indexation claim, or a statement that full A1 functionality is
-23.75% coded. No point is claimed for commits or tests alone.
+Explicit non-claims: no deployment exists, no URL is claimed, no provider attestation is asserted, no
+stage is closed, U01 is not exited, and no report or test substitutes for the missing live proof. This
+report is not an acceptance of anything and does not close the order successfully.
 
-## 8. Remaining blockers and the next decision
+## 7. What the Owner must supply for a corrected order
 
-1. **Independent Architect review** of this bounded deliverable is the open decision now:
-   `ACCEPT` / `REVISE` / `STOP`. The Agent neither self-accepts nor closes U01.
-2. **Vercel deployment is the immediately subsequent Owner-controlled gate** and is not authorized here.
-   It needs its own order naming the project/team, preview-versus-production target, Git-integration
-   policy, access controls and an externally checked HTTPS URL. The page is deliberately `noindex`,
-   which is a search directive and not access control.
-3. **Further languages** require a later Owner decision after the English demonstration is live; this
-   order adds no locale route and does not touch `en-001`.
-4. **U02–U07** remain not started, and the canonical governance consolidation question stays with the
-   Owner. U01 exit still requires its tenth outcome and express Owner closure.
+1. **`VERCEL_SCOPE` filled with the literal scope slug** (for example the team slug as shown in the
+   Vercel dashboard URL) — not a description and not a placeholder. `VERCEL_DEMO_PROJECT` may stay
+   `provelopment-foundation-uno-demo`.
+2. **An authenticated channel on this machine**, supplied Owner-side and outside the repository and
+   chat: either a logged-in Vercel CLI session (`%USERPROFILE%\.vercel`, which the Agent will not
+   create) or scoped credentials placed in the environment. The Agent will confirm availability by
+   boolean presence only and will never print a value.
+3. Confirmation that `PUBLIC_UNPROTECTED_PREVIEW=YES` and `CREATE_PROJECT_IF_ABSENT=YES` still stand for
+   that exact scope, so the preview can be genuinely unauthenticated without weakening unrelated or
+   team-wide protection.
+
+With those three supplied, the plan is unchanged and ready: protected payload (`.vercelignore`), the
+URL/refusal verifier plus its pure fixtures, the report-triggered read-only live workflow, one
+authorized public preview deployment, the single report carrying the four markers, and a
+final-head Actions live proof. Until then this order stays **STOPPED** and no credit is claimed.
+
+**Requested decision:** independent Architect `ACCEPT / REVISE / STOP` on the STOP decision itself, and
+an Owner corrective activation supplying the exact scope and an authenticated channel.
