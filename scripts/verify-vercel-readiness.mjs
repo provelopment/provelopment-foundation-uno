@@ -24,6 +24,7 @@
  *   * Importing this module must not run the check; only direct execution does.
  */
 
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -65,14 +66,17 @@ export const SNAPSHOT_FILES = Object.freeze({
 /** The approved public source link; the page may carry exactly this one external URL. */
 const SOURCE_URL = 'https://github.com/provelopment/provelopment-foundation-uno';
 
-/** Approved visitor-facing copy (UNO-WO-015 / R01). Compared literally, never fuzzily. */
-const HERO_HEADING = 'Foundation Uno — a focused foundation for the web';
-const HERO_LEAD =
-  'Foundation Uno is a working, open-source website demonstration from Provelopment';
-const HERO_NOTE = 'You are viewing a live, single-page example of Foundation Uno.';
-const FOOTER_COPY =
-  'Foundation Uno is a Provelopment initiative. A live, open-source demonstration of a';
-const META_TITLE = 'Foundation Uno | A focused website foundation by Provelopment';
+/** Approved visitor-facing copy (UNO-WO-016 / R01). Compared literally, never fuzzily. */
+const HERO_HEADING = 'One organisation. One connected digital presence.';
+const HERO_LEAD = 'Foundation Uno will bring an organisation';
+const HERO_NOTE = 'This is the live single-page introduction to Foundation Uno.';
+const FOOTER_COPY = '© 2026 Provelopment. Foundation Uno is an open-source website foundation and a';
+const META_TITLE = 'Foundation Uno | One organisation. One connected digital presence.';
+
+/** The approved vector: official-source geometry, charcoal numeral, enlarged canvas. */
+const LOGO_SHA256 = 'de749e41347a043691b3dd82ced90a2d53f80c240993057388cdfaee20a0a568';
+const LOGO_BYTES = 8250;
+const LOGO_VIEWBOX = '0 0 2048 2048';
 
 /** Visible phrases that would resurrect a retired or false status claim. */
 const RETIRED_COPY = Object.freeze([
@@ -176,6 +180,7 @@ export const REASONS = Object.freeze([
   'page:brand-mark',
   'page:brand-alt',
   'page:retired-claim',
+  'page:example-labels',
   'page:missing-title-copy',
   'page:missing-disclosure',
   'page:source-link',
@@ -186,6 +191,10 @@ export const REASONS = Object.freeze([
   'brand:logo-not-svg',
   'brand:logo-viewbox',
   'brand:logo-palette',
+  'brand:logo-geometry',
+  'brand:logo-bytes',
+  'brand:logo-superseded',
+  'brand:logo-digest',
   'brand:logo-unsafe',
   'brand:favicon-parity',
   'layout:missing',
@@ -408,6 +417,11 @@ export function analyzeReadiness(snapshot) {
   expect(pageText.includes(HERO_HEADING), 'page:hero-heading');
   expect(pageText.includes(HERO_LEAD), 'page:hero-lead');
   expect(pageText.includes(HERO_NOTE), 'page:missing-disclosure');
+  expect(pageText.includes('Example: a community organisation'), 'page:example-labels');
+  expect(
+    pageText.includes('Example: a service provider with regional audiences'),
+    'page:example-labels',
+  );
   expect(pageText.includes(FOOTER_COPY), 'page:footer-copy');
   expect(pageText.includes(`src="${LOGO_PATH}"`), 'page:brand-mark');
   expect(pageText.includes('alt="Foundation Uno"'), 'page:brand-alt');
@@ -427,15 +441,22 @@ export function analyzeReadiness(snapshot) {
     'page:retired-claim',
   );
 
-  // --- 4b. Brand assets: one vector, identical favicon, no active content --------------
+  // --- 4b. Brand assets: official-source vector, identical favicon, no active content -----
   const logoText = logo.trim();
   const iconText = icon.trim();
   expect(logoText.length > 0, 'brand:logo-missing');
   expect(/^<svg[\s>]/.test(logoText) && logoText.endsWith('</svg>'), 'brand:logo-not-svg');
-  expect(/viewBox="0 0 128 128"/.test(logoText), 'brand:logo-viewbox');
-  expect(logoText.includes('#1f6f6b') && logoText.includes('#101620'), 'brand:logo-palette');
+  expect(logoText.includes(`viewBox="${LOGO_VIEWBOX}"`), 'brand:logo-viewbox');
+  expect(logoText.includes('#1f6f6b') && logoText.includes('#36454f'), 'brand:logo-palette');
   expect(!LOGO_ACTIVE_CONTENT.test(logoText), 'brand:logo-unsafe');
+  expect((logoText.match(/<path/g) ?? []).length >= 10, 'brand:logo-geometry');
+  expect(logo.length === LOGO_BYTES, 'brand:logo-bytes');
   expect(iconText === logoText, 'brand:favicon-parity');
+  expect(!logoText.includes('#101620'), 'brand:logo-superseded');
+  expect(
+    createHash('sha256').update(logo).digest('hex') === LOGO_SHA256,
+    'brand:logo-digest',
+  );
 
   // --- 5. Language and robots guards in the root layout --------------------------------
   const layoutText = layout.trim();
@@ -446,7 +467,7 @@ export function analyzeReadiness(snapshot) {
   expect(/nocache:\s*true/.test(layoutText), 'layout:nocache-guard');
   expect(layoutText.includes(`title: '${META_TITLE}'`), 'layout:title');
   expect(
-    layoutText.includes('a live, open-source single-page demonstration'),
+    layoutText.includes('Foundation Uno by Provelopment will give organisations'),
     'layout:description',
   );
   expect(!/alternates\s*:/.test(layoutText), 'layout:canonical-or-hreflang');

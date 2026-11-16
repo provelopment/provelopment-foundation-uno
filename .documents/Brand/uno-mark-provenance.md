@@ -1,71 +1,63 @@
-# Uno mark provenance — `UNO-WO-015 / R01`
+# Uno mark provenance — `UNO-WO-016 / R01`
 
-**Audience:** the Owner, the Architect and any future maintainer. **Status:** records the origin and
-limits of the one brand asset installed by this order. It is not a trademark filing, not a claim of
-official brand equivalence and not an execution log.
+**Audience:** the Owner, the Architect and any future maintainer. **Status:** records the origin,
+digests and limits of the one brand asset installed by this order. It is not a trademark filing and not
+an execution log.
 
-## 1. What was installed
+## 1. What is installed
 
 | Item | Value |
 | --- | --- |
-| Header mark | `public/uno-logo.svg` — referenced as `<img src="/uno-logo.svg" alt="Foundation Uno" width="30" height="30">` in the brand row of `src/app/page.tsx` |
-| Favicon | `src/app/icon.svg` — the Next.js App Router icon route, served as `<link rel="icon" href="/icon.svg?…" type="image/svg+xml">` |
-| Byte parity | The two files are **byte-identical**, 1,730 bytes each, SHA-256 `19759bc29d887401dd42550304e22dc625cbd5be936f5f93d2b9fde938010162` |
-| Format | One self-contained static SVG, `viewBox="0 0 128 128"`, no raster fallback, no font, no script |
+| Header emblem | `public/uno-logo.svg`, rendered by `next/image` with `unoptimized`, 30 × 30, `alt="Foundation Uno"` |
+| Favicon | `src/app/icon.svg`, served by the Next.js App Router icon route as `<link rel="icon" href="/icon.svg?…" type="image/svg+xml">` |
+| Byte parity | Identical byte streams: **8,250 bytes** each |
+| SHA-256 | `de749e41347a043691b3dd82ced90a2d53f80c240993057388cdfaee20a0a568` |
+| Canvas | `viewBox="0 0 2048 2048"`, transparent, no raster, no font, no script |
 
-## 2. Provenance — an original concept, not a licensed master
+## 2. Provenance — derived from the official emblem
 
-The mark is an **original dot-network concept with a prominent numeral `1`**, authored for this order
-from the Owner's brief and supplied in the order's §3 as the complete file. The Owner approved that
-exact vector as the Uno mark for this increment.
+The Owner supplied the genuine Provelopment `emblem.svg` (7,938 bytes, SHA-256
+`0512bfa323589990f3300203f5f1e89a6d2a9ebb2df30755fa466ad00f5ed8e0`). This order's derivative:
 
-It is **deliberately not asserted to be the official Provelopment logo.** No rights-cleared
-Provelopment master artwork was available to the Implementation Agent, and the neutral `logo.svg` /
-`favicon.svg` files seen in the sibling Foundation repository are placeholders, not brand masters.
-Anyone reading this file must therefore treat the geometry as an Uno concept, not as official
-Provelopment brand geometry, and must not cite it as a byte-identical overlay of any official emblem.
+- **retains all ten original network `<path>` definitions and their group transforms**, so the official
+  network geometry is preserved rather than redrawn;
+- recolours the network's single original fill `#C5161D` to the approved Uno green `#1f6f6b`;
+- adds one enlarged numeral `1` as clean path geometry in the Owner-selected **charcoal** `#36454f`,
+  replacing the previous concept mark's dark numeral;
+- keeps a transparent canvas with no solid bounding box, no white plate and no embedded raster.
 
-## 3. Design and colour references
+The previous order's concept mark (128-unit canvas, `#101620` numeral) is **superseded** and its
+colours must not reappear; tests refuse `#101620` and any 128-unit canvas.
 
-| Element | Value | Source of the value |
+## 3. Colour references
+
+| Element | Value | Reference |
 | --- | --- | --- |
-| Network stroke and nodes | `#1f6f6b` (light-mode accent) | Existing approved token `--uno-accent` in `src/app/globals.css` |
-| Numeral fill | `#101620` | Existing approved token `--uno-foreground` |
-| Keyline | `#ffffff`, 7 units, `paint-order="stroke fill"` | Keeps the numeral legible against dense network nodes at 16 × 16 |
-| Canvas | `128 × 128` units, integer node coordinates | Reproducible at 16, 32 and header size without resampling |
+| Network stroke and nodes | `#1f6f6b` | Existing approved token `--uno-accent` in the untouched `src/app/globals.css` |
+| Numeral | `#36454f` (charcoal) | Owner's explicit choice for this increment |
+| Canvas | none | Transparent; no white background behind the mark |
 
-The mark introduces **no new colour**: it reuses the two existing palette values, so light and dark
-mode, contrast preferences and the site's colour scheme are unchanged. No CSS filter, gradient or
-animation is applied to it.
+No CSS filter, gradient, animation or new palette entry is introduced, and the stylesheet is unchanged
+by this order.
 
 ## 4. Safety properties
 
 The committed SVG contains no `<script>`, no event attribute, no `<foreignObject>`, no `<image>`, no
-`href`/`xlink:href` remote reference, no embedded base64 payload, no external font, no CSS import and
-no filter URL. It is inert when opened directly or served from the App Router route. Both the
-security-floor test and the brand/copy test assert these properties, and both prove their refusals
-against synthetic negative fixtures.
+`href`/`xlink:href` remote reference, no embedded base64 payload, no external font and no filter URL.
+Both the readiness verifier and the brand/copy suite assert these properties and prove their refusals
+against synthetic fixtures; the HTTP verifier re-checks the served bytes and their digest.
 
-## 5. Parity rule (header = favicon)
+## 5. Parity and replacement procedure
 
-The header image and the favicon must remain **the same vector bytes**. Any revision applies the same
-file to both paths in one change, and the tests fail if they diverge. This prevents the common drift
-where a favicon silently becomes an older or different mark.
+Header and favicon must remain **the same vector bytes**: any revision writes one file to both paths in
+the same change, and the tests fail if they diverge. A future authorized replacement should:
 
-## 6. Replacing the concept with an official master
+1. arrive with a new bounded work order naming exactly `public/uno-logo.svg` and `src/app/icon.svg`;
+2. state the intended digest and byte length, plus the licence or ownership basis;
+3. update the pinned digest in `scripts/verify-vercel-readiness.mjs`,
+   `tests/deployment/uno-brand-copy.test.mjs` and the HTTP verifier in the same change;
+4. keep the transparent canvas, the 30 × 30 header size and the `alt="Foundation Uno"` text;
+5. replace §2 of this file rather than appending a second, conflicting narrative.
 
-If a rights-cleared Provelopment or Uno master is supplied later, the replacement procedure is:
-
-1. A new work order authorizing exactly two paths — `public/uno-logo.svg` and `src/app/icon.svg` — and
-   no copy or layout change.
-2. Write the supplied vector to both paths with byte-identical content, keeping a square `viewBox` and
-   integer-safe geometry.
-3. Update the byte-parity expectation recorded in the brand/copy test **only** if the file size is
-   asserted there; the parity comparison itself stays unchanged.
-4. Re-run the brand/copy test, the HTTP verifier (which checks that both routes serve identical SVG)
-   and both-host CI before any push.
-5. Record the new licence and provenance in this file, replacing §2 rather than appending a second
-   conflicting narrative.
-
-Until that happens, this concept stands as the approved Uno mark for the demonstration page, and no
-document may describe it as official Provelopment brand artwork.
+Until then, this derivative — official network geometry plus the enlarged charcoal numeral — is the
+approved Uno emblem.

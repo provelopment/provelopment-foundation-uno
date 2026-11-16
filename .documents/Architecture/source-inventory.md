@@ -986,3 +986,38 @@ five synthetic negatives. Both new steps run on Ubuntu and Windows.
 
 **Boundaries.** No dependency, lockfile, workflow permission, provider setting, route, locale, EFS
 manifest, authored Home Markdown, release or stage closure was touched by this increment.
+
+## UNO-WO-016 / R01 — official network emblem and benefits-led public copy
+
+**Emblem.** `public/uno-logo.svg` and `src/app/icon.svg` are now the identical official-source
+derivative: **8,250 bytes**, SHA-256
+`de749e41347a043691b3dd82ced90a2d53f80c240993057388cdfaee20a0a568`, canvas `0 0 2048 2048`. It keeps
+all ten original network paths and their group transforms from the Owner-supplied
+`emblem.svg` (7,938 bytes, SHA-256 `0512bfa3…f5ed8e0`), recolours the single original fill `#C5161D`
+to the approved `#1f6f6b`, and adds one enlarged numeral `1` in the Owner-selected charcoal `#36454f`
+on a transparent canvas. The previous 128-unit concept mark and its `#101620` numeral are superseded
+and are refused by tests. The header renders it through `next/image` with `unoptimized` at 30 × 30 and
+`alt="Foundation Uno"`, which removes the former `@next/next/no-img-element` warning without an
+optimizer round trip; the favicon is the App Router icon route.
+
+**Copy.** `src/app/page.tsx` (9,335 bytes, SHA-256
+`d86fdcf6e3d3be85b577ac4fded6e08e954f8db6f481b196df1bfe6834943876`) now explains the finished product
+in direct **will** language: a headline of one organisation and one connected digital presence, a hero
+lead about bringing websites, information and regional editions into one foundation, five features that
+each pair a capability with a benefit (One Entity, Purposeful Facets, Deliberate Sites, Reliable Pages,
+Thoughtful regional editions), two explicitly labelled illustrative examples (a community organisation,
+a service provider with regional audiences) with three benefits each, an open-source and licence
+section, and a footer naming the live single-page demonstration. Metadata carries the approved title
+and description and keeps `noindex, nofollow, nocache` plus the single official Analytics integration.
+Both scenarios are labelled illustrations, never customers, testimonials or measured results.
+
+**Design and boundaries.** `src/app/globals.css` is untouched (blob
+`8d9268c448dfa5a0a25bb14657ca450396efe59d`): palette, typography, dark mode, responsive grid, focus and
+reduced-motion behaviour are preserved. No route, locale, EFS manifest, Home Markdown, dependency,
+lockfile, workflow, 404 or governance file changed. Provenance, digests, colour references and the
+replacement procedure are recorded in `.documents/Brand/uno-mark-provenance.md`.
+
+**Evidence.** The HTTP verifier asserts 101 served checks including the new copy, both brand routes,
+byte parity and the vector digest; the readiness verifier runs 99 checks including the pinned vector
+digest, geometry and palette; the readiness fixtures carry 64 cases; and the brand/copy suite carries 24
+tests with eleven synthetic negatives.
