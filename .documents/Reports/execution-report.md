@@ -1,193 +1,188 @@
-# UNO-WO-022 / R01 — truthful frozen README and pure discoverability intent
+# UNO-WO-023 / R01 — pure canonical base and alias validation
 
-**Work order:** `UNO-WO-022 / R01` · **Edition:** FINAL — EXECUTE · **Stage:** U03, **OPEN**.
-**Installed ACTIVE:** 21,332 bytes, SHA-256 `5dd7f351ae33bce964c028b979bb0f06dea03d6fe1ab5e0e178d89df1c623bd7`,
-verified byte-for-byte at `.documents/WIP/workorder-active.md` before any write, ignored, untracked, unstaged.
-**Owner activation:** approved the exact §4 README correction with its necessary hash update and truth tests,
-the §5 pure discoverability contract, and the Uno-only non-force pushes, including
-`AUTHORIZE_GIT_PUSH_TRIGGERED_PRODUCTION_DEPLOYMENTS=YES` for an incidental Git-triggered build only.
-**Required start and actual start:** `2a815c2f0bf4d10c9b44c1c8273fdf42ccb87c28`.
+**Work order:** `UNO-WO-023 / R01` · **Edition:** FINAL — EXECUTE · **Stage:** U03, **OPEN**.
+**Installed ACTIVE:** 21,411 bytes, SHA-256 `aff74b1e52a7a15a0579c0a59a3ccc579bd7f442e6ac4c94c2bfe73c5eb5ad3a`,
+matched byte-for-byte before any write, ignored, untracked, unstaged, never printed or committed.
+**Owner decision:** the activation contains the exact sentence **`I APPROVE U03 CANONICAL BASE CONTRACT IN
+§4 OF UNO-WO-023 / R01`**, which this order requires before any implementation.
+**Push authorization:** the activation contains **`AUTHORIZE_GIT_PUSH_TRIGGERED_PRODUCTION_DEPLOYMENTS=YES`**,
+covering only the incidental build an authorized non-force Git push may start — not any manual provider action.
+**Required start = actual start:** `e9cac6b1d1e4554f019467b73fd47143a664c1b6`.
 
 ## 1. Status
 
 | Fact | Status | Evidence |
 | --- | --- | --- |
-| `FROZEN_README_CORRECTED` | **PASS** | `README.md` written with the exact §4 bytes: **2,681 bytes**, SHA-256 `97f93bda…995a`, LF only, zero BOM, one final LF |
-| `VERIFIER_HASH_UPDATED` | **PASS** | only the `README.md` SHA-256 literal changed; `maxBytes: 3200` and both other entries byte-identical |
-| `README_TRUTH_TESTS` | **PASS** | stale-U01 test renamed and strengthened; a five-case mutation refusal test added; the exact not-yet-implemented disclaimer preserved |
-| `DISCOVERABILITY_POLICY` | **PASS** | `src/core/efs/uno-discovery-policy.ts`, 9,878 B, blob `2c74ff76…`; pure, closed, no IO/framework/adapter/provider |
-| `REAL_HOME_INTEGRATION` | **PASS** | real loader → header → classifier: `public`, six `true` conditional flags, `null` robots, committed source bytes unchanged |
-| `UNLISTED_EXCLUSION` | **PASS** | scratch non-Home JSON `unlisted`: six `false` flags and `noindex,nofollow`, with no live route |
-| `NONPUBLICATION` | **PASS** | no `src/app/**`, route, middleware, metadata, sitemap, robots, redirect, provider or dependency change; build route table unchanged; `/`, `/en`, `/en-001` behaviour unchanged |
-| `BASELINE_PRESERVED` | **PASS** | 531 unit tests over 16 files (513 previous + 18 new); 25 architecture checks (23 previous + 2 new); 13 protected paths byte-identical |
+| `CANONICAL_BASE_VALIDATOR` | **PASS** | `src/core/efs/uno-canonical-base.ts`, 15,465 B, blob `fe617f03…`; pure, fail-closed, closed 8-code vocabulary |
+| `FOCUSED_TESTS` | **PASS** | **57** cases in one new suite, **32+** of them refusals, each asserting one exact code and vocabulary membership |
+| `PURITY_BOUNDARY` | **PASS** | registered in `CORE_AUTHORED_FILES`; scanner refuses injected Node/Next/React/adapter/provider imports; no `src/app` consumer |
+| `NONPUBLICATION` | **PASS** | `deployment/uno.config.json` and every deployment, app, application, adapter, script, workflow and package path byte-identical; build route table unchanged |
+| `BASELINE_PRESERVED` | **PASS** | 588 unit tests over 17 files (531 + 57); 27 architecture checks (25 + 2); 25 protected paths byte-identical |
+| `PUBLIC_404_PRESERVED` | **PASS** | `/` 200, `/en` 404, `/en-001` 404, `/about` 404, `robots.txt` 404, `sitemap.xml` 404 |
 | `HOSTED_CI_AT_PRODUCT_HEAD` | **PASS** | four jobs on two hosts, zero non-success steps (§7) |
-| `PROVIDER_ACTIONS` | **ZERO** | no provider API call, manual deploy, alias, domain or settings change; only the authorized Git push occurred |
-| `STAGE` | U03 **OPEN** | no closure, release, merge or next-stage authority is asserted |
+| `PROVIDER_ACTIONS` | **ZERO** | no provider call, manual deploy, alias, domain or settings change; only the authorized Git push |
+| `STAGE` | U03 **OPEN** | no closure, release, merge, publication or next-stage authority is asserted |
 
 ## 2. Authorized commits and the exact ledger
 
 | Role | Commit | Content |
 | --- | --- | --- |
-| Product | **`fe74bfe79bf5ea72d6db7b41beee749c8c01a644`** | exactly nine ledger paths; direct child of `2a815c2` |
+| Product | **`cb6b88feb647f5ee8131f57e08edcf0df7e1ee2e`** | exactly six ledger paths; direct child of `e9cac6b` |
 | Report | the report-only child of the product commit; its SHA is returned privately to the Owner | `.documents/Reports/execution-report.md` only |
 
 | # | Path | Op | Blob | Bytes |
 | ---: | --- | --- | --- | ---: |
-| 1 | `README.md` | OVERWRITE | `8f5f4e15…` → `690f0870…` | 2,681 |
-| 2 | `scripts/verify-governance-docs.mjs` | EDIT | `3d9360da…` → `0e607d90…` | 2,092 |
-| 3 | `tests/governance-docs.test.mjs` | EDIT | `c8d51e12…` → `45861502…` | 3,063 |
-| 4 | `tests/architecture/u01-boundaries.test.mjs` | EDIT | `5a49bffe…` → `694e599d…` | 35,030 |
-| 5 | `src/core/efs/uno-discovery-policy.ts` | CREATE | `2c74ff76…` | 9,878 |
-| 6 | `tests/unit/efs-uno-discovery-policy.test.ts` | CREATE | `5f4f8d53…` | 13,875 |
-| 7 | `.documents/Architecture/source-inventory.md` | EDIT | `6e4694ee…` → `5e04c4e0…` | 105,116 |
-| 8 | `.documents/WIP/plan-roadmap.md` | EDIT | `1d89aa08…` → `2e620585…` | 9,523 |
-| 9 | `.documents/WIP/plan-next.md` | OVERWRITE | `fe2e2d36…` → `bb325134…` | 1,112 |
+| 1 | `src/core/efs/uno-canonical-base.ts` | CREATE | ABSENT → `fe617f03…` | 15,465 |
+| 2 | `tests/unit/efs-uno-canonical-base.test.ts` | CREATE | ABSENT → `35322ef1…` | 14,643 |
+| 3 | `tests/architecture/u01-boundaries.test.mjs` | EDIT (additive) | `694e599d…` → `d1002cd6…` | 37,334 |
+| 4 | `.documents/Architecture/source-inventory.md` | EDIT | `5e04c4e0…` → `9f95fedc…` | 107,361 |
+| 5 | `.documents/WIP/plan-roadmap.md` | EDIT | `2e620585…` → `33ecaf64…` | 10,125 |
+| 6 | `.documents/WIP/plan-next.md` | OVERWRITE | `bb325134…` → `bf87eeb7…` | 1,464 |
 
-No other tracked path changed, both CREATE paths were absent at start, and `git diff --cached --check`
-reported nothing before the commit.
+The inventory edit is **purely additive** (29 insertions, 0 deletions): the U03 discoverability section and its
+heading are preserved intact beside the new canonical-base section. No other tracked path changed, both CREATE
+paths were absent at start, and `git diff --cached --check` reported nothing before the commit.
 
 ## 3. Physical, parent, Git and privacy preflight (sanitized)
 
 | Guard | Result |
 | --- | --- |
-| Physical root | the sole Uno checkout resolved physically; toplevel equals the checkout path; one worktree, no hidden linked worktree |
-| Ancestors and parent | no reparse, junction or symlink component in the checkout path; the parent's anchored `/00.foundation-uno/` ignore rule still effective; no parent, Foundation, Solo or sibling tree written, tested or built |
-| Remote | exactly one remote, `origin`, fetching and pushing only `provelopment/provelopment-foundation-uno`; no mirror |
-| Branch and head | branch `main`; local `HEAD` and `origin/main` both `2a815c2f…` before any write; remote re-read immediately before the push and still `2a815c2f…`; no force, reset, rebase or clean |
-| Working tree | clean before work; clean after the product push; no unexpected untracked or staged file |
-| ACTIVE privacy | exactly one private ACTIVE, 21,332 bytes and the activation's SHA-256, ignored, untracked, unstaged, never printed or published |
+| Physical root | the sole Uno checkout resolved physically; Git toplevel equals the checkout path; no reparse or junction alias |
+| Ancestors and parent | no symlink/reparse component; the parent's anchored `/00.foundation-uno/` ignore rule still effective and untouched; parent, Foundation, Solo and every sibling strictly read-only, never written, built or tested |
+| Worktrees / remotes | exactly one worktree, `main` checked out, one remote `origin` fetching and pushing only `provelopment/provelopment-foundation-uno`; no mirror; no force, reset, rebase, amend, merge or clean |
+| Head and remote | local `HEAD` = `origin/main` = `e9cac6b`, and `origin/main` re-read immediately before the push and still `e9cac6b` |
+| Acting tree | clean before work; clean after the product push; no unexpected untracked, staged or ignored source |
+| ACTIVE privacy | exactly one private ACTIVE, 21,411 bytes, activation SHA-256, ignored, untracked, unstaged, neither printed nor committed |
 | WIP slots | exactly four: `plan-roadmap.md`, `plan-next.md`, private `workorder-active.md`, `plan-outlook.md` |
-| Preflight pins | all **sixteen** required start blobs matched before any write |
-| Scratch | task scratch confined to ignored `.temp/` plus the ignored package store; removed before the commit |
+| Pins | **25 / 25** start blobs matched before the first write; the five editable ledger blobs matched their required starting IDs; both CREATE paths confirmed ABSENT |
+| Runtime | Node 26.x and pnpm 11.6.0 from the committed `package.json`; install in-root with an in-root store; no package, lockfile or dependency change |
 
-## 4. The frozen README correction
+## 4. The validated contract
 
-The Owner-approved replacement was written as **exactly** the §4 UTF-8 LF bytes and verified on disk before
-staging: 2,681 bytes, SHA-256 `97f93bdaf710bac53e3be48be0365c414042e89ef4461e55e98852cd0fd1995a`, no CR, no
-BOM, one final LF. The verifier's `README.md` entry now carries that hash, its `maxBytes` is still **3,200**,
-and the `AGENTS.md` and local-SOP entries, the traversal logic and every failure branch are byte-identical.
+`validateUnoCanonicalBase({ canonical, aliases })` accepts only plain own data with exactly those two keys and
+returns either a freshly allocated, deeply frozen
+`{accepted: true, canonical: {origin, pathPrefix}, aliases: [{origin, pathPrefix}…]}`, or one closed
+`{accepted: false, reason}` from an 8-member frozen vocabulary:
 
-The README now states Node.js 26.x and pnpm 11.6.0, points progress at the GitHub execution report and
-`main` instead of a frozen stage or commit, and contains no `U01 remains open`, `U03 is open` or
-`Node.js 24` claim. The exact Owner-approved sentence
-`The authored public Uno A1 website is not implemented yet.` is preserved word for word, so the bootstrap
-not-yet-implemented gate still passes unchanged.
+`base:input-not-plain` · `base:input-shape` · `base:unreadable` · `base:canonical-url` · `base:alias-url` ·
+`base:alias-count` · `base:alias-duplicate` · `base:alias-overlap`
 
-Governance evidence: `scripts/verify-governance-docs.mjs` prints PASS for all three frozen files, and
-`tests/governance-docs.test.mjs` is **9 / 9** — the six preserved tests plus three new README cases (a
-same-length byte edit, an appended status line, and the unchanged file still passing with its 3,200-byte cap).
+- **Untrusted values first.** Prototypes, descriptors and symbol keys are checked before any value is read, so
+  an accessor is refused instead of invoked, a sparse or accessor array entry is refused instead of skipped, and
+  a trap that throws becomes one closed refusal rather than an escaping exception. The caller's value is never
+  mutated.
+- **Screened strings.** 1..255 printable non-space ASCII bytes only; no controls, NUL, Unicode, whitespace,
+  backslash, `@` userinfo, `%`, `?` or `#`; a non-HTTP(S) scheme, relative or protocol-relative reference
+  refuses. The platform `URL` parser runs **after** that screening and only to confirm the spelling: any host
+  case, scheme, port, dot-segment, escaping or trailing-slash normalization it would perform is a refusal, and a
+  bare-origin root's `pathname === "/"` is read as `pathPrefix: ""`.
+- **Origin policy.** HTTPS with lowercase DNS labels (1..63 characters, no empty/trailing-dot/wildcard/all-numeric
+  label, no explicit port at all — an explicit `:443` or `:8443` is refused as redundant or nonstandard). Plain
+  HTTP only for the exact loopback hosts `localhost`, `127.0.0.1`, `[::1]` with an optional explicit port
+  1..65535. Already-canonical punycode labels are accepted as labels. This is lexical safety, not DNS, TLS or
+  Owner approval of a host.
+- **Prefix and aliases.** An optional prefix of 1..8 lowercase content-slug segments (≤160 characters) reuses the
+  authored `isContentSlug`, so `.`/`..`, empty segments, uppercase and `_`-prefixed segments cannot appear; at most
+  eight aliases; no alias identical to the canonical base, no duplicate alias, and no whole-segment origin
+  overlap — while `/site` and `/site2` stay distinct and different hosts or ports stay independent.
+- **No borrowed power.** The result carries no `published`, `redirect`, location, cookie, request, route, locale
+  target, sitemap, canonical tag or dynamic hostname, and the module imports nothing from Node, Next, React, an
+  adapter, a provider or the environment. `validateUnoSiteSelection`, the manifest graph, the locale matcher, the
+  Page-header projector and the discoverability classifier are untouched and remain authoritative in their scopes.
 
-Architecture truth evidence: **25 / 25**. The stale U01-labelled test is renamed to describe the current
-baseline, now asserts the Node 26, pnpm 11.6.0, report-link and no-pinned-commit rules through one shared
-`readmeTruthIssues` predicate, and a new case proves five mutations (U01 stage claim, U03 stage claim,
-restored Node 24, removed disclaimer, pinned commit) are all refused by that same predicate.
 
+## 5. Focused and broad test results
 
-## 5. The discoverability-intent policy
+**Focused suite — 57 cases, all passing.** 48 cases assert a refusal (32 canonical-URL, 6 alias and 9
+untrusted-input refusals) and 9 assert acceptance, one of which also proves the 256-byte refusal — well above the
+required 30 cases and 20 refusals. Every refusal asserts one exact code **and** that the code is a member of the
+closed vocabulary.
 
-`classifyUnoPageDiscoverability(input)` accepts exactly plain own data `{ kind, routePath, visibility }`:
-`kind` is `json` or `markdown`, `routePath` is the validated **authoring** route (`home` for the reserved
-Home, never a candidate's empty route), and `visibility` is the value an already-validated header produced.
-The record is classified before any field is read, so an accessor, symbol key, exotic prototype or throwing
-trap cannot run code, coerce a value or escape as an exception.
-
-`decideSelectedPageVisibility` remains the sole authority. JSON is delegated with the declared visibility;
-Markdown is delegated **without** one, because Markdown may never declare a visibility, and the supplied
-value must then equal the `public` the policy returned — a Markdown `unlisted` refuses as
-`discovery:projection-mismatch` instead of being silently reclassified. The reserved Home rule is decided by
-the policy, not restated here.
-
-An accepted result is freshly allocated and deeply frozen, and contains exactly `accepted`, `visibility`,
-`eligibleIfPublished` with its six conditional flags (`navigation`, `sitemap`, `hreflang`, `xDefault`,
-`languageSwitch`, `automaticLocaleRedirectTarget`) and `robotsIfDirectlyServed`. Every flag is `true` only for
-a validated `public`, and `robotsIfDirectlyServed` is `null` for `public` and `noindex,nofollow` for
-`unlisted`. No URL, pathname, canonical, locale target, asset, body, `published` field or publication token
-can be returned, and no `src/app` source imports the classifier.
-
-## 6. Observed positives and refusals
-
-| Observation | Result |
+| Family | Observed |
 | --- | --- |
-| Committed Home, real loader → real header → classifier | `public`, six `true` flags, `null` robots; the committed source bytes are unchanged |
-| Same Home under a forged `unlisted` | `discovery:projection-mismatch` (Markdown may never declare a visibility) |
-| JSON Home with `unlisted` | `home-cannot-be-unlisted`, the existing exact policy literal |
-| Scratch non-Home `/en-001/offers/home` JSON `unlisted` | six `false` flags and `noindex,nofollow`, with no live route created |
-| Public JSON and Markdown, plus a non-Home authoring route | six `true` flags and `null` robots |
-| Invalid authoring routes (empty, traversal, leading/trailing slash, double slash, backslash, space) | `invalid-route-path`, forwarded from the policy |
-| Unknown visibility / unknown kind / non-string value | `unknown-visibility` and `discovery:input-shape` |
-| Missing key, extra key (`published`), empty object, `null`, array, scalar | `discovery:input-shape` / closed literals |
-| Getter, symbol key, exotic prototype | `discovery:input-not-plain` with **zero** getter invocations |
-| Throwing Proxy trap | `discovery:unreadable` (a trap that throws makes the record unreadable) |
-| Result integrity | fresh allocation each call, no shared flag object, deep freeze throws on assignment, no request mutation, exact key whitelist, no leaked address or content |
-| Closed vocabulary | 14 literals, duplicate-free, every refusal asserted for membership |
+| Acceptances | bare origin with `pathPrefix: ""`; `/site` prefix; two aliases on other origins; `http://localhost`, `localhost:3000`, `127.0.0.1:3000`, `[::1]:3000`; `/site` + `/site2` on one origin; punycode label; eight aliases and an empty list; exactly 255 bytes; fresh frozen result with no caller mutation |
+| Canonical URL refusals (32) | unknown protocol, external HTTP, `http://localhost.evil.org`, credentials, empty host, uppercase host, wildcard, trailing dot, explicit and redundant HTTPS port, query, fragment, percent escape, raw backslash, Unicode, NUL, leading/trailing whitespace, protocol-relative, relative, trailing slash, duplicated slash, `.` and `..` segments, uppercase path, `_`-prefixed segment, nine prefix segments, prefix over 160 characters, IPv4 literal, single-label HTTPS host, 64-character label, 256 bytes, empty string |
+| Alias refusals | invalid alias (two spellings), ninth alias, self-alias, duplicate aliases, ancestor/child overlap both directions, root-versus-prefix overlap, alias-list overlap |
+| Untrusted input | non-object roots, missing/extra/wrong-typed fields, accessor root with **zero** getter invocations, symbol key, exotic prototype, throwing Proxy, sparse array, accessor array entry, twelve aliases refused without throwing |
+| Vocabulary and secrecy | 8 frozen duplicate-free codes; a rejected declaration serialises to exactly `{"accepted":false,"reason":"base:canonical-url"}` with no echoed host, path or scheme |
 
-18 new Vitest cases (16 refusal or negative), 531 unit tests total, and two new architecture checks that
-prove the classifier stays pure, rejects injected Node/Next/React/adapter imports, and is not consumed by the
-app layer.
-
-
-## 7. Local and hosted gates
+**Broad local gates.**
 
 | Gate | Result |
 | --- | --- |
 | `pnpm install --frozen-lockfile --ignore-scripts --store-dir .pnpm-store` | PASS — no package or lockfile change |
-| `node scripts/verify-governance-docs.mjs` | PASS — all three frozen files match Owner-frozen bytes |
-| `node --test tests/governance-docs.test.mjs` | **9 / 9** (6 preserved + 3 new README cases) |
+| `pnpm exec vitest run tests/unit/efs-uno-canonical-base.test.ts` | **57 / 57** |
+| `node scripts/verify-governance-docs.mjs` | PASS — three frozen files match Owner-frozen bytes |
+| `node --test tests/governance-docs.test.mjs` | **9 / 9** |
 | `pnpm test:bootstrap` | **19 / 19** and the CLI reports 11 required files, licence verified, four-slot WIP discipline, private authority screened, no credential or private-path leaks |
-| `pnpm test:architecture` | **25 / 25** (23 preserved + 2 new) |
+| `pnpm test:architecture` | **27 / 27** (25 preserved + 2 new) |
 | `pnpm lint` | exit 0 — 0 errors, 0 warnings (empty report) |
 | `pnpm typecheck` | exit 0 (empty report) |
-| `pnpm test` | **531 passed / 531**, 16 files — 513 previous + **18 new** |
-| `pnpm build` | PASS — `/`, `/_not-found`, `/icon.svg`; no `en-001` route in the output |
-| `pnpm test:http` | **103 passed, 0 failed** — `/en` 404, `/en-001` 404, `/about` 404, unknown path 404, `robots.txt` 404, `sitemap.xml` 404, and the 404 page still advertises no published Site |
-| readiness fixtures / CLI | 66 pass / **100 checks, 0 failed** |
+| `pnpm test` | **588 passed / 588**, 17 files — 531 previous + **57 new** |
+| `pnpm build` | PASS — exactly `/`, `/_not-found`, `/icon.svg`; no `en-001` route |
+| `pnpm test:http` | **103 passed, 0 failed** — `/` 200; `/en` 404, `/en-001` 404, `/about` 404, unknown 404, `robots.txt` 404, `sitemap.xml` 404 |
+| readiness fixtures / CLI | 66 pass / **100 checks, 0 failed** (`VERCEL_NOT_DEPLOYED_BY_AGENT`) |
 | security floors / brand contract | 16 pass / 29 pass |
-| `pnpm audit --audit-level high` | exit 0 — **0 high, 0 critical**; one **moderate** dev-only `minimatch` advisory (GHSA-g3hv-75wg-m249) remains disclosed, not waived |
+| `pnpm audit --audit-level high` | exit 0 — **0 high, 0 critical**; one **moderate** dev-only `minimatch` advisory remains disclosed, not waived |
 | `git diff --check` | clean before the commit and clean after |
-| README on disk | 2,681 bytes and SHA-256 `97f93bda…995a` re-verified after staging |
-| Protected paths | 13 re-checked at the product head: 0 changed |
+| Protected paths | 25 re-checked at the product head: 0 changed |
 
-**Hosted CI at product head `fe74bfe79bf5ea72d6db7b41beee749c8c01a644` — four jobs, all `success`:**
+Testing a pure URL validator is **not** evidence of real HTTP serving, and none of these results demonstrates a
+published Site, an indexable Page, a redirect or a live production base.
+
+
+## 6. Hosted CI at the product head
+
+**`cb6b88feb647f5ee8131f57e08edcf0df7e1ee2e` — four jobs, all `success`:**
 
 | Workflow | Run | ubuntu-24.04 | windows-2025 | Steps / non-success |
 | --- | --- | --- | --- | --- |
-| Verify U01 baseline | `43890828714` | success | success | 24 / **0** |
-| Uno Bootstrap Verify | `43890828710` | success | success | 10 / **0** |
+| Verify U01 baseline | `43895132164` | success | success | 24 / **0** |
+| Uno Bootstrap Verify | `43895131202` | success | success | 10 / **0** |
 
-Both hosts ran the governance verifier and the blocking unit step, which includes the new discovery suite.
-**Full log text is UNVERIFIED** — this client reads job and step conclusions only. The report-only head
-repeats the same four jobs; its run IDs are returned privately to the Owner.
+Both hosts ran the governance verifier, the architecture suite and the blocking unit step that includes the new
+canonical-base suite. **Full log text is UNVERIFIED** — this client reads job and step conclusions only. The
+report-only head repeats the same four jobs; its run IDs are returned privately to the Owner.
 
-## 8. Licensing, security, cleanup and the next blocker
+## 7. Rights, warnings, cleanup and nonpublication
 
-**Licensing and provenance.** `src/core/efs/uno-discovery-policy.ts` is original **Uno-owned** code, class
-**NEW / REWRITE concept**: no upstream code, fixture, schema or prose was copied. The historical Foundation
-GEO-03 commit `c05c55ea…` remains read-only provenance for the *idea* of visibility-conditional
-discoverability and granted no import or write permission; Solo Rust and separately licensed Connect were
-excluded; no dependency, media or brand asset was added; Apache-2.0 notices and source history are unchanged.
+**Provenance and rights.** `src/core/efs/uno-canonical-base.ts` is original **Uno-owned** implementation, class
+**NEW / ABSTRACT DESIGN**; no upstream source, fixture, schema or prose was copied. Historical Foundation GEO-03
+`c05c55ea…` stays read-only design context for the *idea* of an absolute base and granted no import or write
+permission. Solo, Connect and brand/media assets were excluded; Apache-2.0 notices and source history are
+unchanged; the 17-family / 22-ID capability mapping is untouched; no dependency, workflow, asset or schema was
+added.
 
-**Security.** No secret, token, absolute personal path, private ACTIVE byte or unpublished Foundation data is
-in the commit or this report. No governance guard was weakened, no byte cap raised, no workflow job changed,
-and no test was skipped, mocked or removed. The landing page, noindex policy, favicon, emblem, copy and CSS
-are byte-identical.
+**Warnings.** One **moderate** dev-only `minimatch` advisory (GHSA-g3hv-75wg-m249) remains disclosed and is not
+waived; zero high or critical findings, so the blocking gate stays green on its own threshold.
+
+**Privacy.** No secret, token, absolute personal path, private ACTIVE byte or unpublished Foundation data is in
+either commit or in this report. No governance guard was weakened, no cap raised, no workflow job edited and no
+test skipped, mocked or deleted.
 
 **Provider actions: zero.** No provider API call, manual deployment, promotion, alias, domain, analytics or
-settings change was made; the only external effect was the authorized non-force Git push and whatever build
-the existing Git integration starts from it.
+settings change; the only external effect was the authorized non-force Git push and whatever build the existing
+Git integration starts from it.
 
-**Cleanup.** Task scratch removed; `.temp/` and the package store remain ignored; no unknown ignored file was
-deleted; the private ACTIVE remains ignored and unstaged; `git status` is clean at the product head.
+**Nonpublication is preserved.** `deployment/uno.config.json`, `deployment/efs/**`, `deployment/site.config.json`
+(absent), every `src/app/**` file, the landing page, logo, favicon, CSS, root noindex, analytics and every
+workflow are byte-identical. The Next build still emits exactly `/`, `/_not-found` and `/icon.svg`; no `en-001`
+route exists; `/` stays 200 and `/en`, `/en-001`, `/about`, unknown paths, `robots.txt` and `sitemap.xml` stay
+404. No canonical tag, `hreflang`, sitemap, robots header or redirect was emitted or enabled.
 
-**Next blocker.** Publication is still unowned by any order: nothing is routed, served, indexed, canonicalized
-or redirected, and a `public` discoverability result is only an eligibility statement. A next increment would
-need its own Owner-installed work order for the validated Page document and module schema, explicit
-publication authorization, real HTTP and metadata behaviour, and locale routing.
+**Cleanup.** Task scratch (`.temp/`) removed; the ignored package store and build outputs remain ignored; no
+unknown ignored file was deleted; `git status` is clean at the product head; the private ACTIVE remains ignored
+and unstaged.
 
-## 9. Request
+## 8. Next U03 blocker and request
 
-Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`** for this joined U03
-checkpoint: the Owner-approved frozen README corrected to its exact bytes with its exact verifier hash and
-strengthened truth tests, plus one pure, closed discoverability-intent classifier that reuses the existing
-visibility policy and states only what a later Owner-authorized publication would be eligible for — with
-every failure closed, no publication, routing, indexing or provider action, and the live 404 behaviour of the
-technical baseline unchanged.
+A validated base is data, not a deployment. U03 still needs an Owner-controlled integration of a real `base`
+into the single-Site configuration, an explicit Site/Page publication decision, a full-locale policy and then
+actual production HTTP, metadata and refusal proof — each under its own order. The committed Home Markdown is
+recorded in `plan-next.md` as containing outdated statements and as **not approved for publication as-is**;
+correcting it requires a separate Owner-approved content change.
+
+Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`** for this bounded U03 checkpoint:
+one pure, fail-closed canonical-base and alias validator with a closed eight-code vocabulary, 57 focused cases
+(48 of them refusals), a preserved baseline of 588 unit tests and 27 architecture checks, unchanged public 404
+behaviour, zero provider actions and U03 still open.
