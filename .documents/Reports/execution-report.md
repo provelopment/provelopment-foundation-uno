@@ -1,159 +1,219 @@
-# UNO-WO-012 / R01 — STOPPED before any Vercel action: the activation does not name a scope
+# UNO-WO-012 / R02 — deployment-ready repository prepared; no Vercel action by the Agent
 
-**Order / edition:** `UNO-WO-012 / R01` · FINAL — EXECUTE · **Executed:** 2026-11-16
-**Result:** **`STOPPED`** — no deployment, no Vercel project, no live URL, **no progress credit**
-**Starting Uno `main`:** `3b642e12648c4c43b39542aec4d5be0ff41f2b59` (verified equal to `origin/main`)
-**Earned scorecard:** **23.75% → 23.75% (unchanged)** · formal stages **1 / 8** · **U01 remains OPEN**
-**Disposition requested:** Chief Master Architect `ACCEPT` / `REVISE` / `STOP` on this STOP decision
-
-## 1. Why this run stopped, in the order's own terms
-
-The order makes two of its own conditions mandatory before any provider action, and **both fail**.
-
-**(a) The activation does not supply `VERCEL_SCOPE`.** §2 states that the Owner activation **MUST**
-supply `VERCEL_SCOPE` as "exact Vercel personal/team scope slug selected by the Owner. **No default and
-no guessing**", and that "**an unfilled placeholder is not an activation**". The received activation
-carries the literal, unreplaced template token
+**Order:** `UNO-WO-012 / R02` · FINAL — EXECUTE · **Executed:** 2026-11-16
+**Workstream:** manual-Vercel deployment readiness — repository only
+**Result:** **COMPLETE for this order's scope** (deployment preparation, not a deployment)
+**U01:** remains **OPEN** · formal closed stages **1 / 8** · U02–U07 not started
+**Scorecard:** prior earned **23.75%**; this report **proposes 23.75% → 24.00% (+0.25 pp)** for the
+independently reviewable readiness checkpoint · the **0.50** public-deployment points and the **0.50**
+U01-exit points remain **unearned** · Architect acceptance required
 
 ```text
-VERCEL_SCOPE=<REPLACE WITH EXACT OWNER-SELECTED SCOPE>
+VERCEL_NOT_DEPLOYED_BY_AGENT
+MANUAL_DEPLOYMENT_PENDING_OWNER
 ```
 
-alongside three genuinely specified fields (`VERCEL_DEMO_PROJECT=provelopment-foundation-uno-demo`,
-`PUBLIC_UNPROTECTED_PREVIEW=YES`, `CREATE_PROJECT_IF_ABSENT=YES`). §6 step 1 then instructs: "If
-Vercel target cannot be identified exactly, **STOP without attempting a deployment**." Picking a scope
-from anything else — a CLI session, a default, a plausible team name — would be exactly the guessing
-the order forbids. **No scope was selected, and no project was created, adopted or inspected.**
+The only artifact produced here is an auditable, deployment-ready GitHub revision of the existing
+English homepage plus the instruction the Owner needs to deploy it manually. **No Vercel command,
+login, project, inspection, credential, deployment, protection change or URL exists** — the Agent has
+performed zero provider actions, as this edition requires.
 
-**(b) No Owner-authenticated Vercel channel exists on the execution machine.** §2 permits only "the
-Owner-authenticated Vercel environment, tool or CLI already made available to the Implementation
-Agent", forbids asking for a token in chat or printing environment values, and concludes: "If such a
-safe Vercel deployment channel is unavailable, **STOP with a factual GitHub report**." A read-only
-probe found:
+## 1. Lineage and closed ledger
 
-| Probe | Observation |
+| Item | Value |
 | --- | --- |
-| `vercel` CLI on `PATH` | present (a locally installed binary; no version or identity was queried) |
-| `VERCEL_TOKEN` | **not set** (presence checked as a boolean; no value read or printed) |
-| `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` / `VERCEL_SCOPE` | **not set** |
-| any other `VERCEL*` environment variable | none |
-| repository `.vercel` link directory | absent |
-| user-level Vercel CLI config directory | absent |
+| Required start (`main`) | `6de130cff699f6b70540cd20e58a1cef6fa16a4d` — verified equal to `origin/main`, clean tree |
+| Predecessor | `UNO-WO-012 / R01`, correctly stopped report-only at that same commit (no target, no channel) |
+| **Product commit** | **`8a733db2ff2c9242a486baf60e4de4dba7932e74`** — six product paths, direct child of the start commit |
+| **Report commit** | the report-only child of the product commit; its SHA is stated in the Owner handback because a report cannot contain its own commit |
+| Accepted homepage origin | `UNO-WO-011 / R01`, product `5323439f90d5dd1543bde15e0f06f287b0271d51`, report `3b642e12648c4c43b39542aec4d5be0ff41f2b59` |
 
-There is therefore no authenticated scope, team, or project identity to act under. Installing or
-authenticating tooling, or fetching a token through chat, is explicitly prohibited by §2. I did not run
-an authentication probe that would have written CLI state into the user profile, because task-owned
-state belongs inside the verified Uno root.
+Exactly six product paths plus this one report path changed. Nothing else was written, staged or pushed.
 
-Because (a) is a defect in the **activation** rather than a provider failure, no partial deliverable
-could rescue the run: the required output is an unauthenticated public HTTPS URL, and no legal target
-for it exists.
-
-## 2. Ledger — nothing authorized was created; only this report changed
-
-| # | Path | Operation in order | Actual status |
+| # | Path | Operation | What it now is |
 | --- | --- | --- | --- |
-| 1 | `.vercelignore` | CREATE | **NOT CREATED** — payload exclusion is only meaningful for an authorized upload |
-| 2 | `scripts/verify-vercel-demo.mjs` | CREATE | **NOT CREATED** — a live verifier with no live target would be dead weight |
-| 3 | `tests/deployment/verify-vercel-demo.test.mjs` | CREATE | **NOT CREATED** |
-| 4 | `.github/workflows/verify-vercel-demo.yml` | CREATE | **NOT CREATED** — no live check is authorized to run, and a workflow that can only ever print `NOT_APPLICABLE` would be noise, not evidence |
-| 5 | `.documents/Architecture/source-inventory.md` | EDIT narrowly | **NOT EDITED** — the note is meant to describe a controlled public preview that does not exist |
-| 6 | `.documents/Reports/execution-report.md` | OVERWRITE once | **OVERWRITTEN** with this STOPPED report, as the single record for the run |
+| 1 | `.vercelignore` | CREATE | Conservative CLI-upload exclusion: `.documents/**` (private ACTIVE included), `.temp/`, `.git/`, `.vercel/`, `.env`/`.env.*`, certificates, `node_modules/`, `.next/`, `out/`, `build/`, `dist/`, `next-env.d.ts`, `*.tsbuildinfo`, caches and logs. `src/`, `next.config.ts`, `package.json`, `pnpm-lock.yaml` and `tsconfig.json` stay eligible |
+| 2 | `scripts/verify-vercel-readiness.mjs` | CREATE | Offline readiness verifier: pure exported `analyzeReadiness()` over eight enumerated committed files, 70 executed checks, 74 closed reason codes, deterministic marker, no network and no provider |
+| 3 | `tests/deployment/verify-vercel-readiness.test.mjs` | CREATE | 44 Node-native in-memory fixtures: one complete positive fixture plus targeted refusals and hostile-snapshot handling |
+| 4 | `.documents/Deployment/vercel-manual-handoff.md` | CREATE | Owner-only manual Vercel guide: source commit, framework/root/Node/build settings, pnpm-11 platform risk, Git-versus-CLI payload boundaries, post-deployment checks, division of responsibility, provider documentation links |
+| 5 | `.github/workflows/verify-u01.yml` | EDIT narrowly | Adds the readiness fixtures and the readiness CLI to **both** existing hosts after the production HTTP gate, and corrects the stale `technical placeholder` HTTP step label. Triggers, permissions (`contents: read`), installs and every pre-existing gate are untouched |
+| 6 | `.documents/Architecture/source-inventory.md` | EDIT narrowly | One labelled *U01 manual-deployment-readiness* adoption note; earlier U01/U02 inventory and the 22-module/17-family evidence preserved above it |
 
-The repository is otherwise byte-identical to `3b642e1…`: no source, page, CSS, core, application, test
-baseline, workflow, dependency, lockfile, Next config, governance file or planning slot was touched, and
-no `.vercel` link data was created. This report is a **report-only** commit and its direct parent is the
-required starting commit.
+Unchanged and re-verified by blob identity at the product commit: `src/app/page.tsx`
+`7b7c883b3d3c92edfbfefd1f0614a192ed1814fc`, `src/app/layout.tsx`
+`012f28c58ebdfb0bdda48cf7c80d147d1ff5ab98`, `scripts/verify-u01-http.mjs`
+`6c9f4b1ab191c5883a8216389ff5f595ba87ca55`, plus `package.json` `27da575c1c…`,
+`pnpm-lock.yaml` `8252753664…`, `next.config.ts` `ad198a023a…`, `.gitignore` `a8f3f5e4cc…`,
+`AGENTS.md` `94f962d1f6…`, `README.md` `8f5f4e15ee…`,
+`.documents/SOP/sop-implementation.md` `f30d65901c…` and the bootstrap workflow.
 
-## 3. Preflight that did pass
+## 2. The readiness contract that was actually built
 
-Independently verified before deciding to stop:
+`analyzeReadiness(snapshot)` accepts an in-memory text snapshot of exactly these eight files and returns
+`{ accepted, reasons, checks, failed }` — frozen, bounded, sorted and de-duplicated:
 
-- **Private ACTIVE:** present at the canonical ignored path, **not** tracked and **not** staged; its
-  exact bytes and digest were compared with the Owner's stated values and **matched**. The bytes and
-  digest are withheld from this report.
-- **Git authority:** `HEAD` = `origin/main` = `3b642e12648c4c43b39542aec4d5be0ff41f2b59`; branch `main`;
-  exactly one remote (`provelopment/provelopment-foundation-uno`); one checkout and one worktree; clean
-  tree and index; no merge, rebase, cherry-pick, bisect or index-lock residue; parent workspace guard
-  intact; Foundation and Solo untouched by me.
-- **Reviewed source is the accepted source:** the order's pinned blobs match `HEAD` exactly —
-  `src/app/page.tsx` `7b7c883b3d3c92edfbfefd1f0614a192ed1814fc`, `src/app/layout.tsx`
-  `012f28c58ebdfb0bdda48cf7c80d147d1ff5ab98`, `scripts/verify-u01-http.mjs`
-  `6c9f4b1ab191c5883a8216389ff5f595ba87ca55`. Nothing had drifted since the accepted `UNO-WO-011`
-  product commit, so no rework of the page was needed or attempted.
-- **Toolchain:** Node v24.22.1, pnpm 11.6.0, Next 16.4.2 — the same pinned versions as the accepted run.
+```text
+package.json · pnpm-lock.yaml · next.config.ts · src/app/page.tsx
+src/app/layout.tsx · .gitignore · .vercelignore · .github/workflows/verify-u01.yml
+```
 
-**Gates were not re-executed** in this run because **no file they cover changed**; re-running them would
-have produced numbers this report could only describe as re-runs over unchanged code. The accepted
-evidence at this exact head stands. I make no claim of a fresh local pass beyond the preflight checks
-listed here.
+Positive assertions (executed on every run):
 
-## 4. Vercel state — nothing was touched
+1. `package.json` parses; `private: true`; Apache-2.0; version `0.1.0`; `engines.node: "24.x"`;
+   `packageManager: "pnpm@11.6.0"`; Next.js exactly `16.4.2`; React **and** React DOM exactly `19.2.9`;
+   every declared dependency and devDependency pinned to an exact `x.y.z`; `build` is `next build` and
+   `test:http` is `node scripts/verify-u01-http.mjs`.
+2. `pnpm-lock.yaml` is nonempty and carries a `lockfileVersion`; the frozen install stays the operational
+   guarantee on both CI hosts. No version string is asserted that the lockfile does not contain.
+3. `next.config.ts` has no `output: 'export'`, no `ignoreBuildErrors`, no `redirects`/`rewrites`, no
+   remote loader or `images` block and no secret or `process.env` reference. These are lexical checks,
+   not a TypeScript parse, and nothing more is claimed.
+4. The page keeps the accepted English demonstration: one `h1` with the truthful title, the
+   English-demonstration disclosure, exactly one external URL — the approved repository link — no
+   `http://` URL and none of four fabrication markers. Runtime behaviour is still proven separately by
+   the 51-assertion loopback gate; the static scan reads source intent only.
+5. The layout keeps `lang="en"`, `index: false`, `follow: false`, `nocache: true`, the truthful
+   title/description, and no `alternates` (no canonical, no `hreflang`).
+6. `.gitignore` keeps the private ACTIVE screened, plus `.temp/`, `.vercel/`, `.env`/`.env.*` and Next
+   output.
+7. `.vercelignore` excludes private and scratch paths, is not a match-all list, and does not hide a
+   protected build input.
+8. The U01 workflow still runs frozen install, governance, bootstrap, architecture, lint, typecheck, unit,
+   production build, production HTTP **and** both readiness steps, on `ubuntu-24.04` **and**
+   `windows-2025`, with `contents: read`, no bypass token, no provider command and no secret reference.
 
-| Item | State |
+Safety properties proven by fixtures: only own **data** properties of the caller object are read
+(`Object.getOwnPropertyDescriptor`), so a getter is reported as malformed and **never invoked**; a throwing
+property trap is caught; results contain only closed literal codes, so no file text, path, username or
+hostile value can echo into a diagnostic; importing the module never runs the check.
+
+## 3. Refusals proven, not assumed
+
+44 fixtures, all in memory, no repository read, no network, no provider tooling. Each refusal asserts
+`accepted: false`, a nonempty failure count, the **exact** expected code, and a nonzero executed-check
+count — so a refusal cannot come from an empty or always-true scan.
+
+| Group | Fixtures |
 | --- | --- |
-| Vercel scope used | **none** — the required field was an unfilled placeholder |
-| Vercel project created / adopted | **none** — no project name was reserved, cloned, linked or inspected |
-| Deployment | **none** — no build was submitted, no deployment ID exists |
-| Public HTTPS URL | **none** — no `*.vercel.app` address exists or is claimed anywhere in this report |
-| Git integration / auto-deploy | not enabled, not modified |
-| Production promotion, alias, custom domain, DNS | not performed |
-| Team-wide protection, SSO, billing, members, audit settings | not read or changed |
-| Secrets / environment variables | none created, read or printed |
-| Account identity | not authenticated, not probed, not disclosed |
+| Package metadata | unparseable JSON; not `private`; wrong Node major (`20.x`); wrong pnpm (`10.4.0`); drifted Next (`16.3.0`); unpinned dependency (`^5.9.3`); replaced `test:http` script |
+| Lockfile | missing; present but without `lockfileVersion` |
+| `next.config.ts` | `output: 'export'`; `ignoreBuildErrors`; `redirects` rules |
+| Page and layout | obsolete `technical placeholder`; `<h1>` demoted to `<h2>`; disclosure removed; approved source link replaced; extra external URL; an invented success marker; `lang="en-US"`; `index: true`; `follow: true`; `nocache` removed; invented `alternates` |
+| Payload | `.gitignore` without the ACTIVE rule; `.vercelignore` without `.documents/`; match-all `*`; `src/` hidden |
+| CI | `npx vercel deploy`; `secrets.VERCEL_TOKEN`; `continue-on-error`; stale `technical placeholder` label; dropped `pnpm test:http`; dropped readiness CLI; single-host matrix; `contents: write` |
+| Hostile input | accessor snapshot (getter count stays **0**); throwing `getOwnPropertyDescriptor` trap (error text never surfaces); non-string field; missing field; `null`; closed-code whitelist; no-echo check; deterministic formatting with no deployed claim |
 
-No `PUBLIC_PREVIEW_READY` marker is present in this report, and no stand-in URL is offered: a
-placeholder or guessed destination would be the fabrication the order explicitly forbids.
+## 4. Local evidence — the exact order sequence, on Windows with the pinned toolchain
 
-## 5. Hosted evidence at the required starting head
+Node **v24.22.1** · pnpm **11.6.0** · Next.js **16.4.2** · `pnpm-lock.yaml` unchanged.
 
-The two unchanged Uno workflows are already green at this exact commit — the same head this run started
-from and did not alter:
+| Gate | Result |
+| --- | --- |
+| `pnpm install --frozen-lockfile --ignore-scripts` | PASS — "Already up to date", 403 ms, exit 0 |
+| `node --test tests/governance-docs.test.mjs` | PASS — **6 / 6** |
+| `node scripts/verify-governance-docs.mjs` | PASS — AGENTS.md, README.md and local SOP match Owner-frozen bytes |
+| `pnpm test:bootstrap` | PASS — **19 / 19** |
+| `pnpm test:architecture` | PASS — **12 / 12** |
+| `pnpm lint` | PASS — `eslint .`, exit 0, no findings |
+| `pnpm typecheck` | PASS — `tsc --noEmit`, exit 0 |
+| `pnpm test` | PASS — **167 / 167** across 7 files |
+| `pnpm build` | PASS — exit 0, **3 static pages** reported by `next build` |
+| `pnpm test:http` | PASS — **51 passed, 0 failed** (`/` 200 HTML, English text, six refused routes, `noindex`) |
+| `node --test tests/deployment/verify-vercel-readiness.test.mjs` | PASS — **44 / 44** |
+| `node scripts/verify-vercel-readiness.mjs` | PASS — **70 checks, 0 failed**, exit 0 |
+
+The CLI's full success output, verbatim:
+
+```text
+verify-vercel-readiness: PASS — 70 checks, 0 failed
+VERCEL_NOT_DEPLOYED_BY_AGENT
+verify-vercel-readiness: PASS — GitHub/offline inputs only; VERCEL_NOT_DEPLOYED_BY_AGENT
+```
+
+Nothing was skipped, softened or made tolerant of failure. No `continue-on-error`, no `|| true`, no
+disabled test, no network call and no provider process ran at any point.
+
+## 5. Exact-head hosted evidence
+
+**Product head `8a733db2ff2c9242a486baf60e4de4dba7932e74`** — four jobs, all green:
 
 | Workflow | Run | ubuntu-24.04 | windows-2025 | Steps / non-success |
 | --- | --- | --- | --- | --- |
-| Uno Bootstrap Verify | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43822075296 | success | success | 9 / **0** |
-| Verify U01 baseline | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43822075419 | success | success | 18 / **0** |
+| Uno Bootstrap Verify | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43827649594 | success | success | 9 / **0** each |
+| Verify U01 baseline | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43827649726 | success | success | 20 / **0** each |
 
-The report-only head produced by this run triggers the same two workflows again; their identities are
-stated in the Owner handback for this order, because this report cannot contain its own commit SHA. The
-live-verification workflow that this order would have added **does not exist**, so no live job is claimed
-as passing, skipped or `NOT_APPLICABLE` evidence. Job **log text remains `UNVERIFIED`**: the logs
-endpoint was not readable to this client, so no log line is quoted.
+The amended workflow grew from 18 to **20** steps on each host, and the two new steps are observed
+`success` on Ubuntu: `Deployment readiness fixtures (offline, in-memory)` and
+`Deployment readiness (offline; VERCEL_NOT_DEPLOYED_BY_AGENT)`, alongside the now-correctly-labelled
+`Run production HTTP (English demonstration)`.
 
-## 6. Scorecard and non-claims
+The final report-only head re-runs the same two workflows on both hosts; its four run identities and
+eight job conclusions are stated in the Owner handback for this order, because this report cannot know
+its own commit SHA. **Job log text remains `UNVERIFIED`**: the logs endpoint returned 403 to this client,
+so no log line is quoted; only job and step conclusions are claimed as PASS.
 
-| Item | Before | After this run |
-| --- | --- | --- |
-| U00 (Owner-closed) | 12.50 | 12.50 |
-| U01 outcomes 1–8 (accepted) | 10.00 | 10.00 |
-| U01 accepted English homepage (WO-011) | 1.25 | 1.25 |
-| **This order's refinement** — 0.75 public externally verified demo / 0.50 retained for U01 exit | 0.00 | **0.00 — not earned** |
-| U02–U07 | 0.00 | 0.00 |
-| **Earned total** | **23.75%** | **23.75% — unchanged** |
-| Formal closed stages | 1 / 8 | **1 / 8 — U01 OPEN** |
+## 6. What was deliberately *not* changed
 
-Explicit non-claims: no deployment exists, no URL is claimed, no provider attestation is asserted, no
-stage is closed, U01 is not exited, and no report or test substitutes for the missing live proof. This
-report is not an acceptance of anything and does not close the order successfully.
+`src/app/page.tsx`, `layout.tsx`, `globals.css` and `not-found.tsx` are byte-identical: the homepage,
+its CSS, the `lang="en"` declaration, the `noindex, nofollow, nocache` policy and the honest 404 all
+stand as accepted. `scripts/verify-u01-http.mjs` is untouched and still counts 51 real assertions over a
+loopback production server. `package.json`, `pnpm-lock.yaml`, `next.config.ts`, `.gitignore`,
+`tsconfig.json`, `public/**` (absent), `AGENTS.md`, `README.md`, the SOP and the bootstrap workflow are
+untouched. No dependency, asset, route, locale, analytics, client script or npm script was added, and no
+`vercel.json` was created — the order forbids one, and the committed project settings are plain Next.js
+defaults.
 
-## 7. What the Owner must supply for a corrected order
 
-1. **`VERCEL_SCOPE` filled with the literal scope slug** (for example the team slug as shown in the
-   Vercel dashboard URL) — not a description and not a placeholder. `VERCEL_DEMO_PROJECT` may stay
-   `provelopment-foundation-uno-demo`.
-2. **An authenticated channel on this machine**, supplied Owner-side and outside the repository and
-   chat: either a logged-in Vercel CLI session (`%USERPROFILE%\.vercel`, which the Agent will not
-   create) or scoped credentials placed in the environment. The Agent will confirm availability by
-   boolean presence only and will never print a value.
-3. Confirmation that `PUBLIC_UNPROTECTED_PREVIEW=YES` and `CREATE_PROJECT_IF_ABSENT=YES` still stand for
-   that exact scope, so the preview can be genuinely unauthenticated without weakening unrelated or
-   team-wide protection.
 
-With those three supplied, the plan is unchanged and ready: protected payload (`.vercelignore`), the
-URL/refusal verifier plus its pure fixtures, the report-triggered read-only live workflow, one
-authorized public preview deployment, the single report carrying the four markers, and a
-final-head Actions live proof. Until then this order stays **STOPPED** and no credit is claimed.
+## 7. Residual risk register (Owner decisions, not Agent fixes)
 
-**Requested decision:** independent Architect `ACCEPT / REVISE / STOP` on the STOP decision itself, and
-an Owner corrective activation supplying the exact scope and an authenticated channel.
+| # | Risk | Evidence today | What only the Owner can resolve |
+| --- | --- | --- | --- |
+| 1 | **pnpm 11 on Vercel.** The project pins `pnpm@11.6.0`; Vercel's published table (observed 2026-11-16) lists built-in pnpm **6–10**. `ENABLE_EXPERIMENTAL_COREPACK=1` is documented but experimental and **not tested by this order** | `pnpm install --frozen-lockfile` passes on Node 24 locally and on both CI hosts; nothing here tests the provider | Choose Corepack, inspect the real build log, or request a bounded correction. Never silently downgrade pnpm or rewrite the lockfile |
+| 2 | **Provider build != our CI build.** Green Actions cannot certify Next.js on Vercel's image, its cache, or its install step | Local `next build` produced 3 static pages; both CI hosts built successfully | Read the provider build log |
+| 3 | **Deployment protection.** A protected project returns a login or SSO page instead of the homepage | Not observable by the Agent, and no protection setting was read or changed | Choose the project's access setting deliberately |
+| 4 | **Git integration auto-deploys.** A linked project redeploys on every push to the branch | Not configured by the Agent; no Git integration exists because no project exists | Decide whether to link Git at all |
+| 5 | **`.vercelignore` is CLI-only.** A Git-imported project uploads the tracked commit; the ignore list cannot filter it | The private ACTIVE is untracked and gitignored; the tracked set contains no secret | Confirm the imported commit is the accepted one |
+| 6 | **No live proof exists.** No URL, no deployment ID, no provider attestation | Zero provider actions by the Agent | Deploy, then authorize separate verification if wanted |
+
+## 8. Honest limitations and non-claims
+
+- **This is not a deployment.** No Vercel account, team, project, deployment, protection setting, domain,
+  DNS record, environment variable or URL was created, inspected, read or changed by the Agent, and none
+  is asserted anywhere in this report.
+- **Offline readiness is not provider compatibility.** Every provider-specific statement is `UNVERIFIED`
+  until the Owner deploys.
+- **`noindex, nofollow, nocache` is unchanged and mandatory.** A shareable preview URL is not
+  search-index authorization.
+- **The readiness scanner is lexical.** It reads committed text; it is not a TypeScript parser, not a
+  bundler and not a security proof. Its value is that it fails loudly when the *shape* regresses.
+- **Nothing here publishes an EFS Site.** `/` remains an English informational demonstration; `/en`,
+  `/en-001`, `/about`, `/robots.txt` and `/sitemap.xml` remain 404 by design; no manifest, reader,
+  locale route or publication decision exists.
+- **No stage closes, nothing is released, and the Agent cannot self-accept.**
+
+## 9. Owner handoff and requested decision
+
+The deployable revision is **`8a733db2ff2c9242a486baf60e4de4dba7932e74`**, and the final accepted head is
+the report-only commit that contains this report.
+
+**Read `.documents/Deployment/vercel-manual-handoff.md` at the final accepted GitHub SHA** before
+touching Vercel. It contains the import source, the framework/root/Node/build settings, the pnpm-11
+decision points, the Git-versus-CLI payload distinction, and the exact post-deployment checks to run
+yourself (`/` 200 with English content and `noindex`; six real 404 refusals).
+
+Summary of what the Owner does next:
+
+1. Import `provelopment/provelopment-foundation-uno`, branch `main`, at the accepted commit, root at the
+   repository root, Next.js preset, Node 24.x, and no application secrets or environment values (the only
+   optional setting is the Corepack flag described in step 2).
+2. Decide the pnpm question deliberately (Corepack experimental flag, or inspect the build log and stop if
+   incompatible).
+3. Decide visibility/protection — only you can make the preview openly visitable.
+4. After the build, verify the checks in §7 of the handoff and record the real results separately.
+5. Authorize a separate bounded order if you want GitHub-hosted external HTTP verification of the live
+   URL; the Agent must not deploy or access the provider to do it.
+
+**Requested decision:** independent Chief Master Architect **`ACCEPT` / `REVISE` / `STOP`** on this
+deployment-readiness checkpoint, including the proposed **+0.25 pp** toward readiness. U01 remains OPEN;
+the 0.50 public-deployment and 0.50 U01-exit points stay unearned, and no stage is closed by this report.
