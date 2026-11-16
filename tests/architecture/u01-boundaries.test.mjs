@@ -962,3 +962,68 @@ test('the scanner refuses injected Node, framework, adapter and provider imports
     [],
   );
 });
+
+// --- U03 publication-inputs composition (UNO-WO-024 / R01) ---------------------
+
+const PUBLICATION_INPUTS_SOURCE = 'src/application/validate-uno-site-publication-inputs.ts';
+
+test('the publication-inputs composition is registered, pure and unreachable from the app layer', () => {
+  assert.equal(Object.keys(authoredSources()).includes(PUBLICATION_INPUTS_SOURCE), true);
+
+  const source = readFileSync(resolve(ROOT, PUBLICATION_INPUTS_SOURCE), 'utf8');
+  assert.deepEqual(scanSources({ [PUBLICATION_INPUTS_SOURCE]: source }), []);
+
+  // It composes the existing authorities instead of restating any one of them.
+  const executable = stripComments(source);
+  for (const authority of [
+    'validateUnoManifestGraph',
+    'validateUnoSiteSelection',
+    'validateUnoCanonicalBase',
+    'localePolicyIssue',
+    'buildUnoCandidateRouteIndex',
+  ]) {
+    assert.match(executable, new RegExp(authority), `the composition must reuse ${authority}`);
+  }
+  // No runtime power and no published-Page claim of its own.
+  for (const forbidden of ['node:', '/adapters/', 'process.env', 'fetch(', 'deployment/']) {
+    assert.equal(executable.includes(forbidden), false, `the composition must not gain ${forbidden}`);
+  }
+
+  // Serving nothing in this order: no app-layer source may consume the composition yet.
+  for (const [path, body] of Object.entries(readTree('src/app', 'src/app'))) {
+    assert.equal(body.includes('validate-uno-site-publication-inputs'), false, `${path} must not consume it`);
+  }
+  // And the pure kernel must never depend upwards on an application module.
+  for (const [path, body] of Object.entries(readTree('src/core', 'src/core'))) {
+    assert.equal(
+      body.includes('validate-uno-site-publication-inputs'),
+      false,
+      `${path} must not depend on an application use case`,
+    );
+  }
+});
+
+test('the boundary scanner refuses Node, framework, adapter, deployment and provider imports in the composition', () => {
+  const negativeCases = [
+    ["import { readFileSync } from 'node:fs';", 'Node I/O'],
+    ["import Link from 'next/link';", 'framework'],
+    ["import { headers } from 'next/headers';", 'request headers'],
+    ["import { createElement } from 'react';", 'React'],
+    ["import { loadUnoCandidateSource } from '../adapters/efs/uno-confined-source-reader';", 'adapter'],
+    ["import { send } from '@/adapters/providers/notification';", 'provider adapter'],
+    ["import { m } from '../../deployment/efs/manifest.json';", 'deployment data'],
+  ];
+  for (const [line, label] of negativeCases) {
+    const violations = scanSources({ [PUBLICATION_INPUTS_SOURCE]: `${line}\nexport const x = 1;\n` });
+    assert.equal(violations.length, 1, `${label} must be refused in ${PUBLICATION_INPUTS_SOURCE}`);
+  }
+
+  // An approved core-only import stays clean, so the scanner is not simply refusing everything.
+  assert.deepEqual(
+    scanSources({
+      [PUBLICATION_INPUTS_SOURCE]:
+        "import { validateUnoCanonicalBase } from '../core/efs/uno-canonical-base';\nexport const ok = validateUnoCanonicalBase;\n",
+    }),
+    [],
+  );
+});

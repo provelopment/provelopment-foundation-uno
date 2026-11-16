@@ -119,12 +119,13 @@ nothing, no `src/app` source imports it, and `public` eligibility is not publica
 activation, safe HTTP error behaviour, metadata/SEO emission including canonical advertising and `hreflang`,
 real locale routing, and any optional base path. Each requires a later bounded Owner order.
 
-**Canonical base (`UNO-WO-023 / R01`):** `src/core/efs/uno-canonical-base.ts` validates one *proposed*
-canonical HTTP(S) base — an origin plus an optional lowercase path prefix — and at most eight explicit
-aliases, refusing ambiguity, spelling drift and hostile input. A validated base is **data only**: it is not a
-selected production domain, not a migrated configuration, not a published Site and not a redirect. The
-existing `deployment/uno.config.json` remains unchanged and its own validator remains authoritative, so
-installing, integrating or publishing a real base stays an open U03 gate.
+**Composed inputs (`UNO-WO-024 / R01`):** `src/application/validate-uno-site-publication-inputs.ts`
+cross-checks the one-Entity manifest, the explicit selected Site, a *proposed* canonical base and an explicit
+locale policy, and accepts only when the same Site authors exactly the promised locales and a reserved Home at
+the declared default. It is a consistency check, **not** a migration or a publication: the committed
+`deployment/uno.config.json` and manifest are unchanged and still authoritative, so choosing a real base,
+admitting Site locale authorities, correcting the stale Home Markdown, enabling real HTTP/metadata and closing
+U03 all stay open Owner gates.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct
 visibility behaviour.

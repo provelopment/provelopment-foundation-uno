@@ -1223,6 +1223,34 @@ no markup; Markdown must begin with one `# ` heading and is always `public`; rep
 projection proves a Page is routed, public or indexable.
 
 
+## U03 publication-inputs composition (UNO-WO-024 / R01)
+
+**Mapping.** `src/application/validate-uno-site-publication-inputs.ts` (application layer) composes four
+already-validated inputs — the manifest graph, the selected Site, a *proposed* canonical base and an explicit
+full-locale policy — into one consistency verdict: the same single Site authors every locale the policy
+promises, and it authors a reserved Home at the declared default. It adds no fifth validator; it calls
+`validateUnoManifestGraph`, `validateUnoSiteSelection`, `validateUnoCanonicalBase`, `localePolicyIssue` and
+`buildUnoCandidateRouteIndex` and re-states none of their rules.
+
+**Result.** Either a freshly copied, deeply frozen `{accepted: true, site, canonicalBase, aliases, localePolicy,
+candidateCount}` or one of eleven closed `publication-inputs:` codes. `candidateCount` counts declared candidate
+addresses, never published Pages, and the result carries no `published`, `ready`, redirect, canonical URL,
+`hreflang`, sitemap, visibility, body or secret field.
+
+**Boundaries.** Both directions of the locale comparison are refused rather than inferred: an authored locale the
+policy omits, and a promised locale the selected Site never authors. A missing default Home refuses instead of
+falling back to another locale or manufacturing a Page, no language is guessed from geography, and the only
+short-language alias is an explicit `en: "en-001"` mapping. The proposed base and policy are caller data, not a
+committed configuration file; no migration, route, redirect, metadata, provider access or publication is implied.
+
+**Rights and provenance.** Original **Uno-owned** implementation, class **NEW / REWRITE concept**; informed by,
+never copied from, the read-only Foundation GEO-03 commit `c05c55ea…`. No Foundation, Solo Rust, GEO-04, Connect,
+mark or asset imported; no dependency, schema, workflow or asset added; Apache-2.0 obligations preserved.
+
+**Limitations.** A consistent composition is **not** publication: it does not select a production origin, admit
+Site locale authorities the manifest still lacks, correct the stale Home Markdown, publish a Page or serve a
+route. Those remain open U03 gates requiring later Owner orders.
+
 ## U03 canonical base validation (UNO-WO-023 / R01)
 
 **Mapping.** `src/core/efs/uno-canonical-base.ts` (pure core) validates one *proposed* Owner-declared
