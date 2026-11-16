@@ -730,6 +730,41 @@ is an implemented module, and no count here asserts "39 independent modules".
 - **U06** - installation, upgrade and release.
 - **U07** - browser, accessibility, security, rights and independent release gate.
 
+## U01 author-destination security adoption (UNO-WO-008 / R02)
+
+**Scope:** one early U01 authoring/security primitive — a pure **syntax** classifier for a
+destination an author controls. It is not a link resolver, router, renderer, publisher or provider
+adapter, and it decides nothing about a target's existence, visibility or permission.
+
+| Pinned GEO-03 evidence | Blob | Bytes | Used for |
+| --- | --- | ---: | --- |
+| `src/core/safe-url.ts` | `d19b6c8ecb2f1bb3d3a163260ca2afeb87b89493` | 8,195 | Concept: allowlist author destinations, fail closed on obfuscation; its tolerances are NOT adopted |
+| `tests/unit/safe-url.test.ts` | `13343cf06cd3dca1768edcb8ae46480325dc1391` | 3,503 | Reference case *categories* only; no fixture copied |
+| `src/core/page-document.ts` | `a12d964c43626c6313a621bf628f5cc24b65d444` | 45,106 | Evidence that Foundation's Page authoring validator depended on URL classification; not imported |
+
+**Original work, not a copy.** `src/core/safe-author-url.ts` is Uno-authored with no imports, no I/O
+and no global state; `tests/unit/safe-author-url.test.ts` is an independent fixture set. Deliberate
+divergences from the upstream helper: an accepted `href` is the original string byte-for-byte (never
+trimmed, decoded or reserialised); HTML character references are refused rather than decoded;
+`tel:` is refused, so a phone action must come from a validated public property projection later;
+absolute origins are validated lexically before `URL` is used only as a cross-check; a relative
+reference containing `:` is refused as ambiguous.
+
+**Admitted syntax:** root-relative single-slash paths, fragment-only, query-only, conservative
+relative references, absolute `http`/`https` with a real host, and `mailto:` with a real recipient.
+**Refused:** every other scheme (`javascript:`, `vbscript:`, `data:`, `blob:`, `file:`, `ftp:`, `ws:`,
+`about:`, `view-source:`, `tel:`, unknown `x:` forms), protocol-relative and percent-encoded
+protocol-relative forms, raw and encoded control bytes, whitespace, backslash and attribute-breaking
+characters, character references, nested encodings, disguised (encoded) schemes, malformed `http(s)`
+origins (userinfo, invalid port, impossible host) and mailto values carrying raw or encoded CR/LF.
+
+**Boundary and handoff.** No Page, locale route, Site selection, EFS manifest, renderer, webhook or
+provider exists behind this classifier, and an admitted category is never proof of a published
+target. **U03** must add Page/locale/visibility existence checks and canonicalisation; **U05** must
+supply any contact delivery or provider adapter; **U04** must prove caller-side attribute escaping.
+Tests recorded for those stages: syntax acceptance of `/admin` is not authorization, and an accepted
+external origin is not permission to fetch it server-side.
+
 ## Rights
 
 Apache-2.0 source only, subject to review. Branded images, product data, default analytics and
