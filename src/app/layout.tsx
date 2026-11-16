@@ -3,15 +3,19 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 /**
- * Root layout for the U01 technical baseline.
+ * Root layout for the English informational demonstration.
  *
- * The static `lang="en"` here belongs to this NON-PUBLISHED technical placeholder only.
- * It is not an EFS locale representation and must never be read as `en → en-001` logic:
- * no Entity, Site, Facet, Page or representation is configured or implied.
+ * The static `lang="en"` describes this NON-PUBLISHED informational page. It is not an EFS locale
+ * representation, it is not the authored locale identifier `en-001`, and it must never be read as
+ * `en → en-001` logic: no Entity, Site, Facet, Page or representation is configured by it.
+ *
+ * Metadata stays deliberately minimal and truthful: the pre-publication `noindex, nofollow` policy
+ * is preserved, and no canonical, alternate/hreflang, sitemap or analytics tag is invented here.
  */
 export const metadata: Metadata = {
-  title: 'Foundation Uno',
-  description: 'U01 technical baseline — the authored public Site is not configured.',
+  title: 'Foundation Uno — a single-Entity website foundation',
+  description:
+    'English demonstration of Foundation Uno, an independent Apache-2.0 Next.js and TypeScript website foundation built for one Entity. Full authored Site publication is not yet enabled.',
   robots: {
     index: false,
     follow: false,

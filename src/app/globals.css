@@ -1,24 +1,42 @@
 /*
- * Foundation Uno — U01 technical baseline styles.
+ * Foundation Uno — English informational demonstration styles.
  *
- * Small, dependency-free, accessible and responsive. No brand asset, webfont, external
- * request or provider stylesheet is loaded here.
+ * Original, dependency-free CSS: no webfont, no external stylesheet, no CDN, no background image
+ * and no `url()` reference of any kind. Light and dark are both first-class, focus is always
+ * visible, text keeps a comfortable measure, and layout collapses to one column at narrow widths.
  */
 
 :root {
   color-scheme: light dark;
   --uno-background: #ffffff;
-  --uno-foreground: #14181f;
-  --uno-muted: #4a5262;
-  --uno-border: #d8dde6;
+  --uno-surface: #f5f7fb;
+  --uno-surface-strong: #eaeef6;
+  --uno-foreground: #101620;
+  --uno-muted: #4b5566;
+  --uno-border: #d7dee9;
+  --uno-accent: #1f6f6b;
+  --uno-accent-soft: #e4f2f0;
+  --uno-accent-contrast: #ffffff;
+  --uno-focus: #1f6f6b;
+  --uno-radius: 0.75rem;
+  --uno-radius-lg: 1.25rem;
+  --uno-measure: 64ch;
+  --uno-shadow: 0 1px 2px rgb(16 22 32 / 6%), 0 12px 32px -24px rgb(16 22 32 / 35%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --uno-background: #11151c;
-    --uno-foreground: #f2f5f9;
-    --uno-muted: #aeb6c4;
-    --uno-border: #2c333f;
+    --uno-background: #0c1118;
+    --uno-surface: #141b24;
+    --uno-surface-strong: #1b2430;
+    --uno-foreground: #eef2f8;
+    --uno-muted: #a9b4c4;
+    --uno-border: #27313f;
+    --uno-accent: #6fd3c9;
+    --uno-accent-soft: #14312f;
+    --uno-accent-contrast: #05231f;
+    --uno-focus: #8ce7dc;
+    --uno-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 18px 40px -28px rgb(0 0 0 / 70%);
   }
 }
 
@@ -28,48 +46,406 @@
   box-sizing: border-box;
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-padding-top: 5rem;
 }
 
 body {
+  margin: 0;
   min-height: 100vh;
   background-color: var(--uno-background);
   color: var(--uno-foreground);
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 1rem;
-  line-height: 1.6;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
 }
 
-.uno-baseline {
-  max-width: 42rem;
-  margin: 0 auto;
-  padding: 2rem 1.25rem;
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
-.uno-baseline h1 {
-  margin: 0 0 0.75rem;
-  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem);
+h1,
+h2,
+h3 {
+  margin: 0;
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
 }
 
-.uno-baseline p {
-  margin: 0 0 0.75rem;
-  max-width: 60ch;
+p,
+ul,
+ol {
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 3px solid var(--uno-focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* --- Skip link ---------------------------------------------------------------- */
+
+.uno-skip-link {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 10;
+  padding: 0.7rem 1rem;
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-accent);
+  color: var(--uno-accent-contrast);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.uno-skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* --- Page shell --------------------------------------------------------------- */
+
+.uno-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.uno-shell {
+  width: 100%;
+  max-width: 68rem;
+  margin: 0 auto;
+  padding-inline: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+.uno-narrow {
+  max-width: 40rem;
+  padding-block: clamp(3rem, 8vw, 6rem);
+}
+
+/* --- Header ------------------------------------------------------------------- */
+
+.uno-header {
+  border-bottom: 1px solid var(--uno-border);
+  background-color: var(--uno-background);
+}
+
+.uno-header__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  padding-block: 0.9rem;
+}
+
+.uno-brand {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.uno-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.uno-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding-inline: 0.7rem;
+  border-radius: var(--uno-radius);
+  color: var(--uno-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.uno-nav a:hover {
+  background-color: var(--uno-surface-strong);
+  color: var(--uno-foreground);
+}
+
+/* --- Hero --------------------------------------------------------------------- */
+
+.uno-hero {
+  padding-block: clamp(3rem, 9vw, 6.5rem) clamp(2.5rem, 7vw, 5rem);
+  background-image: radial-gradient(
+    120% 90% at 12% 0%,
+    var(--uno-accent-soft) 0%,
+    transparent 62%
+  );
+}
+
+.uno-eyebrow {
+  margin-bottom: 1rem;
+  color: var(--uno-accent);
+  font-size: 0.8rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.uno-hero__title {
+  max-width: 22ch;
+  font-size: clamp(2rem, 1.1rem + 3.4vw, 3.5rem);
+  font-weight: 700;
+}
+
+.uno-hero__lede {
+  max-width: var(--uno-measure);
+  margin-top: 1.25rem;
+  color: var(--uno-muted);
+  font-size: clamp(1.05rem, 1rem + 0.35vw, 1.25rem);
+  line-height: 1.65;
+}
+
+.uno-hero__lede strong {
+  color: var(--uno-foreground);
+}
+
+.uno-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.uno-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.9rem;
+  padding-inline: 1.15rem;
+  border: 1px solid transparent;
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-accent);
+  color: var(--uno-accent-contrast);
+  font-size: 0.98rem;
+  font-weight: 620;
+  text-decoration: none;
+}
+
+.uno-button:hover {
+  filter: brightness(1.07);
+}
+
+.uno-button--quiet {
+  border-color: var(--uno-border);
+  background-color: transparent;
+  color: var(--uno-foreground);
+}
+
+.uno-button--quiet:hover {
+  background-color: var(--uno-surface-strong);
+  filter: none;
+}
+
+/* --- Sections ----------------------------------------------------------------- */
+
+main {
+  flex: 1 0 auto;
+}
+
+.uno-section {
+  padding-block: clamp(2.5rem, 6vw, 4.5rem);
+  border-top: 1px solid var(--uno-border);
+}
+
+.uno-section h2 {
+  font-size: clamp(1.45rem, 1.15rem + 1.3vw, 2.05rem);
+  font-weight: 680;
+}
+
+.uno-section__lede {
+  max-width: var(--uno-measure);
+  margin-top: 0.9rem;
   color: var(--uno-muted);
 }
 
-.uno-baseline a {
-  color: inherit;
-  text-underline-offset: 0.2em;
+/* --- The planned Entity stack -------------------------------------------------- */
+
+.uno-stack {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 2rem;
+  padding: 0;
+  list-style: none;
+  counter-reset: uno-level;
 }
 
-.uno-baseline a:focus-visible {
-  outline: 2px solid var(--uno-foreground);
-  outline-offset: 2px;
-  border-radius: 2px;
+.uno-stack li {
+  position: relative;
+  padding: 1.1rem 1.25rem 1.15rem 3.6rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-surface);
+  counter-increment: uno-level;
+}
+
+.uno-stack li::before {
+  content: counter(uno-level, decimal-leading-zero);
+  position: absolute;
+  top: 1.05rem;
+  left: 1.25rem;
+  color: var(--uno-accent);
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.uno-stack h3 {
+  font-size: 1.05rem;
+  font-weight: 660;
+}
+
+.uno-stack p {
+  max-width: 58ch;
+  margin-top: 0.3rem;
+  color: var(--uno-muted);
+  font-size: 0.97rem;
+}
+
+/* --- Status split -------------------------------------------------------------- */
+
+.uno-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.uno-card {
+  padding: 1.4rem 1.5rem 1.5rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-surface);
+  box-shadow: var(--uno-shadow);
+}
+
+.uno-card h3 {
+  font-size: 1.05rem;
+  font-weight: 680;
+}
+
+.uno-card ul {
+  margin-top: 0.85rem;
+  padding-left: 1.15rem;
+  color: var(--uno-muted);
+  font-size: 0.97rem;
+}
+
+.uno-card li + li {
+  margin-top: 0.55rem;
+}
+
+.uno-card li::marker {
+  color: var(--uno-accent);
+}
+
+/* --- Links, inline notes, footer ---------------------------------------------- */
+
+.uno-link {
+  color: var(--uno-accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+}
+
+.uno-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.uno-note {
+  max-width: var(--uno-measure);
+  margin-top: 2rem;
+  padding: 0.75rem 0 0.75rem 1rem;
+  border-left: 3px solid var(--uno-accent);
+  color: var(--uno-muted);
+  font-size: 0.94rem;
+}
+
+.uno-note--inline {
+  margin-top: 1.5rem;
+}
+
+.uno-footer {
+  border-top: 1px solid var(--uno-border);
+  background-color: var(--uno-surface);
+}
+
+.uno-footer p {
+  padding-block: 1.75rem;
+  max-width: var(--uno-measure);
+  color: var(--uno-muted);
+  font-size: 0.9rem;
+}
+
+/* --- Preference and viewport accommodations ---------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --uno-muted: var(--uno-foreground);
+    --uno-border: var(--uno-foreground);
+  }
+}
+
+@media (max-width: 34rem) {
+  .uno-header__row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .uno-nav ul {
+    gap: 0.15rem;
+  }
+
+  .uno-nav a {
+    padding-inline: 0.55rem;
+  }
+
+  .uno-stack li {
+    padding-left: 1.25rem;
+  }
+
+  .uno-stack li::before {
+    position: static;
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+
+  .uno-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .uno-button {
+    width: 100%;
+  }
 }

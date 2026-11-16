@@ -832,3 +832,23 @@ observation is a trusted dependency's report, not proof of existence.
 
 **Handoff:** U02 owns manifest ownership and cardinality; U03 owns readers, confinement, locale routing,
 unlisted HTTP/SEO behaviour and sanitisation; U04/U05 own modules and provider adapters.
+
+## U01 English informational demonstration adoption (UNO-WO-011 / R01)
+
+**Scope:** the `/` route becomes a visitor-readable English introduction instead of a sentence-only
+placeholder. The change is presentation and proof only: `src/app/page.tsx`, `layout.tsx`,
+`globals.css`, `not-found.tsx` and `scripts/verify-u01-http.mjs`. No core, application, adapter,
+configuration, manifest, reader, module, route or deployment path changes, and no dependency is added.
+
+| Surface | Boundary |
+| --- | --- |
+| `src/app/page.tsx` | Static server-rendered HTML: one `h1`, a hero, the planned Entity → Facets → Sites → Pages → localized-representations contract, a *works today* / *what is next* split, one public source link and the informational-demo disclosure. No client component, no fetch, no module renderer, no manifest read |
+| `src/app/layout.tsx` | Truthful demo `title`/`description`, `lang="en"` for the informational page only, and the unchanged pre-publication `noindex, nofollow` policy. No canonical, alternate/hreflang, sitemap or analytics |
+| `src/app/globals.css` | Original dependency-free CSS: light and dark tokens, `focus-visible` ring, `prefers-reduced-motion` and `prefers-contrast` accommodations, one-column collapse at narrow widths. No webfont, CDN, image, `url()` or `@import` |
+| `src/app/not-found.tsx` | Ordinary 404 that links back to the demonstration homepage and does not imply a published Site |
+| `scripts/verify-u01-http.mjs` | Real loopback production server with 51 counted HTTP assertions over the served document: status, content type, `lang`, single `h1`, served metadata, section content, anchor integrity, source link, `noindex`/`nofollow`, seven absent-fabrication markers, six 404 refusals and negative checks that the old placeholder or a publication claim would fail |
+
+**Explicit non-claims.** This is not the P05 authored EFS Home Page, not a validated one-Entity
+publication, and not evidence that the 22 modules render or the 17 capability families have been
+migrated. `/en`, `/en-001`, `/about`, `/robots.txt` and `/sitemap.xml` remain 404; no locale route,
+manifest, sitemap, redirect or deployment exists, and no live URL is asserted by any test.
