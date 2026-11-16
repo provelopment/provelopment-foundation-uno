@@ -171,6 +171,54 @@ export const LEGACY_ADDRESS_MARKERS = Object.freeze([
   'preferencePrefixMatch',
 ]);
 
+/**
+ * The exact authored Node adapters this repository declares (`UNO-WO-020 / R01`).
+ *
+ * An adapter is the ONLY place allowed to touch the real filesystem. It must never be imported by a
+ * pure core contract or an application use case, and it must never pull a framework, a provider, the
+ * app/router layer or the deployment layer into the process.
+ */
+export const ADAPTER_AUTHORED_FILES = Object.freeze([
+  'src/adapters/efs/uno-confined-source-reader.ts',
+]);
+
+/** Modules a concrete Node adapter must never import. */
+export const ADAPTER_FORBIDDEN_MODULES = Object.freeze([
+  'next',
+  'react',
+  'react-dom',
+  '@vercel/analytics',
+  '@vercel/blob',
+  '@vercel/kv',
+]);
+
+/**
+ * Scan a `{ path: content }` map of concrete adapters for boundary violations.
+ * @returns {string[]} one message per violation; empty means clean
+ */
+export function scanAdapters(files) {
+  const violations = [];
+  for (const [path, content] of Object.entries(files)) {
+    const normalised = path.split('\\').join('/');
+    for (const specifier of specifiersOf(content)) {
+      if (specifier.startsWith('node:')) continue;
+      const forbidden = ADAPTER_FORBIDDEN_MODULES.some(
+        (name) => specifier === name || specifier.startsWith(`${name}/`),
+      );
+      const reachesAppOrDeployment =
+        specifier.includes('/app/') ||
+        specifier.startsWith('@/app') ||
+        specifier.includes('deployment/') ||
+        specifier.startsWith('@/deployment') ||
+        specifier.includes('modules/connect');
+      if (forbidden || reachesAppOrDeployment) {
+        violations.push(`${normalised}: a Node adapter must not import "${specifier}"`);
+      }
+    }
+  }
+  return violations;
+}
+
 /** The exact authored `src/core` kernel this baseline declares. */
 export const CORE_AUTHORED_FILES = Object.freeze([
   'src/core/efs/identity.ts',
@@ -647,5 +695,70 @@ test('the kernel refuses legacy address machinery in code but not in provenance 
     const violations = scanSources({ 'src/core/legacy.ts': source });
     assert.equal(violations.length, 1, source);
     assert.match(violations[0], /legacy/);
+  }
+});
+
+// --- U03 concrete Node adapter boundary (UNO-WO-020 / R01) ---------------------
+
+test('the Node source adapters are exactly the declared file set', () => {
+  const adapters = readTree('src/adapters', 'src/adapters');
+  assert.deepEqual(Object.keys(adapters).sort(), [...ADAPTER_AUTHORED_FILES].sort());
+});
+
+test('the real adapter uses Node built-ins and composes the accepted Uno contracts', () => {
+  const adapters = readTree('src/adapters', 'src/adapters');
+  assert.deepEqual(scanAdapters(adapters), []);
+
+  const source = adapters['src/adapters/efs/uno-confined-source-reader.ts'];
+  assert.match(source, /from "node:fs"/);
+  assert.match(source, /from "node:path"/);
+  assert.match(source, /resolve-declared-page-source/);
+  assert.match(source, /uno-route-address/);
+  assert.doesNotMatch(stripComments(source), /from\s+['"]node:(child_process|http|https|net|dns|worker_threads)['"]/);
+});
+
+test('the adapter scanner refuses a framework, provider, app or deployment import', () => {
+  for (const specifier of [
+    'next/link',
+    'react',
+    '@vercel/analytics/next',
+    '@/app/page',
+    'deployment/efs/manifest',
+  ]) {
+    const violations = scanAdapters({
+      'src/adapters/efs/dirty.ts': `import { x } from "${specifier}";\nexport const y = x;\n`,
+    });
+    assert.equal(violations.length, 1, `${specifier} must be refused`);
+  }
+
+  // A Node built-in is permitted in an adapter, and only there.
+  assert.deepEqual(
+    scanAdapters({
+      'src/adapters/efs/clean.ts': "import { readFileSync } from 'node:fs';\nexport const r = readFileSync;\n",
+    }),
+    [],
+  );
+});
+
+test('the pure kernel and the use cases stay Node-free and never reach an adapter', () => {
+  assert.equal(
+    CORE_AUTHORED_FILES.includes('src/adapters/efs/uno-confined-source-reader.ts'),
+    false,
+    'a Node adapter must never join the pure core kernel',
+  );
+
+  for (const target of ['src/core/efs/x.ts', 'src/application/y.ts']) {
+    const violations = scanSources({
+      [target]:
+        'import { loadUnoCandidateSource } from "../adapters/efs/uno-confined-source-reader";\nexport const z = loadUnoCandidateSource;\n',
+    });
+    assert.equal(violations.length, 1, `${target} must not import the concrete adapter`);
+  }
+
+  const kernel = { ...readTree('src/core', 'src/core'), ...readTree('src/application', 'src/application') };
+  for (const [path, source] of Object.entries(kernel)) {
+    const code = stripComments(source);
+    assert.doesNotMatch(code, /from\s+['"]node:/, `${path} must stay Node-free`);
+    assert.doesNotMatch(code, /\/adapters\//, `${path} must not reach an adapter`);
   }
 });

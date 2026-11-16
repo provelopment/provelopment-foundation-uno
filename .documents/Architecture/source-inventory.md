@@ -1138,3 +1138,56 @@ index is never publication authority.
 **Evidence.** 61 focused cases in `tests/unit/efs-uno-route-address.test.ts` (49 of them refusal cases),
 the exact kernel list in `tests/architecture/u01-boundaries.test.mjs` extended by this one pure path,
 and the unchanged U01 gates including `pnpm test:http` at 103 checks with its six 404 refusals.
+
+## U03 confined source loading (UNO-WO-020 / R01)
+
+**Scope.** The first **real** Node-side read of authored EFS sources. `src/adapters/efs/uno-confined-source-reader.ts`
+composes the accepted candidate-address matcher with the existing declared-source use case and performs one
+bounded, physically confined filesystem read. The committed `deployment/efs/content/home.en-001.md` is
+genuinely opened and returned as a **non-serving, non-publication** text payload; the address `/en-001`
+remains a real HTTP 404.
+
+**Provenance.** NEW UNO-OWNED code. It imports only `node:fs` and `node:path` plus Uno's own contracts —
+`matchUnoCandidateRoute`, and `resolveDeclaredPageSource` (which owns `selectDeclaredPageSource`). No
+Foundation or Solo reader, layout, site code or fallback is adopted, and no upstream byte runs here. The
+confinement and UTF-8 rules are Uno's own.
+
+**Trust boundary.** `repoRoot` is a trusted absolute argument supplied by the caller; it is never
+`process.cwd()`, never a request value, and a missing, relative, non-string or non-directory value is
+refused. The `pathname` is untrusted and is used only as an address lookup, so no cookie, header,
+hostname, query string or country can ever become a filename. `loadUnoCandidateSource` validates the
+graph and the Site selection and obtains the candidate itself; a caller-supplied object that merely
+resembles a candidate reads nothing.
+
+**Physical confinement.** Every path component below the trusted root is checked with `lstat` and a
+symlink, junction or reparse alias is refused — a linked content root, a linked intermediate folder and a
+linked final component alike. The content root and the target are re-resolved with `realpath` and accepted
+only by real path-relative containment, so a sibling whose name merely starts with `content` is not
+inside it. The file must be an ordinary regular file; `O_NOFOLLOW` is used where the platform supports
+it, and identity is re-verified after open. Reads are bounded as they happen (manifest 128 KiB, selection
+8 KiB, content 64 KiB), so a file that grows after the first stat is still refused at the cap. Decoding is
+strict UTF-8 with no replacement characters, and no refusal echoes a path, a body or a system message.
+
+**Source validation and precedence.** Markdown must be non-empty, start with one `# ` heading and carry a
+body, with no raw HTML and no NUL/control characters; the text stays opaque and is never rendered. JSON
+must parse to an ordinary top-level object, free of prototype-polluting keys, within bounded depth and
+width — syntax and safety only, with no Page-document schema, canonical, visibility or `published` field
+accepted. Precedence is decided by the **existing** `resolveDeclaredPageSource` use case: a valid declared
+JSON wins even when Markdown was listed first, an invalid declared JSON refuses before Markdown is opened,
+an absent declared JSON may let declared Markdown answer, and an undeclared file is never probed.
+
+**Non-publication boundary.** No `src/app` file imports the adapter; no route, dynamic segment,
+middleware, redirect, metadata alternate, sitemap or `robots.txt` endpoint is created; the landing page,
+its copy, the black emblem, the favicon, the CSS, Analytics and `noindex, nofollow, nocache` are unchanged.
+An accepted payload carries no URL, host, visibility, release, cache or index authority, and a JSON
+`public: true` grants nothing.
+
+**Honest limitations.** Portable Node cannot prove absolute race freedom on every filesystem; Windows
+lacks POSIX file-symlink semantics without elevation, so symlink refusal is proved with junctions
+(intermediate, final and content-root), which are real reparse aliases rather than a simulated check. No
+Page document, rendering, routing or publication is implemented, and the adapter is exercised only by
+tests.
+
+**Evidence.** 81 new Vitest cases across `tests/unit/efs-confined-source-reader.test.ts` (48) and
+`tests/unit/efs-source-resolution-pipeline.test.ts` (33), the architecture suite at 20 checks including
+four new adapter-boundary assertions, and the unchanged U01 gates including `pnpm test:http` at 103 checks.

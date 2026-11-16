@@ -92,9 +92,18 @@ path, Page and locale behaviour, and visibility. `canonicalLocaleTag` remains di
 reserved Home declaration, `/<lowercase-full-locale>/<relative-route>` otherwise, with exact-path
 matching and closed refusals. The live `/` page and every existing 404 are unchanged.
 
-**Still outstanding:** physical source confinement and reading, document parsing, per-Page visibility
-and publication controls, safe HTTP integration and error behaviour, metadata/SEO including canonical
-advertising and `hreflang`, and any optional base path. Each requires a later bounded Owner order.
+**Confined source loading (`UNO-WO-020 / R01`):** the first real Node adapter,
+`src/adapters/efs/uno-confined-source-reader.ts`, reads one declared source from a trusted root with a
+physical confinement boundary — symlink/junction refusal on every component, bounded reads (128 KiB
+manifest, 8 KiB selection, 64 KiB content), strict UTF-8, and minimal Markdown/JSON safety validation.
+It is wired through the existing `resolveDeclaredPageSource` use case, so declared **JSON-before-
+Markdown** precedence governs reads. The committed `en-001` Home Markdown is genuinely opened and
+returned as a non-serving payload. Nothing is routed, published, indexed or rendered, and the adapter is
+imported only by its tests: no `src/app` file, no route, no metadata.
+
+**Still outstanding:** validated Page-document and visibility semantics, explicit Owner publication and
+route activation, safe HTTP error behaviour, metadata/SEO including canonical advertising and
+`hreflang`, and any optional base path. Each requires a later bounded Owner order.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct
 visibility behaviour.
