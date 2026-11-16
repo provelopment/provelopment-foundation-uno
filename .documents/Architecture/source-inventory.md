@@ -852,3 +852,24 @@ configuration, manifest, reader, module, route or deployment path changes, and n
 publication, and not evidence that the 22 modules render or the 17 capability families have been
 migrated. `/en`, `/en-001`, `/about`, `/robots.txt` and `/sitemap.xml` remain 404; no locale route,
 manifest, sitemap, redirect or deployment exists, and no live URL is asserted by any test.
+
+## U01 manual-deployment readiness adoption (UNO-WO-012 / R02)
+
+**Scope:** repository-only preparation for an **Owner-operated** manual Vercel deployment of the accepted
+English demonstration. Nothing is deployed by the Implementation Agent, no provider resource is created
+or inspected, and no URL, project identity or provider success is asserted here or by any test.
+
+| Surface | Boundary |
+| --- | --- |
+| `.vercelignore` | Conservative **CLI-upload** exclusion: `.documents/**` (including the private ACTIVE), `.temp/`, `.git/`, `.vercel/`, `.env*`, installed/generated Node and Next output, caches and logs stay out, while `src/`, `next.config.ts`, `package.json`, `pnpm-lock.yaml` and `tsconfig.json` stay eligible. It is **not** a guarantee for a Git-imported project, where the tracked set governs what is uploaded |
+| `scripts/verify-vercel-readiness.mjs` | Offline, dependency-free readiness gate over eight enumerated committed files: pinned private Apache-2.0 Node 24 / pnpm 11.6.0 / Next 16.4.2 package, nonempty lockfile, bounded `next.config.ts`, accepted English page plus `lang`/`noindex`/`nofollow`/`nocache` guards, Git ignore of the private ACTIVE, upload exclusion that keeps build inputs, and a two-host CI workflow with no bypass. Pure `analyzeReadiness()` accepts only own data properties of an in-memory snapshot and returns closed literal reason codes; the CLI reads this checkout only and emits `VERCEL_NOT_DEPLOYED_BY_AGENT` |
+| `tests/deployment/verify-vercel-readiness.test.mjs` | Node-native positive fixture plus targeted refusals (metadata, pins, lock, export mode, suppressed types, obsolete page, lost guards, payload regressions, CI weakening, hostile snapshots). In-memory only: no repository read, no network, no provider tooling |
+| `.github/workflows/verify-u01.yml` | Both existing hosts additionally run the readiness fixtures and the readiness CLI after the 51-assertion production HTTP gate; the stale "technical placeholder" HTTP step label is corrected to the English demonstration. Permissions stay `contents: read`, triggers unchanged, no secrets and no deployment step |
+| `.documents/Deployment/vercel-manual-handoff.md` | Owner-only manual guide: source commit, framework/root/Node/build settings, the pnpm-11-on-Vercel platform risk, Git-versus-CLI payload boundaries, and the post-deployment 404/`noindex` checks the Agent cannot perform |
+
+**Explicit non-claims.** Green CI here is **offline preparedness**, not a Vercel build, not a provider
+configuration, not an access-protection state and not a live site. Provider-specific compatibility remains
+`UNVERIFIED` until the Owner deploys from the exact accepted commit. This is still not the authored P05
+EFS Home Page, not an EFS Site publication, and not evidence that the 22 modules render or the 17
+capability families have been migrated; `/en`, `/en-001`, `/about`, `/robots.txt` and `/sitemap.xml`
+remain 404 by design, and the pre-publication `noindex, nofollow` policy is unchanged.

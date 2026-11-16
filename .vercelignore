@@ -1,0 +1,49 @@
+# Foundation Uno — Vercel CLI upload exclusion (UNO-WO-012 / R02).
+#
+# Purpose: keep private authority, task scratch, credentials and build output OUT of a
+# CLI-initiated upload of this repository.
+#
+# Scope and honest limits:
+#   * This file is an ADDITIONAL layer for CLI uploads such as `vercel deploy` from a local
+#     checkout. It is NOT proof of protection for a Git-imported Vercel project: a Git clone
+#     contains exactly the tracked files of the commit, so `.gitignore` and the tracked set
+#     govern what exists there, not this file.
+#   * It must never screen the build inputs Vercel needs. `src/`, `next.config.ts`,
+#     `package.json`, `pnpm-lock.yaml`, `tsconfig.json` and `next-env.d.ts` stay eligible.
+#   * An ignore list never deletes, moves or rewrites anything.
+
+# --- Private Owner authority and project records ---------------------------
+# The whole documents tree, including the private ACTIVE work order, is not an upload input.
+.documents/
+
+# --- Task scratch, local evidence and logs --------------------------------
+.temp/
+tmp/
+*.log
+
+# --- Version control and provider state -----------------------------------
+.git/
+.vercel/
+
+# --- Credentials and environment ------------------------------------------
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# --- Installed and generated Node / Next.js output ------------------------
+node_modules/
+.pnpm-store/
+.next/
+out/
+build/
+dist/
+next-env.d.ts
+*.tsbuildinfo
+
+# --- Coverage and tool caches ---------------------------------------------
+coverage/
+.eslintcache
+.cache/

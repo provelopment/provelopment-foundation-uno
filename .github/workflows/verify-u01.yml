@@ -88,6 +88,18 @@ jobs:
         run: pnpm build
         shell: bash
 
-      - name: Run production HTTP (technical placeholder)
+      - name: Run production HTTP (English demonstration)
         run: pnpm test:http
+        shell: bash
+
+      # Offline deployment-readiness gate (UNO-WO-012 / R02). Reads only committed text from
+      # this checkout: no network, no provider call, no credential and no deployment. It fails
+      # the job if the pinned build inputs, the payload exclusions, the page/robots guards or
+      # these CI steps themselves drift or weaken.
+      - name: Deployment readiness fixtures (offline, in-memory)
+        run: node --test tests/deployment/verify-vercel-readiness.test.mjs
+        shell: bash
+
+      - name: Deployment readiness (offline; VERCEL_NOT_DEPLOYED_BY_AGENT)
+        run: node scripts/verify-vercel-readiness.mjs
         shell: bash
