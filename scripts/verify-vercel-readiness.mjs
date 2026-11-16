@@ -73,9 +73,9 @@ const HERO_NOTE = 'This is the live single-page introduction to Foundation Uno.'
 const FOOTER_COPY = '© 2026 Provelopment. Foundation Uno is an open-source website foundation and a';
 const META_TITLE = 'Foundation Uno | One organisation. One connected digital presence.';
 
-/** The approved vector: official-source geometry, charcoal numeral, enlarged canvas. */
-const LOGO_SHA256 = 'de749e41347a043691b3dd82ced90a2d53f80c240993057388cdfaee20a0a568';
-const LOGO_BYTES = 8250;
+/** The approved vector: official-source geometry, true-black numeral, enlarged canvas. */
+const LOGO_SHA256 = 'bd804ce683824ad85852615b0e0a700badb80cf2cdff38dd642d9f1947d57d9c';
+const LOGO_BYTES = 8247;
 const LOGO_VIEWBOX = '0 0 2048 2048';
 
 /**
@@ -453,12 +453,13 @@ export function analyzeReadiness(snapshot) {
   expect(logoText.length > 0, 'brand:logo-missing');
   expect(/^<svg[\s>]/.test(logoText) && logoText.endsWith('</svg>'), 'brand:logo-not-svg');
   expect(logoText.includes(`viewBox="${LOGO_VIEWBOX}"`), 'brand:logo-viewbox');
-  expect(logoText.includes('#1f6f6b') && logoText.includes('#36454f'), 'brand:logo-palette');
+  expect(logoText.includes('#1f6f6b') && logoText.includes('#000000'), 'brand:logo-palette');
   expect(!LOGO_ACTIVE_CONTENT.test(logoText), 'brand:logo-unsafe');
   expect((logoText.match(/<path/g) ?? []).length >= 10, 'brand:logo-geometry');
   expect(Buffer.byteLength(canonicalSvg(logo), 'utf8') === LOGO_BYTES, 'brand:logo-bytes');
   expect(iconText === logoText, 'brand:favicon-parity');
   expect(!logoText.includes('#101620'), 'brand:logo-superseded');
+  expect(!logoText.includes('#36454f'), 'brand:logo-superseded');
   expect(
     createHash('sha256').update(canonicalSvg(logo)).digest('hex') === LOGO_SHA256,
     'brand:logo-digest',

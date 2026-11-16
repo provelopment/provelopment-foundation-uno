@@ -108,6 +108,6 @@ l-167 250 27 23 c15 13 53 46 84 73 80 70 181 200 228 294 54 110 80 210 87
 722 -59 97 25 265 103 349 163 223 159 367 370 437 643 28 107 33 334 10 448
 -71 360 -323 672 -642 795 -170 65 -400 87 -580 54z"/>
 </g></g>
-  <!-- Enlarged charcoal 1, vector-drawn in the silhouette style selected by the Owner. Transparent surrounding canvas. -->
-  <path d="M 1080 440 H 1236 V 1440 H 1400 V 1600 H 754 V 1440 H 972 V 792 L 718 844 V 705 Z" fill="#36454f"/>
+  <!-- Enlarged black 1, vector-drawn in the silhouette style selected by the Owner. Transparent surrounding canvas. -->
+  <path d="M 1080 440 H 1236 V 1440 H 1400 V 1600 H 754 V 1440 H 972 V 792 L 718 844 V 705 Z" fill="#000000"/>
 </svg>

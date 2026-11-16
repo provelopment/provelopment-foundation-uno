@@ -81,12 +81,12 @@ const REQUIRED_TOKENS = Object.freeze([
 
 /** The approved official-source derivative. */
 const LOGO = Object.freeze({
-  bytes: 8250,
-  sha256: 'de749e41347a043691b3dd82ced90a2d53f80c240993057388cdfaee20a0a568',
+  bytes: 8247,
+  sha256: 'bd804ce683824ad85852615b0e0a700badb80cf2cdff38dd642d9f1947d57d9c',
   viewBox: '0 0 2048 2048',
   network: '#1f6f6b',
-  numeral: '#36454f',
-  superseded: '#101620',
+  numeral: '#000000',
+  supersededColours: Object.freeze(['#101620', '#36454f']),
 });
 
 /** Canonical LF form so a Windows checkout and a Linux checkout hash identically. */
@@ -136,7 +136,9 @@ export function auditBrandCopy(fixture) {
   if (!logo.includes(`viewBox="${LOGO.viewBox}"`)) problems.push('brand:svg-viewbox');
   if (!logo.includes(LOGO.network)) problems.push('brand:svg-network');
   if (!logo.includes(LOGO.numeral)) problems.push('brand:svg-numeral');
-  if (logo.includes(LOGO.superseded)) problems.push('brand:svg-superseded');
+  for (const colour of LOGO.supersededColours) {
+    if (logo.includes(colour)) problems.push('brand:svg-superseded');
+  }
   if (ACTIVE_SVG.test(logo)) problems.push('brand:svg-unsafe');
   if ((logo.match(/<path/g) ?? []).length < 10) problems.push('brand:svg-geometry');
   if (Buffer.byteLength(canonical(logo), 'utf8') !== LOGO.bytes) problems.push('brand:svg-bytes');
@@ -236,14 +238,16 @@ test('no retired internal claim survives in the visible page copy', () => {
   for (const phrase of RETIRED) assert.equal(page.includes(phrase), false, phrase);
 });
 
-test('the vector is the official network with the enlarged charcoal numeral', () => {
+test('the vector is the official network with the enlarged black numeral', () => {
   const logo = read('public/uno-logo.svg');
   assert.equal(logo.startsWith('<svg'), true);
   assert.equal(logo.trimEnd().endsWith('</svg>'), true);
   assert.equal(logo.includes(`viewBox="${LOGO.viewBox}"`), true);
   assert.equal(logo.includes(LOGO.network), true, 'green network');
-  assert.equal(logo.includes(LOGO.numeral), true, 'charcoal numeral');
-  assert.equal(logo.includes(LOGO.superseded), false, 'no superseded concept colour');
+  assert.equal(logo.includes('fill="#000000"'), true, 'true black numeral');
+  for (const colour of LOGO.supersededColours) {
+    assert.equal(logo.includes(colour), false, `no superseded colour ${colour}`);
+  }
   assert.equal((logo.match(/<path/g) ?? []).length, 11, 'ten network paths and one numeral');
   assert.equal(ACTIVE_SVG.test(logo), false);
 });
@@ -312,8 +316,8 @@ test('negative fixture: the superseded concept canvas is refused', () => {
   assert.equal(problems.includes('brand:svg-viewbox'), true);
 });
 
-test('negative fixture: a numeral that abandoned the charcoal is refused', () => {
-  const fixture = withAssets((text) => text.replaceAll(LOGO.numeral, LOGO.superseded));
+test('negative fixture: the superseded charcoal numeral is refused', () => {
+  const fixture = withAssets((text) => text.replaceAll(LOGO.numeral, '#36454f'));
   const problems = auditBrandCopy(fixture);
   assert.equal(problems.includes('brand:svg-numeral'), true);
   assert.equal(problems.includes('brand:svg-superseded'), true);
@@ -351,4 +355,48 @@ test('negative fixture: an image optimizer rewrite is refused', () => {
     text.replace('src="/uno-logo.svg"', 'src="/_next/image?url=%2Funo-logo.svg"'),
   );
   assert.equal(auditBrandCopy(fixture).includes('brand:mark-missing'), true);
+});
+
+// --- UNO-WO-017 / R01: the black numeral, and the withdrawn charcoal -------------------
+
+test('a CRLF working-tree copy canonicalises to the same black vector digest', () => {
+  const logo = read('public/uno-logo.svg');
+  const crlf = canonical(logo).replace(/\n/g, '\r\n');
+  assert.equal(crlf.includes('\r\n'), true, 'the variant really carries CRLF');
+  assert.equal(crlf.includes('\r\r'), false, 'the variant is well-formed CRLF');
+  assert.equal(Buffer.byteLength(canonical(crlf), 'utf8'), LOGO.bytes);
+  assert.equal(createHash('sha256').update(canonical(crlf)).digest('hex'), LOGO.sha256);
+});
+
+test('the approved numeral is true black, not the withdrawn charcoal', () => {
+  const logo = read('public/uno-logo.svg');
+  assert.equal(logo.includes('fill="#000000"'), true);
+  assert.equal(logo.includes('#36454f'), false);
+  assert.equal(logo.includes('Enlarged black 1'), true);
+  assert.equal(logo.includes('charcoal'), false);
+});
+
+test('negative fixture: the withdrawn charcoal asset is refused by digest and colour', () => {
+  const fixture = withAssets((text) =>
+    text.replaceAll('#000000', '#36454f').replace('Enlarged black 1', 'Enlarged charcoal 1'),
+  );
+  const problems = auditBrandCopy(fixture);
+  assert.equal(problems.includes('brand:svg-superseded'), true);
+  assert.equal(problems.includes('brand:svg-digest'), true);
+  assert.equal(problems.includes('brand:svg-bytes'), true, 'the withdrawn asset was three bytes longer');
+});
+
+test('negative fixture: a near-black numeral is refused', () => {
+  const fixture = withAssets((text) => text.replace('fill="#000000"', 'fill="#0a0a0a"'));
+  const problems = auditBrandCopy(fixture);
+  assert.equal(problems.includes('brand:svg-numeral'), true);
+  assert.equal(problems.includes('brand:svg-digest'), true);
+});
+
+test('negative fixture: a single drifted network coordinate is refused', () => {
+  const fixture = withAssets((text) => text.replace('M9792 18850', 'M9793 18850'));
+  const problems = auditBrandCopy(fixture);
+  assert.equal(problems.includes('brand:svg-digest'), true);
+  assert.equal(problems.includes('brand:svg-geometry'), false, 'the path count is unchanged');
+  assert.equal(problems.includes('brand:svg-numeral'), false, 'the numeral is untouched');
 });

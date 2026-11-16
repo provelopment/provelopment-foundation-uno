@@ -84,8 +84,8 @@ const OBSOLETE_PHRASES = Object.freeze([
 const RETIRED_DISCLOSURE = "English demonstration — full authored Site publication is not yet enabled.";
 const LOGO_SRC = "/uno-logo.svg";
 const ICON_SRC = "/icon.svg";
-const LOGO_BYTES = 8250;
-const LOGO_SHA256 = "de749e41347a043691b3dd82ced90a2d53f80c240993057388cdfaee20a0a568";
+const LOGO_BYTES = 8247;
+const LOGO_SHA256 = "bd804ce683824ad85852615b0e0a700badb80cf2cdff38dd642d9f1947d57d9c";
 
 /**
  * Canonical LF form. The committed vector is stored with LF and the pinned digest covers those
@@ -448,8 +448,18 @@ async function main() {
       !/<script|<foreignObject|<image|xlink:href|\son[a-z]+=/i.test(logo.body),
     );
     check(
+      "the served numeral is exactly one true-black fill",
+      (logo.body.match(/fill="#000000"/g) ?? []).length === 1,
+      (logo.body.match(/fill="#000000"/g) ?? []).length + " black fills",
+    );
+    check(
+      "the served network keeps exactly one approved green fill",
+      (logo.body.match(/fill="#1f6f6b"/g) ?? []).length === 1,
+      (logo.body.match(/fill="#1f6f6b"/g) ?? []).length + " green fills",
+    );
+    check(
       "the served mark keeps the approved palette",
-      logo.body.includes("#1f6f6b") && logo.body.includes("#36454f"),
+      logo.body.includes("#1f6f6b") && logo.body.includes('fill="#000000"'),
     );
     check(
       "the served mark is the approved official-source vector by digest",
@@ -474,8 +484,10 @@ async function main() {
       !/<rect[^>]*fill="#/i.test(logo.body) && !/base64,/i.test(logo.body),
     );
     check(
-      "the superseded concept mark is gone",
-      !logo.body.includes("#101620") && !logo.body.includes('viewBox="0 0 128 128"'),
+      "the superseded concept and charcoal marks are gone",
+      !logo.body.includes("#101620") &&
+        !logo.body.includes("#36454f") &&
+        !logo.body.includes('viewBox="0 0 128 128"'),
     );
 
     // Every declared refusal must stay a real 404: not a redirect, not invisible content.

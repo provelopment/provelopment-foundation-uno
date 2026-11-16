@@ -615,12 +615,28 @@ test('refuses the superseded concept canvas', () => {
   assert.equal(result.reasons.includes('brand:logo-viewbox'), true, 'brand:logo-viewbox');
 });
 
-test('refuses a numeral that abandoned the approved charcoal', () => {
-  const snapshot = withAssets((text) => text.replaceAll('#36454f', '#101620'));
+test('refuses the withdrawn charcoal numeral', () => {
+  const snapshot = withAssets((text) => text.replaceAll('#000000', '#36454f'));
   const result = analyzeReadiness(snapshot);
   assert.equal(result.accepted, false);
   assert.equal(result.reasons.includes('brand:logo-palette'), true, 'brand:logo-palette');
   assert.equal(result.reasons.includes('brand:logo-superseded'), true, 'brand:logo-superseded');
+});
+
+test('refuses the superseded concept numeral colour', () => {
+  const snapshot = withAssets((text) => text.replaceAll('#000000', '#101620'));
+  const result = analyzeReadiness(snapshot);
+  assert.equal(result.accepted, false);
+  assert.equal(result.reasons.includes('brand:logo-superseded'), true, 'brand:logo-superseded');
+});
+
+test('accepts the true-black numeral and keeps the official network', () => {
+  const result = analyzeReadiness(validSnapshot());
+  assert.equal(result.accepted, true, JSON.stringify(result.reasons));
+  const logo = validSnapshot().logo;
+  assert.equal(logo.includes('#1f6f6b'), true, 'green network retained');
+  assert.equal(logo.includes('fill="#000000"'), true, 'true black numeral');
+  assert.equal(logo.includes('#36454f'), false, 'charcoal withdrawn');
 });
 
 test('refuses a page that drops an illustrative example label', () => {
