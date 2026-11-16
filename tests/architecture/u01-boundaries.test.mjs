@@ -7,9 +7,9 @@ import { fileURLToPath } from 'node:url';
 /**
  * Foundation Uno — U01 architecture boundary tests (Node-native, dependency-free).
  *
- * These tests scan only the authored U01 surfaces: `src/core/**`, `src/app/**` and
- * `package.json`. Historical documentation elsewhere in `.documents/**` is deliberately
- * NOT treated as active source, so upstream references recorded there cannot create a
+ * These tests scan only the authored U01 surfaces: `src/core/**`, `src/application/**`,
+ * `src/app/**` and `package.json`. Historical documentation elsewhere in `.documents/**` is
+ * deliberately NOT treated as active source, so upstream references recorded there cannot create a
  * false violation.
  *
  * The scanners are pure functions over a `{ path: content }` map so that a synthetic
@@ -41,6 +41,36 @@ export const APP_FORBIDDEN_MARKERS = Object.freeze([
   '@vercel/analytics',
   'modules/connect',
   'deployment/',
+]);
+
+/**
+ * Modules an application use case must never import.
+ *
+ * `src/application/**` may depend on core contracts and on its own siblings; it is not allowed to
+ * reach a framework, the Node filesystem/process/network surface, an adapter, `src/app/**`, the
+ * deployment layer or a separately licensed module. Those belong behind an injected port.
+ */
+export const APPLICATION_FORBIDDEN_MODULES = Object.freeze([
+  'next',
+  'react',
+  'react-dom',
+  'node:fs',
+  'node:fs/promises',
+  'node:child_process',
+  'node:net',
+  'node:http',
+  'node:https',
+  'node:dns',
+  'node:os',
+  'node:worker_threads',
+  'fs',
+  'fs/promises',
+  'child_process',
+  'net',
+  'http',
+  'https',
+  'dns',
+  'worker_threads',
 ]);
 
 /**
@@ -105,6 +135,30 @@ function isForbiddenCoreSpecifier(specifier) {
 }
 
 /**
+ * An application use case may import core contracts and sibling application modules only. It must
+ * not import a framework, Node I/O, an adapter, the app/router layer, the deployment layer or the
+ * separately licensed module tree.
+ */
+function isForbiddenApplicationSpecifier(specifier) {
+  if (
+    APPLICATION_FORBIDDEN_MODULES.some(
+      (name) => specifier === name || specifier.startsWith(`${name}/`),
+    )
+  ) {
+    return true;
+  }
+  return (
+    specifier.includes('/adapters/') ||
+    specifier.startsWith('@/adapters') ||
+    specifier.includes('/app/') ||
+    specifier.startsWith('@/app') ||
+    specifier.includes('deployment/') ||
+    specifier.startsWith('@/deployment') ||
+    specifier.includes('modules/connect')
+  );
+}
+
+/**
  * Scan a `{ path: content }` map for U01 boundary violations.
  * @returns {string[]} one message per violation; empty means clean
  */
@@ -123,6 +177,16 @@ export function scanSources(files) {
       for (const marker of LEGACY_ADDRESS_MARKERS) {
         if (code.includes(marker)) {
           violations.push(`${normalised}: src/core must not reintroduce legacy "${marker}"`);
+        }
+      }
+    }
+
+    if (normalised.startsWith('src/application/')) {
+      for (const specifier of specifiersOf(content)) {
+        if (isForbiddenApplicationSpecifier(specifier)) {
+          violations.push(
+            `${normalised}: src/application must stay adapter-free but imports "${specifier}"`,
+          );
         }
       }
     }
@@ -196,6 +260,7 @@ function readTree(dir, prefix) {
 
 const authoredSources = () => ({
   ...readTree('src/core', 'src/core'),
+  ...readTree('src/application', 'src/application'),
   ...readTree('src/app', 'src/app'),
 });
 const packageJson = () => readFileSync(resolve(ROOT, 'package.json'), 'utf8');
@@ -235,6 +300,44 @@ test('the boundary scanner refuses React, Next and adapters inside src/core', ()
     scanSources({ 'src/core/d.ts': "const cp = require('node:child_process');\nexport { cp };\n" })
       .length,
     1,
+  );
+});
+
+test('the boundary scanner refuses Node I/O, framework and adapter imports in src/application', () => {
+  const clean = {
+    'src/application/use-case.ts':
+      "import { selectDeclaredPageSource } from '../core/page-authoring-policy';\nexport { selectDeclaredPageSource };\n",
+  };
+  assert.deepEqual(scanSources(clean), []);
+
+  const ioViolations = scanSources({
+    'src/application/io.ts':
+      "import { readFileSync } from 'node:fs';\nexport const read = readFileSync;\n",
+  });
+  assert.equal(ioViolations.length, 1);
+  assert.match(ioViolations[0], /node:fs/);
+
+  const adapterViolations = scanSources({
+    'src/application/adapter.ts':
+      "import { reader } from '../adapters/content/json-page';\nexport { reader };\n",
+  });
+  assert.equal(adapterViolations.length, 1);
+  assert.match(adapterViolations[0], /adapters/);
+
+  assert.equal(
+    scanSources({ 'src/application/next.ts': "import Link from 'next/link';\nexport default Link;\n" })
+      .length,
+    1,
+  );
+  assert.equal(
+    scanSources({ 'src/application/ui.ts': "import { page } from '../app/page';\nexport { page };\n" })
+      .length,
+    1,
+  );
+
+  // The real application tree is genuinely inspected, not merely declared.
+  assert.ok(
+    Object.keys(authoredSources()).includes('src/application/resolve-declared-page-source.ts'),
   );
 });
 

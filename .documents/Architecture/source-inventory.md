@@ -803,3 +803,32 @@ Apache-2.0 source only, subject to review. Branded images, product data, default
 Foundation's separate Connect module are excluded; no licence or right is inferred for any
 other path. Solo Rust source was **not** read for this ledger; its capability names are Owner
 approved contracts, not imported code.
+
+## U01 application source-resolution adoption (UNO-WO-010 / R01)
+
+**Scope:** one application use case, `src/application/resolve-declared-page-source.ts`, that asks the
+approved core policy which *declared* source answers one already-identified representation and returns
+the caller's opaque winning source by reference. No manifest, reader, parser, path, locale, Site,
+route, visibility or publication behaviour is added.
+
+| Pinned GEO-03 evidence | Blob | Bytes | Class | Note |
+| --- | --- | ---: | --- | --- |
+| `src/application/page-source-resolution.ts` | `05060f116a7f2703db42d8e7c10d57bc2e5748ed` | 4,261 | REWRITE | Precedence-versus-reader separation kept as an idea; providers, locale fallback and Site codes rejected |
+| `src/core/page-source.ts` | `8071f0a425dcbb5422d25be308ae2135cfd64219` | 12,614 | ADAPT | Declared JSON-before-Markdown order only; no on-disk roots or country selector |
+| `tests/unit/page-source-resolution.test.ts` | `ca3abff92116ea9157f00dd355fe5c7eda5da883` | 4,710 | reference | Test *categories* only; no fixture or test code copied |
+| Uno `src/core/page-authoring-policy.ts` (starting head) | `b9ddbee09eb776d034038dca09cad48680939512` | 12,483 | KEEP | Unchanged: still the single decision authority, called by the use case and never re-implemented |
+
+**Semantics.** Ports are validated as data (1–2 plain records, unique exact `json`/`markdown`, function
+observers) before any observer runs. A declared JSON observer runs once: a throw, rejection or malformed
+observation refuses `observer-failed` / `invalid-observation` without consulting Markdown, and an
+`invalid` observation refuses with the core's `invalid-json-source`. Only a declared-`absent` JSON (or no
+JSON declaration) lets the declared Markdown observer run, once; the core confirms the selection from the
+observed states, and a `valid` body is returned by reference, never parsed, copied or frozen.
+
+**Exclusions.** No EFS manifest/schema/graph, Site or Page locator, source ownership, filesystem or
+network access, JSON/Markdown reader, sanitiser, envelope, renderer, URL, locale mapping, redirect,
+sitemap, visibility or publication decision, and no fallback to another locale, Page or Site. A `valid`
+observation is a trusted dependency's report, not proof of existence.
+
+**Handoff:** U02 owns manifest ownership and cardinality; U03 owns readers, confinement, locale routing,
+unlisted HTTP/SEO behaviour and sanitisation; U04/U05 own modules and provider adapters.
