@@ -259,13 +259,38 @@ function checkHomePage(home) {
     'rel="canonical"',
     "hreflang",
     "sitemap",
-    "analytics",
     "googletagmanager",
-    "@vercel",
     "modules/connect",
+    "plausible.io",
+    "posthog",
+    "matomo",
+    "google-analytics.com",
+    "doubleclick",
   ]) {
     check(`served HTML does not advertise "${forbidden}"`, !text.toLowerCase().includes(forbidden));
   }
+
+  // The ONE approved analytics integration (UNO-WO-014 / R01). Next renders the provider script
+  // only when the deployment runs on Vercel, so a loopback production server legitimately shows
+  // no script at all: the assertion is exact in both cases rather than tuned to one host.
+  const insightsReferences = (raw.match(/\/_vercel\/insights\/script\.js/g) ?? []).length;
+  check(
+    "the approved analytics script is referenced at most once",
+    insightsReferences <= 1,
+    `${insightsReferences} references`,
+  );
+  const vercelRoutes = [...new Set(raw.match(/\/_vercel\/[a-z0-9-]+/gi) ?? [])];
+  check(
+    "only the approved provider route is referenced",
+    vercelRoutes.every((route) => route === "/_vercel/insights"),
+    vercelRoutes.join(",") || "none",
+  );
+  check(
+    "no analytics or advertising provider host is referenced",
+    !/(?:https?:)?\/\/(?:[a-z0-9-]+\.)*(?:google-analytics|googletagmanager|doubleclick|plausible|posthog|matomo|segment)\./i.test(
+      raw,
+    ),
+  );
 
   check(
     "no external stylesheet, script, font or image is referenced",

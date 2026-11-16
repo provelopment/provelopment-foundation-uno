@@ -4,7 +4,7 @@
  * What this proves, and what it cannot prove.
  *
  * It proves that the committed GitHub revision has the shape a manual Vercel deployment
- * needs: a pinned private Apache-2.0 Node 24 / pnpm 11 / Next.js 16 package, a nonempty
+ * needs: a pinned private Apache-2.0 Node 26 / pnpm 11 / Next.js 16 package, a nonempty
  * committed lockfile, a bounded `next.config.ts` with no static export or suppressed type
  * errors, the accepted English demonstration page and its language + robots guards, a
  * Git-level ignore rule for the private ACTIVE, a conservative CLI upload exclusion, and a
@@ -17,7 +17,7 @@
  * `VERCEL_NOT_DEPLOYED_BY_AGENT`.
  *
  * Design constraints:
- *   * Node 24 built-ins only; no dependency, no subprocess, no environment secret read.
+ *   * Node 26 built-ins only; no dependency, no subprocess, no environment secret read.
  *   * The exported `analyzeReadiness()` is pure: it reads only own data properties of the
  *     supplied snapshot, never invokes getters, never mutates, and never copies untrusted
  *     text into a result. Every reason code is a closed literal from `REASONS`.
@@ -61,12 +61,30 @@ export const SNAPSHOT_FILES = Object.freeze({
 /** The approved public source link; the page may carry exactly this one external URL. */
 const SOURCE_URL = 'https://github.com/provelopment/provelopment-foundation-uno';
 
-/** Exact dependency pins the accepted baseline ships. */
+/** Exact dependency pins the accepted baseline ships, including the one approved provider. */
 const EXPECTED_DEPENDENCIES = Object.freeze({
+  '@vercel/analytics': '2.0.1',
   next: '16.4.2',
   react: '19.2.9',
   'react-dom': '19.2.9',
 });
+
+/** The single approved analytics integration, and how it must appear in the root layout. */
+const APPROVED_ANALYTICS_SPECIFIER = '@vercel/analytics/next';
+const APPROVED_ANALYTICS_COMPONENT = '<Analytics';
+
+/** Any `@vercel/*` module specifier written as a static import in a source file. */
+const VERCEL_IMPORT_RE = /from\s*['"](@vercel\/[^'"]+)['"]/g;
+
+/** Third-party analytics/advertising packages that are never approved for Uno. */
+const UNAPPROVED_ANALYTICS_PACKAGES = Object.freeze([
+  '@vercel/speed-insights',
+  'posthog-js',
+  'plausible-tracker',
+  'react-ga',
+  'react-ga4',
+  'matomo',
+]);
 
 /** Claims that would turn a not-deployed repository into a false success message. */
 const FABRICATION_MARKERS = Object.freeze([
@@ -107,6 +125,8 @@ export const REASONS = Object.freeze([
   'package:build-script',
   'package:http-script',
   'package:unpinned-dependency',
+  'package:analytics-version',
+  'package:unapproved-provider',
   'lockfile:missing',
   'lockfile:no-lockfile-version',
   'next-config:missing',
@@ -131,6 +151,9 @@ export const REASONS = Object.freeze([
   'layout:title',
   'layout:description',
   'layout:canonical-or-hreflang',
+  'layout:analytics-missing',
+  'layout:analytics-duplicate',
+  'layout:unapproved-provider',
   'gitignore:missing',
   'gitignore:active-order',
   'gitignore:temp',
@@ -160,6 +183,9 @@ export const REASONS = Object.freeze([
   'workflow:no-readiness-unit',
   'workflow:no-readiness-cli',
   'workflow:no-two-host-matrix',
+  'workflow:no-node26',
+  'workflow:no-security-floor',
+  'workflow:no-audit-gate',
   'workflow:permissions',
   'workflow:bypass',
   'workflow:provider-command',
@@ -275,10 +301,14 @@ export function analyzeReadiness(snapshot) {
     expect(pkg.private === true, 'package:private');
     expect(pkg.license === 'Apache-2.0', 'package:license');
     expect(pkg.version === '0.1.0', 'package:version');
-    expect(engines.node === '24.x', 'package:engines-node');
+    expect(engines.node === '26.x', 'package:engines-node');
     expect(pkg.packageManager === 'pnpm@11.6.0', 'package:package-manager');
     expect(dependencies.next === EXPECTED_DEPENDENCIES.next, 'package:next-version');
     expect(dependencies.react === EXPECTED_DEPENDENCIES.react, 'package:react-version');
+    expect(
+      dependencies['@vercel/analytics'] === EXPECTED_DEPENDENCIES['@vercel/analytics'],
+      'package:analytics-version',
+    );
     expect(scripts.build === 'next build', 'package:build-script');
     expect(scripts['test:http'] === 'node scripts/verify-u01-http.mjs', 'package:http-script');
 
@@ -290,6 +320,14 @@ export function analyzeReadiness(snapshot) {
       return typeof value === 'string' && pinned.test(value);
     });
     expect(allExact, 'package:unpinned-dependency');
+
+    // One provider only: the approved package, and no other Vercel or analytics package.
+    const unapprovedProviders = names.filter(
+      (name) =>
+        (name.startsWith('@vercel/') && name !== '@vercel/analytics') ||
+        UNAPPROVED_ANALYTICS_PACKAGES.includes(name),
+    );
+    expect(unapprovedProviders.length === 0, 'package:unapproved-provider');
   }
 
   // --- 2. The committed lockfile exists and is a real lockfile, not an empty placeholder ---
@@ -336,6 +374,25 @@ export function analyzeReadiness(snapshot) {
   expect(/title:\s*'[^']*Foundation Uno[^']*'/.test(layoutText), 'layout:title');
   expect(layoutText.includes('English demonstration of Foundation Uno'), 'layout:description');
   expect(!/alternates\s*:/.test(layoutText), 'layout:canonical-or-hreflang');
+
+  // --- 5b. Exactly one approved analytics integration, rendered once -------------------
+  expect(
+    layoutText.includes(`from '${APPROVED_ANALYTICS_SPECIFIER}'`) ||
+      layoutText.includes(`from "${APPROVED_ANALYTICS_SPECIFIER}"`),
+    'layout:analytics-missing',
+  );
+  const analyticsRenders = countOf(layoutText, APPROVED_ANALYTICS_COMPONENT);
+  expect(analyticsRenders >= 1, 'layout:analytics-missing');
+  expect(analyticsRenders <= 1, 'layout:analytics-duplicate');
+  const vercelImports = [...layoutText.matchAll(VERCEL_IMPORT_RE)].map((match) => match[1]);
+  expect(
+    vercelImports.every((specifier) => specifier === APPROVED_ANALYTICS_SPECIFIER),
+    'layout:unapproved-provider',
+  );
+  expect(
+    !UNAPPROVED_ANALYTICS_PACKAGES.some((name) => layoutText.includes(name)),
+    'layout:unapproved-provider',
+  );
 
   // --- 6. Git must keep the private ACTIVE out of the public tree ----------------------
   const gitignoreText = gitignore;
@@ -387,6 +444,12 @@ export function analyzeReadiness(snapshot) {
     workflowText.includes('ubuntu-24.04') && workflowText.includes('windows-2025'),
     'workflow:no-two-host-matrix',
   );
+  expect(/node-version:\s*'26'/.test(workflowText), 'workflow:no-node26');
+  expect(
+    workflowText.includes('tests/deployment/node26-security-floor.test.mjs'),
+    'workflow:no-security-floor',
+  );
+  expect(/pnpm audit --audit-level high/.test(workflowText), 'workflow:no-audit-gate');
   expect(
     /contents:\s*read/.test(workflowText) && !/contents:\s*write/.test(workflowText),
     'workflow:permissions',

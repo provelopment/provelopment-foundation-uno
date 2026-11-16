@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
 /**
@@ -10,7 +11,14 @@ import './globals.css';
  * `en → en-001` logic: no Entity, Site, Facet, Page or representation is configured by it.
  *
  * Metadata stays deliberately minimal and truthful: the pre-publication `noindex, nofollow` policy
- * is preserved, and no canonical, alternate/hreflang, sitemap or analytics tag is invented here.
+ * is preserved, and no canonical, alternate/hreflang or sitemap tag is invented here.
+ *
+ * ANALYTICS. Exactly one provider integration is approved for Uno: the official
+ * `@vercel/analytics` package (MIT), pinned to `2.0.1`, imported through its Next.js App Router
+ * entry and rendered once here. It is a source-level capability only. Whether Uno's Vercel project
+ * collects Web Analytics is a separate provider setting the Owner controls, and this file makes no
+ * claim about it. No other provider, tag manager, custom event, cookie, secret, external script or
+ * relaxed metadata is introduced, and the page itself stays unchanged.
  */
 export const metadata: Metadata = {
   title: 'Foundation Uno — a single-Entity website foundation',
@@ -30,7 +38,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }

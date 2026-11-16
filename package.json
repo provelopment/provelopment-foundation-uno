@@ -6,7 +6,7 @@
   "description": "Foundation Uno — independent single-Entity Next.js / TypeScript website foundation. U01 technical baseline only.",
   "packageManager": "pnpm@11.6.0",
   "engines": {
-    "node": "24.x"
+    "node": "26.x"
   },
   "scripts": {
     "dev": "next dev",
@@ -20,12 +20,13 @@
     "test:architecture": "node --test tests/architecture/u01-boundaries.test.mjs"
   },
   "dependencies": {
+    "@vercel/analytics": "2.0.1",
     "next": "16.4.2",
     "react": "19.2.9",
     "react-dom": "19.2.9"
   },
   "devDependencies": {
-    "@types/node": "24.19.1",
+    "@types/node": "26.6.6",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "eslint": "9.39.5",

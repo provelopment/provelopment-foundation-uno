@@ -38,10 +38,93 @@ export const APP_FORBIDDEN_MARKERS = Object.freeze([
   'spokeSelector',
   'ownerSelector',
   'multiOwner',
-  '@vercel/analytics',
   'modules/connect',
   'deployment/',
 ]);
+
+/**
+ * The ONE approved provider integration (`UNO-WO-014 / R01`).
+ *
+ * The previous rule refused the string `@vercel/analytics` anywhere in `src/app` and any such
+ * dependency. That prohibition is now an exceptionally narrow allowlist rather than a broad
+ * refusal, because the Owner approved exactly one official analytics integration. Everything the
+ * old rule protected is still refused: any other provider, any other analytics entrypoint, any
+ * second injection, any other module in the app tree, and any other `@vercel/*` package.
+ */
+export const APPROVED_ANALYTICS = Object.freeze({
+  packageName: '@vercel/analytics',
+  version: '2.0.1',
+  specifier: '@vercel/analytics/next',
+  placement: 'src/app/layout.tsx',
+  renderMarker: '<Analytics',
+});
+
+/** Known third-party analytics/advertising packages that are never approved for Uno. */
+export const UNAPPROVED_PROVIDER_PACKAGES = Object.freeze([
+  '@vercel/speed-insights',
+  'posthog-js',
+  'plausible-tracker',
+  'react-ga',
+  'react-ga4',
+  'matomo',
+]);
+
+/** Any `@vercel/*` module specifier, however it is written. */
+const VERCEL_SPECIFIER_RE = /(?:from\s*|require\s*\(\s*|import\s*)['"](@vercel\/[^'"]+)['"]/g;
+
+/**
+ * Scan a `{ path: content }` map for analytics-integration violations.
+ *
+ * Refuses: any `@vercel/*` module other than the exact approved App Router entry, the approved
+ * entry imported anywhere but the root layout, the approved import repeated, the component
+ * rendered zero or more than once, and analytics imported by more than one module overall.
+ */
+export function scanAnalyticsUsage(files) {
+  const violations = [];
+  let placements = 0;
+
+  for (const [path, content] of Object.entries(files)) {
+    const normalised = path.split('\\').join('/');
+    VERCEL_SPECIFIER_RE.lastIndex = 0;
+    const specifiers = [];
+    let match = VERCEL_SPECIFIER_RE.exec(content);
+    while (match !== null) {
+      specifiers.push(match[1]);
+      match = VERCEL_SPECIFIER_RE.exec(content);
+    }
+    if (specifiers.length === 0) continue;
+
+    placements += 1;
+    for (const specifier of specifiers) {
+      if (specifier !== APPROVED_ANALYTICS.specifier) {
+        violations.push(`${normalised}: "${specifier}" is not the approved provider entry`);
+      }
+    }
+    if (normalised !== APPROVED_ANALYTICS.placement) {
+      violations.push(`${normalised}: provider code may only live in ${APPROVED_ANALYTICS.placement}`);
+    }
+    if (specifiers.length > 1) {
+      violations.push(`${normalised}: the approved provider must be imported exactly once`);
+    }
+    const rendered = content.split(APPROVED_ANALYTICS.renderMarker).length - 1;
+    if (rendered !== 1) {
+      violations.push(`${normalised}: <Analytics /> must be rendered exactly once, found ${rendered}`);
+    }
+  }
+
+  if (placements > 1) {
+    violations.push(`analytics may be imported by exactly one module, found ${placements}`);
+  }
+  return violations;
+}
+
+/** Node 26 is the only supported runtime major: anything else is refused, never tolerated. */
+export function nodeEngineIssue(parsed) {
+  const engines = parsed !== null && typeof parsed === 'object' ? parsed.engines : undefined;
+  const node = engines !== null && typeof engines === 'object' ? engines.node : undefined;
+  return node === '26.x' ? null : 'package.json: engines.node must be exactly "26.x" (Node 26 LTS)';
+}
+
 
 /**
  * Modules an application use case must never import.
@@ -204,7 +287,6 @@ export function scanSources(files) {
 }
 
 const PACKAGE_FORBIDDEN_MARKERS = Object.freeze([
-  '@vercel/analytics',
   'modules/connect',
   'postinstall',
   'spoke',
@@ -236,6 +318,24 @@ export function scanPackageJson(raw) {
   }
 
   const direct = { ...(parsed.dependencies ?? {}), ...(parsed.devDependencies ?? {}) };
+
+  // The approved provider, narrowly: exactly this package at exactly this version, and no
+  // other Vercel package or known analytics provider anywhere in the dependency set.
+  const approvedAnalytics = direct[APPROVED_ANALYTICS.packageName];
+  if (approvedAnalytics !== undefined && approvedAnalytics !== APPROVED_ANALYTICS.version) {
+    violations.push(
+      `package.json: ${APPROVED_ANALYTICS.packageName} must be exactly ${APPROVED_ANALYTICS.version}`,
+    );
+  }
+  for (const name of Object.keys(direct)) {
+    if (name.startsWith('@vercel/') && name !== APPROVED_ANALYTICS.packageName) {
+      violations.push(`package.json: unapproved provider package "${name}"`);
+    }
+    if (UNAPPROVED_PROVIDER_PACKAGES.includes(name)) {
+      violations.push(`package.json: unapproved analytics provider "${name}"`);
+    }
+  }
+
   for (const [name, range] of Object.entries(direct)) {
     // A direct dependency must pin an exact version: x.y.z, optionally with a prerelease tag.
     if (typeof range !== 'string' || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(range)) {
@@ -342,17 +442,15 @@ test('the boundary scanner refuses Node I/O, framework and adapter imports in sr
   );
 });
 
-test('the boundary scanner refuses Spoke and provider markers in src/app', () => {
+test('the boundary scanner refuses Spoke and deployment markers in src/app', () => {
   const spoke = scanSources({
     'src/app/page.tsx': 'export const ctx: SpokeRuntimeContext = {} as never;\nexport {};\n',
   });
   assert.equal(spoke.length, 1);
   assert.match(spoke[0], /SpokeRuntimeContext/);
 
-  assert.equal(
-    scanSources({ 'src/app/x.tsx': "import '@vercel/analytics';\nexport {};\n" }).length,
-    1,
-  );
+  // Provider code is no longer a blanket string match: the narrow allowlist below owns it,
+  // and it still refuses deployment-layer leakage into the app tree.
   assert.equal(
     scanSources({ 'src/app/y.tsx': "import { m } from 'deployment/efs/manifest';\nexport { m };\n" })
       .length,
@@ -360,15 +458,75 @@ test('the boundary scanner refuses Spoke and provider markers in src/app', () =>
   );
 });
 
-test('the package scanner refuses postinstall and an analytics dependency', () => {
+test('the analytics allowlist permits exactly one approved placement and nothing else', () => {
+  const approved = {
+    'src/app/layout.tsx':
+      "import { Analytics } from '@vercel/analytics/next';\n" +
+      'export default function Layout({ children }) {\n' +
+      '  return (<html lang="en"><body>{children}<Analytics /></body></html>);\n' +
+      '}\n',
+  };
+  assert.deepEqual(scanAnalyticsUsage(approved), []);
+
+  // A second app module importing the same entrypoint is refused three ways: wrong module,
+  // a second placement overall, and no render in that module.
+  assert.equal(
+    scanAnalyticsUsage({
+      ...approved,
+      'src/app/page.tsx': "import { Analytics } from '@vercel/analytics/next';\nexport { Analytics };\n",
+    }).length,
+    3,
+  );
+
+  // The bare package entry, the React entry and Speed Insights are all refused.
+  for (const specifier of ['@vercel/analytics', '@vercel/analytics/react', '@vercel/speed-insights/next']) {
+    const violations = scanAnalyticsUsage({
+      'src/app/layout.tsx': `import { Analytics } from '${specifier}';\nexport { Analytics };\n`,
+    });
+    assert.ok(violations.some((line) => line.includes('not the approved provider entry')), specifier);
+  }
+
+  // Duplicate injection and a removed render are both refused.
+  assert.equal(
+    scanAnalyticsUsage({
+      'src/app/layout.tsx':
+        "import { Analytics } from '@vercel/analytics/next';\nimport { Analytics as Again } from '@vercel/analytics/next';\n<Analytics />\n",
+    }).length,
+    1,
+  );
+  assert.equal(
+    scanAnalyticsUsage({
+      'src/app/layout.tsx': "import { Analytics } from '@vercel/analytics/next';\nexport { Analytics };\n",
+    }).length,
+    1,
+  );
+});
+
+test('the package scanner refuses postinstall and a drifted analytics pin', () => {
   const dirty = JSON.stringify({
     scripts: { postinstall: 'node evil.mjs' },
     dependencies: { '@vercel/analytics': '1.0.0' },
   });
   const violations = scanPackageJson(dirty);
-  assert.ok(violations.length >= 2);
   assert.ok(violations.some((line) => line.includes('postinstall')));
-  assert.ok(violations.some((line) => line.includes('@vercel/analytics')));
+  assert.ok(violations.some((line) => line.includes('must be exactly 2.0.1')));
+});
+
+test('the package scanner accepts the exact provider pin and refuses other providers', () => {
+  assert.deepEqual(
+    scanPackageJson(JSON.stringify({ dependencies: { '@vercel/analytics': '2.0.1' } })),
+    [],
+  );
+  assert.ok(
+    scanPackageJson(JSON.stringify({ dependencies: { '@vercel/speed-insights': '1.0.0' } })).some(
+      (line) => line.includes('unapproved provider package'),
+    ),
+  );
+  assert.ok(
+    scanPackageJson(JSON.stringify({ dependencies: { 'posthog-js': '1.0.0' } })).some((line) =>
+      line.includes('unapproved analytics provider'),
+    ),
+  );
 });
 
 test('the package scanner refuses a non-exact direct dependency', () => {
@@ -391,10 +549,30 @@ test('the real package.json is exact, boundary clean and pinned', () => {
   assert.equal(parsed.version, '0.1.0');
   assert.equal(parsed.license, 'Apache-2.0');
   assert.equal(parsed.packageManager, 'pnpm@11.6.0');
-  assert.equal(parsed.engines.node, '24.x');
+  assert.equal(parsed.engines.node, '26.x');
+  assert.equal(nodeEngineIssue(parsed), null);
   assert.equal(parsed.dependencies.next, '16.4.2');
   assert.equal(parsed.dependencies.react, '19.2.9');
   assert.equal(parsed.dependencies['react-dom'], '19.2.9');
+  assert.equal(parsed.dependencies[APPROVED_ANALYTICS.packageName], APPROVED_ANALYTICS.version);
+  assert.match(parsed.devDependencies['@types/node'], /^26\.\d+\.\d+$/);
+});
+
+test('a Node 24 or unpinned engine is refused even when everything else is exact', () => {
+  assert.match(nodeEngineIssue({ engines: { node: '24.x' } }), /26\.x/);
+  assert.match(nodeEngineIssue({ engines: { node: '>=26' } }), /26\.x/);
+  assert.match(nodeEngineIssue({}), /26\.x/);
+  assert.equal(nodeEngineIssue({ engines: { node: '26.x' } }), null);
+});
+
+test('the real root layout carries exactly the one approved provider integration', () => {
+  const layoutSource = doc('src/app/layout.tsx');
+  assert.ok(layoutSource.includes(`from '${APPROVED_ANALYTICS.specifier}'`));
+  assert.deepEqual(scanAnalyticsUsage({ 'src/app/layout.tsx': layoutSource }), []);
+  assert.deepEqual(scanAnalyticsUsage(authoredSources()), []);
+  // The visitor-visible page and the noindex policy are untouched by the integration.
+  assert.equal(layoutSource.includes('/_vercel/insights'), false);
+  assert.match(layoutSource, /index:\s*false/);
 });
 
 test('README and AGENTS label U01 truthfully as a technical baseline', () => {

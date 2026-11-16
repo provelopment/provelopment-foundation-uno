@@ -30,12 +30,17 @@ function validSnapshot() {
       license: 'Apache-2.0',
       description: 'Foundation Uno — English informational demonstration.',
       packageManager: 'pnpm@11.6.0',
-      engines: { node: '24.x' },
+      engines: { node: '26.x' },
       scripts: {
         build: 'next build',
         'test:http': 'node scripts/verify-u01-http.mjs',
       },
-      dependencies: { next: '16.4.2', react: '19.2.9', 'react-dom': '19.2.9' },
+      dependencies: {
+        '@vercel/analytics': '2.0.1',
+        next: '16.4.2',
+        react: '19.2.9',
+        'react-dom': '19.2.9',
+      },
       devDependencies: { typescript: '5.9.3', vitest: '4.1.12' },
     },
     null,
@@ -55,6 +60,7 @@ function validSnapshot() {
   ].join('\n');
 
   const layout = [
+    "import { Analytics } from '@vercel/analytics/next';",
     'export const metadata = {',
     "  title: 'Foundation Uno — a single-Entity website foundation',",
     "  description: 'English demonstration of Foundation Uno, an independent Apache-2.0 Next.js foundation.',",
@@ -62,7 +68,7 @@ function validSnapshot() {
     '};',
     '',
     'export default function RootLayout({ children }) {',
-    '  return (<html lang="en"><body>{children}</body></html>);',
+    '  return (<html lang="en"><body>{children}<Analytics /></body></html>);',
     '}',
     '',
   ].join('\n');
@@ -106,10 +112,17 @@ function validSnapshot() {
     '      matrix:',
     '        os: [ubuntu-24.04, windows-2025]',
     '    steps:',
+    "      - name: Set up Node 26",
+    '        with:',
+    "          node-version: '26'",
     '      - name: Governance',
     '        run: node scripts/verify-governance-docs.mjs',
     '      - name: Install (frozen lockfile)',
     '        run: pnpm install --frozen-lockfile --ignore-scripts',
+    '      - name: Node 26 and dependency security floors',
+    '        run: node --test tests/deployment/node26-security-floor.test.mjs',
+    '      - name: Dependency audit (high and critical must be zero)',
+    '        run: pnpm audit --audit-level high',
     '      - name: Bootstrap governance gate',
     '        run: pnpm test:bootstrap',
     '      - name: Architecture boundaries',
@@ -170,8 +183,63 @@ test('refuses a package that is not private', () => {
 });
 
 test('refuses an unsupported Node major', () => {
-  const snapshot = withChange('packageJson', (text) => text.replace('"node": "24.x"', '"node": "20.x"'));
+  const snapshot = withChange('packageJson', (text) => text.replace('"node": "26.x"', '"node": "24.x"'));
   assertRefused(analyzeReadiness(snapshot), 'package:engines-node');
+});
+
+test('refuses a drifted analytics pin', () => {
+  const snapshot = withChange('packageJson', (text) =>
+    text.replace('"@vercel/analytics": "2.0.1"', '"@vercel/analytics": "1.6.1"'),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'package:analytics-version');
+});
+
+test('refuses a second, unapproved provider package', () => {
+  const snapshot = withChange('packageJson', (text) =>
+    text.replace('"@vercel/analytics": "2.0.1",', '"@vercel/analytics": "2.0.1",\n    "@vercel/speed-insights": "2.0.0",'),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'package:unapproved-provider');
+});
+
+test('refuses a layout without the approved analytics integration', () => {
+  const snapshot = withChange('layout', (text) =>
+    text
+      .replace("import { Analytics } from '@vercel/analytics/next';\n", '')
+      .replace('<Analytics />', ''),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'layout:analytics-missing');
+});
+
+test('refuses a duplicated analytics render', () => {
+  const snapshot = withChange('layout', (text) => text.replace('<Analytics />', '<Analytics /><Analytics />'));
+  assertRefused(analyzeReadiness(snapshot), 'layout:analytics-duplicate');
+});
+
+test('refuses an unapproved provider module in the layout', () => {
+  const snapshot = withChange('layout', (text) =>
+    text.replace(
+      "import { Analytics } from '@vercel/analytics/next';",
+      "import { Analytics } from '@vercel/analytics/next';\nimport { SpeedInsights } from '@vercel/speed-insights/next';",
+    ),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'layout:unapproved-provider');
+});
+
+test('refuses a workflow that is not pinned to Node 26', () => {
+  const snapshot = withChange('u01Workflow', (text) => text.replace("node-version: '26'", "node-version: '24'"));
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-node26');
+});
+
+test('refuses a workflow without the security-floor or audit gate', () => {
+  const noFloor = withChange('u01Workflow', (text) =>
+    text.replace('node --test tests/deployment/node26-security-floor.test.mjs', 'echo skipped'),
+  );
+  assertRefused(analyzeReadiness(noFloor), 'workflow:no-security-floor');
+
+  const noAudit = withChange('u01Workflow', (text) =>
+    text.replace('pnpm audit --audit-level high', 'echo audit-skipped'),
+  );
+  assertRefused(analyzeReadiness(noAudit), 'workflow:no-audit-gate');
 });
 
 test('refuses a package manager other than the pinned pnpm', () => {

@@ -1,9 +1,10 @@
 # Manual Vercel deployment handoff — Foundation Uno English demonstration
 
-**Audience:** the Owner only. Written by the Implementation Agent under `UNO-WO-012 / R02`.
+**Audience:** the Owner only. Written by the Implementation Agent under `UNO-WO-012 / R02` and revised
+under `UNO-WO-014 / R01` for Node 26 and the approved analytics integration.
 **Status of this document:** stable instruction, **not** an execution log. It records no account, no
-token, no project ID, no URL and no deployment result, because the Agent performed **zero** Vercel
-actions and cannot observe them.
+token, no project ID, no URL and no deployment result produced by the Agent, which performed **zero**
+Vercel write actions and cannot observe them.
 
 `VERCEL_NOT_DEPLOYED_BY_AGENT` · `MANUAL_DEPLOYMENT_PENDING_OWNER`
 
@@ -65,35 +66,37 @@ not inspect any team policy.
 | Install command | the project's default for the lockfile, i.e. a **frozen** pnpm install |
 | Build command | the project's existing build, i.e. `pnpm build` → `next build` |
 | Output | Next.js's own build output (do not switch to a static export) |
-| Node.js version | **24.x** (`engines.node` is `"24.x"`; `packageManager` is `pnpm@11.6.0`) |
-| Environment variables | none required — no secrets, no API keys, no analytics, no contact integration |
+| Node.js version | **26.x** (`engines.node` is `"26.x"`; `packageManager` is `pnpm@11.6.0`). A project-level Node setting of `26.x` agrees with `package.json`, so the historic "`engines.node` overrides the project version" warning no longer applies |
+| Environment variables | none required — no secrets, no API keys, no contact integration. Web Analytics needs **no** environment variable; it needs the dashboard feature you control |
 
 Do not disable type checking, linting or tests to make a build pass. If the provider build fails, that
-is a real finding to report, not something to mask. Node 24 availability:
+is a real finding to report, not something to mask. Node 26 availability:
 <https://vercel.com/docs/functions/runtimes/node-js/node-js-versions>.
 
-## 5. The one known compatibility risk: pnpm 11
+## 5. pnpm 11 in Vercel — now observed, not assumed
 
 Uno pins `pnpm@11.6.0` in `package.json` (`packageManager`) with a committed
 `pnpm-lock.yaml` (`lockfileVersion: '9.0'`).
 
-Vercel's published package-manager table, as observed on 2026-11-16, lists built-in pnpm versions
-**6 through 10** — pnpm **11** is not among them. Vercel documents an optional project setting,
-`ENABLE_EXPERIMENTAL_COREPACK=1`, that makes the provider honour the `packageManager` field. That
-option is experimental and was **not tested by this work order**.
+An earlier revision of this document listed pnpm 11 as an untested compatibility risk. That risk is now
+**observed**: the existing Uno project's build log for the pre-correction deployment records
+`pnpm v11.6.0` installing successfully, followed by Next 16.4.2 building and generating three static
+pages. No `ENABLE_EXPERIMENTAL_COREPACK` decision is required for the observed behaviour.
 
-Your options, all Owner decisions:
+If a future provider change breaks that, the rule stays: **do not** silently downgrade pnpm or rewrite
+`pnpm-lock.yaml` to fit the provider. Stop and request a separate, bounded correction order, because a
+rewritten lockfile invalidates the reviewed, tested artifact this handoff describes.
 
-1. Set `ENABLE_EXPERIMENTAL_COREPACK=1` in the project's environment settings and accept experimental
-   behaviour. Read <https://vercel.com/docs/builds/configure-a-build> and
-   <https://vercel.com/docs/package-managers> first.
-2. Deploy and inspect the real build log. If the provider resolves pnpm 10 against a lockfile written
-   by pnpm 11, expect an install/lockfile error rather than a silent success.
-3. If it is incompatible, stop and request a separate, bounded correction order. **Do not** silently
-   downgrade pnpm or rewrite `pnpm-lock.yaml` to fit the provider: that would invalidate the reviewed,
-   tested artifact this handoff describes.
+## 5b. What now happens automatically, and the one thing that does not
 
-The Agent cannot verify any of this. Provider behaviour is `UNVERIFIED` until you deploy.
+| Behaviour | Who controls it | Effect |
+| --- | --- | --- |
+| `main` → production build | you, through the project's existing Git integration | every push to Uno `main` triggers a production deployment of that exact commit; the Agent pushes nothing without your explicit activation |
+| Node version actually used | `package.json` `engines.node` + the project setting | both now read 26.x; the effective runtime must be confirmed in a build log, not assumed |
+| Web Analytics collection | **you only**, in the Vercel dashboard | source code imports and renders the official `<Analytics />`; until the project's Web Analytics feature is enabled, no visitor data is collected |
+
+The Agent cannot toggle Analytics and never will: that is a provider setting, not a repository change.
+
 
 ## 6. Payload, privacy and what `.vercelignore` does *not* do
 
@@ -115,8 +118,9 @@ Before you import, confirm the private material is genuinely absent from the pub
 git ls-files | grep -E '(^|/)workorder-active\.md$|(^|/)\.env' || echo "no private paths tracked"
 ```
 
-The repository contains no token, no customer content, no analytics, no tracking, no contact form and no
-third-party script. Keep it that way in project settings as well.
+The repository contains no token, no customer content, no contact form, no third-party script and no
+tracking beyond the single first-party Vercel Analytics integration described in §5b. Keep it that way
+in project settings as well.
 
 ## 7. After the deployment exists — checks to run yourself
 
@@ -145,10 +149,17 @@ The Agent cannot perform these and pre-certifies nothing. Record the actual resu
 5. **Access reality.** If a login page, SSO prompt or protection interstitial appears instead of the
    homepage, the deployment is **not** an open public demonstration — that is a project setting you
    control, not a defect in the source.
-6. **Build log.** Confirm the effective Node and pnpm versions, that the install was frozen, and that
-   `next build` succeeded. This is the only place the pnpm 11 question in §5 can be answered.
-7. **No invented surface.** Confirm there is no canonical tag, no `hreflang` alternate, no sitemap, no
-   analytics and no unexpected redirect on `/`.
+6. **Build log.** Confirm the effective **Node 26** runtime, the pnpm version, that the install was
+   frozen, and that `next build` succeeded. The pre-correction log warned that `engines.node` overrode
+   the project's Node choice; after this correction that warning must be gone, and the effective runtime
+   in the same log must read 26.x.
+7. **Analytics, two separate facts.** (a) Source: the HTML may reference the first-party
+   `/_vercel/insights/script.js` route once — it appears only when the deployment runs on Vercel, so its
+   absence on a local server proves nothing either way. (b) Collection: open the project's Vercel
+   **Analytics** page. Unless you enabled Web Analytics there, the script may load but no visitor data is
+   collected. Neither fact is certified by the Agent.
+8. **No invented surface.** Confirm there is no canonical tag, no `hreflang` alternate, no sitemap, no
+   third-party analytics or advertising host, and no unexpected redirect on `/`.
 
 
 ## 8. Division of responsibility

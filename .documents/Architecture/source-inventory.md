@@ -904,3 +904,42 @@ is authorship evidence, never publication authority.
 the separately configured selected public Site in `deployment/uno.config.json`; U03 owns path
 confinement, content readers, locale routing, visibility/SEO and the publication decision; U04 owns the
 presentation shell and module/family parity.
+
+## UNO-WO-014 / R01 — Node 26, security floors and one approved analytics integration
+
+**Runtime.** `package.json` now declares `engines.node: "26.x"` (previously `24.x`) and pins
+`@types/node` to the exact stable release `26.6.6` (MIT, `types: index.d.ts`, dependency
+`undici-types ~8.9.0`). Both GitHub workflows set up Node 26 and then **assert** it at runtime in the
+job, so a YAML value alone cannot stand in for a real v26 process. The offline readiness verifier and
+its fixtures, the architecture scanner, the new security-floor gate and the HTTP verifier all agree on
+26; no Node 24 expectation survives in tracked code.
+
+**Security provenance (reference only — no code copied).** The October advisory work in
+`provelopment/provelopment-foundation` at `573859a8b2b2d4dfd95227c3018ce9d49cfb5f9c`,
+`58ced2a2f8a9aff57003119c12f92a31dc4c9d39` and `65f26e8f51f96c40a1a58e1e13f3a25efcfd372c` was read
+for provenance. Uno's own lockfile already resolved the patched floors it needed
+(`sharp@0.35.5`, `source-map-js@1.2.2`, `brace-expansion@1.1.22` and `5.0.13`, `zod@4.6.7`), so **no**
+byte, script, workspace file or override was imported from Foundation, and its `engines.node: "24.x"`
+was explicitly not adopted as evidence of Node 26 compatibility. Those floors are now asserted
+mechanically rather than assumed.
+
+**Analytics (separately licensed integration).** `@vercel/analytics@2.0.1`, **MIT**, integrity
+`sha512-MTQG6V9qQrt1tsDeF+2Uoo5aPjqbVPys1xvnIftXSJYG2SrwXRHnqEvVoYID7BTruDz4lCd2Z7rM1BdkUehk2g==`,
+is the single provider dependency. It is imported only as `@vercel/analytics/next` in
+`src/app/layout.tsx` and rendered exactly once inside `<body>`. This is a **source-level capability
+only**: visitor collection additionally requires the Owner to enable Web Analytics in the Vercel
+project, which no Agent action can or did change. No custom event, cookie, tag manager, advertising
+script, secret or relaxed metadata was added, and `src/app/page.tsx`, the CSS and the robots policy are
+unchanged.
+
+**Boundary rules, still closed.** The former blanket refusal of the analytics dependency became a
+narrow allowlist: exact package, exact version, exact App Router entry, exactly one file, exactly one
+render. Any other `@vercel/*` module, any other analytics provider (Speed Insights, PostHog, Plausible,
+Matomo, react-ga), any second injection, any import from another app module and any postinstall bypass
+is still refused, and each refusal has a synthetic negative fixture in the architecture tests and in
+`tests/deployment/node26-security-floor.test.mjs`.
+
+**Exclusions.** No `vercel.json`, no project or dashboard setting, no deployment, promotion, alias,
+domain, secret or protection change; no new route, locale, Site selection, `deployment/uno.config.json`,
+workflow, provider token or release. U02 remains open and its manifest, Home Markdown and graph
+validator are untouched.
