@@ -109,9 +109,15 @@ the raw unrendered body. The reserved Home candidate maps to the authoring route
 other key opaque, and a refused load stays refused. **Projection is not publication:** no route is served,
 no Page is published or indexed, nothing is rendered, and `src/app/**` is untouched.
 
-**Still outstanding:** the validated Page-document and module schema, explicit Owner publication and
-route activation, safe HTTP error behaviour, metadata/SEO including canonical advertising and
-`hreflang`, and any optional base path. Each requires a later bounded Owner order.
+**Discoverability intent (`UNO-WO-022 / R01`):** the pure
+`src/core/efs/uno-discovery-policy.ts` classifies what an already-projected Page header would be *eligible*
+for **if** an Owner later authorized publication — six conditional surface flags plus a robots intent — and
+delegates every visibility decision to the existing policy. It publishes, routes, renders and indexes
+nothing, no `src/app` source imports it, and `public` eligibility is not publication.
+
+**Still outstanding:** the validated Page-document and module schema, explicit Owner publication and route
+activation, safe HTTP error behaviour, metadata/SEO emission including canonical advertising and `hreflang`,
+real locale routing, and any optional base path. Each requires a later bounded Owner order.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct
 visibility behaviour.

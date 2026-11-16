@@ -227,6 +227,7 @@ export const CORE_AUTHORED_FILES = Object.freeze([
   'src/core/efs/uno-config.ts',
   'src/core/efs/uno-route-address.ts',
   'src/core/efs/uno-page-header.ts',
+  'src/core/efs/uno-discovery-policy.ts',
   'src/core/efs/uno-locales.ts',
   'src/core/modules/capability-registry.ts',
   'src/core/page-authoring-policy.ts',
@@ -627,7 +628,24 @@ test('the real root layout carries exactly the one approved provider integration
   assert.match(layoutSource, /index:\s*false/);
 });
 
-test('README and AGENTS label U01 truthfully as a technical baseline', () => {
+/**
+ * Every README truth rule in one place, so the mutation test cannot drift from the real check.
+ * Returns the list of violated rules; an empty list means the README tells the truth.
+ */
+const readmeTruthIssues = (body) => {
+  const issues = [];
+  if (!body.includes('The authored public Uno A1 website is not implemented yet.')) issues.push('missing-disclaimer');
+  if (!body.includes('Node.js 26.x')) issues.push('missing-node26');
+  if (!body.includes('pnpm 11.6.0')) issues.push('missing-pnpm');
+  if (!/execution-report\.md/.test(body)) issues.push('missing-report-link');
+  for (const stale of ['U01 remains open', 'U03 is open', 'Node.js 24']) {
+    if (body.includes(stale)) issues.push(`stale:${stale}`);
+  }
+  if (/(?=[0-9a-f]*[0-9])[0-9a-f]{7,40}/.test(body)) issues.push('pinned-commit');
+  return issues;
+};
+
+test('README and AGENTS describe the current technical baseline truthfully', () => {
   const readme = doc('README.md');
   const agents = doc('AGENTS.md');
 
@@ -637,6 +655,10 @@ test('README and AGENTS label U01 truthfully as a technical baseline', () => {
   );
   assert.match(readme, /technical baseline/i);
   assert.match(agents, /technical baseline/i);
+
+  // The README must point progress at GitHub instead of freezing a stage or a commit.
+  assert.deepEqual(readmeTruthIssues(readme), []);
+  assert.match(readme, /github\.com\/provelopment\/provelopment-foundation-uno/);
 
   for (const [name, body] of [
     ['README.md', readme],
@@ -649,6 +671,27 @@ test('README and AGENTS label U01 truthfully as a technical baseline', () => {
       `${name} must not claim a published website`,
     );
   }
+});
+
+test('a README that reintroduces a stale stage, Node 24 or a lost disclaimer is refused', () => {
+  const readme = doc('README.md');
+  assert.deepEqual(readmeTruthIssues(readme), [], 'the committed README must keep passing every rule');
+
+  const mutations = [
+    ['appended U01 stage claim', `${readme}\nU01 remains open\n`],
+    ['appended U03 stage claim', `${readme}\nU03 is open\n`],
+    ['restored Node 24 claim', readme.replace('Node.js 26.x', 'Node.js 24.x')],
+    ['removed disclaimer', readme.replace('The authored public Uno A1 website is not implemented yet.', '')],
+    ['pinned commit', `${readme}\nStart at 2a815c2.\n`],
+  ];
+  for (const [label, body] of mutations) {
+    assert.notEqual(body, readme, `${label} must actually change the text`);
+    const issues = readmeTruthIssues(body);
+    assert.ok(issues.length > 0, `${label} must be refused by the README truth rules`);
+  }
+
+  // The exact Owner-approved disclaimer is still present word for word.
+  assert.equal(readme.includes('The authored public Uno A1 website is not implemented yet.'), true);
 });
 
 test('the authored core kernel is exactly the declared file set', () => {
@@ -828,6 +871,49 @@ test('the boundary scanner refuses Node I/O, framework, adapter and deployment i
       'src/application/resolve-uno-page-header.ts':
         "import { projectUnoSelectedPageHeader } from '../core/efs/uno-page-header';\nexport const ok = projectUnoSelectedPageHeader;\n",
     }),
+    [],
+  );
+});
+
+// --- U03 discoverability-intent boundary (UNO-WO-022 / R01) ---------------------
+
+const DISCOVERY_SOURCE = 'src/core/efs/uno-discovery-policy.ts';
+
+test('the discoverability classifier is registered, pure and unreachable from the app layer', () => {
+  assert.equal(Object.keys(authoredSources()).includes(DISCOVERY_SOURCE), true);
+  assert.equal(CORE_AUTHORED_FILES.includes(DISCOVERY_SOURCE), true);
+
+  const source = readFileSync(resolve(ROOT, DISCOVERY_SOURCE), 'utf8');
+  assert.deepEqual(scanSources({ [DISCOVERY_SOURCE]: source }), []);
+
+  // It must compose the accepted visibility policy rather than restate it.
+  assert.match(stripComments(source), /decideSelectedPageVisibility/);
+
+  // No runtime power: no Node, framework, adapter, provider or environment access in executable code.
+  const executable = stripComments(source);
+  for (const forbidden of ['node:', 'next/', 'react', '/adapters/', 'process.env', 'fetch(']) {
+    assert.equal(executable.includes(forbidden), false, `the classifier must not gain ${forbidden}`);
+  }
+
+  // No current app-layer source may consume it in this order.
+  for (const [path, body] of Object.entries(readTree('src/app', 'src/app'))) {
+    assert.equal(body.includes('uno-discovery-policy'), false, `${path} must not import the classifier`);
+  }
+});
+
+test('the scanner refuses injected Node, framework and adapter imports in the classifier', () => {
+  const injected = [
+    ["import { readFileSync } from 'node:fs';", 'Node I/O'],
+    ["import Link from 'next/link';", 'framework'],
+    ["import { useState } from 'react';", 'React'],
+    ["import { loadUnoCandidateSource } from '../adapters/efs/uno-confined-source-reader';", 'adapter'],
+  ];
+  for (const [line, label] of injected) {
+    const violations = scanSources({ [DISCOVERY_SOURCE]: `${line}\nexport const x = 1;\n` });
+    assert.equal(violations.length, 1, `${label} must be refused inside ${DISCOVERY_SOURCE}`);
+  }
+  assert.deepEqual(
+    scanSources({ [DISCOVERY_SOURCE]: "import { isPageRoutePath } from '../page-route-path';\nexport const ok = isPageRoutePath;\n" }),
     [],
   );
 });

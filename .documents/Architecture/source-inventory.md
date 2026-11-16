@@ -1221,3 +1221,34 @@ array and every other key stay opaque, unvalidated and non-authoritative.
 no markup; Markdown must begin with one `# ` heading and is always `public`; repeated top-level `title`,
 `description` or `visibility` keys refuse the whole source rather than allowing a last-wins value; and no
 projection proves a Page is routed, public or indexable.
+
+
+## U03 discoverability intent (UNO-WO-022 / R01)
+
+**Mapping.** `src/core/efs/uno-discovery-policy.ts` (pure core) classifies the discoverability **intent** of
+an already-validated Page header. Its input is exactly `{kind, routePath, visibility}` — the validated
+authoring route, not a candidate address — and it delegates every visibility decision to the existing
+`decideSelectedPageVisibility`. An accepted result lists six conditional flags (`navigation`, `sitemap`,
+`hreflang`, `xDefault`, `languageSwitch`, `automaticLocaleRedirectTarget`) plus
+`robotsIfDirectlyServed`, and nothing else: no URL, path, canonical, locale target, body or `published` field.
+
+**Rights and provenance.** Original **Uno-owned** code, class **NEW / REWRITE concept**; no upstream text,
+fixture, schema or prose is copied. The historical Foundation GEO-03 commit
+`c05c55ea61b5347cf5032211dd0bf37f2cc5083c` remains read-only provenance for the *idea* of
+visibility-conditional discoverability only, never an import or a write permission. Solo Rust and separately
+licensed Connect are excluded, and no package, media or brand asset was added. Apache-2.0 notices and source
+history are unchanged.
+
+**Omitted powers.** No publication, routing, rendering, sitemap generation, robots emission, canonical or
+`hreflang` output, automatic locale redirect, provider call or access control. A `public` classification is a
+constraint for a later Owner-authorized pipeline, not a publication; `unlisted` withholds intent signals and
+is explicitly not access control. No `src/app` source imports the classifier, and no manifest field, JSON
+property or visibility value can authorize publication by itself.
+
+**Deferred.** The validated Page document and module schema, the 17 module families, real HTTP/status
+behaviour, metadata emission, locale routing and the 22 registered capability IDs remain U04 obligations and
+are untouched here.
+
+**Limitations.** The classifier proves only what a future publisher would be *eligible* to do. It does not
+prove a Page is served, indexed, linked, translated or redirectable, and a forged `visibility` on a Markdown
+projection refuses as a mismatch rather than being reclassified.

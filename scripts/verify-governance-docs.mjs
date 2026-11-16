@@ -9,7 +9,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const FROZEN_GOVERNANCE_FILES = Object.freeze([
   { path: 'AGENTS.md', sha256: '6c6d5dcba44c9769df8a18db00d4791b38fc804759cb1da14e20daf9de31ca6f', maxBytes: 3200 },
-  { path: 'README.md', sha256: '0cf934ec458c5fef3d6561c33eb6a4aa04f01680931a0d2a62b6536f8521f9a2', maxBytes: 3200 },
+  { path: 'README.md', sha256: '97f93bdaf710bac53e3be48be0365c414042e89ef4461e55e98852cd0fd1995a', maxBytes: 3200 },
   { path: '.documents/SOP/sop-implementation.md', sha256: '6d790ad43349c434297d4d8a1e98311a822d4ec31df67aa882542aeab21cb388', maxBytes: 6000 },
 ]);
 

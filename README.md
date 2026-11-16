@@ -1,14 +1,16 @@
 # Foundation Uno
 
-Foundation Uno is an independent Apache-2.0 **Next.js/TypeScript** website foundation derived from [Provelopment Foundation](https://github.com/provelopment/provelopment-foundation). It is designed for **one Entity** with Facets, Sites, Pages and explicitly authored localized representations, initially publishing one selected Site. No Hub/Spoke runtime or multi-Entity tenancy.
+Foundation Uno is an independent, rebrandable Apache-2.0 **Next.js/TypeScript** website foundation adapted from audited [Provelopment Foundation](https://github.com/provelopment/provelopment-foundation) code. One Installation owns **one Entity → Facets → Sites → Pages → explicitly authored full-locale representations**. A1 permits exactly one explicitly selected public Site. It does not implement multi-Entity Hub/Spoke operation. Solo informs only adopted design concepts, not runtime code.
 
-## Current maturity
+## Source of truth
 
-**U00 is Owner-closed; U01 remains open.** The repository contains a reproducible Next.js technical baseline, pure EntityID/content-slug/relative-route/locale-policy code, tests and Windows/Ubuntu CI. `/` serves a deliberately non-indexable technical placeholder. The authored public Uno A1 website is not implemented yet. There is no published EFS Site/Page, locale URL routing, modular presentation system, live provider, release or deployment. Consult the [roadmap](.documents/WIP/plan-roadmap.md) and [single execution report](.documents/Reports/execution-report.md) for current evidence; this README is not a status log.
+The [Uno repository](https://github.com/provelopment/provelopment-foundation-uno) is the **only record of progress and executed work**. Read current `main`, [the single execution report](.documents/Reports/execution-report.md), [the roadmap](.documents/WIP/plan-roadmap.md) and exact-head CI for present stage, implemented features and limitations. This README has no run history, closed/open stage declarations or pinned commit.
+
+The authored public Uno A1 website is not implemented yet. A **technical baseline**, valid EFS declaration, passing tests or projected Page header is not by itself a published A1 website. Public routes, publication, releases and deployments require their own Owner-authorized work and evidence; do not describe unfinished functions as live.
 
 ## Develop and verify
 
-Use Node.js 24 and pnpm 11.6.0 inside the Uno checkout; the dependency lock is committed.
+Use the versions required by the actual `package.json`, lockfile and CI: **Node.js 26.x**, **pnpm 11.6.0**. Inside the physically verified Uno checkout, under the active work order only:
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
@@ -21,12 +23,10 @@ pnpm build
 pnpm test:http
 ```
 
-The HTTP gate checks the **technical placeholder**, not a usable public website. No deploy or release follows from successful tests.
+A passing HTTP test of the current informational page does not establish public EFS routing or authorize deployment.
 
-## Governance and source
+## Authority and rights
 
-Read [AGENTS.md](AGENTS.md) first and the [local Implementation SOP](.documents/SOP/sop-implementation.md) before any work. Execution requires one matching Owner-authorized private ACTIVE order; roadmap and README are not work orders. The canonical seven project documents are maintained by the Architect in [Uno Drive](https://drive.google.com/drive/folders/1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0). For exact upstream provenance and the 17/22 capability mapping, see the [source inventory](.documents/Architecture/source-inventory.md).
+Read [AGENTS.md](AGENTS.md) and the [Implementation SOP](.documents/SOP/sop-implementation.md). Only the exact private, Owner-activated `.documents/WIP/workorder-active.md` and its explicit ledger authorize implementation. The Architect maintains the [seven canonical Drive documents](https://drive.google.com/drive/folders/1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0) as direction and guardrails, not status logs. The [source inventory](.documents/Architecture/source-inventory.md) retains source rights and the 17/22 capability mapping.
 
-Apache-2.0 does not grant rights to Provelopment trademarks, unaudited imagery or separately licensed Connect code. Keep credentials and private authoring data out of public files.
-
-**Owner approval is mandatory for any change to this README, AGENTS.md or the local Implementation SOP.** No append-only milestones or execution history belong in these files.
+Apache-2.0 does not automatically license Provelopment trademarks, unreviewed imagery or separately licensed Connect code. Do not publish secrets, private authoring data or unapproved integrations. Changes to this frozen README, `AGENTS.md` or the local SOP require explicit Owner approval and exact-hash verification.
