@@ -1,167 +1,181 @@
-# UNO-WO-010 / R01 — injected-observer Page-source resolution seam
+# UNO-WO-011 / R01 — English informational homepage at `/` with production HTTP proof
 
-**Order / edition:** `UNO-WO-010 / R01` (FINAL — EXECUTE) · **Executed:** 2026-11-16
-**Private ACTIVE:** `.documents/WIP/workorder-active.md`, SHA-256 `0d0cc9c3fa943bfe7ef0e1aecc473323b9480d62959b94019ea7cf6473787bcd` (content withheld)
-**Starting Uno `main`:** `2e50e45913241f1f8513633f2376782e906f9aca` · **Product head:** `6b948e318d939f4153f5928a9acf553e02536a54`
-**Stage:** U01 — one bounded application/ports increment · **U01 remains OPEN**
+**Order / disposition:** `UNO-WO-011 / R01` · FINAL — EXECUTE · **Executed:** 2026-11-16
+**Private ACTIVE:** `.documents/WIP/workorder-active.md` — matching private installation and the Owner's separate activation were both checked before any write; ACTIVE content, digest and size are withheld from this report
+**Starting Uno `main`:** `833611297fe5f26d245f73189000dad0c13fbd3b` · **Product head:** `5323439f90d5dd1543bde15e0f06f287b0271d51`
+**Stage:** U01 — English informational demonstration · **U01 remains OPEN**, formal closed stages **1 / 8**
 **Disposition requested:** Chief Master Architect `ACCEPT / REVISE / STOP`
 
-Paths are symbolic; no private absolute path, credential, ACTIVE byte or personal datum appears here
-or in any committed file.
+## 1. What a visitor now receives at `GET /`
 
-## 1. Authority verified
+The served production document is 17,665 bytes of static HTML, built by the pinned Next 16.4.2 toolchain and
+verified over real loopback HTTP. Its outline:
 
-| Item | Observed |
+| Served element | Actual value |
 | --- | --- |
-| ACTIVE slot | one regular, non-symlink file at the single private slot; ignored by the repository, untracked, unstaged; no root-level alternative or duplicate |
-| ACTIVE identity | SHA-256 `0d0cc9c3…7bcd`, matching the separate Owner activation; length, line endings, absent BOM and terminating newline checked without exposing content |
-| Order edition | `UNO-WO-010 / R01`; the superseded order slot was replaced directly, which this order permits |
-| Read before writing | `AGENTS.md`, local SOP, all three `plan-*.md` slots, the prior single report, the source inventory, current `src/core/**` and `src/application/**`, and this exact ACTIVE |
-| Progress authority | Uno GitHub only: source, inventory, commit history, one execution report, exact-head Actions. No Drive access was made or claimed |
+| `<html>` | `lang="en"` — the demonstration page language, never the authored locale id |
+| `<title>` | `Foundation Uno — a single-Entity website foundation` |
+| meta description | `English demonstration of Foundation Uno, an independent Apache-2.0 Next.js and TypeScript website foundation built for one Entity. Full authored Site publication is not yet enabled.` |
+| meta robots | `noindex, nofollow, nocache` (pre-publication policy preserved) |
+| `h1` (exactly one) | `Foundation Uno — a single-Entity website foundation` |
+| `h2` order | `How it is organized` → `What works today and what comes next` → `Explore the code` |
+| `h3` order | `Entity`, `Facets`, `Sites`, `Pages`, `Localized representations`, `What works today`, `What's next` |
+| anchor targets | `#main`, `#hero-title`, `#how-it-is-organized`, `#organized-title`, `#status`, `#status-title`, `#explore`, `#explore-title` — all seven in-page links resolve |
+| external links | exactly two, both `https://github.com/provelopment/provelopment-foundation-uno`, with readable text |
 
-## 2. Read-only preflight (before any write)
+**Content map.** A hero states that Uno is an independent Apache-2.0 Next.js/TypeScript foundation
+built around **one Entity**; a numbered "How it is organized" panel presents
+`Entity → Facets → Sites → Pages → localized representations` and labels it a **planned contract**,
+including that locales such as `en-001` are explicitly authored and never guessed; a two-column split
+separates **What works today** (reproducible baseline, pure tested primitives, declared-source policy
+and application resolver, architecture refusals, two-host CI, Apache-2.0) from **What's next** (EFS
+manifest and confined readers, authored rendering and the 22-module / 17-family presentation system,
+locale routing and route authority, publication, release, Owner-controlled deployment); an
+"Explore the code" section links the one public repository. A visible disclosure reads
+**"English demonstration — full authored Site publication is not yet enabled."**
 
-| Check | Result |
-| --- | --- |
-| Physical Uno root; no junction, symlink or reparse escape; `git rev-parse --show-toplevel` names it exactly | `PASS` |
-| Exactly one worktree, branch `main`, clean index and worktree, no merge/rebase/cherry-pick/bisect/lock | `PASS` |
-| Exactly one remote, `origin` → `provelopment/provelopment-foundation-uno`; no alternate remote | `PASS` |
-| Local `HEAD` = local `main` = remote `refs/heads/main` = `2e50e45…` | `PASS` |
-| Parent workspace anchored `/00.foundation-uno/` ignore rule effective; parent tracks no Uno path; parent `e17fd960…` unchanged | `PASS` |
-| Foundation template `8789a45…` and Solo read-only and untouched by this run | `PASS` |
-| Frozen governance bytes match; `verify-governance-docs.mjs` `PASS` | `PASS` |
-| Pinned GEO-03 objects re-verified read-only on GitHub before use | `PASS` |
+**Honest boundary.** This is an informational demonstration surface. It is **not** the P05 authored
+EFS Home Page, **not** a validated one-Entity publication, and **not** evidence that modules render or
+that any family has been migrated. It does not claim a published Site, a live site or a deployment.
 
-The required starting commit matched exactly, so no STOP condition was engaged.
+## 2. Ledger — six product paths plus one report path
 
-## 3. Delivered — closed ledger, four product paths plus one report
-
-| # | Path | Operation | Content |
+| # | Path | Operation | What changed |
 | --- | --- | --- | --- |
-| 1 | `src/application/resolve-declared-page-source.ts` | CREATE | The use case plus injected observer port types. Imports only `../core/page-authoring-policy`; no adapter, framework, Node I/O or provider |
-| 2 | `tests/unit/resolve-declared-page-source.test.ts` | CREATE | 23 named Vitest cases: invocation counts and order, fail-closed JSON, pass-through identity, hostile ports and observations, core integration |
-| 3 | `tests/architecture/u01-boundaries.test.mjs` | EDIT | Added `APPLICATION_FORBIDDEN_MODULES`, an application specifier check, an `src/application/**` scan branch, `src/application` in the real inspected tree, and one synthetic negative test. Every prior check, fixture and the core scanner meaning preserved (11 → 12 tests) |
-| 4 | `.documents/Architecture/source-inventory.md` | EDIT | One appended, labelled U01 application-resolution entry: four pins with sizes and classes, semantics, exclusions, stage handoff |
-| 5 | `.documents/Reports/execution-report.md` | OVERWRITE | This single report |
+| 1 | `src/app/page.tsx` | EDIT | Sentence-only placeholder replaced by the full static English page: skip link, header nav, hero, planned-contract stack, status split, source section, footer disclosure |
+| 2 | `src/app/layout.tsx` | EDIT | Truthful demonstration `title`/`description`; `lang="en"` retained; `noindex, nofollow, nocache` and `googleBot` policy unchanged; no canonical or alternate invented |
+| 3 | `src/app/globals.css` | EDIT | Original dependency-free styling: light/dark tokens, `focus-visible` ring, `prefers-reduced-motion` and `prefers-contrast`, card/stack rhythm, one-column collapse below 34rem |
+| 4 | `src/app/not-found.tsx` | EDIT | Ordinary 404 restored to accurate copy with a link to the demonstration homepage; no implied publication |
+| 5 | `scripts/verify-u01-http.mjs` | EDIT | Placeholder assertions replaced by **51 counted production-HTTP assertions**; bounded loopback lifecycle, readiness, real `fetch`, teardown and port-release checks preserved |
+| 6 | `.documents/Architecture/source-inventory.md` | EDIT | One appended, titled U01 English-demonstration adoption/boundary note with an explicit non-claims paragraph |
+| 7 | `.documents/Reports/execution-report.md` | OVERWRITE | This report only, in its own single-path commit; its own SHA is not predicted here |
 
-Product commit `6b948e3…`: exactly paths 1–4, +933/−3, direct parent `2e50e45…`. This report alone
-forms the separate single-path report-only commit; its own SHA is deliberately not predicted here.
+Product commit `5323439…`: exactly paths 1–6, **+845/−94**, direct parent `8336112…`, non-force
+fast-forward push. No other tracked path, dependency, asset, font, image, manifest, workflow, lockfile,
+config or governance file changed.
 
-## 4. Contract as implemented and proven
+## 3. The production HTTP gate — what it actually proves
 
-**Ports.** `input` is one or two plain records with exactly the own data fields `kind` and `observe`;
-`kind` is exactly `json` or `markdown` and unique; `observe` is a caller-supplied function. The whole
-collection is validated as data **before any observer runs**, so accessors, symbol keys, exotic
-prototypes, duplicates, casing variants, extra or missing keys and non-functions can never execute
-caller code — proven by counters that stay at zero. A hostile collection or proxy trap yields a bounded
-`invalid-input` instead of an exception.
+`pnpm test:http` starts the built application with the pinned local Next CLI on `127.0.0.1` and an
+ephemeral port, waits for readiness, issues real `fetch` requests, then stops that exact child and
+confirms the port is released. **51 assertions pass, 0 fail** — up from 21, and no earlier safety check
+was dropped.
 
-**Observations.** Each observation is a plain record: exactly `state`, plus exactly one `source` for
-`valid`. `valid` with a missing, `undefined` or `null` body refuses `invalid-observation`; `absent` or
-`invalid` carrying a body refuses too. A malformed observation is never read as an absence.
+**Grouped coverage (51):** 1 readiness · 4 document identity (`200`, `text/html`, `lang="en"`, exactly
+one `h1`) · 3 `h1`/title truthfulness · 2 served description checks · 1 obsolete-sentence absence ·
+3 introduction facts (Apache-2.0 + Next.js + TypeScript, one Entity, Facets/Sites/Pages/locales) ·
+4 planned-contract checks (section, four levels + localized representations, region-qualified `en-001`
+never guessed, labelled planned) · 4 status-split checks (both columns, real lists of ≥4 items each,
+"not a finished website") · 1 visible disclosure · 1 no-publication-claim negative · 3 source-link
+checks (exact URL, readable text, and it is the only absolute link) · 1 anchor-integrity check (7 links,
+0 broken) · 2 robots directives · 7 absent-fabrication markers (`canonical`, `hreflang`, `sitemap`,
+`analytics`, `googletagmanager`, `@vercel`, `modules/connect`) · 1 no-external-subresource check ·
+1 substance check · **six 404 refusals** (`/en`, `/en-001`, `/about`, `/does-not-exist-9f3`,
+`/robots.txt`, `/sitemap.xml`) · 3 404-page checks (homepage link, stale copy gone, no publication
+language) · 1 server-stayed-up · 1 port-released.
 
-**Order (the material invariant).**
+**Negative assertions are not decorative.** The old placeholder would fail three of them. A throwaway
+in-memory proof (no tracked file) applied the same expressions to the superseded markup and reported
+`DETECTED` for: obsolete-sentence detection, missing single-Entity `h1`, stale 404 copy, and 404
+publication language — `negatives-non-vacuous=true`. A regression to the old page, to `/en` routing or
+to premature metadata therefore fails this gate rather than passing silently.
 
-1. A declared JSON observer is invoked once. A throw, a rejected promise or a malformed observation
-   refuses `observer-failed` / `invalid-observation` and Markdown is **never** consulted.
-2. An `invalid` JSON observation refuses with the core's own `invalid-json-source`, even when valid
-   Markdown exists, in either declaration order.
-3. A `valid` JSON observation is confirmed through `selectDeclaredPageSource` and returned with the
-   caller's exact source object by reference; Markdown is not invoked.
-4. Only a declared-and-`absent` JSON (or no JSON declaration) lets the declared Markdown observer run,
-   once, after which the core confirms the selection from the actually observed states.
-5. Otherwise the core supplies the bounded refusal (`no-valid-source`, `invalid-markdown-source`).
+## 4. Local verification
 
-**Bounded refusals:** `invalid-input`, `invalid-observer`, `invalid-observation`, `observer-failed`, plus
-these exact core reasons: `invalid-json-source`, `invalid-markdown-source`, `no-valid-source`. A refusal
-has exactly `accepted` and `reason`; an acceptance has exactly `accepted`, `kind`, `source`. No thrown
-message, path, URL, locale, visibility or candidate value ever appears in a refusal.
-
-## 5. Dependency evidence — one decision authority, not a copy
-
-The use case imports `selectDeclaredPageSource` and core types only, and calls the policy in the
-accepted, the invalid and the empty cases alike, so precedence and refusal wording cannot drift. The
-integration test compares the use case's refusal strings with `selectDeclaredPageSource`'s answer for
-`invalid` JSON, `invalid` Markdown and an absent JSON: a core change to its refusal fails this test
-rather than letting divergent logic pass. The architecture test now also refuses any `src/application`
-import of a framework, Node filesystem/process/network module, adapter, `src/app` or deployment path,
-and inspects the real `src/application` tree rather than a declared list.
-
-## 6. Provenance, rights and pins
-
-| Pinned GEO-03 object | Blob | Bytes | Class and use |
-| --- | --- | ---: | --- |
-| `src/application/page-source-resolution.ts` | `05060f116a7f2703db42d8e7c10d57bc2e5748ed` | 4,261 | **REWRITE** — precedence-versus-reader separation only; providers, locale fallback and Site codes rejected |
-| `src/core/page-source.ts` | `8071f0a425dcbb5422d25be308ae2135cfd64219` | 12,614 | **ADAPT** — declared JSON-before-Markdown order only |
-| `tests/unit/page-source-resolution.test.ts` | `ca3abff92116ea9157f00dd355fe5c7eda5da883` | 4,710 | reference for test *categories* only; no code or fixture copied |
-| Uno `src/core/page-authoring-policy.ts` at `2e50e45` | `b9ddbee09eb776d034038dca09cad48680939512` | 12,483 | **KEEP unchanged** — still the single authority |
-
-All four were read as committed immutable objects at `c05c55ea…` through read-only GitHub reads; no
-dirty reference worktree was read. No upstream source, test, fixture, brand, licensed asset, Connect
-module or Solo Rust code entered Uno. No `NOTICE`, `package.json`, lockfile, workflow or governance
-change was made and no new dependency was added.
-
-## 7. Local verification — this machine
-
-Node v24.22.1, pnpm 11.6.0, Next 16.4.2, React 19.2.9; frozen lockfile, nothing installed or upgraded.
+Node v24.22.1, pnpm 11.6.0, Next 16.4.2, React 19.2.9; frozen lockfile unchanged.
 
 | Gate | Result |
 | --- | --- |
-| `pnpm install --frozen-lockfile --ignore-scripts` | `PASS` — up to date; lockfile unchanged |
-| `node scripts/verify-governance-docs.mjs` | `PASS` |
+| `pnpm install --frozen-lockfile --ignore-scripts` | `PASS` — up to date |
+| `node scripts/verify-governance-docs.mjs` | `PASS` — frozen bytes match |
 | `node --test tests/governance-docs.test.mjs` | `PASS` — 6 / 6 |
-| `pnpm test:bootstrap` | `PASS` — 19 / 19 plus the 11-file/licence/slot/private-authority screen |
-| `pnpm test:architecture` | `PASS` — 12 / 12 (11 prior + 1 new application negative) |
+| `pnpm test:bootstrap` | `PASS` — 19 / 19 |
+| `pnpm test:architecture` | `PASS` — 12 / 12 |
 | `pnpm lint` | `PASS` — exit 0 |
 | `pnpm typecheck` | `PASS` — exit 0 |
-| `pnpm test` (Vitest) | `PASS` — **167 / 167 = 144 retained + 23 new** |
-| `pnpm build` | `PASS` — 3 / 3 static pages, exit 0 |
-| `pnpm test:http` | `PASS` — 21 / 21 against a real loopback server |
-| Local WSL | `UNVERIFIED` — not attempted; hosted Linux is not relabelled as local |
+| `pnpm test` (Vitest) | `PASS` — 167 / 167 retained |
+| `pnpm build` | `PASS` — 3 / 3 static pages, `/` prerendered |
+| `pnpm test:http` | `PASS` — **51 / 51**, up from 21 |
+| Local WSL | `UNVERIFIED` — not attempted |
+| Browser render, screenshot, axe/a11y scan | **NOT APPLICABLE / NOT EXECUTED** — this order is GitHub-only; no browser or a11y tool ran, and nothing here claims one did |
+| Vercel preview, production URL, live HTTP to a deployed host | **NOT APPLICABLE** — no deployment exists or is authorized |
 
-Nothing was skipped, downscoped, silenced or made non-blocking. `/` still serves the non-indexable
-placeholder: no Site, locale route, manifest, sitemap, canonical or analytics exists.
+**Warnings, disclosed.** The CI workflow step is still named "Run production HTTP (technical
+placeholder)"; workflows are outside this ledger and were not edited, so the label is stale while the
+command it runs is the new 51-assertion gate. pnpm prints a cosmetic version notice. One trailing blank
+line was removed from five files and line endings normalised before committing, with
+`git diff --check` and `git diff --cached --check` clean. `DEP0190`, Next cache notices and pnpm
+shim-layout warnings were not observed on this machine.
 
-**Warnings and refusals, disclosed.** pnpm prints a cosmetic "update available 11.6.0 → 12.21.0"
-notice (no upgrade performed). The two new files were normalised to LF and one trailing blank line was
-removed before committing; `git diff --check` and `git diff --cached --check` were clean at commit time.
-Not observed here: Windows Node `DEP0190`, Next "no cache" notices, pnpm v10 shim-layout warnings.
+## 5. Exact-head hosted verification
 
-## 8. Exact-head hosted verification — product head `6b948e3…`
+Both unchanged workflows ran on both operating systems at the product head `5323439…`.
 
 | Workflow | Run | ubuntu-24.04 | windows-2025 | Steps / non-success |
 | --- | --- | --- | --- | --- |
-| Uno Bootstrap Verify | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43818431638 | success | success | 9 / **0** |
-| Verify U01 baseline | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43818431646 | success | success | 18 / **0** |
+| Uno Bootstrap Verify | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43821721955 | success | success | 9 / **0** |
+| Verify U01 baseline | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43821721896 | success | success | 18 / **0** |
 
-Step conclusions were read for the exact product SHA. **Full job log text is `UNVERIFIED`: the logs
-endpoint returned HTTP 403** to this unauthenticated client on all four jobs, so no log line is claimed.
-No workflow was edited, rerun, cancelled or retried; step-level greens never substitute for the local
-gates above.
+Each run reported `completed/success` with `head_sha` `5323439…`. Job and step conclusions were read
+per host and confirm the pipeline actually exercised this change: `Architecture boundaries`,
+`Production build` and `Run production HTTP` all `success` on **Windows 2025** and **Ubuntu 24.04** —
+i.e. the 51-assertion production gate passed in hosted CI on both platforms, not only locally.
+**Full log text is `UNVERIFIED`:** the logs endpoint was not readable to this client, so no log line is
+quoted. No workflow was edited, rerun, cancelled or retried. Both workflows also run at the
+report-only head; those run identities are given in the handback for this order, since this report
+cannot contain its own commit SHA.
 
-## 9. Write boundary, privacy and cleanup
+## 6. Security, privacy, rights and cleanup
 
-- Only paths 1–4 entered the product commit; the report is the sole content of the report-only commit.
-  Not touched: `src/core/**` (including the unchanged policy), `src/app/**`, `deployment/**`, `public/**`,
-  `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `scripts/**`, `.github/**`, plan slots, frozen
-  governance documents, governance hash/tests or any Foundation/Solo/sibling file.
-- The ACTIVE was never staged, copied or published, and no private path, credential or datum appears in
-  any changed file, commit message or this report.
-- Scratch was one empty hooks directory under `.temp/uno-wo-010-r01/`, removed after use; build output
-  stayed in ignored Uno paths; no listener or server was left running.
+- **Frozen governance untouched and still verified:** `AGENTS.md`, `README.md` and
+  `.documents/SOP/sop-implementation.md` are byte-identical; `verify-governance-docs.mjs` passes and the
+  governance test count is unchanged at 6. No planning slot, workflow, lockfile, `package.json`,
+  `next.config.ts`, `tsconfig.json`, `src/core/**`, `src/application/**`, `deployment/**` or `public/**`
+  path changed.
+- **Pre-publication state preserved:** `noindex, nofollow, nocache` remain; the six declared paths still
+  return real 404s (never a redirect); no canonical, `hreflang`, sitemap, analytics, tag manager,
+  provider marker, middleware, `route.ts`, `robots.ts` or `sitemap.ts` was added.
+- **No external surface:** the page is static HTML/CSS with zero external subresources, zero client
+  fetch, zero environment-driven display and no contact form; the only outbound references are two
+  ordinary links to the public Uno repository. Light and dark both remain readable; motion is limited
+  to a preference-gated smooth scroll; focus is always visible.
+- **Privacy:** no ACTIVE byte or digest, no machine path, no credential, no token, no Vercel project or
+  provider detail and no personal datum appears in this report or any changed file. ACTIVE stayed
+  ignored, untracked and unstaged throughout.
+- **Rights:** all page copy and CSS are original Uno-authored work. No Foundation trademark, imagery,
+  demo copy, testimonial, Connect asset, third-party font, icon or dependency was copied or added.
+- **External state:** no Vercel or provider action of any kind was taken; no deployment, preview,
+  promotion, domain, secret or release exists from this run. Foundation `8789a45…`, Solo and the parent
+  workspace were read-only and unwritten.
+- **Cleanup:** build output stayed in ignored Uno paths; the only scratch was a `.temp/uno-wo-011-r01/`
+  directory (one empty hooks dir plus the throwaway negative proof), removed after use; no listener or
+  server was left running and the loopback port release is asserted by the gate itself.
 
-## 10. Stage status and requested disposition
+## 7. Progress measurement (milestone credit)
 
-**COMPLETE for this order only.** The delivered seam is real executable orchestration over trusted
-injected ports — not another registry — with the core policy imported rather than duplicated, fail-closed
-preferred JSON, byte-identical pass-through of the caller's opaque source, and bounded refusals.
+| Item | Before | After |
+| --- | --- | --- |
+| U00 (Owner-closed) | 12.50 | 12.50 |
+| U01 outcomes 1–8 | 8 × 1.25 = 10.00 | 10.00 |
+| **U01 outcome 9** — visitor-useful English page at `/`, CSS/accessibility, ≥25 production HTTP proofs | 0.00 | **1.25** |
+| U01 outcome 10 — full stage exit | 0.00 | 0.00 (not authorized) |
+| U02–U07 | 0.00 | 0.00 |
+| **Earned total** | **22.50%** | **23.75%** |
+| Formal closed stages | 1 / 8 | **1 / 8 — U01 remains OPEN** |
 
-Still **not** delivered and not implied: any EFS manifest or schema, source ownership, filesystem
-confinement, JSON/Markdown reader or sanitiser, Page envelope or module prop, locale mapping, Site
-selection, URL, route, metadata, sitemap, redirect, unlisted discoverability or publication decision.
-U02 (manifest and cardinality), U03 (readers, locale routing, visibility/serving behaviour, SEO,
-sanitisation), U04 (22 modules, 17-family parity) and U05 (provider adapters) remain open.
+The claimed increment is earned only by the delivered page, styling and real production HTTP evidence.
+It is **not** a proportion of hours, an indexation claim, or a statement that full A1 functionality is
+23.75% coded. No point is claimed for commits or tests alone.
 
-Formal closed-stage meter stays **1 / 8 (12.5%)**: U00 Owner-closed, **U01 OPEN**, U02–U07 NOT STARTED.
-The Agent closes nothing, accepts nothing and requests one `ACCEPT` / `REVISE` / `STOP` from the Chief
-Master Architect on this exact bounded order.
+## 8. Remaining blockers and the next decision
+
+1. **Independent Architect review** of this bounded deliverable is the open decision now:
+   `ACCEPT` / `REVISE` / `STOP`. The Agent neither self-accepts nor closes U01.
+2. **Vercel deployment is the immediately subsequent Owner-controlled gate** and is not authorized here.
+   It needs its own order naming the project/team, preview-versus-production target, Git-integration
+   policy, access controls and an externally checked HTTPS URL. The page is deliberately `noindex`,
+   which is a search directive and not access control.
+3. **Further languages** require a later Owner decision after the English demonstration is live; this
+   order adds no locale route and does not touch `en-001`.
+4. **U02–U07** remain not started, and the canonical governance consolidation question stays with the
+   Owner. U01 exit still requires its tenth outcome and express Owner closure.
