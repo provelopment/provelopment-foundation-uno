@@ -624,7 +624,67 @@ Uno.** Ownership is primarily U04; `contactForm` delivery is U05.
 | 17 | `contactForm` | type plus `formRef` (intent only: `[a-z0-9][a-z0-9-]*`, max 64) | rendered by the CALLER behind an authorization seam; draws nothing when unauthorized | `contact-form` boundary only | U05 | absent authorization renders nothing; delivery, secrets and provider choice are U05 (**OPEN**) |
 
 Ambiguity is marked `OPEN` rather than claimed as parity. No row asserts an implemented Uno
-module, and none is silently deferred without a recorded acceptance test.## 22 A1 capability contracts (Owner-approved targets, NOT implemented)
+module, and none is silently deferred without a recorded acceptance test.
+
+## 22 A1 capability contracts — exact approved identifiers
+
+> **Superseded target descriptions (UNO-WO-007 / R01).** The provisional rows at the end of this
+> section were R01-era placeholders awaiting confirmation of upstream identifiers. They are
+> retained as history only and are **not** a target list and not an ID source. Target identity is
+> fixed by canonical `BLUEPRINT.md` §5, restated exactly below and in `UNO-WO-007 / R01` §3. No
+> provisional row is a registered module, an approval or a parity claim.
+
+### Approved 22 registered A1 capability IDs (binding)
+
+| Group | Count | Exact IDs |
+| --- | ---: | --- |
+| `layout` | 4 | `layout.stack`, `layout.grid`, `layout.bento`, `layout.layers` |
+| `content` | 8 | `content.heading`, `content.prose`, `content.actions`, `content.hero`, `content.stats`, `content.testimonials`, `content.pricing`, `content.timeline` |
+| `media` | 4 | `media.image`, `media.video`, `media.gallery`, `media.carousel` |
+| `design` | 2 | `design.watermark`, `design.motion` |
+| `interaction` | 4 | `interaction.tabs`, `interaction.accordion`, `interaction.modal`, `interaction.contact` |
+| **Total** | **22** | 4 + 8 + 4 + 2 + 4 |
+
+### Support classification at U01 — vocabulary only
+
+| Layer | State | Owner |
+| --- | --- | --- |
+| Vocabulary: the 22 exact IDs, single group ownership, membership and refusal guard (`src/core/modules/capability-registry.ts`) | `IMPLEMENTED` — registry only | U01 |
+| Renderer, authored props/envelope, composition and page integration for any of those IDs | `UNIMPLEMENTED` — no renderer, props schema, composer or route | U04 |
+| Delivery behind `interaction.contact` (mail, provider, authorization adapter) | `UNIMPLEMENTED` — no adapter, secret or provider | U05 |
+
+Registering a vocabulary is **not** module parity: 22 registered *names* are not 22 executable
+modules, and the registry grants no rendering, routing or publication capability.
+
+## 17 Foundation families → candidate approved ID, composition and gap
+
+Families come from the pinned GEO-03 schema blob `a12d964c43626c6313a621bf628f5cc24b65d444`
+(`PAGE_SECTION_TYPES`) and composer blob `fc35a52d6cfc5f114e50470e8286a89916cde801`. They are
+**obligations in a separate namespace**, never registered module IDs; a shared word is not parity
+and no row asserts an automatic one-to-one mapping. Every row is `UNIMPLEMENTED` for renderer parity.
+
+| # | Family | Candidate approved ID(s) | Composition or gap | Parity | Owner | Behaviour or refusal proof needed |
+| ---: | --- | --- | --- | --- | --- | --- |
+| 1 | `hero` | `content.hero` | direct candidate | `UNIMPLEMENTED` | U04 | eyebrow/lede/support render, actions resolve, exactly one page `h1` |
+| 2 | `prose` | `content.prose` | direct candidate | `UNIMPLEMENTED` | U04 | sanitised markdown body; heading level follows section order |
+| 3 | `media` | `media.image` | **gap**: media-and-text composition has no approved ID | `UNIMPLEMENTED` | U04 | caption and start/end position render; no provider request |
+| 4 | `gallery` | `media.gallery` | direct candidate; 2/3/4 declared columns | `UNIMPLEMENTED` | U04 | N items in declared column count; responsive reflow |
+| 5 | `actions` | `content.actions` | direct candidate | `UNIMPLEMENTED` | U04 | primary/secondary/link variants; unresolvable target degrades to label |
+| 6 | `callout` | — | **gap**: no approved ID carries tone variants (`note`/`info`/`warning`); `layout.stack` composition is not parity | `UNIMPLEMENTED` | U04 | each tone distinguishable and announced accessibly |
+| 7 | `cards` | — | **gap**: no approved ID; `layout.grid` + `content.*` composition is not parity | `UNIMPLEMENTED` | U04 | card grid renders items and declared columns |
+| 8 | `features` | — | **gap**: no approved ID; differs from `cards` only by observed row layout | `UNIMPLEMENTED` | U04 | feature rows render without a second `h1` |
+| 9 | `columns` | `layout.grid` | candidate, but observed `ratio` (`equal`/`start-wide`/`end-wide`) is a fidelity gap | `UNIMPLEMENTED` | U04 | 2-3 columns with declared ratio; stacks on narrow viewport |
+
+| 10 | `steps` | `content.timeline` | candidate; observed `max 12` items is a gap | `UNIMPLEMENTED` | U04 | ordered steps render; 13 items refused at authoring |
+| 11 | `stats` | `content.stats` | direct candidate, honouring `PAGE_MAX_STATS` | `UNIMPLEMENTED` | U04 | definition-style list; overflow refused |
+| 12 | `quote` | `content.testimonials` | **gap**: one `quote` with `attribution`/`role` is not a testimonial collection | `UNIMPLEMENTED` | U04 | quote and attribution render inside `blockquote`/`cite` semantics |
+| 13 | `table` | — | **gap**: no approved ID covers tabular data or row/column validation | `UNIMPLEMENTED` | U04 | mismatched row/column count refused; caption associated with the table |
+| 14 | `faq` | `interaction.accordion` | candidate; FAQ semantics versus generic disclosure is a fidelity gap | `UNIMPLEMENTED` | U04 | question/answer pairs render; keyboard-expandable if disclosure UI is chosen |
+| 15 | `list` | — | **gap**: ordered/unordered list has no approved ID | `UNIMPLEMENTED` | U04 | ordered versus unordered honoured; nesting defined or refused |
+| 16 | `divider` | — | **gap**: no approved ID for a non-focusable separator | `UNIMPLEMENTED` | U04 | separator renders with no heading and no focusable content |
+| 17 | `contactForm` | `interaction.contact` (possible future boundary) | **gap**: family is not a module ID; the registry equates nothing and supplies no delivery | `UNIMPLEMENTED` | U05 delivery · U04 surface | absent authorization renders nothing; no secret or provider in the repository |
+
+### Historical R01 provisional descriptions (superseded — history only)
 
 R01 requires 22 capability contracts: **4 layout · 8 content · 4 media · 2 design ·
 4 interaction**. The canonical Solo-reference identifiers are **not supplied in R01**, and
