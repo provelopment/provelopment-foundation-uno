@@ -765,6 +765,38 @@ supply any contact delivery or provider adapter; **U04** must prove caller-side 
 Tests recorded for those stages: syntax acceptance of `/admin` is not authorization, and an accepted
 external origin is not permission to fetch it server-side.
 
+## U01 Page-source and visibility policy adoption (UNO-WO-009 / R01)
+
+**Scope:** one pure, observation-only authoring policy. It decides which *declared* source answers one
+already-identified representation, and which visibility vocabulary that source may carry. It reads no
+file, parses no JSON/Markdown, selects no Site or locale, and publishes nothing.
+
+| Pinned GEO-03 evidence | Blob | Bytes | Class | Note |
+| --- | --- | ---: | --- | --- |
+| `src/core/page-source.ts` | `8071f0a425dcbb5422d25be308ae2135cfd64219` | 12,614 | ADAPT | JSON-before-Markdown order and fail-closed idea only; site codes, bare-locale lookup and default-locale fallback **rejected** |
+| `src/application/page-source-resolution.ts` | `05060f116a7f2703db42d8e7c10d57bc2e5748ed` | 4,261 | REWRITE | Resolver/provider separation rewritten as one pure policy with no provider, reader or I/O |
+| `tests/unit/page-source-resolution.test.ts` | `ca3abff92116ea9157f00dd355fe5c7eda5da883` | 4,710 | reference only | Positive/refusal *categories* read; no fixture or test code copied |
+| `src/core/page-document.ts` | `a12d964c43626c6313a621bf628f5cc24b65d444` | 45,106 | DEFER | Full Page schema, section families and document fields not adopted; only the `public`/`unlisted` vocabulary and the reserved Home rule appear |
+
+**Uno precedence, narrower than upstream.** A declared `json` observed `valid` wins even when Markdown
+is `invalid`; a declared `json` observed `invalid` refuses outright; valid Markdown answers only when
+JSON is `absent` or undeclared; zero valid candidates refuse. There is no locale, Site, directory or
+Page fallback input, so none can be invented. Visibility: JSON defaults to `public` and may declare
+`public`/`unlisted`, the reserved root Home may never be `unlisted`, and Markdown is `public` with no
+visibility field at all (even `public` refuses). Uno-local predicates `HOME_CONTENT_SLUG` and
+`isPageRoutePath` are reused; no slug grammar is redefined.
+
+**Refusal proofs carried by `tests/unit/page-authoring-policy.test.ts` (26 cases):** non-array, 0/3
+records, duplicate/unknown kind, unknown state, extra or missing keys, null/array/class candidates,
+accessor and symbol fields, prototype-pollution-shaped records, hostile prototypes with
+`toString`/`valueOf`/`Symbol.toPrimitive` (never invoked), throwing proxies (bounded refusal, no
+throw), all malformed route paths, unknown visibility values, and non-mutation/determinism.
+
+**Handoff.** Still owed: U02 EFS manifest ownership and cardinality; U03 locale routing, real
+Page/locale/visibility composition, unlisted HTTP/SEO behaviour and Markdown sanitisation; U04 the 22
+capability modules and 17-family parity; U05 provider adapters. An `unlisted` decision is a vocabulary
+value only — not access control, not discovery, not a URL, header, redirect, body or sitemap entry.
+
 ## Rights
 
 Apache-2.0 source only, subject to review. Branded images, product data, default analytics and
