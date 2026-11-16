@@ -1,104 +1,142 @@
-# UNO-WO-006 / R03 — VERIFICATION AND TRUTHFUL REPORT CORRECTION
+# UNO-WO-007 / R01 — A1 capability vocabulary and ledger reconciliation
 
-**Order:** `UNO-WO-006 / R03` (FINAL), verification only · **Executed:** 2026-11-15
-**Starting `main`:** `6755b379ee2b4554cb24332a7682e733c37fecfa` · **U01: OPEN**
-**Role:** Implementation Agent · **Review:** Chief Master Architect
-**Local outcome:** `COMPLETE` for this narrow verification only — not stage acceptance, not self-`ACCEPT`
+**Order:** `UNO-WO-007 / R01` (FINAL — EXECUTE) · **Executed:** 2026-11-16
+**Starting `main`:** `606f0771a97c50899467afb0e2be18ae8b02cad7`
+**Product commit:** `09511614c2f685d365ed6df195e49be2b0c3c9df`
+**Stage:** U01 — bounded product slice · **U01 remains OPEN** · **no stage closure, release or deployment**
+**Role:** Implementation Agent · **Disposition requested:** Chief Master Architect review
 
-Paths are symbolic; no private path, ACTIVE byte, credential or personal datum appears. Canonical
-Drive records were not edited.
+Paths are symbolic; no private absolute path, ACTIVE byte, credential or personal datum appears
+below. Canonical Drive records were not edited.
 
-## 1. R02 disposition — procedural STOP, not retroactively repaired
+## 1. Authority actually verified
 
-`UNO-WO-006 / R02` reported `COMPLETE`. **That report was procedurally non-compliant and is not
-validated after the fact.** Its step 2.4 required the ACTIVE slot to still hold `UNO-WO-005 / R01`
-(31,628 B, `E2526174…64334E`) with an express STOP otherwise. The Owner had installed R02 directly,
-so that state was never observable. The Agent noticed, proceeded and disclosed it afterwards:
-observing a literal STOP and continuing was an Agent failure; the contradictory direct-install
-predecessor requirement was an Architect-authored handoff flaw. Both are recorded as such.
-
-**Architect disposition: `STOP (procedural)`.** It alleges no wrong R02 bytes, unsafe edit or broken
-gate — only that R02 failed its own literal preflight and cannot be marked compliant now.
-
-## 2. R03 authority and preflight
-
-Private order verified in place and never written by the Agent: regular, ignored, untracked, unstaged,
-at the canonical slot — **12,428 bytes**, SHA-256
-**`3103D57D789F16CB8A50A01A8C0C0058C3A2A37F6874AAB0CF6582E6F2060BE7`**, exactly the Owner's
-activated R03. No root-level alternative, no duplicate order.
-
-| Preflight check | Result |
+| Item | Observed |
 | --- | --- |
-| Physical root, no symlink/junction/reparse escape; one worktree; `main`; one `origin` to Uno only | `PASS` |
-| Local `HEAD` = local `main` = remote `refs/heads/main` = `6755b37…` | `PASS` |
-| Parent edges `6755b37^` = `e7e381f…`, `e7e381f^` = `ae8fd25…` | `PASS` |
-| Clean index/worktree; no merge, rebase, bisect, cherry-pick or lock; one report slot, no archive | `PASS` |
-| `<PARENT>` anchored `/00.foundation-uno/` guard; HEAD `e17fd960…` | `PASS`, read-only |
-| `<FOUNDATION>` HEAD `8789a450…`; names only, no dirty contents read | `PASS`, read-only |
-| Three WIP plans and the prior report read; none grants authority | `PASS` |
+| Private ACTIVE slot | regular, ignored, untracked, unstaged, `.documents/WIP/workorder-active.md`, no root alternative, no duplicate order |
+| Installed order | `UNO-WO-007 / R01`, **21,620 bytes**, SHA-256 `BE002669000331174EBD6E0EEBCB675E641F808F272DCA34B7E8324582597DE6` — exact match to the Owner activation |
+| Prior orders | `UNO-WO-006 / R03` accepted within verification scope; `UNO-WO-006 / R02` a procedural STOP. Neither was treated as a precondition, and no spent ACTIVE was required to remain in the slot |
+| Read before acting | repository `AGENTS.md`, local SOP, three `plan-*.md` slots, the previous report, this order |
 
-## 3. Independent verification of the preserved result
+**Drive limitation, stated plainly:** this agent has no Drive access and did **not** read
+`BLUEPRINT.md`. The 22 approved IDs used here are taken from this order's own §3 restatement of
+`BLUEPRINT.md` §5, which is the operative authority supplied to the agent. No claim to have read
+the canonical Drive is made.
 
-Checked from exact Git objects and byte-level reads, not from the R02 narrative. For every frozen path
-the worktree blob ID equals the committed `HEAD` blob ID, so the bytes below are the committed bytes.
+## 2. Read-only preflight (before any write)
 
-| Path | Bytes | CR | SHA-256 | Required | Blob = HEAD |
-| --- | ---: | ---: | --- | --- | --- |
-| `AGENTS.md` | 2,730 | 0 | `6C6D5DCB…31CA6F` | match | `94f962d1f67e` ✓ |
-| `README.md` | 2,375 | 0 | `0CF934EC…8521F9A2` | match | `8f5f4e15eed6` ✓ |
-| `.documents/SOP/sop-implementation.md` | 4,796 | 0 | `6D790AD4…B21CB388` | match | `f30d65901c9a` ✓ |
-| `scripts/verify-governance-docs.mjs` | 2,092 | 0 | `F108EF1C…CC2C1E67` | match | `3d9360dae473` ✓ |
-| `tests/governance-docs.test.mjs` | 1,834 | 0 | `31AD46A9…F28930FC` | match | `c8d51e12f995` ✓ |
+| Check | Result |
+| --- | --- |
+| Physical Uno root resolved; no symlink, junction or reparse escape; ancestors contained | `PASS` |
+| Exactly one Git checkout/worktree; branch `main`; clean index and worktree | `PASS` |
+| Exactly one remote `origin` → `provelopment/provelopment-foundation-uno` only | `PASS` |
+| Local `HEAD` = local `main` = remote `refs/heads/main` = `606f077…` | `PASS` |
+| No merge, rebase, bisect, cherry-pick or index lock | `PASS` |
+| Parent workspace anchored `/00.foundation-uno/` guard; parent HEAD `e17fd960…` unchanged, read-only | `PASS` |
+| Local Foundation template HEAD `8789a450…`; file names only, no dirty contents read or written | `PASS` |
+| Frozen governance bytes unchanged; `verify-governance-docs.mjs` `PASS` | `PASS` |
+## 3. What was delivered — four authorized paths only
 
-Pre-change blobs at `ae8fd25…` were `bd5fec6fb0e0`, `dabb27db6e2e`, `5529bf65b6bb`: the three prose
-files changed once and only once. Product `e7e381f…` changed exactly those seven paths (`M`×5, `A`×2).
-The workflow delta `ae8fd25..e7e381f` is 12 added, 0 removed lines — one governance step per workflow,
-no gate disabled. `git diff 6755b37..HEAD` and the worktree diff are both empty: `src/**`, package and
-lock, WIP plans, workflows, SOP, freeze script and tests are unchanged since the start SHA.
-## 4. What was rerun locally versus reused
+| Path | Operation | Content |
+| --- | --- | --- |
+| `src/core/modules/capability-registry.ts` | CREATE | Pure, import-free, frozen registry: the 22 approved A1 IDs in groups 4 / 8 / 4 / 2 / 4, a `Set`-backed membership guard, a single-owner group lookup, and a separate immutable list of the 17 observed Foundation families |
+| `tests/unit/capability-registry.test.ts` | CREATE | 14 Vitest cases: exact vocabulary, counts, uniqueness, freezing, membership and refusals |
+| `tests/architecture/u01-boundaries.test.mjs` | EDIT (1 line) | Added only the new core file to the hard-coded authored-inventory list; every prior assertion retained |
+| `.documents/Architecture/source-inventory.md` | EDIT (62 lines) | Old provisional 22 descriptions marked superseded; exact binding ID table added; registry-only versus renderer support classified; 17-family candidate-ID/gap matrix added with stages, owners and pending proofs |
 
-**Rerun now** (Node `v24.22.1`; no install, no new package): `node --check` on both new files `rc=0`;
-`node --test tests/governance-docs.test.mjs` **6/6 pass, 0 fail**;
-`node scripts/verify-governance-docs.mjs` `PASS`; `node --test tests/bootstrap.test.mjs` **19/19 pass**.
+**Contract behaviour.** `isCapabilityId(value: unknown)` is a real type guard: it refuses a
+non-string before any lookup, so no value is coerced and an object carrying `toString` or
+`Symbol.toPrimitive` is never read as an ID. `capabilityGroupFor` returns exactly one group or
+`undefined`; it never derives a group by splitting an unregistered string, and no near-miss is
+repaired. Groups and lists are frozen against runtime mutation. The 22 IDs and the 17 family
+names occupy **different namespaces**: `contactForm` is not `interaction.contact` and carries no
+delivery, provider or authorization meaning.
 
-**Reused, not rerun:** architecture 11/11, Vitest 77/77, HTTP 21/21, lint, typecheck and build 3/3 come
-from exact-head hosted evidence (section 5); no product byte changed, so a local product rebuild would
-add no information. Hosted **log text** is `UNVERIFIED` here: the logs endpoint returns 403.
+**Refusal coverage proven** (all `false` / `undefined`): unknown and invented IDs; case variants;
+bare family names (`hero`, …); category-only and malformed strings (`layout.`, `.stack`,
+`layout..stack`, `layout stack`, `layout/stack`); near-matches (`interaction.contactForm`,
+`content.table`); prototype-looking keys (`constructor`, `__proto__`, `prototype`, `toString`,
+`valueOf`, `hasOwnProperty`); blank and whitespace-only values; non-strings including `null`,
+`undefined`, numbers, booleans, arrays, objects, `Symbol` and `bigint`; hostile objects, with
+zero `toString`/`Symbol.toPrimitive` calls asserted.
 
-## 5. Hosted evidence at both heads — read again, never rerun
+## 4. Source, rights and provenance proof
 
-| Head | Workflow | Run | ubuntu-24.04 | windows-2025 |
+| Pinned Foundation object | Blob at GEO-03 `c05c55ea…` | Bytes |
+| --- | --- | ---: |
+| `src/core/page-document.ts` (`PAGE_SECTION_TYPES`) | `a12d964c43626c6313a621bf628f5cc24b65d444` | 45,106 |
+| `src/components/site/page-document-content.tsx` | `fc35a52d6cfc5f114e50470e8286a89916cde801` | 8,280 |
+
+Both blob identities were confirmed read-only through authenticated GitHub reads before the family
+list was written. **No external source byte was copied:** the registry imports nothing, contains no
+Foundation code, asset, brand, `modules/connect` path, Solo Rust code or provider integration, and
+no generated, licensed or third-party material entered the repository. The 17 families are recorded
+as obligations with explicit gaps, never as parity.
+
+**Known, recorded gaps (unchanged by this order).** `callout`, `cards`, `features`, `quote`,
+`table`, `list` and `divider` have no approved A1 ID and remain explicit gaps rather than invented
+IDs; `media`-and-text composition, `columns` ratios, `steps` item caps and FAQ-versus-disclosure
+semantics are recorded fidelity gaps. All 17 rows are `UNIMPLEMENTED` for renderer parity, owned by
+U04, with `contactForm` delivery at U05.
+## 5. Local verification — rerun on this machine
+
+Node 24.x, pnpm 11.6.0, existing frozen lock, no global install and no package added.
+
+| Gate | Result |
+| --- | --- |
+| `pnpm install --frozen-lockfile --ignore-scripts` | up to date; lockfile unchanged |
+| `node scripts/verify-governance-docs.mjs` | `PASS` — frozen bytes match |
+| `node --test tests/governance-docs.test.mjs` | 6 / 6 pass |
+| `pnpm test:bootstrap` | 19 / 19 pass |
+| `pnpm test:architecture` | 11 / 11 pass |
+| `pnpm lint` | clean, exit 0 |
+| `pnpm typecheck` | clean, exit 0 |
+| `pnpm test` (Vitest) | **91 / 91 pass = 77 pre-existing + 14 new** |
+| `pnpm build` | success, 3 / 3 static pages, exit 0 |
+| `pnpm test:http` (real loopback production server) | 21 / 21 pass, exit 0 |
+
+No gate was skipped, weakened or reclassified, and no hosted job is reported as a local run.
+`/` still serves the non-indexable technical placeholder with unchanged refusals (`/en`, `/about`,
+`/robots.txt`, `/sitemap.xml` → 404; no `hreflang`, canonical, sitemap or analytics markup).
+
+**Warnings, disclosed rather than waived:** pnpm prints a cosmetic "update available 11.6.0 → 12.21.0"
+notice (no upgrade performed); the four edited files were normalised to LF per `.gitattributes` and
+the staged blobs were proven byte-identical before and after that normalisation.
+
+## 6. Exact-head hosted verification — product commit `0951161…`
+
+| Workflow | Run | ubuntu-24.04 | windows-2025 | Governance step |
 | --- | --- | --- | --- | --- |
-| product `e7e381f…` | Bootstrap | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43735071092 | success, gov success | success, gov success |
-| product `e7e381f…` | U01 | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43735071184 | success, gov success | success, gov success |
-| report `6755b37…` | Bootstrap | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43736083893 | success, gov success | success, gov success |
-| report `6755b37…` | U01 | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43736083502 | success, gov success | success, gov success |
+| Uno Bootstrap Verify | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43807688044 | success | success | success (both) |
+| Verify U01 baseline | https://github.com/provelopment/provelopment-foundation-uno/actions/runs/43807688047 | success | success | success (both) |
 
-Each `head_sha`, job and governance step was re-read; the four run IDs match the Architect's table
-exactly and all eight jobs have zero non-success steps. No Action was rerun or mutated. The Architect,
-fetching full logs with connected GitHub, reports governance 6/6, bootstrap 19/19, architecture 11/11,
-Vitest 77/77, HTTP 21/21, lint, typecheck and build 3/3 on both hosts, and notes a pnpm v10 shim-layout
-warning and a Windows Node `DEP0190` warning. Those log texts are attributed to that read; here they
-remain `UNVERIFIED` (403) and nothing contradicts the step results.
+Step-level conclusions were read from the GitHub API for the exact head SHA; both jobs have zero
+non-success steps (9 and 18 steps). Full job log text was **not** read in this run — unauthenticated
+log access returns 403 — so log-internal warning text is `UNVERIFIED` here while the step outcomes
+are `PASS`. No Action was rerun, cancelled or mutated.
 
-## 6. Corrections to the previous report
+## 7. Write boundary, privacy and cleanup
 
-1. Its `COMPLETE` claim is withdrawn as a compliance statement; R02 stands as `STOP (procedural)`.
-2. Its section 6.1 offered the predecessor breach as a pending exception; it is now a procedural STOP.
-3. Its verified facts — seven paths, three frozen hashes, 77 tests, preserved gates — are independently
-   confirmed here, not restated from its narrative.
+- Product commit `0951161…`: exactly the four authorized paths, 513 insertions, 1 deletion, direct
+  parent `606f077…`, fast-forward push only. No other tracked path, no `src/app/**`, no workflow,
+  `package.json`, lockfile, `.gitignore`, bootstrap script or frozen governance file changed.
+- This report is the sole content of the single permitted report-only commit; it is not duplicated
+  or archived, and it does not assert its own SHA.
+- The private ACTIVE was never staged, rewritten or published; no private absolute path, secret,
+  ACTIVE byte or personal datum appears in any changed file.
+- Scratch use was limited to one empty hooks directory under `.temp/uno-wo-007-r01/`, removed after
+  use. Parent workspace, Foundation template, Solo and all siblings were read-only throughout.
 
-## 7. Remaining governance blocker and stage status
+## 8. Stage status and requested disposition
 
-The seven canonical Drive governance documents **have NOT been consolidated**; they are the remaining
-Owner-directed blocker before new product work. No Drive file was edited or used as an instruction
-source. There is no U01 closure, live website, release or deployment. `U00` Owner-closed, **`U01`
-OPEN**, `U02`-`U07` NOT STARTED; no product-work order is activated by this run.
+This order's bounded deliverable — the capability vocabulary, its refusal tests and the reconciled
+ledger — is **COMPLETE**. That is **not** U01 completion and not a website: there is no renderer, no
+authored props or envelope schema, no composer, no EFS manifest, no public route, no locale HTTP
+behaviour and no publication. Twenty-two registered *names* are not 22 executable modules. The
+formal closed-stage meter remains **1 / 8**: U00 Owner-closed, **U01 OPEN**, U02–U07 NOT STARTED.
 
-## 8. Qualifiers
+The canonical Drive's seven governance documents remain **unconsolidated**; that Owner-directed
+blocker still precedes any further product work.
 
-Local rerun `PASS`; exact-head hosted step results `PASS`; hosted log text `UNVERIFIED` (403); product
-architecture/unit/HTTP/build gates reused from hosted evidence. R03 private order: 12,428 bytes,
-SHA-256 `3103D57D789F16CB8A50A01A8C0C0058C3A2A37F6874AAB0CF6582E6F2060BE7`. The report-only commit
-and its two final-head run URLs are read back after publication and returned separately; this document
-does not assert its own SHA. The Chief Master Architect alone issues `ACCEPT`, `REVISE` or `STOP`.
+The Agent does not accept or close anything: the Chief Master Architect is asked for
+`ACCEPT` / `REVISE` / `STOP` on this order only.
