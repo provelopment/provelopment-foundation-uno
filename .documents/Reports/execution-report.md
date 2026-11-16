@@ -1,162 +1,162 @@
-# UNO-WO-019 / R01 — U02 closed by the Owner, U03 canonical candidate-address contract
+# UNO-WO-020 / R01 — U03 physically confined source reader and declared-source integration
 
-**Order:** `UNO-WO-019 / R01` · FINAL — EXECUTE · **Activated order bytes:** 22,523 bytes, SHA-256
-`7c85d15838875500b3c579b4d5460d10d12aadef242239ba2e90a3a3573e61a0` (verified before any work).
-**Required start:** `6b1e9279bcf48a1af44305990ad4e8238e9d8d53` — matched `origin/main`, clean tree, one
-worktree. Every one of the 23 pinned start guards matched.
-**Stage:** the Owner's activation contains `I CLOSE U02 AND OPEN U03` and
-`I APPROVE U03 ROUTE SCHEMA IN §3 OF UNO-WO-019 / R01`, so **U02 is CLOSED by explicit Owner
-authority** and **U03 is OPEN**. That transition is the Owner's record; this report does not
-self-accept anything and closes no further stage.
+**Order:** `UNO-WO-020 / R01` · FINAL — EXECUTE · **Activated order bytes:** 26,143 bytes, SHA-256
+`3a2b7f5fb8748ed8dcd9bd39cade14745f3ac6651c7720e0900452aa64553c03` (verified before any work).
+**Required start:** `08eaefc13bde945ec8a2f1bbd685ff0c4681190a` — matched `origin/main`, clean tree, one
+worktree; all 24 pinned start guards matched.
+**Stage:** U00, U01, U02 **CLOSED**; **U03 OPEN**. No closure, publication, route activation, release or
+later stage is claimed.
 **Provider write actions by the Agent: ZERO.**
 
 ## 1. Status
 
 | Fact | Status | Evidence |
 | --- | --- | --- |
-| `CANDIDATE_ROUTE_INDEX` | **PASS** | `src/core/efs/uno-route-address.ts`, 14,391 B, blob `5c087843…`; the committed fixture yields exactly one candidate `/en-001` |
-| `EXACT_PATH_MATCHER` | **PASS** | `matchUnoCandidateRoute` compares one pathname byte-exactly; `/en`, `/EN-001`, `/en-001/home`, `/en-001/`, `//en-001`, query/fragment/percent/absolute-URL input and an over-long path all refuse with their exact codes |
-| `CLOSED_REFUSALS` | **PASS** | 9 literals in `UNO_ROUTE_REFUSAL_REASONS` (6 required + 3 narrowly justified); every negative asserts the exact code and membership |
-| `NON_PUBLICATION_BOUNDARY` | **PASS** | No `src/app` import; build route table is still `/`, `/_not-found`, `/icon.svg`; zero `en-001` occurrences in the build output |
-| `EXISTING_SITE_PRESERVED` | **PASS** | 19 immutable paths blob-identical, including page `837aad87…`, layout `c7dc9392…`, CSS `8d9268c4…`, both SVGs `204b4d12…`, manifest `13d38f20…`, selection `71147d24…` |
-| `EXISTING_404_BEHAVIOUR` | **PASS** | `pnpm test:http` 103/103 with its six 404 refusals unchanged |
-| `LOCAL_GATES` | **PASS** | §5 — unit 374, HTTP 103, fixtures 66, readiness 100, security 16, brand 29, architecture 16, bootstrap 19, governance 6, lint 0/0, build 3 routes |
-| `HOSTED_CI_AT_PRODUCT_HEAD` | **PASS** | §6 — four jobs, both hosts, zero non-success steps |
-| `PROVIDER_INSPECTION` | **UNVERIFIED** | No Vercel tool exists in this session's toolset (discovery returned only GitLab, GitHub and Sentry, none connected); nothing was read, and no connection was initiated |
-| `STAGE` | U02 **CLOSED** / U03 **OPEN** | Owner authority only; U03's remaining obligations are listed in §7 |
+| `REAL_CONFINED_READER` | **PASS** | `src/adapters/efs/uno-confined-source-reader.ts`, 30,816 B, blob `3321c485…`; Node `fs`/`path` only, no framework, provider, app or deployment import |
+| `REAL_FILESYSTEM_EVIDENCE` | **PASS** | The committed `deployment/efs/content/home.en-001.md` (2,085 bytes, SHA-256 `2ffd423d…7513`) is opened and returned byte-identically; the payload changes when the on-disk fixture is edited |
+| `PHYSICAL_CONFINEMENT` | **PASS** | Symlink/junction refusal on every component (intermediate, final and content root), realpath containment, regular-file check, `O_NOFOLLOW` where supported, post-open identity and size re-check |
+| `BOUNDED_READS` | **PASS** | 128 KiB manifest, 8 KiB selection, 64 KiB content; exactly-at-cap accepted by design, cap+1 refused; growth after stat still refused |
+| `STRICT_UTF8_AND_CONTENT` | **PASS** | Fatal `TextDecoder`; NUL/control refused; Markdown heading/body/raw-HTML rules; JSON object/parse/prototype/depth/width rules |
+| `JSON_BEFORE_MARKDOWN` | **PASS** | Decided by the existing `resolveDeclaredPageSource` use case; JSON wins even when Markdown is declared first, invalid JSON aborts before Markdown, absent JSON may fall through |
+| `NON_PUBLICATION` | **PASS** | Adapter imported only by its two test files; build route table still `/`, `/_not-found`, `/icon.svg`; zero `en-001` occurrences in build output; `/en-001` remains a 404 |
+| `EXISTING_SITE_PRESERVED` | **PASS** | 19 immutable paths blob-identical including page, layout, CSS, both SVGs, manifest, selection, Home Markdown, workflows, scripts, governance |
+| `LOCAL_GATES` | **PASS** | §6 — unit **455**, HTTP 103, readiness 100, fixtures 66, brand 29, security 16, architecture **20**, bootstrap 19, governance 6, lint 0/0, build 3 routes |
+| `HOSTED_CI_AT_PRODUCT_HEAD` | **PASS** | §7 — four jobs, both hosts, zero non-success steps |
+| `PROVIDER_INSPECTION` | **UNVERIFIED** | No Vercel tool exists in this session (discovery returned only GitLab, GitHub and Sentry, none connected); nothing was read and no connection was initiated |
+| `STAGE` | U03 **OPEN** | No stage transition, credit or release is asserted here |
 
 ## 2. The two authorized commits and the exact ledger
 
 | Role | Commit | Content |
 | --- | --- | --- |
-| Product | **`28149c870d9107cac4bfb754a3d0a06a3a106685`** | exactly six ledger paths; direct child of `6b1e927` |
+| Product | **`6f03e6d0b8a133b460bdcd1870b476fed9844c20`** | exactly seven ledger paths; direct child of `08eaefc` |
 | Report | the report-only child of the product commit; its SHA is in the Owner handback | `.documents/Reports/execution-report.md` only |
 
 | # | Path | Op | Before → after blob | Bytes |
 | ---: | --- | --- | --- | ---: |
-| 1 | `src/core/efs/uno-route-address.ts` | CREATE | *(absent)* → `5c087843…` | 14,391 |
-| 2 | `tests/unit/efs-uno-route-address.test.ts` | CREATE | *(absent)* → `c197a96b…` | 27,008 |
-| 3 | `tests/architecture/u01-boundaries.test.mjs` | EDIT | `27fb081d…` → `23060855…` | 23,159 |
-| 4 | `.documents/WIP/plan-roadmap.md` | EDIT | `e1600ecb…` → `87847654…` | 7,657 |
-| 5 | `.documents/WIP/plan-next.md` | OVERWRITE | `05bd6e77…` → `08fbf365…` | 1,242 |
-| 6 | `.documents/Architecture/source-inventory.md` | EDIT | `14fd2663…` → `5fbee6d1…` | 96,238 |
+| 1 | `src/adapters/efs/uno-confined-source-reader.ts` | CREATE | *(absent)* → `3321c485…` | 30,816 |
+| 2 | `tests/unit/efs-confined-source-reader.test.ts` | CREATE | *(absent)* → `6721ee4a…` | 20,965 |
+| 3 | `tests/unit/efs-source-resolution-pipeline.test.ts` | CREATE | *(absent)* → `3877007d…` | 19,086 |
+| 4 | `tests/architecture/u01-boundaries.test.mjs` | EDIT | `23060855…` → `09985b01…` | 27,464 |
+| 5 | `.documents/WIP/plan-roadmap.md` | EDIT | `87847654…` → `30c6d42f…` | 8,394 |
+| 6 | `.documents/WIP/plan-next.md` | OVERWRITE | `08fbf365…` → `a2315b2e…` | 1,232 |
+| 7 | `.documents/Architecture/source-inventory.md` | EDIT | `5fbee6d1…` → `4a387437…` | 100,379 |
 
-No other tracked path changed in the product commit; the private ACTIVE stayed ignored, untracked and
-unstaged; `.temp/` was scratch only and is not committed or required. Total tracked change from the
-required start is **seven** paths (six + the report).
+No other tracked path changed in the product commit. `src/app/**`, `src/core/**`, `src/application/**`,
+`public/**`, `deployment/**`, `scripts/**`, `package.json`, the lockfile, both workflows and every frozen
+governance file are byte-identical. Scratch stayed inside the ignored `.temp/` root and is neither staged
+nor required.
 
-## 3. What the candidate contract actually does
+## 3. Actual filesystem-read evidence
 
-`buildUnoCandidateRouteIndex(manifest, selection)` validates the manifest first
-(`route:manifest-invalid`), then the Site selection (`route:selection-invalid`), then walks **only** the
-selected Site's Pages and representations. It never searches for another Site, never reads a source,
-never chooses between sources and never decides visibility.
+The committed Home source is really read, not assumed:
 
-| Schema rule (Owner-approved §3) | Implemented behaviour |
+| Observation | Value |
 | --- | --- |
-| One Entity, one selected Site | Only `foundation`/`main` from `deployment/uno.config.json` is indexed; a second Entity or a different Site refuses |
-| Authored locale is identity, lowercase key is the address | Candidate carries `localeTag` (`de-DE`) **and** `localePathKey` (`de-de`); no short-language mapping, no inference |
-| Reserved Home → locale root | `id: "home"` + route `["home"]` → `/en-001`, `routePath: ""`; no `/en-001/home` alias |
-| Other Pages → `/<key>/<route>` | `["offers","web-design"]` in `de-DE` → `/de-de/offers/web-design`, `routePath: "offers/web-design"`; no Site or Facet segment |
-| Bounded | Relative route through `pageRoutePath` (≤4 segments, ≤160 chars), path key ≤64, whole pathname ≤240 ASCII |
-| Exact match only | One leading slash, lowercase slug segments, no query/fragment/percent/backslash/scheme/doubled/trailing slash; `/en`, `/en-US`, `/en-001/home` never match |
-| Sources preserved, not read | Candidate keeps `{kind, path}` declarations in authored order with no precedence and no authority |
+| Declared candidate | `deployment/efs/content/home.en-001.md`, kind `markdown` |
+| File on disk | 2,085 bytes, SHA-256 `2ffd423d8efa8b732ac236085bdd098c1d0a92be855d7f4aed675922c6f57513`, LF only |
+| Returned payload | byte-identical to the file; first line `# Foundation Uno`; length > 400 |
+| Selected kind | `markdown` (the only declared kind of the committed representation) |
+| Address | `/en-001`, matched through `matchUnoCandidateRoute` → Page `home`, locale `en-001` |
 
-**Committed-fixture evidence.** The real manifest plus the real selection produce exactly **one**
-candidate: Entity `e_7a3knkx60eacyhca7a0cr1k6e1`, Facet `foundation`, Site `main`, Page `home`,
-`localeTag` and `localePathKey` both `en-001`, `routePath` `""`, pathname `/en-001`, one `markdown`
-source `deployment/efs/content/home.en-001.md`. **That candidate is not an active HTTP route:** the
-production build still emits only `/`, `/_not-found` and `/icon.svg`, and no build output mentions
-`en-001`.
+Additional real-read proofs:
 
-**Immutability and determinism.** Every accepted result is freshly copied and recursively deep-frozen
-(index object, array, candidate, sources, source); ordering uses a code-point comparator, never
-`localeCompare`; repeated builds are byte-identical; two results share no mutable state; caller
-manifest and selection are never mutated.
+- **The read follows the file.** A scratch repository's Markdown is loaded, rewritten on disk from
+  `# First title` to `# Second title`, and loaded again: the two payloads differ and the second begins with
+  the new heading — so nothing is hardcoded.
+- **Reads never write.** Fixture bytes before and after a load are equal, and the committed file is
+  unchanged after every suite run.
+- **Absence is not invention.** A declared but missing candidate observes `absent`; the loader then returns
+  `no-valid-source`. A directory, a wrong suffix, a broken encoding or an oversize file observes `invalid`.
 
-## 4. Refusals, non-vacuity and the unreachable guard
+## 4. Confinement and read-safety actually proved
 
-Nine literals: `route:manifest-invalid`, `route:selection-invalid`, `route:invalid-pathname`,
-`route:unmatched`, `route:duplicate-address`, `route:unreadable`, plus the narrowly justified
-`route:invalid-route`, `route:invalid-locale`, `route:pathname-too-long`.
+| Rule | Proof |
+| --- | --- |
+| Trusted root | absolute, existing, real directory only; missing/relative/non-string/file/junction root refused |
+| Component walk | `lstat` on every segment; a linked intermediate folder, a linked final component named `x.md` and a linked content root each refuse `path:symlink` |
+| Physical containment | `realpath` of content root and target must be inside the trusted root by path-relative containment; a common-prefix sibling (`content-evil`) is not inside `content` |
+| Regular file only | a directory target refuses `path:not-a-regular-file` |
+| Single open | `O_NOFOLLOW` where the platform supports it; post-open `fstat` re-checks kind, size and device/inode identity |
+| Bounded read | the read loop stops at the cap, so a file that grows after the first stat is still refused; exactly-at-cap accepted, cap+1 refused |
+| Strict UTF-8 | fatal decode; malformed bytes refused, never replaced |
+| Content rules | Markdown heading + body, no raw HTML, no NUL/control; JSON ordinary object, strict parse, no prototype keys, bounded depth/width |
+| No leakage | refusals carry one closed literal; no path, body, system message or stack is exposed |
 
-Proved by category, each with its exact code:
+**Honest limitations.** Portable Node cannot prove absolute race freedom on every filesystem. Windows lacks
+POSIX file-symlink semantics without elevation, so symlink refusal is proved with **junctions** — real
+reparse aliases covering an intermediate folder, a final component and the content root — rather than a
+simulated check; no symlink case is skipped or passed by absence of setup.
 
-- **Manifest**: zero Entities, two Entities, non-object manifest, duplicate Page route, Home id at a
-  foreign route, source traversal, malformed locale, non-canonical authored tag, empty Pages.
-- **Selection**: missing, unknown Facet, unknown Site, Entity mismatch, Site id under two Facets,
-  wrong-Facet Site, unsupported version, and `host`/`publication`/`spokeId`/`basePath`/`release`.
-- **Pathname**: `/en` (unmatched), `/EN-001`, `/en-001/home` (unmatched), `/en-US`, `/en-001/unknown`
-  (unmatched), `/en-001/`, `//en-001`, `?x=1`, `#section`, `/%65n-001`, `/en-001/%2e%2e`,
-  `http://…`, an over-long value, and non-string input without reading it.
-- **Hostile**: accessor (getter invocation count proved **zero**), symbol key, throwing Proxy trap,
-  non-plain prototype — all `route:unreadable`.
+## 5. Declared precedence, observed
 
-**The one unreachable guard, stated honestly.** `route:duplicate-address` is a live check, but no
-validated input can reach it: a repeated pathname needs a repeated Page route
-(graph → `page:duplicate-route`) or a repeated locale key inside one Page
-(graph → `representation:duplicate-locale`). Rather than assert an unreachable fake, the test suite
-proves both earlier exact upstream refusals, and `route:duplicate-address` remains in the closed
-vocabulary as defence in depth. `route:invalid-route`, `route:invalid-locale` and
-`route:pathname-too-long` are likewise unreachable through valid input for the same reason (the graph
-or the documented bounds refuse first), which is recorded rather than papered over.
+Precedence is decided by the existing `resolveDeclaredPageSource` use case, and a bounded trace records which
+declared kinds were actually observed:
 
+| Declared | Files on disk | Result | Observed |
+| --- | --- | --- | --- |
+| JSON then Markdown | both valid | `json` | `["json"]` |
+| Markdown then JSON | both valid | `json` | `["json"]` — Markdown never opened |
+| JSON then Markdown | invalid JSON, valid Markdown | refused `invalid-json-source` | `["json"]` — no fall-through |
+| JSON then Markdown | JSON absent, Markdown valid | `markdown` | `["json","markdown"]` |
+| JSON then Markdown | JSON absent, Markdown invalid | refused `invalid-markdown-source` | `["json","markdown"]` |
+| Markdown only | valid | `markdown` | `["markdown"]` |
+| An undeclared stray file exists | declared Markdown valid | `markdown` | `["markdown"]` — undeclared files are never probed |
 
-## 5. Local gates (Node 26, pnpm 11.6.0) — every one executed before the product commit
+## 6. Local gates (Node 26, pnpm 11.6.0) — all before the product commit
 
 | Gate | Observed result |
 | --- | --- |
 | `pnpm install --frozen-lockfile --ignore-scripts` | PASS — no package or lockfile change |
-| `node scripts/verify-governance-docs.mjs` | PASS — frozen bytes |
-| `node --test tests/governance-docs.test.mjs` | **6 pass, 0 fail** |
-| `pnpm test:bootstrap` (tests + script) | **19 pass, 0 fail**; script OK (11 files, licence, four-slot discipline, no leaks) |
-| `pnpm test:architecture` | **16 pass, 0 fail** — kernel list now includes `uno-route-address.ts`; every prior refusal retained; a React/Node import in a core file is still rejected |
+| governance verifier + `tests/governance-docs.test.mjs` | PASS — **6 / 6** |
+| `pnpm test:bootstrap` | **19 / 19** + script OK |
+| `pnpm test:architecture` | **20 / 20** (16 previous + 4 new adapter-boundary checks) |
 | `pnpm lint` | exit 0 — **0 errors, 0 warnings** |
 | `pnpm typecheck` | exit 0 |
-| `pnpm test` | **374 passed / 374** across 11 files — 313 previous + **61** new route-address cases, 49 of them refusal cases |
-| `pnpm build` | PASS — route table `/`, `/_not-found`, `/icon.svg`; 4 static pages; **no `/en-001`** |
-| `pnpm test:http` | **103 passed, 0 failed** — the live `/` and the six established 404s unchanged |
+| `pnpm test` | **455 passed / 455** across 13 files — 374 previous + **81 new** (48 reader, 33 pipeline), **69 of them refusal/negative cases** |
+| `pnpm build` | PASS — `/`, `/_not-found`, `/icon.svg`; **no `/en-001` anywhere in the build output** |
+| `pnpm test:http` | **103 passed, 0 failed** — live `/` and six 404s unchanged |
 | readiness fixtures | **66 pass, 0 fail** |
-| readiness CLI | **PASS — 100 checks, 0 failed** |
+| readiness CLI | **PASS — 100 checks** |
 | security floors | **16 pass, 0 fail** |
 | brand/copy contract | **29 pass, 0 fail** |
 | `pnpm audit --audit-level high` | exit 0 — **0 high, 0 critical**; one moderate dev-only `minimatch` advisory (GHSA-g3hv-75wg-m249) unchanged and not waived |
 | `git diff --check` | clean |
 
-## 6. Hosted CI
 
-**Product head `28149c870d9107cac4bfb754a3d0a06a3a106685` — four jobs, all `success`:**
+## 7. Hosted CI
+
+**Product head `6f03e6d0b8a133b460bdcd1870b476fed9844c20` — four jobs, all `success`:**
 
 | Workflow | Run | ubuntu-24.04 | windows-2025 | Steps / non-success |
 | --- | --- | --- | --- | --- |
-| Uno Bootstrap Verify | `43872189558` | success | success | 10 / **0** |
-| Verify U01 baseline | `43872188550` | success | success | 24 / **0** |
+| Uno Bootstrap Verify | `43876571315` | success | success | 10 / **0** |
+| Verify U01 baseline | `43876571170` | success | success | 24 / **0** |
 
-Both hosts ran governance, bootstrap, architecture, lint, typecheck, unit, build, production HTTP, both
-readiness steps, brand/copy, dependency audit and the Node 26 security floors with no non-success step.
-The report-only head repeats the same four jobs; its two run IDs are in the Owner handback.
-**Full log text is UNVERIFIED** — the GitHub API available to this client returns job and step
-conclusions, not downloadable logs.
+The blocking `Unit tests` step ran both new Vitest files on both hosts, so the real filesystem,
+junction-refusal and precedence cases are proven on Ubuntu and Windows. **Full log text is UNVERIFIED** —
+this client's GitHub API returns job and step conclusions, not downloadable logs. The report-only head
+repeats the same four jobs; its run IDs are in the Owner handback.
 
-## 7. Warnings, provider state and non-claims
+## 8. Provider state, warnings and non-claims
 
 | Item | Disposition |
 | --- | --- |
-| Vercel inspection | **UNVERIFIED** — a tool-discovery call returned only GitLab, GitHub and Sentry, **no Vercel toolkit**; nothing was read, no connection was initiated, and no deployment, build log, alias, domain or Analytics state is claimed |
+| Vercel inspection | **UNVERIFIED** — tool discovery returned only GitLab, GitHub and Sentry with **no Vercel toolkit**, none connected; no deployment, build log, alias, domain or Analytics state was read, and no connection was initiated |
 | Provider writes | **ZERO** — no provider tool was called; the only provider effect is the automatic Git-linked build the Owner authorised |
-| Dev-only `minimatch` moderate advisory | Disclosed; high/critical gate still enforced at zero |
-| Candidate address vs served route | A candidate is a proposal. `/en-001` still 404s; nothing is indexed, canonically advertised or rendered |
-| Property `public` / manifest data | Still inert authorship metadata; never publication authority |
-| Deferred U03 work | Source confinement and reading, document parsing, visibility/publication controls, safe HTTP error behaviour, metadata/SEO and `hreflang`, optional base path — each needs a later bounded Owner order |
-| Stage | U02 **CLOSED** by the Owner's explicit activation; U03 **OPEN**; no later stage, release or promotion is authorised |
+| `/en-001` on the live site | **Not claimed** — the local production build contains no such route, and the existing 404 behaviour is unchanged; no live observation was made |
+| Dev-only `minimatch` moderate advisory | Disclosed and unchanged; the high/critical gate still exits 0 |
+| Race freedom | Portable Node cannot guarantee it; the adapter refuses symlinks, re-verifies identity and documents the residual risk instead of claiming absolute safety |
+| Source payload authority | An accepted payload carries no URL, host, visibility, release, cache or index authority; a JSON `public: true` grants nothing |
+| Stage | U03 **OPEN**; U00/U01/U02 remain CLOSED; no later stage, release, route or publication is authorised |
 
-## 8. Request
+## 9. Request
 
-Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`** for the U03
-candidate-address checkpoint: one pure, Uno-owned index and byte-exact matcher for the already selected
-`foundation/main` Site, deriving `/<lowercase-full-locale>` for the reserved Home declaration and
-`/<lowercase-full-locale>/<relative-route>` otherwise, with a closed nine-literal refusal vocabulary,
-deep-frozen deterministic output, preserved source declarations and no route, redirect, metadata
-alternate, publication or locale activation anywhere in `src/app`. The live landing page, benefits
-copy, black emblem, favicon, design, Analytics and `noindex, nofollow, nocache` are byte-identical to
-the required start, and every previously established 404 behaviour is unchanged.
+Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`** for the U03 confined-source
+checkpoint: one real Node adapter that reads a declared authored source from a trusted root inside a
+physical confinement boundary, bounds the read at 64 KiB, decodes strictly as UTF-8, validates Markdown or
+JSON minimally and safely, and hands the observation to the existing `resolveDeclaredPageSource` use case so
+declared JSON-before-Markdown precedence genuinely governs reads. The committed `en-001` Home Markdown is
+opened and returned unrendered; nothing is routed, published, indexed or rendered, and the live landing
+page, benefits copy, black emblem, favicon, CSS, Analytics and `noindex, nofollow, nocache` remain
+byte-identical to the required start.
