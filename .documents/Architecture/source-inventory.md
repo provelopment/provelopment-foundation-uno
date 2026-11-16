@@ -1191,3 +1191,33 @@ tests.
 **Evidence.** 81 new Vitest cases across `tests/unit/efs-confined-source-reader.test.ts` (48) and
 `tests/unit/efs-source-resolution-pipeline.test.ts` (33), the architecture suite at 20 checks including
 four new adapter-boundary assertions, and the unchanged U01 gates including `pnpm test:http` at 103 checks.
+
+## U03 selected Page-header projection (UNO-WO-021 / R01)
+
+**Mapping.** `src/core/efs/uno-page-header.ts` (pure core) projects one already-loaded authored source into a
+bounded, non-serving header: `kind`, `title`, optional `description`, `visibility`, and — for Markdown only —
+the raw unrendered `markdownBody`. `src/application/resolve-uno-page-header.ts` consumes the accepted
+non-serving `loadUnoCandidateSource` result, maps the reserved Home candidate `{pageId: "home", routePath: ""}`
+to the authoring route `home`, and forwards an existing loader refusal unchanged. Visibility is decided by the
+existing `decideSelectedPageVisibility`; route validity by the existing `isPageRoutePath`. Neither file reads a
+file, resolves precedence, creates a candidate, imports an adapter or a `node:` built-in, or adds a URL,
+canonical, `hreflang`, rendered HTML, sitemap, redirect, provider or publication field.
+
+**Rights and provenance.** Class **REWRITE concept / DEFER**, original **Uno-owned** code. The read-only
+comparator was Foundation GEO-03 commit `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, `src/core/page-document.ts`
+(Git blob `a12d964c43626c6313a621bf628f5cc24b65d444`, 45,106 bytes), inspected for concept only: **no code,
+fixture, prose or schema is copied**, no dirty or unpublished upstream was read, no branch was switched, and no
+Foundation or Solo Rust, Connect module, media, brand asset or package was imported. Only the approved
+`public | unlisted` vocabulary and the reserved Home rule appear, and both are called from the existing policy
+rather than restated. Apache-2.0 notices and source history are unchanged; the omitted runtime powers — routing,
+rendering, publication, indexing and the module AST — remain deliberately absent.
+
+**Deferred to U04 and beyond.** The full Page-document schema, the 17 module families, module validation and
+composition, rendering, per-Page publication authorization, HTTP/status behaviour, canonical and `hreflang`
+policy, sitemap and any base path. A successful header projection states none of these: the JSON `modules`
+array and every other key stay opaque, unvalidated and non-authoritative.
+
+**Limitations.** Titles and descriptions are single-line plain text with fixed code-point caps (160 / 320) and
+no markup; Markdown must begin with one `# ` heading and is always `public`; repeated top-level `title`,
+`description` or `visibility` keys refuse the whole source rather than allowing a last-wins value; and no
+projection proves a Page is routed, public or indexable.

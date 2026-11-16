@@ -101,7 +101,15 @@ Markdown** precedence governs reads. The committed `en-001` Home Markdown is gen
 returned as a non-serving payload. Nothing is routed, published, indexed or rendered, and the adapter is
 imported only by its tests: no `src/app` file, no route, no metadata.
 
-**Still outstanding:** validated Page-document and visibility semantics, explicit Owner publication and
+**Header projection (`UNO-WO-021 / R01`):** the pure projector
+`src/core/efs/uno-page-header.ts` and its application use case
+`src/application/resolve-uno-page-header.ts` turn an already loaded, non-serving source payload into a
+bounded Page header — `title`, optional `description`, the policy-decided `visibility`, and for Markdown
+the raw unrendered body. The reserved Home candidate maps to the authoring route `home`, JSON keeps every
+other key opaque, and a refused load stays refused. **Projection is not publication:** no route is served,
+no Page is published or indexed, nothing is rendered, and `src/app/**` is untouched.
+
+**Still outstanding:** the validated Page-document and module schema, explicit Owner publication and
 route activation, safe HTTP error behaviour, metadata/SEO including canonical advertising and
 `hreflang`, and any optional base path. Each requires a later bounded Owner order.
 

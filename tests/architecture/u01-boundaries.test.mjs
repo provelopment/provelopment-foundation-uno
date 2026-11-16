@@ -226,6 +226,7 @@ export const CORE_AUTHORED_FILES = Object.freeze([
   'src/core/efs/properties.ts',
   'src/core/efs/uno-config.ts',
   'src/core/efs/uno-route-address.ts',
+  'src/core/efs/uno-page-header.ts',
   'src/core/efs/uno-locales.ts',
   'src/core/modules/capability-registry.ts',
   'src/core/page-authoring-policy.ts',
@@ -761,4 +762,72 @@ test('the pure kernel and the use cases stay Node-free and never reach an adapte
     assert.doesNotMatch(code, /from\s+['"]node:/, `${path} must stay Node-free`);
     assert.doesNotMatch(code, /\/adapters\//, `${path} must not reach an adapter`);
   }
+});
+
+// --- U03 selected Page-header boundary (UNO-WO-021 / R01) ----------------------
+
+const PAGE_HEADER_SOURCES = Object.freeze([
+  'src/core/efs/uno-page-header.ts',
+  'src/application/resolve-uno-page-header.ts',
+]);
+
+test('the Page-header projector and use case are registered, scanned and pure', () => {
+  // The pure kernel declares the projector; the use case is an application module.
+  for (const path of PAGE_HEADER_SOURCES) {
+    assert.equal(Object.keys(authoredSources()).includes(path), true, `${path} must be a scanned source`);
+  }
+  assert.equal(CORE_AUTHORED_FILES.includes('src/core/efs/uno-page-header.ts'), true);
+
+  const scannerInput = {
+    'src/core/efs/uno-page-header.ts': readFileSync(
+      resolve(ROOT, 'src/core/efs/uno-page-header.ts'),
+      'utf8',
+    ),
+    'src/application/resolve-uno-page-header.ts': readFileSync(
+      resolve(ROOT, 'src/application/resolve-uno-page-header.ts'),
+      'utf8',
+    ),
+  };
+  assert.deepEqual(scanSources(scannerInput), []);
+
+  // The projector composes the accepted pure contracts instead of restating them.
+  const projector = stripComments(scannerInput['src/core/efs/uno-page-header.ts']);
+  assert.match(projector, /decideSelectedPageVisibility/);
+  assert.match(projector, /isPageRoutePath/);
+  const useCase = stripComments(scannerInput['src/application/resolve-uno-page-header.ts']);
+  assert.match(useCase, /projectUnoSelectedPageHeader/);
+  assert.doesNotMatch(useCase, /loadUnoCandidateSource/);
+});
+
+test('the boundary scanner refuses Node I/O, framework, adapter and deployment imports in the new files', () => {
+  const negativeCases = [
+    ["import { readFileSync } from 'node:fs';", 'src/core Node I/O'],
+    ["import Link from 'next/link';", 'src/core framework'],
+    ["import { loadUnoCandidateSource } from '../adapters/efs/uno-confined-source-reader';", 'src/core adapter'],
+  ];
+  for (const [line, label] of negativeCases) {
+    const violations = scanSources({ 'src/core/efs/uno-page-header.ts': `${line}\nexport const x = 1;\n` });
+    assert.equal(violations.length, 1, `${label} must be refused in src/core`);
+  }
+
+  const applicationCases = [
+    ["import { readFileSync } from 'node:fs';", 'src/application Node I/O'],
+    ["import Link from 'next/link';", 'src/application framework'],
+    ["import { loadUnoCandidateSource } from '../adapters/efs/uno-confined-source-reader';", 'src/application adapter'],
+    ["import { m } from '../../deployment/efs/manifest.json';", 'src/application deployment'],
+  ];
+  for (const [line, label] of applicationCases) {
+    const violations = scanSources({ 'src/application/resolve-uno-page-header.ts': `${line}\nexport const x = 1;\n` });
+    assert.equal(violations.length, 1, `${label} must be refused in src/application`);
+  }
+
+  // A clean synthetic pair stays clean, so the scanner is not simply refusing everything.
+  assert.deepEqual(
+    scanSources({
+      'src/core/efs/uno-page-header.ts': "import { isPageRoutePath } from '../page-route-path';\nexport const ok = isPageRoutePath;\n",
+      'src/application/resolve-uno-page-header.ts':
+        "import { projectUnoSelectedPageHeader } from '../core/efs/uno-page-header';\nexport const ok = projectUnoSelectedPageHeader;\n",
+    }),
+    [],
+  );
 });
