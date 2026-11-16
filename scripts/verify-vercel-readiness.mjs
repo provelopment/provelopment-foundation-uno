@@ -78,6 +78,12 @@ const LOGO_SHA256 = 'de749e41347a043691b3dd82ced90a2d53f80c240993057388cdfaee20a
 const LOGO_BYTES = 8250;
 const LOGO_VIEWBOX = '0 0 2048 2048';
 
+/**
+ * Canonical LF form. The repository stores the vector with LF and the pinned digest is over those
+ * bytes; a Windows checkout may hand the file back with CRLF, which is the same content.
+ */
+const canonicalSvg = (text) => text.replace(/\r\n/g, '\n');
+
 /** Visible phrases that would resurrect a retired or false status claim. */
 const RETIRED_COPY = Object.freeze([
   'A1',
@@ -450,11 +456,11 @@ export function analyzeReadiness(snapshot) {
   expect(logoText.includes('#1f6f6b') && logoText.includes('#36454f'), 'brand:logo-palette');
   expect(!LOGO_ACTIVE_CONTENT.test(logoText), 'brand:logo-unsafe');
   expect((logoText.match(/<path/g) ?? []).length >= 10, 'brand:logo-geometry');
-  expect(logo.length === LOGO_BYTES, 'brand:logo-bytes');
+  expect(Buffer.byteLength(canonicalSvg(logo), 'utf8') === LOGO_BYTES, 'brand:logo-bytes');
   expect(iconText === logoText, 'brand:favicon-parity');
   expect(!logoText.includes('#101620'), 'brand:logo-superseded');
   expect(
-    createHash('sha256').update(logo).digest('hex') === LOGO_SHA256,
+    createHash('sha256').update(canonicalSvg(logo)).digest('hex') === LOGO_SHA256,
     'brand:logo-digest',
   );
 

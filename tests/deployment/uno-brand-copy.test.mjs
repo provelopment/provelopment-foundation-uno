@@ -89,6 +89,9 @@ const LOGO = Object.freeze({
   superseded: '#101620',
 });
 
+/** Canonical LF form so a Windows checkout and a Linux checkout hash identically. */
+const canonical = (svg) => svg.replace(/\r\n/g, '\n');
+
 /** Remove comments and decode entities so a wrapped sentence still matches the approved copy. */
 const flat = (text) =>
   text
@@ -136,8 +139,10 @@ export function auditBrandCopy(fixture) {
   if (logo.includes(LOGO.superseded)) problems.push('brand:svg-superseded');
   if (ACTIVE_SVG.test(logo)) problems.push('brand:svg-unsafe');
   if ((logo.match(/<path/g) ?? []).length < 10) problems.push('brand:svg-geometry');
-  if (Buffer.byteLength(logo, 'utf8') !== LOGO.bytes) problems.push('brand:svg-bytes');
-  if (createHash('sha256').update(logo).digest('hex') !== LOGO.sha256) problems.push('brand:svg-digest');
+  if (Buffer.byteLength(canonical(logo), 'utf8') !== LOGO.bytes) problems.push('brand:svg-bytes');
+  if (createHash('sha256').update(canonical(logo)).digest('hex') !== LOGO.sha256) {
+    problems.push('brand:svg-digest');
+  }
   if (fixture.icon !== fixture.logo) problems.push('brand:favicon-parity');
 
   for (const token of fixture.tokens) {
@@ -244,7 +249,7 @@ test('the vector is the official network with the enlarged charcoal numeral', ()
 });
 
 test('the vector matches the pinned digest and byte length', () => {
-  const logo = read('public/uno-logo.svg');
+  const logo = canonical(read('public/uno-logo.svg'));
   assert.equal(Buffer.byteLength(logo, 'utf8'), LOGO.bytes);
   assert.equal(createHash('sha256').update(logo).digest('hex'), LOGO.sha256);
 });

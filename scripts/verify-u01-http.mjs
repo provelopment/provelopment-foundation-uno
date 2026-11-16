@@ -86,6 +86,12 @@ const LOGO_SRC = "/uno-logo.svg";
 const ICON_SRC = "/icon.svg";
 const LOGO_BYTES = 8250;
 const LOGO_SHA256 = "de749e41347a043691b3dd82ced90a2d53f80c240993057388cdfaee20a0a568";
+
+/**
+ * Canonical LF form. The committed vector is stored with LF and the pinned digest covers those
+ * bytes; a Windows checkout may deliver CRLF for the same content.
+ */
+const canonicalSvg = (text) => text.replace(/\r\n/g, "\n");
 const REFUSED_PATHS = Object.freeze([
   "/en",
   "/en-001",
@@ -447,12 +453,12 @@ async function main() {
     );
     check(
       "the served mark is the approved official-source vector by digest",
-      createHash("sha256").update(logo.body).digest("hex") === LOGO_SHA256,
+      createHash("sha256").update(canonicalSvg(logo.body)).digest("hex") === LOGO_SHA256,
     );
     check(
       "the served mark is exactly the approved byte length",
-      Buffer.byteLength(logo.body, "utf8") === LOGO_BYTES,
-      String(Buffer.byteLength(logo.body, "utf8")),
+      Buffer.byteLength(canonicalSvg(logo.body), "utf8") === LOGO_BYTES,
+      String(Buffer.byteLength(canonicalSvg(logo.body), "utf8")),
     );
     check(
       "the served mark uses the large official canvas",
