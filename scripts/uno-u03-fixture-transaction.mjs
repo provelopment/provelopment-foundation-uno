@@ -21,8 +21,19 @@
  * filesystem operations below.
  */
 import { createHash } from "node:crypto";
-import { lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import {
+  closeSync,
+  fstatSync,
+  lstatSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+  writeSync,
+} from "node:fs";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 /** SHA-256 of one byte buffer, as lowercase hex. */
 function digestOf(bytes) {
@@ -38,8 +49,16 @@ const DEFAULT_WRITER = Object.freeze({
   readFile: (absolutePath) => readFileSync(absolutePath),
   /** Replace a declaration with the exact original bytes. */
   writeFileReplace: (absolutePath, bytes) => writeFileSync(absolutePath, bytes),
-  /** Create a fixture source, refusing to overwrite anything that already exists. */
-  writeFileExclusive: (absolutePath, bytes) => writeFileSync(absolutePath, bytes, { flag: "wx" }),
+  /**
+   * Claim a fixture path exclusively and return the open handle. This call IS the ownership boundary: `wx` either
+   * grants the caller a brand-new file or throws `EEXIST` and grants nothing.
+   */
+  openExclusive: (absolutePath) => openSync(absolutePath, "wx"),
+  /** The identity of the claimed file, read from the handle rather than the path. */
+  statOfHandle: (handle) => fstatSync(handle),
+  /** Write bytes through the claimed handle, so a partial write cannot land on a different file. */
+  writeToHandle: (handle, bytes) => writeSync(handle, bytes),
+  closeHandle: (handle) => closeSync(handle),
   removeFile: (absolutePath) => rmSync(absolutePath, { force: false }),
   makeScratch: (parent) => mkdtempSync(join(parent, "tx-")),
   removeScratch: (absolutePath) => rmSync(absolutePath, { recursive: true, force: true }),
@@ -56,13 +75,74 @@ function reason(code, detail) {
 }
 
 /**
+ * A file's platform identity: the device and inode pair the OS reports for it. It is captured from the open handle at
+ * the instant exclusive creation was granted, so it describes *this* transaction's file and not whatever may later
+ * occupy the same path.
+ */
+function identityOf(stats) {
+  return { dev: stats.dev, ino: stats.ino };
+}
+
+/** True when the platform reported a usable identity — never assume one, and never unlink without it. */
+function identityUsable(identity) {
+  return (
+    identity !== null &&
+    typeof identity === "object" &&
+    Number.isFinite(identity.dev) &&
+    Number.isFinite(identity.ino) &&
+    identity.ino !== 0
+  );
+}
+
+/** True when two identities describe the same physical file. */
+function identityMatches(claimed, observed) {
+  return claimed.dev === observed.dev && claimed.ino === observed.ino;
+}
+
+/**
+ * Component-aware containment. A string prefix test would accept a sibling such as `<root>-other`, so the target is
+ * expressed relative to the verified root and rejected when it is empty, absolute, or begins with `..`.
+ * Returns the relative component list, or `null` when the target is outside the root.
+ */
+function componentsWithin(root, absolutePath) {
+  const resolvedRoot = resolve(root);
+  const relativePath = relative(resolvedRoot, resolve(absolutePath));
+  if (relativePath === "" || isAbsolute(relativePath)) return null;
+  const parts = relativePath.split(sep).filter((part) => part !== "");
+  if (parts.length === 0) return null;
+  if (parts.some((part) => part === ".." || part === ".")) return null;
+  return parts;
+}
+
+/**
+ * Prove the root itself: it must exist, be a real directory, and be its own canonical path, so no junction or reparse
+ * point can be the base of every containment decision that follows.
+ */
+function rootProblem(writer, root) {
+  let stats;
+  try {
+    stats = writer.lstat(root);
+  } catch (error) {
+    return reason(isAbsent(error) ? "root:absent" : "root:unreadable");
+  }
+  if (stats.isSymbolicLink()) return reason("root:symlink");
+  if (!stats.isDirectory()) return reason("root:not-directory");
+  try {
+    if (writer.realpath(root).toLowerCase() !== root.toLowerCase()) return reason("root:reparse-escape");
+  } catch {
+    return reason("root:unresolvable");
+  }
+  return null;
+}
+
+/**
  * Prove that a path and every component below `root` is physical: no symlink, no junction, no reparse escape.
  * Returns a bounded reason token, or `null` when the path is safe.
  */
 function physicalEscape(writer, root, absolutePath) {
   const resolvedRoot = resolve(root);
-  const resolvedPath = resolve(absolutePath);
-  if (!resolvedPath.toLowerCase().startsWith(resolvedRoot.toLowerCase())) return reason("path:outside-root");
+  const parts = componentsWithin(resolvedRoot, absolutePath);
+  if (parts === null) return reason("path:outside-root");
 
   let canonicalRoot;
   try {
@@ -72,9 +152,8 @@ function physicalEscape(writer, root, absolutePath) {
   }
 
   // Walk from the root down, so a symlinked or junctioned parent is caught even when the leaf does not exist yet.
-  const relative = resolvedPath.slice(resolvedRoot.length).split(/[\\/]+/u).filter((part) => part !== "");
   let current = canonicalRoot;
-  for (const part of relative) {
+  for (const part of parts) {
     current = join(current, part);
     let stats;
     try {
@@ -134,7 +213,7 @@ export async function prepareUnoU03FixtureTransaction(options) {
   }
 
   // --- 1. The root and every target must be physically inside it: no symlink or junction in between ------------
-  const rootEscape = physicalEscape(writer, root, root);
+  const rootEscape = rootProblem(writer, root);
   if (rootEscape !== null) return { status: "refused", reasons: [rootEscape] };
 
   const declarationPaths = declarations.map((declaration) => ({
@@ -147,6 +226,16 @@ export async function prepareUnoU03FixtureTransaction(options) {
     relativePath: source.path,
     bytes: Buffer.isBuffer(source.bytes) ? source.bytes : Buffer.from(String(source.bytes), "utf8"),
   }));
+
+  // A fixture may not be declared twice, and may never be one of the declarations it is supposed to leave alone.
+  const declarationKeys = new Set(declarationPaths.map((target) => target.absolutePath.toLowerCase()));
+  const seenFixtures = new Set();
+  for (const target of fixturePaths) {
+    const key = target.absolutePath.toLowerCase();
+    if (seenFixtures.has(key)) reasons.push(`fixture:duplicate:${target.relativePath}`);
+    seenFixtures.add(key);
+    if (declarationKeys.has(key)) reasons.push(`fixture:collides-with-declaration:${target.relativePath}`);
+  }
 
   for (const target of [...declarationPaths, ...fixturePaths]) {
     const escape = physicalEscape(writer, root, target.absolutePath);
@@ -205,11 +294,37 @@ export async function prepareUnoU03FixtureTransaction(options) {
     return { status: "refused", reasons: [reason("scratch:not-creatable")] };
   }
 
+  // --- 2b. Prove the platform reports a usable file identity ------------------------------------------------
+  // Cleanup is by identity, never by pathname alone, so a host that cannot distinguish two files at one path may not
+  // begin a transaction at all. The probe file lives only in this transaction's private scratch.
+  try {
+    const probePath = join(scratch, "identity-probe");
+    const probeHandle = writer.openExclusive(probePath);
+    let probeIdentity;
+    try {
+      probeIdentity = identityOf(writer.statOfHandle(probeHandle));
+    } finally {
+      writer.closeHandle(probeHandle);
+    }
+    const observed = identityOf(writer.lstat(probePath));
+    const usable = identityUsable(probeIdentity) && identityMatches(probeIdentity, observed);
+    writer.removeFile(probePath);
+    if (!usable) return { status: "refused", reasons: [reason("identity:unprovable")] };
+  } catch {
+    return { status: "refused", reasons: [reason("identity:unprovable")] };
+  }
+
+
   const backups = [];
   for (const original of originals) {
     const backupPath = join(scratch, `${original.relativePath.replace(/[\\/]+/gu, "__")}.original`);
     try {
-      writer.writeFileExclusive(backupPath, original.bytes);
+      const handle = writer.openExclusive(backupPath);
+      try {
+        writer.writeToHandle(handle, original.bytes);
+      } finally {
+        writer.closeHandle(handle);
+      }
       if (digestOf(writer.readFile(backupPath)) !== original.digest) throw new Error("digest");
     } catch {
       return { status: "refused", reasons: [reason("backup:not-verified")] };
@@ -224,7 +339,13 @@ export async function prepareUnoU03FixtureTransaction(options) {
   let preserveScratch = false;
   let lastRestore = null;
 
-  /** Restore the exact original bytes and remove only what this transaction created. Idempotent. */
+  /**
+   * Restore the exact original bytes and remove only files this transaction *provably* owns.
+   *
+   * Ownership is proven twice: the path is only considered at all because exclusive creation succeeded, and the file
+   * found there now must still carry the device/inode identity captured from the handle at that instant. A file placed
+   * at the same path afterwards is a stranger — it is left untouched and the restore fails closed.
+   */
   const restore = async () => {
     if (verified) return { ok: true, idempotent: true, backups: backups.length };
 
@@ -240,6 +361,23 @@ export async function prepareUnoU03FixtureTransaction(options) {
       }
     }
     for (const created of [...intent.fixtures].reverse()) {
+      let observed;
+      try {
+        observed = writer.lstat(created.absolutePath);
+      } catch (error) {
+        if (isAbsent(error)) continue; // Already gone: nothing of this transaction remains at that path.
+        problems.push(reason("restore:unreadable", created.relativePath));
+        continue;
+      }
+      // Never treat a replacement, a link or an unprovable identity as this transaction's own file.
+      if (observed.isSymbolicLink()) {
+        problems.push(reason("restore:identity:link", created.relativePath));
+        continue;
+      }
+      if (!identityUsable(created.identity) || !identityMatches(created.identity, identityOf(observed))) {
+        problems.push(reason("restore:identity:foreign", created.relativePath));
+        continue;
+      }
       try {
         writer.removeFile(created.absolutePath);
       } catch (error) {
@@ -265,7 +403,13 @@ export async function prepareUnoU03FixtureTransaction(options) {
     return lastRestore;
   };
 
-  /** Install the fixture. Any failure — including a partially completed write — triggers rollback here. */
+  /**
+   * Install the fixture. Any failure — including a partially completed write — triggers rollback here.
+   *
+   * The exclusive create is the ownership boundary: an `EEXIST` refusal grants nothing, so the intervening stranger's
+   * file is never recorded, never removed and never reported as owned. Ownership is recorded from the handle
+   * immediately after the OS grants it and *before* the content write, so a partial write is still cleaned up.
+   */
   const install = async () => {
     if (verified) return { ok: false, reasons: [reason("install:already-restored")] };
 
@@ -276,8 +420,25 @@ export async function prepareUnoU03FixtureTransaction(options) {
         writer.writeFileReplace(original.absolutePath, original.replacement);
       }
       for (const fixture of fixturePaths) {
-        intent.fixtures.push(fixture);
-        writer.writeFileExclusive(fixture.absolutePath, fixture.bytes);
+        const handle = writer.openExclusive(fixture.absolutePath);
+        let identity;
+        try {
+          identity = identityOf(writer.statOfHandle(handle));
+        } catch (error) {
+          writer.closeHandle(handle);
+          throw error;
+        }
+        if (!identityUsable(identity)) {
+          // Claimed but unprovable: refuse rather than leave a file that can never be safely removed.
+          writer.closeHandle(handle);
+          throw new Error("identity-unprovable");
+        }
+        intent.fixtures.push({ absolutePath: fixture.absolutePath, relativePath: fixture.relativePath, identity });
+        try {
+          writer.writeToHandle(handle, fixture.bytes);
+        } finally {
+          writer.closeHandle(handle);
+        }
       }
       return { ok: true };
     } catch (error) {

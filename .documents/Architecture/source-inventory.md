@@ -1223,6 +1223,45 @@ no markup; Markdown must begin with one `# ` heading and is always `public`; rep
 projection proves a Page is routed, public or indexable.
 
 
+## U03 fixture ownership safety (UNO-WO-031 / R01)
+
+**Why.** The transaction armed its recovery correctly but recorded a fixture as its own *before* the exclusive create
+succeeded. If an unrelated file appeared between the successful preflight and that create, `wx` failed `EEXIST` and the
+rollback still unlinked the stranger. A second weakness was containment by string prefix, which would accept a sibling
+directory named `<root>-other`.
+
+**Ownership is now the exclusive create.** `install()` calls `openExclusive()`, and only a granted handle produces an
+ownership record. The record is captured from `fstat()` on that handle — device and inode as the OS reports them — and
+written before any content byte, so an owned file whose write fails mid-way is still cleaned up while a file the OS
+refused to grant is never recorded, never removed and never reported as owned. Content is written through the granted
+handle, not through the path.
+
+**Restore removes only proven ownership.** For each record, `restore()` re-`lstat`s the path and unlinks the file only
+when it is not a link and still carries the claimed device/inode pair. A replacement file, a symlink or an identity the
+platform cannot prove is left untouched and turns the restore into a fail-closed result: `preserveScratch`, both
+recovery copies kept, `dispose()` refused, and a bounded reason list that names no absolute path. `prepare()` proves the
+platform can even distinguish two files at one path — an identity probe in private scratch — and refuses with
+`identity:unprovable` rather than ever unlinking by pathname alone.
+
+**Containment is component-aware.** `componentsWithin()` expresses each target as `path.relative()` from the verified
+root and rejects empty, absolute or `..`-bearing results before the physical `lstat`/`realpath` walk, so a sibling whose
+name extends the root, a literal `../` traversal and any unknown reparse outcome are refused before mutation. The root
+itself must be a real directory that is its own canonical path. Duplicate fixture paths and any fixture colliding with a
+declaration are refused.
+
+**The proof.** Twenty-six named cases drive the same exported operations in isolated `.temp/wo031-*` roots: the original
+nineteen (happy path, idempotence, five preflight refusals including both symlink fixtures, all seven write positions,
+caller exception, mid-fixture refusal, fail-closed retention and recovery, scratch hygiene, exported surface) plus seven
+ownership cases — an intervening `EEXIST` at the first path, an `EEXIST` at the fifth after four owned files were
+created, a partial content write after a granted claim, an owned file replaced before restore, a root-prefix sibling
+escape, a literal `..` traversal, and duplicate/colliding declarations. Each asserts the real bytes *and* the real
+identity on disk, not an intention counter.
+
+**Unchanged.** No route, component, core rule, application use case, declaration, content file, dependency or provider
+setting changed. The positive gate still proves the same four published Pages, alias redirect, canonical/hreflang/OG,
+`robots.txt`, `sitemap.xml`, the preserved `/` demonstration and ten strict refusals at 195/0, then rebuilds the
+unpublished configuration and re-runs the original U01 103 and U03 91 gates.
+
 ## U03 fixture transaction safety (UNO-WO-030 / R01)
 
 **Why.** The positive HTTP gate's first version armed its recovery flag only after the whole fixture had been installed,

@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
+  closeSync,
   existsSync,
+  fstatSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -12,6 +15,7 @@ import {
   symlinkSync,
   unlinkSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -21,7 +25,7 @@ import { prepareUnoU03FixtureTransaction } from '../../scripts/uno-u03-fixture-t
 /**
  * Foundation Uno — publication-fixture transaction fault injection (`UNO-WO-030 / R01`).
  *
- * Every case runs against an isolated, test-owned root under the checkout's ignored `.temp/wo030-*`, so no real
+ * Every case runs against an isolated, test-owned root under the checkout's ignored `.temp/wo031-*`, so no real
  * committed deployment input is touched. Each case drives the *same* exported transaction operations the positive HTTP
  * runner uses and asserts original digest parity, absence of every fixture source, refusal or failure status, and
  * either clean scratch removal or deliberate backup retention. Failures are induced with deterministic injected writer
@@ -35,11 +39,11 @@ const SELECTION = 'deployment/uno.config.json';
 const HOME = 'deployment/efs/content/home.en-001.md';
 const HOME_BYTES = Buffer.from('# Home\n\nA synthetic Home source.\n', 'utf8');
 const FIXTURE_SOURCES = [
-  'deployment/efs/content/wo030-home.de-de.md',
-  'deployment/efs/content/wo030-about.en-001.md',
-  'deployment/efs/content/wo030-about.de-de.md',
-  'deployment/efs/content/wo030-draft.en-001.md',
-  'deployment/efs/content/wo030-hidden.en-001.json',
+  'deployment/efs/content/wo031-home.de-de.md',
+  'deployment/efs/content/wo031-about.en-001.md',
+  'deployment/efs/content/wo031-about.de-de.md',
+  'deployment/efs/content/wo031-draft.en-001.md',
+  'deployment/efs/content/wo031-hidden.en-001.json',
 ];
 
 const ORIGINAL_MANIFEST = Buffer.from('{ "entities": [], "note": "synthetic committed declaration" }\n', 'utf8');
@@ -52,7 +56,7 @@ const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 /** One isolated sandbox: a private root, private scratch, both declarations and the Home source. */
 function makeSandbox() {
   mkdirSync(SCRATCH_PARENT, { recursive: true });
-  const sandbox = mkdtempSync(join(SCRATCH_PARENT, 'wo030-tx-'));
+  const sandbox = mkdtempSync(join(SCRATCH_PARENT, 'wo031-tx-'));
   const root = join(sandbox, 'root');
   const scratchRoot = join(sandbox, 'scratch');
   mkdirSync(join(root, 'deployment', 'efs', 'content'), { recursive: true });
@@ -79,45 +83,72 @@ function makeSandbox() {
 }
 
 /**
- * The real filesystem operations, with hooks that fail one chosen mutating call deterministically.
+ * The real filesystem operations, with hooks that fail one chosen operation deterministically.
  *
- * `failWrite` is the 1-based index of the mutating call that throws, counting declaration replacements and fixture
- * creations in the order the transaction makes them: 1 = the manifest, 2 = the selection, 3..7 = the five sources.
+ * `failWrite` is the 1-based index of the mutating operation that throws, counting declaration replacements and
+ * *exclusive claims* in the order the transaction makes them: 1 = the manifest, 2 = the selection, 3..7 = the five
+ * fixture claims. `failContentAt` fails the nth content write through an already-claimed handle, optionally after
+ * writing `partialBytes` first, which is the "owned file, partial content" state.
+ *
+ * Scratch writes (recovery copies and the identity probe) are never fault positions: they belong to the transaction's
+ * own private directory, not to the repository the fixture touches.
  */
-function makeWriter({ failWrite = 0, failRemove = false, failRestore = false } = {}) {
+function makeWriter({
+  failWrite = 0,
+  failRemove = false,
+  failRestore = false,
+  failContentAt = 0,
+  partialBytes = 0,
+} = {}) {
   let writes = 0;
   let restoring = false;
   let stopped = false;
+  let contentWrites = 0;
   const recorded = [];
+  const handlePaths = new Map();
+  const isScratch = (path) => path.endsWith('.original') || path.endsWith('identity-probe');
+
+  const note = (path) => {
+    recorded.push(path);
+    writes += 1;
+    if (failWrite !== 0 && writes === failWrite) {
+      stopped = true;
+      throw new Error('injected write failure');
+    }
+  };
+
   return {
     lstat: (path) => lstatSync(path),
     realpath: (path) => realpathSync(path),
     readFile: (path) => readFileSync(path),
     writeFileReplace: (path, bytes) => {
-      // Only declaration and fixture writes count: the recovery copies written during prepare are not fault positions.
-      const counted = !path.endsWith('.original');
+      const counted = !isScratch(path);
       if (counted && restoring && failRestore) throw new Error('injected restore write failure');
-      if (counted && !stopped) {
-        recorded.push(path);
-        writes += 1;
-        if (failWrite !== 0 && writes === failWrite) {
-          stopped = true;
-          throw new Error('injected write failure');
-        }
-      }
+      if (counted && !stopped) note(path);
       writeFileSync(path, bytes);
     },
-    writeFileExclusive: (path, bytes) => {
-      const counted = !path.endsWith('.original');
-      if (counted && !stopped) {
-        recorded.push(path);
-        writes += 1;
-        if (failWrite !== 0 && writes === failWrite) {
-          stopped = true;
-          throw new Error('injected write failure');
+    openExclusive: (path) => {
+      const counted = !isScratch(path);
+      if (counted && !stopped) note(path);
+      const handle = openSync(path, 'wx');
+      handlePaths.set(handle, path);
+      return handle;
+    },
+    statOfHandle: (handle) => fstatSync(handle),
+    writeToHandle: (handle, bytes) => {
+      const path = handlePaths.get(handle) ?? '';
+      if (!isScratch(path)) {
+        contentWrites += 1;
+        if (failContentAt !== 0 && contentWrites === failContentAt) {
+          if (partialBytes > 0) writeSync(handle, bytes.subarray(0, partialBytes));
+          throw new Error('injected content write failure');
         }
       }
-      writeFileSync(path, bytes, { flag: 'wx' });
+      writeSync(handle, bytes);
+    },
+    closeHandle: (handle) => {
+      handlePaths.delete(handle);
+      closeSync(handle);
     },
     removeFile: (path) => {
       if (restoring && failRestore) throw new Error('injected remove failure');
@@ -130,7 +161,8 @@ function makeWriter({ failWrite = 0, failRemove = false, failRestore = false } =
       restoring = true;
     },
     writes: () => writes,
-    /** The counted declaration/fixture writes attempted before the injected failure, in order. */
+    contentWrites: () => contentWrites,
+    /** The counted declaration/fixture operations attempted before the injected failure, in order. */
     recorded: () => [...recorded],
   };
 }
@@ -161,7 +193,9 @@ test('happy path: install then restore returns the exact original bytes and leav
   const sandbox = makeSandbox();
   try {
     const transaction = await prepareUnoU03FixtureTransaction({ ...sandbox, writer: makeWriter() });
-    assert.equal(transaction.status, 'armed');
+    if (transaction.status !== 'armed') {
+      assert.deepEqual(transaction.reasons, [], 'the happy path must arm');
+    }
 
     const installed = await transaction.install();
     assert.equal(installed.ok, true);
@@ -276,12 +310,12 @@ test('preflight refuses a symlinked parent directory', async (t) => {
 
     const transaction = await prepareUnoU03FixtureTransaction({
       ...sandbox,
-      fixtureSources: [{ path: 'linked-parent/wo030-escape.md', bytes: '# escape\n' }],
+      fixtureSources: [{ path: 'linked-parent/wo031-escape.md', bytes: '# escape\n' }],
       writer: makeWriter(),
     });
     assert.equal(transaction.status, 'refused');
     assert.ok(transaction.reasons.some((entry) => entry.includes('path:symlink') || entry.includes('path:reparse')));
-    assert.equal(existsSync(join(elsewhere, 'wo030-escape.md')), false, 'nothing was created through the link');
+    assert.equal(existsSync(join(elsewhere, 'wo031-escape.md')), false, 'nothing was created through the link');
   } finally {
     sandbox.cleanup();
   }
@@ -423,9 +457,9 @@ test('a restore that cannot write fails closed, keeps the backups, then succeeds
   }
 });
 
-test('successful cases leave no stray .temp/wo030-* data behind', async () => {
+test('successful cases leave no stray .temp/wo031-* data behind', async () => {
   mkdirSync(SCRATCH_PARENT, { recursive: true });
-  const before = readdirSync(SCRATCH_PARENT).filter((entry) => entry.startsWith('wo030-'));
+  const before = readdirSync(SCRATCH_PARENT).filter((entry) => entry.startsWith('wo031-'));
   const sandbox = makeSandbox();
   try {
     const transaction = await prepareUnoU03FixtureTransaction({ ...sandbox, writer: makeWriter() });
@@ -436,7 +470,7 @@ test('successful cases leave no stray .temp/wo030-* data behind', async () => {
   } finally {
     sandbox.cleanup();
   }
-  const after = readdirSync(SCRATCH_PARENT).filter((entry) => entry.startsWith('wo030-'));
+  const after = readdirSync(SCRATCH_PARENT).filter((entry) => entry.startsWith('wo031-'));
   assert.deepEqual(after, before, 'no sandbox or transaction scratch outlives the case');
 });
 
@@ -457,4 +491,200 @@ test('the transaction exposes one entry point and refuses an unauthorised call',
   });
   assert.equal(noDeclarations.status, 'refused');
   assert.deepEqual(noDeclarations.reasons, ['declarations:unspecified']);
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Ownership: exclusive creation is the boundary, identity is the proof, and a stranger is never removed.
+// ---------------------------------------------------------------------------------------------------------------
+
+/** The device/inode identity of a path, as the OS reports it. */
+function identityOfPath(path) {
+  const stats = lstatSync(path);
+  return { dev: stats.dev, ino: stats.ino };
+}
+
+/** Assert only the declarations came back: a stranger keeps its own file. */
+function assertDeclarationsRestored(root) {
+  assert.equal(sha256(readFileSync(join(root, MANIFEST))), sha256(ORIGINAL_MANIFEST), 'manifest restored');
+  assert.equal(sha256(readFileSync(join(root, SELECTION))), sha256(ORIGINAL_SELECTION), 'selection restored');
+  assert.equal(sha256(readFileSync(join(root, HOME))), sha256(HOME_BYTES), 'Home source untouched');
+}
+
+test('an EEXIST at the first fixture path preserves the intervening file and claims nothing', async () => {
+  const sandbox = makeSandbox();
+  try {
+    const transaction = await prepareUnoU03FixtureTransaction({ ...sandbox, writer: makeWriter() });
+    assert.equal(transaction.status, 'armed');
+
+    // The competitor appears after a successful arm but before install — exactly the window the previous version lost.
+    const competitorPath = join(sandbox.root, FIXTURE_SOURCES[0]);
+    const competitorBytes = Buffer.from('# unrelated file that appeared during the run\n', 'utf8');
+    writeFileSync(competitorPath, competitorBytes);
+    const competitorIdentity = identityOfPath(competitorPath);
+
+    const installed = await transaction.install();
+    assert.equal(installed.ok, false, 'a refused exclusive create is an install failure');
+    assert.equal(installed.rollback.ok, true, 'the declarations still restore');
+    assertDeclarationsRestored(sandbox.root);
+
+    // The stranger survives byte-for-byte and identity-for-identity.
+    assert.equal(sha256(readFileSync(competitorPath)), sha256(competitorBytes), 'competitor bytes preserved');
+    assert.deepEqual(identityOfPath(competitorPath), competitorIdentity, 'competitor identity preserved');
+    for (const path of FIXTURE_SOURCES.slice(1)) {
+      assert.equal(existsSync(join(sandbox.root, path)), false, `${path} must be absent`);
+    }
+    assert.equal(transaction.describe().backupsPreserved, 0);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test('an EEXIST at a later fixture path removes only the files this transaction owned', async () => {
+  const sandbox = makeSandbox();
+  try {
+    const transaction = await prepareUnoU03FixtureTransaction({ ...sandbox, writer: makeWriter() });
+    assert.equal(transaction.status, 'armed');
+
+    const competitorPath = join(sandbox.root, FIXTURE_SOURCES[4]);
+    const competitorBytes = Buffer.from('# fifth-path stranger\n', 'utf8');
+    writeFileSync(competitorPath, competitorBytes);
+    const competitorIdentity = identityOfPath(competitorPath);
+
+    const installed = await transaction.install();
+    assert.equal(installed.ok, false);
+    assert.equal(installed.rollback.ok, true);
+    assertDeclarationsRestored(sandbox.root);
+
+    // The four files this transaction genuinely created are gone; the fifth path is the stranger's.
+    for (const path of FIXTURE_SOURCES.slice(0, 4)) {
+      assert.equal(existsSync(join(sandbox.root, path)), false, `${path} (owned) must be removed`);
+    }
+    assert.equal(sha256(readFileSync(competitorPath)), sha256(competitorBytes), 'competitor bytes preserved');
+    assert.deepEqual(identityOfPath(competitorPath), competitorIdentity, 'competitor identity preserved');
+    assert.equal(transaction.describe().backupsPreserved, 0);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+
+test('a partial content write after a successful claim removes the owned partial file', async () => {
+  const sandbox = makeSandbox();
+  try {
+    const writer = makeWriter({ failContentAt: 1, partialBytes: 8 });
+    const transaction = await prepareUnoU03FixtureTransaction({ ...sandbox, writer });
+    assert.equal(transaction.status, 'armed');
+
+    const installed = await transaction.install();
+    assert.equal(installed.ok, false, 'a failed content write is an install failure');
+    assert.equal(writer.contentWrites(), 1, 'the failure landed on the first content write');
+
+    // The claim succeeded first, so this file is owned and its partial content must be removed.
+    assert.equal(existsSync(join(sandbox.root, FIXTURE_SOURCES[0])), false, 'owned partial file removed');
+    assert.equal(installed.rollback.ok, true);
+    assertRestored(sandbox.root);
+    assert.equal(transaction.describe().backupsPreserved, 0);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test('a transaction-owned file replaced before restore is preserved and the restore fails closed', async () => {
+  const sandbox = makeSandbox();
+  try {
+    const transaction = await prepareUnoU03FixtureTransaction({ ...sandbox, writer: makeWriter() });
+    assert.equal(transaction.status, 'armed');
+    assert.equal((await transaction.install()).ok, true);
+
+    // Someone replaces an owned fixture with a different file at the same path.
+    const ownedPath = join(sandbox.root, FIXTURE_SOURCES[1]);
+    unlinkSync(ownedPath);
+    const foreignBytes = Buffer.from('# a replacement that is not ours\n', 'utf8');
+    writeFileSync(ownedPath, foreignBytes);
+    const foreignIdentity = identityOfPath(ownedPath);
+
+    const restored = await transaction.restore();
+    assert.equal(restored.ok, false, 'an unprovable identity is never a clean restore');
+    assert.ok(restored.reasons.some((entry) => entry.startsWith('restore:identity:foreign')));
+    assert.equal(sha256(readFileSync(ownedPath)), sha256(foreignBytes), 'the replacement survives');
+    assert.deepEqual(identityOfPath(ownedPath), foreignIdentity, 'the replacement identity survives');
+
+    assert.equal(restored.backupsPreserved, 2, 'both recovery copies remain');
+    assert.equal((await transaction.dispose()).ok, false, 'recovery scratch is never discarded unverified');
+    assert.equal(transaction.describe().verified, false);
+
+    // The bounded diagnostic must not leak a private absolute path.
+    const diagnostic = JSON.stringify(transaction.describe());
+    assert.equal(diagnostic.includes(sandbox.sandbox), false, 'no absolute sandbox path in the diagnostic');
+    assert.equal(diagnostic.includes(sandbox.root), false, 'no absolute root in the diagnostic');
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+
+test('a target in a sibling directory whose name extends the root is refused before any mutation', async () => {
+  const sandbox = makeSandbox();
+  try {
+    // `/root-other` shares the root's leading characters, so a string prefix test would have accepted it.
+    const sibling = join(sandbox.sandbox, 'root-other');
+    mkdirSync(sibling, { recursive: true });
+    const escaped = join(sibling, 'escape.md');
+
+    const transaction = await prepareUnoU03FixtureTransaction({
+      ...sandbox,
+      fixtureSources: [{ path: escaped, bytes: '# escape\n' }],
+      writer: makeWriter(),
+    });
+    assert.equal(transaction.status, 'refused');
+    assert.ok(transaction.reasons.some((entry) => entry.startsWith('path:outside-root')));
+    assert.equal(existsSync(escaped), false, 'nothing was created in the sibling');
+    assertDeclarationsRestored(sandbox.root);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test('a literal parent traversal is refused before any mutation', async () => {
+  const sandbox = makeSandbox();
+  try {
+    const transaction = await prepareUnoU03FixtureTransaction({
+      ...sandbox,
+      fixtureSources: [{ path: '../outside.md', bytes: '# escape\n' }],
+      writer: makeWriter(),
+    });
+    assert.equal(transaction.status, 'refused');
+    assert.ok(transaction.reasons.some((entry) => entry.startsWith('path:outside-root')));
+    assert.equal(existsSync(join(sandbox.sandbox, 'outside.md')), false, 'nothing was created outside the root');
+    assertDeclarationsRestored(sandbox.root);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test('a duplicate fixture path and a fixture colliding with a declaration are both refused', async () => {
+  const sandbox = makeSandbox();
+  try {
+    const duplicate = await prepareUnoU03FixtureTransaction({
+      ...sandbox,
+      fixtureSources: [
+        { path: FIXTURE_SOURCES[0], bytes: 'a\n' },
+        { path: FIXTURE_SOURCES[0], bytes: 'b\n' },
+      ],
+      writer: makeWriter(),
+    });
+    assert.equal(duplicate.status, 'refused');
+    assert.ok(duplicate.reasons.some((entry) => entry.startsWith('fixture:duplicate')));
+
+    const colliding = await prepareUnoU03FixtureTransaction({
+      ...sandbox,
+      fixtureSources: [{ path: MANIFEST, bytes: 'collision\n' }],
+      writer: makeWriter(),
+    });
+    assert.equal(colliding.status, 'refused');
+    assert.ok(colliding.reasons.some((entry) => entry.startsWith('fixture:collides-with-declaration')));
+    assertDeclarationsRestored(sandbox.root);
+  } finally {
+    sandbox.cleanup();
+  }
 });

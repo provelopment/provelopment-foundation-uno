@@ -1413,6 +1413,29 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
     }
   }
 
+  // The positive HTTP runner delegates every fixture mutation to the sanctioned transaction: no route, no second
+  // destructive helper and no independent setup/cleanup logic may reappear in it.
+  const runner = stripComments(doc('scripts/verify-u03-published-http.mjs'));
+  assert.match(runner, /from "\.\/uno-u03-fixture-transaction\.mjs"/u);
+  assert.match(runner, /prepareUnoU03FixtureTransaction\(/u);
+  assert.match(runner, /await transaction\.install\(\)/u);
+  assert.match(runner, /await transaction\.restore\(\)/u);
+  for (const forbidden of ['writeFileSync(resolve(ROOT', 'mkdirSync(resolve(ROOT, relativePath', 'rmSync(resolve(ROOT, relativePath']) {
+    assert.equal(runner.includes(forbidden), false, `the runner must not mutate fixtures itself: ${forbidden}`);
+  }
+
+  // The transaction is absent from every runtime import: only the runner and its own suite may reference it.
+  assert.equal(runner.includes('deployment/efs'), true, 'the runner does name the fixture paths it plans');
+  for (const layer of ['src/app', 'src/core', 'src/application', 'src/adapters']) {
+    for (const [path, content] of Object.entries(readTree(layer, layer))) {
+      assert.equal(
+        stripComments(content).includes(moduleName),
+        false,
+        `${path} must not reference the fixture transaction`,
+      );
+    }
+  }
+
   // The existing provider boundary is unchanged: the approved analytics import stays the single sanctioned exception,
   // already policed by `scanAnalyticsUsage`, and no route names a deployment path of its own.
   const serving = stripComments(doc('src/config/uno-serving.ts'));

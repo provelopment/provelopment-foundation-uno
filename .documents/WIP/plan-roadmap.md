@@ -119,13 +119,12 @@ nothing, no `src/app` source imports it, and `public` eligibility is not publica
 activation, safe HTTP error behaviour, metadata/SEO emission including canonical advertising and `hreflang`,
 real locale routing, and any optional base path. Each requires a later bounded Owner order.
 
-**Recovery hardening (`UNO-WO-030 / R01`):** the temporary fixture the positive HTTP proof uses is now one armed
-transaction. Recovery is armed before the first destructive write, every failure position — before the first write,
-between the two declarations, and at each of the five fixture creations — rolls back to the exact original bytes, and a
-restoration that cannot be verified fails closed with its recovery copies preserved rather than reporting success.
-Nineteen fault-injection cases drive the same exported operations in isolated roots; the published-Page behaviour, the
-canonical/hreflang/robots/sitemap contract and the strict refusals are unchanged. No domain, publication or provider
-change, and U03 stays open.
+**Ownership hardening (`UNO-WO-031 / R01`):** exclusive creation is now the only ownership boundary and the OS-reported
+device/inode identity is the only proof for removal, so a file that appears between preflight and the create is never
+claimed and never deleted, and a file replaced before cleanup fails the restore closed with its recovery copies kept.
+Containment is component-aware, so a sibling whose name extends the root or a literal `..` traversal is refused before
+any mutation. Twenty-six fault and ownership cases plus the unchanged 195-check publication proof confirm it; no domain,
+publication or provider change, and U03 stays open.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct
 visibility behaviour.

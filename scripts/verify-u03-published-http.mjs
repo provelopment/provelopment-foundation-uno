@@ -13,10 +13,12 @@
  * proxy, no browser claim, no external hostname. The fixture base is the literal test-only
  * `http://localhost:3000`; it is not a chosen public origin and it is never committed.
  *
- * SAFETY. The two committed declaration files are backed up to ignored task scratch, replaced, and restored in an
- * unconditional `finally` that verifies SHA-256 and byte equality; the five fixture sources are created only when
- * physically absent and removed in the same `finally`. A failed build or HTTP check therefore still restores. If
- * restoration cannot be proven the script fails loudly and never reports success.
+ * SAFETY. Every mutation is owned by `./uno-u03-fixture-transaction.mjs`. It backs the two committed declarations
+ * up, arms recovery *before* the first destructive write, claims each fixture source by exclusive creation (so a file
+ * that appears in the meantime is never claimed and never removed), and is restored in an unconditional `finally` that
+ * verifies SHA-256 and byte equality. A file at a claimed path is removed only while it still proves the identity the
+ * OS granted at claim time; a replacement is preserved, and an unverifiable restore fails closed with its recovery
+ * copies kept. A failed build or HTTP check therefore still restores, and no success is ever reported without proof.
  */
 
 import { spawn, spawnSync } from "node:child_process";
@@ -697,7 +699,7 @@ async function main() {
 
     const installed = await transaction.install();
     if (!check("the fixture installs without a write failure", installed.ok === true, installed.cause ?? "")) {
-      // install() already rolled back; the outer finally verifies and cleans up.
+      // install() attempted its own rollback; the outer finally verifies it and keeps any recovery copy it needed.
       return 1;
     }
     check("the fixture manifest is installed", sha256Of(MANIFEST) !== PINNED_DECLARATIONS.get(MANIFEST));

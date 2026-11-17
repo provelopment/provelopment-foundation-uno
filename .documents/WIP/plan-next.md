@@ -4,16 +4,17 @@ No item in this slot is authorised. It is a planning note, never executable auth
 
 ## One unissued candidate
 
-**Owner release decision (candidate only, not issued).** The U03 publication engine is proved end to end locally and its
-proof is now transactional: a synthetic declaration makes the real production build serve published Home and About Pages
-in two authored locales with truthful `<html lang>`, canonical, same-Page `hreflang`, one `x-default` on the default
-Home, a temporary `/en` redirect, and a `robots.txt` and `sitemap.xml` that agree with the HTML; draft, unlisted, unknown
-and malformed addresses stay real 404s. The fixture cannot survive a failure — recovery is armed before the first write
-and a restoration that cannot be verified fails closed with its backups kept. The committed declaration still states no
-base and publishes no Page, so the deployed site is unchanged and refuses everything.
+**Owner release decision (candidate only, not issued).** U03's publication engine and its proof are complete locally: a
+synthetic declaration makes the real production build serve published Home and About Pages in two authored locales with
+truthful `<html lang>`, canonical, same-Page `hreflang`, one `x-default` on the default Home, a temporary `/en` redirect,
+and a `robots.txt` and `sitemap.xml` that agree with the HTML, while draft, unlisted, unknown and malformed addresses
+stay real 404s. That proof is now ownership-safe: exclusive creation is the only claim, device/inode identity is the only
+proof for removal, a stranger's file is never deleted, a replaced file fails closed with its recovery copies kept, and
+containment is component-aware. The committed declaration still states no base and publishes no Page, so the deployed
+site is unchanged and refuses everything.
 
-Four Owner decisions are outstanding and cannot be inferred by an Agent: the real HTTPS canonical origin; which real
-authored Pages may be `published`; whether and when the protected `/` demonstration is replaced or retired; and whether a
+Four Owner decisions remain and cannot be inferred by an Agent: the real HTTPS canonical origin; which real authored
+Pages may be `published`; whether and when the protected `/` demonstration is replaced or retired; and whether a
 rebuild-to-publish operation is approved, since a published address exists only after a build enumerates it.
 
 Proofs a localhost fixture cannot supply remain open: a live HTTPS origin, real browser and accessibility behaviour, and
