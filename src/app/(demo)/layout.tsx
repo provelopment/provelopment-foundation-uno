@@ -1,10 +1,15 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Analytics } from '@vercel/analytics/next';
-import './globals.css';
+import '../globals.css';
 
 /**
- * Root layout for the English informational demonstration.
+ * Root layout of the `(demo)` route group, which serves the English informational demonstration at `/`.
+ *
+ * `(demo)` is a route group, so this file is a **root layout**: it owns `<html>` and `<body>` for the
+ * demonstration and for nothing else. The published EFS Site lives in the separate `(site)` group, whose own
+ * locale-root layout owns a truthful `<html lang>` for an authored locale. Moving this file into the group
+ * changed no copy, no metadata and no analytics placement.
  *
  * The static `lang="en"` describes this NON-PUBLISHED informational page. It is not an EFS locale
  * representation, it is not the authored locale identifier `en-001`, and it must never be read as

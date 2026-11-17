@@ -1223,6 +1223,48 @@ no markup; Markdown must begin with one `# ` heading and is always `public`; rep
 projection proves a Page is routed, public or indexable.
 
 
+## U03 positive publication, locale documents and SEO (UNO-WO-029 / R01)
+
+**Two root layouts.** `src/app/(demo)/page.tsx` and `src/app/(demo)/layout.tsx` (moved, content byte-identical apart
+from one CSS import depth) keep the English demonstration at `/` with its metadata, `lang="en"`, noindex/nofollow and
+the one approved Analytics component. The published Site lives in its own root, `src/app/(site)/[locale]/…`, so the two
+surfaces can carry different, truthful documents. `src/app/global-not-found.tsx` is the complete HTML 404 for an
+address that matches no route — the same visible copy, one `h1`, `lang="en"`, `noindex, nofollow`, the same stylesheet
+and no analytics — enabled by the one approved Next 16 flag `experimental.globalNotFound` in `next.config.ts`.
+
+**Truthful language.** `src/app/(site)/[locale]/layout.tsx` owns `<html lang>` for a published Page and resolves the
+requested path key through `resolveUnoServingLocaleTag` in `src/config/uno-serving.ts`: the stored, validated locale
+authority maps `de-de` back to the authored `de-DE` and `en-001` to `en-001`, and only an explicitly stored short alias
+(`en`) is reported as an alias for a redirect-only request. No Host, cookie, `Accept-Language`, environment value or raw
+path is authority, and an unknown key is a genuine 404.
+
+**One SEO source of truth.** A published **public** Page takes its canonical URL, its same-Page public locale
+alternates and its `x-default` from `planUnoServingDiscovery()` — the same plan behind `robots.txt` and
+`sitemap.xml` — so HTML and sitemap cannot disagree. A published **unlisted** Page keeps its own canonical and
+`noindex,nofollow` with no alternate, and a JSON body is still refused for serving until U04's renderer exists. An exact
+discovery entry is required: a public Page that cannot be found in the plan is refused rather than served with invented
+links.
+
+**Address set.** The `[locale]` layout enumerates the locales the declaration publishes and the `[[...segments]]` page
+enumerates the published route shapes, both from the same publication gate; `dynamicParams = false` on the page means an
+address that was never enumerated is refused by the router with the global 404 document, never streamed as a shell.
+
+**Positive proof.** `scripts/verify-u03-published-http.mjs` installs a temporary, physically confined synthetic
+publication fixture (two declarations plus five short original documents), validates it through the **real** loader,
+planner and serving composition, builds and serves the real production output on loopback, asserts published Pages with
+truthful `lang`, canonical/OG/`hreflang`, one `x-default` on the default Home only, the alias 307, `robots.txt`,
+`sitemap.xml` with exactly four public URLs, the untouched `/` demonstration and ten strict refusals, then restores both
+declarations byte-for-byte in a `finally`, proves the restoration, rebuilds the unpublished configuration and re-runs the
+two original HTTP gates.
+
+**Limits.** The fixture base is the literal test-only `http://localhost:3000`; no production origin exists, no committed
+Page is published, no provider was contacted and U03 remains open. Publishing a Page requires a rebuild, exactly as a
+file-based site does. Browser, accessibility and real crawler behaviour are not claimed.
+
+**Rights.** Original **Uno-owned** implementation, class **NEW / REWRITE concept**; the pinned Foundation GEO-03 commit
+`c05c55ea61b5347cf5032211dd0bf37f2cc5083c` stays read-only context with **no code copied**. No dependency, asset,
+secret or licence change; Apache-2.0 notices and the 17-family / 22-module obligations are unchanged and undelivered.
+
 ## U03 publication, serving and discovery (UNO-WO-028 / R01)
 
 **Publication authority.** The manifest Page now accepts one optional own-data key, `publication`, whose only

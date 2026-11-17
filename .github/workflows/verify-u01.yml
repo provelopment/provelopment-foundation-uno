@@ -128,6 +128,14 @@ jobs:
         run: node scripts/verify-u03-http.mjs
         shell: bash
 
+      # Blocking positive U03 publication gate (UNO-WO-029 / R01). It installs a temporary, restore-in-finally
+      # synthetic publication fixture, builds and serves the REAL production output on loopback, asserts published
+      # Pages, truthful locale documents, canonical/hreflang/OG, robots and sitemap plus strict refusals, then
+      # restores the committed declarations byte-for-byte and re-runs the two gates above against them.
+      - name: Run production HTTP (U03 published Pages, restored afterwards)
+        run: node scripts/verify-u03-published-http.mjs
+        shell: bash
+
       # Offline deployment-readiness gate (UNO-WO-012 / R02). Reads only committed text from
       # this checkout: no network, no provider call, no credential and no deployment. It fails
       # the job if the pinned build inputs, the payload exclusions, the page/robots guards or

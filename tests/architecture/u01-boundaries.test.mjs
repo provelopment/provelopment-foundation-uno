@@ -55,7 +55,7 @@ export const APPROVED_ANALYTICS = Object.freeze({
   packageName: '@vercel/analytics',
   version: '2.0.1',
   specifier: '@vercel/analytics/next',
-  placement: 'src/app/layout.tsx',
+  placement: 'src/app/(demo)/layout.tsx',
   renderMarker: '<Analytics',
 });
 
@@ -514,7 +514,7 @@ test('the boundary scanner refuses Spoke and deployment markers in src/app', () 
 
 test('the analytics allowlist permits exactly one approved placement and nothing else', () => {
   const approved = {
-    'src/app/layout.tsx':
+    'src/app/(demo)/layout.tsx':
       "import { Analytics } from '@vercel/analytics/next';\n" +
       'export default function Layout({ children }) {\n' +
       '  return (<html lang="en"><body>{children}<Analytics /></body></html>);\n' +
@@ -543,14 +543,14 @@ test('the analytics allowlist permits exactly one approved placement and nothing
   // Duplicate injection and a removed render are both refused.
   assert.equal(
     scanAnalyticsUsage({
-      'src/app/layout.tsx':
+      'src/app/(demo)/layout.tsx':
         "import { Analytics } from '@vercel/analytics/next';\nimport { Analytics as Again } from '@vercel/analytics/next';\n<Analytics />\n",
     }).length,
     1,
   );
   assert.equal(
     scanAnalyticsUsage({
-      'src/app/layout.tsx': "import { Analytics } from '@vercel/analytics/next';\nexport { Analytics };\n",
+      'src/app/(demo)/layout.tsx': "import { Analytics } from '@vercel/analytics/next';\nexport { Analytics };\n",
     }).length,
     1,
   );
@@ -620,9 +620,9 @@ test('a Node 24 or unpinned engine is refused even when everything else is exact
 });
 
 test('the real root layout carries exactly the one approved provider integration', () => {
-  const layoutSource = doc('src/app/layout.tsx');
+  const layoutSource = doc('src/app/(demo)/layout.tsx');
   assert.ok(layoutSource.includes(`from '${APPROVED_ANALYTICS.specifier}'`));
-  assert.deepEqual(scanAnalyticsUsage({ 'src/app/layout.tsx': layoutSource }), []);
+  assert.deepEqual(scanAnalyticsUsage({ 'src/app/(demo)/layout.tsx': layoutSource }), []);
   assert.deepEqual(scanAnalyticsUsage(authoredSources()), []);
   // The visitor-visible page and the noindex policy are untouched by the integration.
   assert.equal(layoutSource.includes('/_vercel/insights'), false);
@@ -1291,7 +1291,7 @@ test('one server-only composition owns the fixed root and the file read', () => 
 
 test('the locale, robots and sitemap surfaces consume only the server composition', () => {
   const surfaces = [
-    'src/app/[locale]/[[...segments]]/page.tsx',
+    'src/app/(site)/[locale]/[[...segments]]/page.tsx',
     'src/app/robots.txt/route.ts',
     'src/app/sitemap.xml/route.ts',
   ];
@@ -1315,12 +1315,35 @@ test('the locale, robots and sitemap surfaces consume only the server compositio
     }
   }
 
-  // The frozen root surface stays a single static demonstration: no locale wiring was smuggled in.
-  for (const path of ['src/app/page.tsx', 'src/app/layout.tsx', 'src/app/not-found.tsx']) {
+  // The frozen demonstration keeps its single static page and document: no locale wiring was smuggled in. The two
+  // published-Site files are the deliberate boundary and are asserted separately below.
+  for (const path of [
+    'src/app/(demo)/page.tsx',
+    'src/app/(demo)/layout.tsx',
+    'src/app/global-not-found.tsx',
+    'src/app/not-found.tsx',
+  ]) {
     const source = stripComments(readFileSync(resolve(ROOT, path), 'utf8'));
     for (const forbidden of ['uno-serving', 'plan-uno-', 'hreflang', 'rel="canonical"', 'redirect(']) {
       assert.equal(source.includes(forbidden), false, `${path} must not gain ${forbidden}`);
     }
+  }
+
+  // The locale-root layout owns the document language and nothing else: no canonical, no analytics, no redirect.
+  const localeLayout = stripComments(readFileSync(resolve(ROOT, 'src/app/(site)/[locale]/layout.tsx'), 'utf8'));
+  assert.match(localeLayout, /resolveUnoServingLocaleTag/u);
+  assert.match(localeLayout, /<html lang=\{/u);
+  for (const forbidden of ['<Analytics', 'rel="canonical"', 'hreflang', 'redirect(', 'process.env', 'Accept-Language']) {
+    assert.equal(localeLayout.includes(forbidden), false, `the locale layout must not contain ${forbidden}`);
+  }
+
+  // The global 404 document carries the approved copy, one h1 and no advertising or analytics of any kind.
+  const globalNotFound = stripComments(readFileSync(resolve(ROOT, 'src/app/global-not-found.tsx'), 'utf8'));
+  assert.match(globalNotFound, /<html lang="en">/u);
+  assert.match(globalNotFound, /Page not found/u);
+  assert.match(globalNotFound, /Go to the Foundation Uno homepage/u);
+  for (const forbidden of ['<Analytics', 'canonical', 'hreflang', 'noindex, follow', 'dangerouslySetInnerHTML']) {
+    assert.equal(globalNotFound.includes(forbidden), false, `the global 404 must not contain ${forbidden}`);
   }
 });
 

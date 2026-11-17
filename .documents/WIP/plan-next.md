@@ -4,21 +4,21 @@ No item in this slot is authorised. It is a planning note, never executable auth
 
 ## One unissued candidate
 
-**Owner publication decision, chosen HTTPS origin, positive live HTTP and the JSON document contract (candidate
-only, not issued).** A Page may now declare itself published, a planner composes every accepted contract into one
-serving decision, a discovery planner derives sitemap and `hreflang` entries from public published Pages only, and a
-thin localized route, `robots.txt` and `sitemap.xml` exist behind a single server boundary. Everything that exists
-today refuses: the committed declaration states no canonical base and publishes no Page, so the production surface
-answers real 404s.
+**Owner release decision (candidate only, not issued).** The publication engine is now proved end to end locally: with
+a synthetic declaration the real production build serves published Home and About Pages in two authored locales, each
+with a truthful `<html lang>`, canonical, same-Page `hreflang` alternates, a single `x-default` on the default Home, a
+temporary `/en` redirect, and a `robots.txt` and `sitemap.xml` that agree with the HTML — while draft, unlisted, unknown
+and malformed addresses remain real 404s. The committed declaration still states no base and publishes no Page, so the
+deployed site is unchanged and refuses everything.
 
-What remains is Owner work this Agent cannot infer: choosing the real HTTPS canonical origin and installing it as the
-declared base, publishing named real Pages, and only then proving positive live HTTP and browser behaviour. Two
-engineering dependencies follow: a versioned JSON Page document contract with a renderer (U04) before any JSON body
-may be served, and a truthful per-Page language attribute, which the frozen root layout currently prevents — that
-gate is UNVERIFIED rather than satisfied.
+What remains is Owner work this Agent cannot infer: choosing the real HTTPS canonical origin, installing it as the
+declared base, and publishing named real Pages. Then the proofs that a localhost fixture cannot supply: a live HTTPS
+origin, real browser and accessibility behaviour, crawler behaviour, and an operational decision about when a rebuild is
+acceptable. Two engineering dependencies remain open: the U04 JSON document contract and renderer before any JSON body
+may be served, and the 17-family / 22-module parity obligations.
 
-Three boundaries carry forward: a validated declaration is not a chosen production domain, a published declaration
-is not a delivered website, and a prepared or planned decision is not a live response.
+Three boundaries carry forward: a test-only origin is not a chosen production domain, a fixture publication is not a
+delivered website, and a local production build is not a deployment.
 
 That work needs its own Owner-installed work order, its own exact-path ledger and its own independent tests on
 both hosts; nothing in this note authorises it.

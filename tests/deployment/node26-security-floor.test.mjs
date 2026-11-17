@@ -126,11 +126,11 @@ export function inspectProject(snapshot) {
     (match) => match[1],
   );
   if (layoutImports.length !== 1 || layoutImports[0] !== '@vercel/analytics/next') {
-    violations.push("src/app/layout.tsx: must import only '@vercel/analytics/next'");
+    violations.push("src/app/(demo)/layout.tsx: must import only '@vercel/analytics/next'");
   }
   const renders = snapshot.layout.split('<Analytics').length - 1;
   if (renders !== 1) {
-    violations.push(`src/app/layout.tsx: <Analytics /> must be rendered exactly once, found ${renders}`);
+    violations.push(`src/app/(demo)/layout.tsx: <Analytics /> must be rendered exactly once, found ${renders}`);
   }
 
   return violations;
@@ -143,7 +143,7 @@ export function realSnapshot() {
     lockfile: read('pnpm-lock.yaml'),
     bootstrapWorkflow: read('.github/workflows/verify-bootstrap.yml'),
     u01Workflow: read('.github/workflows/verify-u01.yml'),
-    layout: read('src/app/layout.tsx'),
+    layout: read('src/app/(demo)/layout.tsx'),
   };
 }
 
@@ -193,7 +193,7 @@ test('no other Vercel or analytics provider is declared or resolved', () => {
 });
 
 test('the root layout imports only the approved entry and renders it once', () => {
-  const layout = read('src/app/layout.tsx');
+  const layout = read('src/app/(demo)/layout.tsx');
   const imports = [...layout.matchAll(/from\s*['"](@vercel\/[^'"]+)['"]/g)].map((m) => m[1]);
   assert.deepEqual(imports, ['@vercel/analytics/next']);
   assert.equal(layout.split('<Analytics').length - 1, 1);

@@ -54,8 +54,8 @@ export const SNAPSHOT_FILES = Object.freeze({
   packageJson: 'package.json',
   lockfile: 'pnpm-lock.yaml',
   nextConfig: 'next.config.ts',
-  page: 'src/app/page.tsx',
-  layout: 'src/app/layout.tsx',
+  page: 'src/app/(demo)/page.tsx',
+  layout: 'src/app/(demo)/layout.tsx',
   logo: 'public/uno-logo.svg',
   icon: 'src/app/icon.svg',
   gitignore: '.gitignore',
@@ -177,6 +177,7 @@ export const REASONS = Object.freeze([
   'next-config:redirects-or-rewrites',
   'next-config:remote-loader',
   'next-config:secret-reference',
+  'next-config:unapproved-experimental-flag',
   'page:missing',
   'page:obsolete-placeholder',
   'page:missing-heading',
@@ -413,6 +414,16 @@ export function analyzeReadiness(snapshot) {
   expect(!/remotePatterns|loader\s*:/.test(nextConfigText), 'next-config:remote-loader');
   expect(!/process\.env|NEXT_PUBLIC_|apiKey|api_key|password|accessToken/.test(nextConfigText),
     'next-config:secret-reference');
+
+  // The only experimental flag this baseline may carry is the supported global 404 document (UNO-WO-029 / R01).
+  // Anything else in that block is an unreviewed routing or rendering change, so it is refused rather than ignored.
+  const experimentalBlock = /experimental\s*:\s*\{([^}]*)\}/.exec(nextConfigText)?.[1] ?? '';
+  if (experimentalBlock.trim() !== '') {
+    expect(
+      experimentalBlock.replace(/\s+/g, ' ').trim().replace(/,$/u, '') === 'globalNotFound: true',
+      'next-config:unapproved-experimental-flag',
+    );
+  }
 
   // --- 4. The accepted English demonstration is present, not the superseded placeholder ----
   const pageText = page.trim();

@@ -155,8 +155,8 @@ export function auditBrandCopy(fixture) {
 }
 
 const realFixture = () => ({
-  page: read('src/app/page.tsx'),
-  layout: read('src/app/layout.tsx'),
+  page: read('src/app/(demo)/page.tsx'),
+  layout: read('src/app/(demo)/layout.tsx'),
   css: read('src/app/globals.css'),
   logo: read('public/uno-logo.svg'),
   icon: read('src/app/icon.svg'),
@@ -189,7 +189,7 @@ test('the committed copy, official vector and design tokens satisfy the contract
 });
 
 test('the hero states the product promise in forward-looking language', () => {
-  const page = flat(read('src/app/page.tsx'));
+  const page = flat(read('src/app/(demo)/page.tsx'));
   assert.equal(page.includes(COPY.eyebrow), true);
   assert.equal(page.includes(COPY.heading), true);
   assert.equal(page.includes(COPY.lead), true);
@@ -198,7 +198,7 @@ test('the hero states the product promise in forward-looking language', () => {
 });
 
 test('all five features pair a capability with a user benefit', () => {
-  const page = flat(read('src/app/page.tsx'));
+  const page = flat(read('src/app/(demo)/page.tsx'));
   for (const [heading, description] of LEVELS) {
     assert.equal(page.includes(heading), true, heading);
     assert.equal(page.includes(description), true, description);
@@ -206,7 +206,7 @@ test('all five features pair a capability with a user benefit', () => {
 });
 
 test('the two illustrative examples and their benefits are the approved copy', () => {
-  const page = flat(read('src/app/page.tsx'));
+  const page = flat(read('src/app/(demo)/page.tsx'));
   for (const label of EXAMPLE_LABELS) assert.equal(page.includes(label), true, label);
   for (const bullet of EXAMPLE_BULLETS) assert.equal(page.includes(bullet), true, bullet);
   assert.equal(
@@ -216,7 +216,7 @@ test('the two illustrative examples and their benefits are the approved copy', (
 });
 
 test('the source, licence and footer copy is approved', () => {
-  const page = flat(read('src/app/page.tsx'));
+  const page = flat(read('src/app/(demo)/page.tsx'));
   assert.equal(page.includes(COPY.source), true);
   assert.equal(page.includes(COPY.sourceLink), true);
   assert.equal(page.includes(COPY.licence), true);
@@ -225,7 +225,7 @@ test('the source, licence and footer copy is approved', () => {
 });
 
 test('the metadata is the approved pair and the robots policy is intact', () => {
-  const layout = read('src/app/layout.tsx');
+  const layout = read('src/app/(demo)/layout.tsx');
   assert.equal(layout.includes(COPY.title), true);
   assert.equal(layout.includes(COPY.description), true);
   assert.match(layout, /index:\s*false/);
@@ -234,7 +234,7 @@ test('the metadata is the approved pair and the robots policy is intact', () => 
 });
 
 test('no retired internal claim survives in the visible page copy', () => {
-  const page = flat(read('src/app/page.tsx'));
+  const page = flat(read('src/app/(demo)/page.tsx'));
   for (const phrase of RETIRED) assert.equal(page.includes(phrase), false, phrase);
 });
 
@@ -266,7 +266,7 @@ test('the header mark and the favicon are the same bytes on disk', () => {
 });
 
 test('the header renders the local vector through the unoptimized image component', () => {
-  const page = read('src/app/page.tsx');
+  const page = read('src/app/(demo)/page.tsx');
   assert.equal(page.includes("from 'next/image'"), true);
   assert.equal(page.includes('src="/uno-logo.svg"'), true);
   assert.equal(page.includes('alt="Foundation Uno"'), true);
@@ -278,7 +278,7 @@ test('the header renders the local vector through the unoptimized image componen
 
 test('the favicon lives on the App Router icon route', () => {
   assert.equal(statSync(`${ROOT}/src/app/icon.svg`).isFile(), true);
-  assert.equal(read('src/app/page.tsx').includes('/icon.svg'), false);
+  assert.equal(read('src/app/(demo)/page.tsx').includes('/icon.svg'), false);
 });
 
 test('the approved colour tokens and responsive rules are untouched', () => {

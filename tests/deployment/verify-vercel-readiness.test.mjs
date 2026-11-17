@@ -652,3 +652,29 @@ test('refuses a page whose benefit sentence is missing', () => {
   );
   assertRefused(analyzeReadiness(snapshot), 'page:hero-lead');
 });
+test('refuses an unapproved experimental Next flag', () => {
+  const snapshot = withChange(
+    'nextConfig',
+    () => "const nextConfig = { devIndicators: false, experimental: { ppr: true } };\nexport default nextConfig;\n",
+  );
+  assertRefused(analyzeReadiness(snapshot), 'next-config:unapproved-experimental-flag');
+});
+
+test('accepts only the approved global not-found flag', () => {
+  const snapshot = withChange(
+    'nextConfig',
+    () =>
+      "const nextConfig = { devIndicators: false, experimental: { globalNotFound: true } };\nexport default nextConfig;\n",
+  );
+  assert.deepEqual(analyzeReadiness(snapshot).reasons, []);
+});
+
+test('the demonstration and its document live in the demo route group', () => {
+  // `src/app` has two root layouts (`(demo)` and `(site)`), so the demonstration must be inside its group and the
+  // superseded top-level paths must be gone. The snapshot is path-keyed, so this guard proves the real paths.
+  const readiness = readFileSync(new URL('../../scripts/verify-vercel-readiness.mjs', import.meta.url), 'utf8');
+  assert.equal(readiness.includes("page: 'src/app/(demo)/page.tsx'"), true);
+  assert.equal(readiness.includes("layout: 'src/app/(demo)/layout.tsx'"), true);
+  assert.equal(readiness.includes("page: 'src/app/page.tsx'"), false);
+  assert.equal(readiness.includes("layout: 'src/app/layout.tsx'"), false);
+});

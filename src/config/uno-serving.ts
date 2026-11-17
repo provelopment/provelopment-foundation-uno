@@ -259,6 +259,49 @@ export interface UnoServingAddress {
   readonly segments: readonly string[];
 }
 
+/** What a requested locale path key resolved to against the stored Site authority. */
+export type UnoServingLocaleOutcome =
+  | { readonly status: 'supported'; readonly tag: string }
+  | { readonly status: 'alias'; readonly tag: string }
+  | { readonly status: 'unknown' };
+
+/**
+ * Resolve a requested locale path key against the **committed** locale authority.
+ *
+ * This is the only locale lookup the App Router may use, and it is deliberately narrow: the key must be one of the
+ * lowercase full path keys the selected Site actually authors, or an explicit short alias the declaration itself
+ * stores. `de-de` maps back to the authored `de-DE`; a short alias such as `en` maps to its declared target and is
+ * reported as `alias`, because only a redirect-only request may use it. Nothing here reads a Host, a cookie,
+ * `Accept-Language`, an environment variable or the raw path as authority: an unknown, malformed or unsupported key
+ * is `unknown`, and every caller must fail closed.
+ */
+export function resolveUnoServingLocaleTag(pathKey: unknown): UnoServingLocaleOutcome {
+  if (typeof pathKey !== "string") return { status: "unknown" };
+  if (pathKey.length === 0 || pathKey.length > 64) return { status: "unknown" };
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(pathKey)) return { status: "unknown" };
+
+  const authority = readAuthority();
+  if (authority.status === "refused") return { status: "unknown" };
+
+  const stored = resolveUnoCommittedLocales({ manifest: authority.manifest, selection: authority.selection });
+  if (!stored.accepted) return { status: "unknown" };
+
+  for (const tag of stored.localePolicy.supportedLocales) {
+    let key: string;
+    try {
+      key = localePathKey(tag);
+    } catch {
+      return { status: "unknown" };
+    }
+    if (key === pathKey) return { status: "supported", tag };
+  }
+
+  const aliasTarget = stored.localePolicy.languagePreferences[pathKey];
+  if (aliasTarget === undefined) return { status: "unknown" };
+  if (!stored.localePolicy.supportedLocales.includes(aliasTarget)) return { status: "unknown" };
+  return { status: "alias", tag: aliasTarget };
+}
+
 /**
  * Enumerate the addresses this deployment may render.
  *
