@@ -1,190 +1,187 @@
-# UNO-WO-026 / R01 — One prepared, non-serving Page-delivery candidate
+# UNO-WO-027 / R02 — Optional declared canonical base integrated; no domain chosen
 
-**Work order:** `UNO-WO-026 / R01` · **Edition:** FINAL — EXECUTE · **Stage:** U03, **OPEN**.
-**Installed ACTIVE:** 14,163 bytes, SHA-256 `920b8ffdf233d73ebdf4dc24fab3345cc86aa2d51fab4be08cab95c5f80d464c`,
-heading `UNO-WO-026 / R01 — Prepare one validated Page-delivery candidate`; verified byte-for-byte before any
-write; ignored, untracked, unstaged, never printed, never committed.
-**Owner decision:** the activation approves the Page-delivery candidate contract in §3 of the order.
+**Work order:** `UNO-WO-027 / R02` · **Edition:** FINAL — EXECUTE · **Stage:** U03, **OPEN**.
+**Installed ACTIVE:** 13,036 bytes, SHA-256 `c613b6dde8d96b3086e85c802c0f74f50d3c1aaf928c15518fda6625f1f364a3`,
+heading `UNO-WO-027 / R02 — Integrate an optional Uno canonical base`; verified byte-for-byte before any write;
+ignored, untracked, unstaged, never printed, never committed.
+**Owner decision:** the activation approves the optional canonical-base configuration and committed-base reader
+contract in §3.
 **Push authorization:** the activation contains **`AUTHORIZE_GIT_PUSH_TRIGGERED_PRODUCTION_DEPLOYMENTS=YES`**.
-**Required start = actual start:** `ca82eb41cab332775019dc08d710098e0b216d03`.
+**Required start = actual start:** `99cc6905a0c5002687733667da6243d3e542db27`.
 
 ## 1. Status
 
 | Fact | Status | Evidence |
 | --- | --- | --- |
-| `DELIVERY_USE_CASE` | **PASS** | `src/application/prepare-uno-page-delivery-candidate.ts`, blob `d943c3b9…`, 15,332 B |
-| `STORED_POLICY_ONLY` | **PASS** | accepts the *stored* `localePolicy` from `resolveUnoCommittedLocales`; a caller-supplied policy is not an input |
-| `CANDIDATE_AUTHORITY` | **PASS** | authoritative candidate from `matchUnoCandidateRoute`; the loader result is compared field-by-field and per source, in order |
-| `POLICY_REUSE` | **PASS** | header and discoverability come from `resolveUnoPageHeader` and `classifyUnoPageDiscoverability`; no re-implementation, no JSON AST |
-| `CANONICAL_LABEL` | **PASS** | `ifServed.canonicalUrl` is labelled hypothetical, built only from the validated proposed base, capped at 384 ASCII bytes, never truncated |
-| `CLOSED_VOCABULARY` | **PASS** | ten frozen `delivery:` literals; refusals carry `{accepted:false, reason}` only |
-| `FOCUSED_TESTS` | **PASS** | **24** cases, **24** refusal assertions executed over **42** distinct refusal inputs, no existing suite touched |
-| `BASELINE_PRESERVED` | **PASS** | 676 unit tests over 20 files (652 + 24); 33 architecture checks (31 + 2) |
-| `PUBLIC_BEHAVIOUR_UNCHANGED` | **PASS** | `/` 200; `/en`, `/en-001`, `/about`, unknown, `robots.txt`, `sitemap.xml` 404; build still three routes |
+| `CONFIG_BASE_ACCEPTED` | **PASS** | `src/core/efs/uno-config.ts` gains exactly one optional key, `base`, re-expressed from the accepted policy's own answer |
+| `POLICY_DELEGATION` | **PASS** | one `validateUnoCanonicalBase` call; no URL, prefix, alias-count, duplicate or overlap rule restated (architecture-proved) |
+| `CLOSED_CODE` | **PASS** | one new literal `config:invalid-base`; the policy's own unreadable outcome keeps `config:unreadable` |
+| `ABSENT_IS_ABSENT` | **PASS** | an absent base yields the unchanged config with no `base` property; nothing defaulted |
+| `READER` | **PASS** | `src/application/resolve-uno-committed-base.ts`, five frozen `committed-base:` literals, deep-frozen `{site, base}` |
+| `COMMITTED_REALITY` | **PASS** | the committed declaration states no base and the reader answers `committed-base:missing`, supplying no domain |
+| `FOCUSED_TESTS` | **PASS** | **21** new cases and **49** new exact-code refusal inputs across the two suites (52 focused tests) |
+| `BASELINE_PRESERVED` | **PASS** | 697 unit tests over 21 files (676 + 21); 36 architecture checks (33 + 3); every existing test kept |
+| `PUBLIC_BEHAVIOUR_UNCHANGED` | **PASS** | `/` 200; `/en`, `/en-001`, `/about`, unknown, `robots.txt`, `sitemap.xml` 404; build exactly three routes |
 | `HOSTED_CI_AT_PRODUCT_HEAD` | **PASS** | four jobs, two hosts, zero non-success steps (§6) |
 | `PROVIDER_ACTIONS` | **ZERO** | no provider call, manual deploy, alias, domain or settings change |
-| `STAGE` | U03 **OPEN** | no route activated, no publication, no closure |
+| `STAGE` | U03 **OPEN** | no route activated, no domain selected, no publication |
 
 ## 2. Authorized commits and the exact ledger
 
 | Role | Commit | Content |
 | --- | --- | --- |
-| Product | **`9eb93156aeb52ee283fa1c3cc03bbbb64e6f86d8`** | exactly six ledger paths; direct child of `ca82eb4` |
+| Product | **`d58696d2d391b97e7e935a163b7350e78ef3341a`** | exactly eight ledger paths; direct child of `99cc690` |
 | Report | the report-only child of the product commit; its SHA is returned privately to the Owner | `.documents/Reports/execution-report.md` only |
 
 | # | Path | Op | Blob | Bytes |
 | ---: | --- | --- | --- | ---: |
-| 1 | `src/application/prepare-uno-page-delivery-candidate.ts` | CREATE | ABSENT → `d943c3b9…` | 15,332 |
-| 2 | `tests/unit/efs-uno-page-delivery-candidate.test.ts` | CREATE | ABSENT → `b1bc9ec1…` | 31,522 |
-| 3 | `tests/architecture/u01-boundaries.test.mjs` | EDIT (additive) | `b030201d…` → `0bea41fa…` | 45,883 |
-| 4 | `.documents/Architecture/source-inventory.md` | EDIT (additive) | `7b6a6c02…` → `4cee36ef…` | 114,295 |
-| 5 | `.documents/WIP/plan-roadmap.md` | EDIT (narrow) | `3329dcc1…` → `f77320f3…` | 9,998 |
-| 6 | `.documents/WIP/plan-next.md` | OVERWRITE | `99d0298c…` → `2d3e2bd7…` | 1,121 |
+| 1 | `src/core/efs/uno-config.ts` | EDIT | `b1b6a2fb…` → `62ebb236…` | 15,626 |
+| 2 | `tests/unit/efs-uno-config.test.ts` | EDIT | `a3ac711f…` → `5a5888b1…` | 22,620 |
+| 3 | `src/application/resolve-uno-committed-base.ts` | CREATE | ABSENT → `30f5af0e…` | 7,782 |
+| 4 | `tests/unit/efs-uno-committed-base.test.ts` | CREATE | ABSENT → `64d272d3…` | 11,395 |
+| 5 | `tests/architecture/u01-boundaries.test.mjs` | EDIT (additive) | `0bea41fa…` → `bb048eea…` | 49,403 |
+| 6 | `.documents/Architecture/source-inventory.md` | EDIT (narrow additive) | `4cee36ef…` → `d7864318…` | 116,538 |
+| 7 | `.documents/WIP/plan-roadmap.md` | EDIT (U03 only) | `f77320f3…` → `d052728c…` | 10,070 |
+| 8 | `.documents/WIP/plan-next.md` | OVERWRITE (forward-only) | `2d3e2bd7…` → `80a1b6d9…` | 1,198 |
 
-Both CREATE paths were absent at start. `git diff --cached --check` was clean; no other tracked path changed;
-`src/app/**`, deployment files, authored content, packages, lockfiles, scripts, workflows, frozen governance and
-existing unit suites are byte-identical.
+Both CREATE paths were absent at start; the six editable start blobs matched exactly. `git diff --cached --check`
+was clean; eight paths staged and committed, ACTIVE never staged, working tree clean at the product head.
 
 ## 3. Guards (sanitized)
 
 | Guard | Result |
 | --- | --- |
-| Physical root | the single Uno checkout resolved physically; Git toplevel equal; no symlink, junction or reparse alias |
-| Parent and siblings | the parent anchored `/00.foundation-uno/` ignore rule verified and untouched; parent, Foundation, Solo and every sibling strictly read-only |
-| Worktrees / remotes | one worktree, `main`, one fetch/push remote `origin` for `provelopment/provelopment-foundation-uno`, no mirror; no reset, rebase, force, clean or amend |
-| Head and remote | `HEAD` = `origin/main` = `ca82eb4` at start and re-read immediately before the push; clean index and worktree |
-| ACTIVE | one private file at the expected path, matching byte count, digest and heading, ignored, untracked, unstaged, absent from every diff |
+| ACTIVE | one private file at the expected path, 13,036 bytes, digest and heading matching the activation, ignored, untracked, unstaged, absent from every diff |
+| Physical root | the single Uno checkout resolved physically; Git toplevel equal; no symlink, junction or reparse alias on the checkout or its ancestors |
+| Parent and siblings | the parent-anchored `/00.foundation-uno/` ignore rule verified without editing the parent; parent, Foundation, Solo and every sibling path and remote strictly read-only |
+| Git | one worktree, `main`, exactly one fetch/push remote `origin` for `provelopment/provelopment-foundation-uno`, no mirror; no reset, rebase, force, clean or amend |
+| Head and remote | `HEAD` = `origin/main` = `99cc690` at start and re-read immediately before the push, where it had not moved |
 | WIP slots | exactly four: `plan-roadmap.md`, `plan-next.md`, the ignored private ACTIVE, `plan-outlook.md` |
-| Pins | **24 / 24** immutable blobs byte-identical; both CREATE destinations ABSENT at start |
-| Runtime | Node 26.13.1 and pnpm 11.6.0; in-root install `--frozen-lockfile --ignore-scripts --store-dir .pnpm-store`; `package.json` and `pnpm-lock.yaml` blobs unchanged |
+| Pins | **21 / 21** immutable anchors byte-identical; all six editable start blobs matched; both CREATE destinations ABSENT |
+| Runtime | Node 26.13.1 and pnpm 11.6.0; in-root frozen install with `--frozen-lockfile --ignore-scripts --store-dir .pnpm-store`; `package.json` and `pnpm-lock.yaml` blobs unchanged |
 
 ## 4. What was built
 
-**One use case, one record.** `prepareUnoPageDeliveryCandidate(input)` accepts exactly
-`{manifest, selection, base, pathname, loadedSource}`, classifies plain records and descriptors before reading
-anything, and never invokes an accessor. It reads the stored Site locale policy through
-`resolveUnoCommittedLocales`, and only on acceptance hands that **stored** policy — never a caller-supplied one —
-to `validateUnoSitePublicationInputs` with the proposed canonical base, so one Entity, one selected Site, the
-declared locales, a reserved default Home and a valid base must all agree before an address is considered. It then
-takes the authoritative candidate from `matchUnoCandidateRoute` and accepts the supplied loader result only when
-it is the exact accepted loader shape and describes that same candidate field for field — Entity, Facet, Site,
-Page, locale tag, locale path key, route, pathname — with the same declared source kinds and paths in the same
-order. A rebuilt, fully checked loader record is what reaches `resolveUnoPageHeader`; the header and the
-discoverability intent are then read from their own accepted policies.
+**A. The declaration may now state a base.** `src/core/efs/uno-config.ts` accepts exactly one additional optional
+top-level key, `base: { canonical, aliases }`. When it is absent, the validated config is unchanged and carries no
+`base` property, with identical selection and language-mapping semantics. When it is present the module calls
+`validateUnoCanonicalBase(base)` — the single owner of every URL, scheme, credential, query, fragment,
+percent-encoding, host, prefix, alias-count, duplicate and overlap rule — and stores that policy's own answer,
+re-expressed as `canonical = origin + pathPrefix` and one string per alias in validated order, freshly frozen with
+only those two keys. A policy refusal becomes the one new closing code `config:invalid-base`; the policy's own
+unreadable outcome keeps the existing `config:unreadable`. Root unknown keys and unknown keys inside `base` both
+refuse, nothing is inferred from a host or environment, and no rejected value is returned, thrown or echoed.
 
-**The record.** `{accepted, identity, document, ifServed}`. `identity` names the one Entity, Facet, Site, Page,
-authored locale tag and exact pathname. `document` carries the projected header plus the raw, deliberately
-unrendered Markdown body where the source is Markdown; no JSON key is ever returned as executable content.
-`ifServed` carries the **hypothetical** canonical URL, the robots intent and the six eligibility booleans copied
-unchanged from the discoverability policy. The canonical address is
-`validatedBase.origin + validatedBase.pathPrefix + candidate.pathname` — one slash between prefix and locale —
-uses the canonical base only and never an alias or a request Host, is proven ASCII, and is refused beyond 384
-bytes rather than truncated.
+**B. One pure reader over that declaration.** `src/application/resolve-uno-committed-base.ts` takes exactly
+`{manifest, selection}` as own data, never invoking an accessor, and delegates to `validateUnoSiteSelection`,
+which already validates the graph, the selection, the optional language mapping and the newly integrated base. It
+translates that validator's closed codes onto its own five frozen literals — `committed-base:input-invalid`,
+`committed-base:unreadable`, `committed-base:selection-invalid`, `committed-base:missing`, `committed-base:invalid`
+— and returns a fresh, deeply frozen `{accepted, site, base}` identifying exactly the selected Entity, Facet, Site
+and declared base. A hostile prototype, symbol key or accessor refuses without being read; a throwing proxy trap
+becomes `committed-base:unreadable`.
 
-**Refusals.** Ten closed literals: `delivery:input-invalid`, `delivery:unreadable`,
-`delivery:committed-locales-invalid`, `delivery:site-inputs-invalid`, `delivery:route-invalid`,
-`delivery:load-refused`, `delivery:candidate-mismatch`, `delivery:header-invalid`, `delivery:discovery-invalid`,
-`delivery:canonical-too-long`. Rejected output is exactly `{accepted:false, reason}`; accepted output is freshly
-allocated and deeply frozen. No refusal echoes a pathname, a host, a title, a body or an exception.
-
-**Not serving.** No route, redirect, response object, HTTP status, rendered HTML, `hreflang` tag, sitemap entry or
-metadata emission is produced; no `published`, `authorized` or `live` field exists; `src/app/**` does not import
-the use case and the pure kernel never depends on it.
+**C. The committed reality is stated, not repaired.** `deployment/uno.config.json` still declares no base, so the
+reader answers `committed-base:missing`. It supplies no domain, no loopback default and no placeholder — the
+absence is the answer, and the file was not edited. `src/app/**` does not import the reader and no core module
+depends on it; no route, redirect, metadata, `basePath`, deployment or provider surface changed.
 
 
-## 5. Test evidence — 24 focused cases, 42 exact-code refusal inputs
+## 5. Test evidence — 21 new cases, 49 new exact-code refusal inputs
 
-| Area | Cases | What is proved |
-| --- | ---: | --- |
-| Committed Home through the real confined loader | 5 | `Foundation Uno`, one Entity / `foundation` / `main`, stored `en-001`, raw unrendered body, `http://localhost:3000/en-001`, `https://example.org/site/en-001`, alias origin never used, committed files unchanged by digest |
-| Scratch repositories | 4 | unlisted non-Home JSON → six flags false and `noindex,nofollow`; public non-Home Markdown → six flags true and `robots: null`; declared JSON-before-Markdown precedence holds; malformed preferred JSON refuses instead of falling back |
-| Stored authority and base refusals | 4 | missing Site `locales`, missing mapping, four invalid bases, over-cap canonical measured on a real candidate |
-| Route and loader refusals | 3 | missing / unknown / malformed pathname, loader refusal at a declared address, non-loader and incomplete loader shapes |
-| Candidate identity refusals | 2 | ten identity/source disagreements and a swapped source order |
-| Header, discovery and request shape | 4 | unlisted Home refused by the header policy, six non-object roots, extra and missing keys, accessor with zero reads, symbol, exotic prototype, throwing Proxy |
-| Freshness and the byte boundary | 3 | public JSON without description or body, per-call freshness with no caller reference, exactly 384 bytes accepted and one byte more refused |
+| Suite | Cases | New refusal inputs | What is proved |
+| --- | ---: | ---: | --- |
+| `efs-uno-config` | 39 (31 preserved + 8) | 18 | absent-vs-present; root, one sub-path and an explicit loopback base; eight aliases accepted in declared order and a ninth refused; duplicate alias and ancestor/descendant overlap refused; nine malformed families (scheme, credentials, query, fragment, percent encoding, invalid host, extra key, non-array aliases, non-object base) each refused as `config:invalid-base`; root and nested accessors refused with **zero** invocations; symbol key, exotic prototype and throwing proxy; byte-for-byte no caller mutation; fresh deep freeze; a refusal that echoes nothing |
+| `efs-uno-committed-base` | 13 (all new) | 31 | the committed files answer `committed-base:missing` and the reader reads no file itself; accepted root, sub-path, alias-ordered and loopback bases; policy-refused bases map to `committed-base:invalid`; an unreadable declaration maps to `committed-base:unreadable`; every other selection failure maps to `committed-base:selection-invalid`; wrong shape, extra key, missing key, non-object manifest or selection, accessor, symbol and exotic prototype refuse as `input-invalid`; a throwing proxy refuses as `unreadable`; fresh frozen answers, no caller mutation, one frozen five-code vocabulary, and refusals that never echo a host or path |
 
-No existing test was dropped, skipped, weakened or mocked. The two loader-driven refusal classes were
-distinguished empirically rather than assumed: a loader failure at an *undeclared* address refuses as
-`delivery:route-invalid` (the matcher owns the address), while a loader failure at a *declared* address refuses as
-`delivery:load-refused`.
+No existing test was skipped, weakened, mocked or downgraded; the 31 pre-existing config cases and every other
+suite are unchanged in expectation.
+
+**Hostile-structure codes, stated precisely.** The nested reading belongs to the canonical-base policy, so a
+nested accessor, symbol key or exotic prototype surfaces as that policy's own not-plain refusal and therefore as
+`config:invalid-base`, while a *root* accessor is refused by this validator's own reader as `config:unreadable`.
+A trap that throws a plain error is not hostile structure and keeps `config:unreadable`. Both families were
+verified empirically rather than assumed; in every case the accessor was never invoked.
 
 **Broad local gates.**
 
 | Gate | Result |
 | --- | --- |
 | `pnpm install --frozen-lockfile --ignore-scripts --store-dir .pnpm-store` | PASS — both dependency blobs unchanged |
-| Focused suite `efs-uno-page-delivery-candidate` | **24 / 24** |
+| Focused suites (`efs-uno-config`, `efs-uno-committed-base`) | **52 / 52** |
 | `node scripts/verify-governance-docs.mjs` | PASS — three frozen files match Owner-frozen bytes |
 | `node --test tests/governance-docs.test.mjs` | **9 / 9** |
 | `pnpm test:bootstrap` | **19 / 19**; CLI: 11 files, licence verified, four-slot discipline, no credential or private-path leak |
-| `pnpm test:architecture` | **33 / 33** (31 preserved + 2 new) |
+| `pnpm test:architecture` | **36 / 36** (33 preserved + 3 new) |
 | `pnpm lint` | exit 0 — 0 errors, 0 warnings |
 | `pnpm typecheck` | exit 0 |
-| `pnpm test` | **676 passed / 676**, 20 files — 652 previous + **24 new** |
+| `pnpm test` | **697 passed / 697**, 21 files — 676 previous + **21 new** |
 | `pnpm build` | PASS — exactly `/`, `/_not-found`, `/icon.svg`; no `en-001` route |
-| `pnpm test:http` | **103 passed, 0 failed** — `/` 200 with the approved headline; `/en`, `/en-001`, `/about`, unknown, `/robots.txt`, `/sitemap.xml` 404 |
+| `pnpm test:http` | **103 passed, 0 failed** — `/` 200; `/en`, `/en-001`, `/about`, unknown, `/robots.txt`, `/sitemap.xml` 404 |
 | readiness fixtures / CLI | 66 pass / **100 checks, 0 failed** (`VERCEL_NOT_DEPLOYED_BY_AGENT`) |
 | security floors / brand contract | 16 pass / 29 pass |
 | `pnpm audit --audit-level high` | exit 0 — **0 high, 0 critical, 2 moderate** |
 | `git diff --check` | clean before the commit and after |
-| Immutable pins | 24 blobs byte-identical; both CREATE paths absent at start |
+| Pins | 21 immutable anchors byte-identical; six editable start blobs matched; both CREATE paths absent at start |
 
 **Warnings, disclosed.** Two **moderate** advisories remain — the same dev-only `minimatch` denial-of-service
 family (`>=7.0.0 <11.0.1`, patched `>=11.0.1`) reached only through the ESLint toolchain, never through a runtime
 or production dependency path. They are recorded, not waived or silenced; the blocking threshold is zero high or
 critical, and zero is what the gate reports. Local Windows execution is **PASS**; WSL is **NOT APPLICABLE**.
 
-**Reachability, stated honestly.** `delivery:header-invalid` is proven reachable by the unlisted-Home case, which
-the Page-header policy refuses before discoverability is consulted. `delivery:discovery-invalid` remains a
-**defensive** code: no accepted precedence reached it in this run, so its reachability is **UNVERIFIED** and the
-inventory records that status rather than implying coverage.
+**Architecture coverage, stated honestly.** Three additive checks were added rather than the two required: the
+reader is inside the authored-source scan with `../core/efs/uno-config` as its only import specifier; injected
+Node, Next, React, adapter, `deployment/` and `src/app` imports are each refused while an inward core import stays
+clean; and the config validator is proven to reference `validateUnoCanonicalBase` exactly twice — one import and
+one call site — while restating none of the policy's URL, prefix, alias-count, duplicate or overlap vocabulary.
 
 
 ## 6. Hosted CI
 
-**Product head `9eb93156aeb52ee283fa1c3cc03bbbb64e6f86d8` — four jobs, all `success`:**
+**Product head `d58696d2d391b97e7e935a163b7350e78ef3341a` — four jobs, all `success`:**
 
 | Workflow | Run | ubuntu-24.04 | windows-2025 | Steps / non-success |
 | --- | --- | --- | --- | --- |
-| Verify U01 baseline | `44013801756` | success | success | 24 / **0** |
-| Uno Bootstrap Verify | `44013801713` | success | success | 10 / **0** |
+| Verify U01 baseline | `44027391031` | success | success | 24 / **0** |
+| Uno Bootstrap Verify | `44027390957` | success | success | 10 / **0** |
 
-Both hosts ran the governance verifier, the architecture suite and the blocking unit step that includes the new
-focused suite. **Full log text is UNVERIFIED** — this client reads job and step conclusions only. The report-only
-head repeats the same four jobs; its run IDs are returned privately to the Owner.
+Both hosts ran the governance verifier, the architecture suite and the blocking unit step that includes
+`efs-uno-config` and the new `efs-uno-committed-base` suite. Log **text** is **UNVERIFIED** — this client reads job
+and step conclusions only. The report-only head repeats the same four jobs; its run IDs are returned privately to
+the Owner.
 
 ## 7. Rights, privacy and cleanup
 
-**Provenance.** The new implementation is original **Uno-owned** work, class **NEW**; the pinned read-only
-Foundation GEO-03 commit `c05c55ea61b5347cf5032211dd0bf37f2cc5083c` remains conceptual context only. No
+**Provenance.** Both new files are original **Uno-owned** work, class **NEW**; the pinned read-only Foundation
+GEO-03 commit `c05c55ea61b5347cf5032211dd0bf37f2cc5083c` remains conceptual context with **no code imported**. No
 Foundation, Solo or Connect source, media or brand was copied, and the 17-family / 22-module rights inventory is
 unchanged.
 
-**Privacy.** No secret, token, absolute personal path, private ACTIVE byte or unpublished external content
-appears in either commit, in CI or in this report. No guard was weakened, no threshold raised, no workflow edited
-and no test skipped.
+**Privacy.** No secret, token, absolute personal path, private ACTIVE byte or unpublished external content appears
+in either commit, in CI or in this report. No guard was weakened, no threshold raised, no workflow edited and no
+test skipped. The committed declaration was **not** edited: no domain, origin or placeholder was installed.
 
 **Provider actions: zero.** No provider API call, manual deployment, promotion, alias, domain or settings change;
 the only external effect was the authorized non-force Git push and any build the existing Git integration starts
 from it.
 
-**Cleanup.** Task scratch under the ignored `.temp/` directory removed; build, package-store and cache outputs
-stay ignored; no unknown file was deleted; `git status` is clean at the product head; the private ACTIVE remains
-ignored and unstaged.
+**Cleanup.** Task-owned `.temp/` scratch removed; build, package-store and cache outputs stay ignored; no unknown
+file was deleted; `git status` is clean at the product head; the private ACTIVE remains ignored and unstaged.
 
 ## 8. What remains unimplemented — U03 stays OPEN
 
-1. **A real canonical base.** No production origin is chosen; the base this use case consumes is the caller's
-   proposed value, and the committed declaration still carries none.
-2. **An explicit publication decision.** A prepared candidate is not a served Page: no Site or Page is published,
-   no route is activated and no address is served.
-3. **Real delivery.** HTTP status and error behaviour, emitted metadata with canonical advertising and real
-   `hreflang` tags, locale routing for the declared locales, and sitemap and robots policy are all still
-   unimplemented, as is any response body rendering.
-4. **Provider state.** Production SHA, build log and analytics remain **UNVERIFIED** by this Agent.
+1. **No production domain.** The committed declaration still states no base; the capability exists, the Owner's
+   real public origin does not. Choosing it remains an Owner decision this Agent must not infer.
+2. **No publication decision.** No Site or Page is published, no route is activated, no address is served.
+3. **No real delivery.** HTTP status and error behaviour, emitted metadata with canonical advertising and real
+   `hreflang` tags, locale routing for the declared locales, sitemap and robots policy, and response rendering all
+   remain unimplemented.
+4. **No runtime `basePath`.** A validated declared base is data for validated contracts only; nothing yet derives a
+   serving path or a redirect from it.
+5. **Provider state.** Production SHA, build log and analytics remain **UNVERIFIED** by this Agent.
 
 Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`** for this bounded U03 checkpoint:
-one pure non-serving delivery-candidate use case, ten closed refusals, a 384-byte canonical cap proven at its
-boundary, 24 focused cases with 42 exact-code refusal inputs, a preserved baseline of 676 unit tests and 33
-architecture checks, unchanged public behaviour, zero provider actions and U03 still open.
+one optional declared canonical base delegated entirely to the accepted policy, one closed code, one pure reader
+with five closed literals, `committed-base:missing` as the truthful answer for the committed files, 21 new cases
+with 49 new refusal inputs, 697 unit tests and 36 architecture checks green, unchanged public behaviour, zero
+provider actions and U03 still open.
