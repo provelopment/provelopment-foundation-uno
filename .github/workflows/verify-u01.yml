@@ -120,6 +120,14 @@ jobs:
         run: pnpm test:http
         shell: bash
 
+      # Blocking U03 fail-closed integration gate (UNO-WO-028 / R01). The committed deployment
+      # declares no canonical base and publishes no Page, so every localized address, robots.txt
+      # and sitemap.xml must answer a real 404 while `/` keeps its approved copy and noindex.
+      # Read-only: no provider call, no deployment, no rewrite and no bypass.
+      - name: Run production HTTP (U03 locale and discovery refusals)
+        run: node scripts/verify-u03-http.mjs
+        shell: bash
+
       # Offline deployment-readiness gate (UNO-WO-012 / R02). Reads only committed text from
       # this checkout: no network, no provider call, no credential and no deployment. It fails
       # the job if the pinned build inputs, the payload exclusions, the page/robots guards or

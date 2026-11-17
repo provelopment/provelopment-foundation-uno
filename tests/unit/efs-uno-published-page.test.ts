@@ -1,0 +1,442 @@
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { loadUnoCandidateSource } from "../../src/adapters/efs/uno-confined-source-reader";
+import { planUnoPublicDiscovery } from "../../src/application/plan-uno-public-discovery";
+import {
+  listUnoServingAddresses,
+  planUnoServingDiscovery,
+  planUnoServingPage,
+  renderUnoServingRobots,
+  renderUnoServingSitemap,
+} from "../../src/config/uno-serving";
+import {
+  UNO_PUBLICATION_INPUT_KEYS,
+  UNO_PUBLICATION_REFUSAL_REASONS,
+  planUnoPublishedPage,
+  type UnoPublicationRefusal,
+  type UnoPublishedPageResult,
+} from "../../src/application/plan-uno-published-page";
+
+/**
+ * U03 published-Page planner tests (`UNO-WO-028 / R01`).
+ *
+ * Every positive decision is produced from a **real synthetic Uno fixture** on disk — the fixed committed
+ * declaration paths, the confined loader and the accepted route matcher — so nothing here fabricates a loader
+ * result. The committed deployment's own declaration is never touched: it stays base-free and unpublished,
+ * which is why the production surface answers 404.
+ */
+
+const ENTITY_ID = "e_7a3knkx60eacyhca7a0cr1k6e1";
+const BASE = { canonical: "http://localhost:3000", aliases: [] as string[] };
+const fixtureRoot = join(process.cwd(), ".temp", "uno-wo028-published");
+
+const PAGE = (id: string, publication: unknown, sources: unknown[]) => {
+  const page: Record<string, unknown> = {
+    id,
+    route: id === "home" ? ["home"] : [id],
+    representations: [{ locale: "en-001", sources }],
+  };
+  if (publication !== undefined) page["publication"] = publication;
+  return page;
+};
+
+const MANIFEST = {
+  entities: [
+    {
+      id: ENTITY_ID,
+      facets: [
+        {
+          id: "foundation",
+          sites: [
+            {
+              id: "main",
+              locales: { supportedLocales: ["en-001"], defaultLocale: "en-001" },
+              pages: [
+                PAGE("home", "published", [
+                  { kind: "markdown", path: "deployment/efs/content/home.en-001.md" },
+                ]),
+                PAGE("about", "published", [
+                  { kind: "markdown", path: "deployment/efs/content/about.en-001.md" },
+                ]),
+                PAGE("draft", undefined, [
+                  { kind: "markdown", path: "deployment/efs/content/draft.en-001.md" },
+                ]),
+                PAGE("hidden", "published", [
+                  { kind: "json", path: "deployment/efs/content/hidden.en-001.json" },
+                ]),
+                PAGE("broken", "published", [
+                  { kind: "json", path: "deployment/efs/content/broken.en-001.json" },
+                  { kind: "markdown", path: "deployment/efs/content/broken.en-001.md" },
+                ]),
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const SELECTION = {
+  version: 1,
+  entityId: ENTITY_ID,
+  selectedSite: { facetId: "foundation", siteId: "main" },
+  languagePreferences: { en: "en-001" },
+  base: BASE,
+};
+
+/** Write one fixture file, creating its directories. */
+function writeFixture(relativePath: string, contents: string): void {
+  const path = join(fixtureRoot, relativePath);
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, contents, "utf8");
+}
+
+/** Load one fixture address through the real confined loader and plan it. */
+async function plan(
+  pathname: string,
+  overrides: Record<string, unknown> = {},
+): Promise<UnoPublishedPageResult> {
+  const loaded = await loadUnoCandidateSource({ repoRoot: fixtureRoot, pathname });
+  // A refused load is forwarded as the loader's own closed refusal, exactly as a real caller would.
+  const loadedSource = loaded.accepted
+    ? { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text }
+    : { accepted: false, reason: loaded.reason };
+  return planUnoPublishedPage({
+    manifest: MANIFEST,
+    selection: SELECTION,
+    base: BASE,
+    pathname,
+    loadedSource,
+    ...overrides,
+  });
+}
+
+/** Assert one exact closed refusal. */
+function expectRefused(result: UnoPublishedPageResult, code: UnoPublicationRefusal): void {
+  expect(result.accepted).toBe(false);
+  if (result.accepted) return;
+  expect(result.reason).toBe(code);
+  expect(UNO_PUBLICATION_REFUSAL_REASONS).toContain(result.reason);
+  expect(Object.keys(result).sort()).toEqual(["accepted", "reason"]);
+}
+
+beforeAll(() => {
+  writeFixture("deployment/efs/manifest.json", JSON.stringify(MANIFEST));
+  writeFixture("deployment/uno.config.json", JSON.stringify(SELECTION));
+  writeFixture(
+    "deployment/efs/content/home.en-001.md",
+    "# Fixture home\n\nWelcome to the fixture home page.\n\n## What this proves\n\nA published Page renders.\n\n- one\n- two\n",
+  );
+  writeFixture(
+    "deployment/efs/content/about.en-001.md",
+    "# About the fixture\n\nThis is the fixture About page.\n",
+  );
+  writeFixture("deployment/efs/content/draft.en-001.md", "# Draft\n\nNot published.\n");
+  writeFixture(
+    "deployment/efs/content/hidden.en-001.json",
+    JSON.stringify({ title: "Hidden fixture page", visibility: "unlisted" }),
+  );
+  writeFixture("deployment/efs/content/broken.en-001.json", '{ "broken": ');
+  writeFixture("deployment/efs/content/broken.en-001.md", "# Broken\n\nMust never be reached.\n");
+});
+
+afterAll(() => {
+  rmSync(fixtureRoot, { recursive: true, force: true });
+});
+
+describe("published fixture Pages", () => {
+  it("plans the published Home with an exact canonical URL", async () => {
+    const result = await plan("/en-001");
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+
+    expect(result.identity).toEqual({
+      entityId: ENTITY_ID,
+      facetId: "foundation",
+      siteId: "main",
+      pageId: "home",
+      localeTag: "en-001",
+      localePathKey: "en-001",
+      routePath: "",
+      pathname: "/en-001",
+    });
+    expect(result.document.kind).toBe("markdown");
+    expect(result.document.title).toBe("Fixture home");
+    expect(result.document.visibility).toBe("public");
+    expect(result.document.markdownBody).toContain("A published Page renders.");
+    expect(result.delivery.canonicalUrl).toBe("http://localhost:3000/en-001");
+    expect(result.delivery.robots).toBeNull();
+    expect(result.delivery.public).toBe(true);
+    expect(result.delivery.unlisted).toBe(false);
+    expect(result.delivery.indexable).toBe(true);
+    expect(result.delivery.defaultLocale).toBe("en-001");
+    expect(result.delivery.supportedLocales).toEqual(["en-001"]);
+    expect(result.delivery.languagePreferences).toEqual({ en: "en-001" });
+  });
+
+  it("plans a non-Home published Markdown Page at its own address", async () => {
+    const result = await plan("/en-001/about");
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+
+    expect(result.identity.pageId).toBe("about");
+    expect(result.identity.routePath).toBe("about");
+    expect(result.delivery.canonicalUrl).toBe("http://localhost:3000/en-001/about");
+    expect(result.document.title).toBe("About the fixture");
+    expect(result.document.description).toBeUndefined();
+  });
+
+  it("plans a published unlisted JSON Page for classification only", async () => {
+    const result = await plan("/en-001/hidden");
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+
+    expect(result.document.kind).toBe("json");
+    expect(result.document.visibility).toBe("unlisted");
+    expect(result.delivery.unlisted).toBe(true);
+    expect(result.delivery.public).toBe(false);
+    expect(result.delivery.robots).toBe("noindex,nofollow");
+    expect(result.delivery.indexable).toBe(false);
+    expect(result.delivery.eligible.sitemap).toBe(false);
+    expect(result.document.markdownBody).toBeUndefined();
+  });
+
+  it("feeds its own accepted decisions into the public discovery planner", async () => {
+    const home = await plan("/en-001");
+    const about = await plan("/en-001/about");
+    const hidden = await plan("/en-001/hidden");
+    expect(home.accepted && about.accepted && hidden.accepted).toBe(true);
+    if (!home.accepted || !about.accepted || !hidden.accepted) return;
+
+    const discovery = planUnoPublicDiscovery({
+      decisions: [home, about, hidden],
+      locales: { supportedLocales: ["en-001"], defaultLocale: "en-001" },
+    });
+    expect(discovery.accepted).toBe(true);
+    if (!discovery.accepted) return;
+
+    // The unlisted Page contributes nothing: no entry, no alternate, no x-default.
+    expect(discovery.sitemapUrls).toEqual([
+      "http://localhost:3000/en-001",
+      "http://localhost:3000/en-001/about",
+    ]);
+    expect(JSON.stringify(discovery).includes("/hidden")).toBe(false);
+    const homeEntry = discovery.entries[0];
+    expect(homeEntry?.pageId).toBe("home");
+    expect(homeEntry?.xDefault).toBe("http://localhost:3000/en-001");
+    expect(homeEntry?.alternates).toEqual([]);
+  });
+
+  it("returns a fresh, deeply frozen plan without mutating the caller", async () => {
+    const manifestSnapshot = JSON.stringify(MANIFEST);
+    const first = await plan("/en-001");
+    const second = await plan("/en-001");
+    expect(first.accepted && second.accepted).toBe(true);
+    if (!first.accepted || !second.accepted) return;
+
+    expect(first).not.toBe(second);
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Object.isFrozen(first.identity)).toBe(true);
+    expect(Object.isFrozen(first.document)).toBe(true);
+    expect(Object.isFrozen(first.delivery)).toBe(true);
+    expect(Object.isFrozen(first.delivery.eligible)).toBe(true);
+    expect(Object.isFrozen(first.delivery.supportedLocales)).toBe(true);
+    expect(JSON.stringify(MANIFEST)).toBe(manifestSnapshot);
+  });
+});
+
+
+describe("the publication gate", () => {
+  it("refuses a Page that declares no publication, even when everything else accepts", async () => {
+    expectRefused(await plan("/en-001/draft"), "publication:not-published");
+  });
+
+  it("refuses a Page that declares draft", async () => {
+    const manifest = JSON.parse(JSON.stringify(MANIFEST)) as Record<string, unknown>;
+    const entity = (manifest["entities"] as Record<string, unknown>[])[0] as Record<string, unknown>;
+    const facet = (entity["facets"] as Record<string, unknown>[])[0] as Record<string, unknown>;
+    const site = (facet["sites"] as Record<string, unknown>[])[0] as Record<string, unknown>;
+    for (const page of site["pages"] as Record<string, unknown>[]) {
+      if (page["id"] === "draft") page["publication"] = "draft";
+    }
+
+    expectRefused(await plan("/en-001/draft", { manifest }), "publication:not-published");
+  });
+
+  it("refuses an invalid publication spelling as a manifest refusal", async () => {
+    for (const invalid of ["Published", "public", true, "publish"]) {
+      const manifest = JSON.parse(JSON.stringify(MANIFEST)) as Record<string, unknown>;
+      const entity = (manifest["entities"] as Record<string, unknown>[])[0] as Record<string, unknown>;
+      const facet = (entity["facets"] as Record<string, unknown>[])[0] as Record<string, unknown>;
+      const site = (facet["sites"] as Record<string, unknown>[])[0] as Record<string, unknown>;
+      const home = (site["pages"] as Record<string, unknown>[])[0] as Record<string, unknown>;
+      home["publication"] = invalid;
+      expectRefused(await plan("/en-001", { manifest }), "publication:manifest-invalid");
+    }
+  });
+
+  it("refuses a missing or invalid proposed base before any Page is considered", async () => {
+    expectRefused(
+      await plan("/en-001", { base: { canonical: "", aliases: [] } }),
+      "publication:base-invalid",
+    );
+    expectRefused(
+      await plan("/en-001", { base: { canonical: "ftp://localhost:3000", aliases: [] } }),
+      "publication:base-invalid",
+    );
+  });
+
+  it("refuses unknown, wrong-locale and non-Home addresses", async () => {
+    expectRefused(await plan("/en-001/nope"), "publication:route-invalid");
+    expectRefused(await plan("/de-001"), "publication:route-invalid");
+    expectRefused(await plan("/en"), "publication:route-invalid");
+    expectRefused(await plan("/en-001/hidden/extra"), "publication:route-invalid");
+  });
+
+  it("refuses an invalid JSON declaration without falling back to the declared Markdown", async () => {
+    expectRefused(await plan("/en-001/broken"), "publication:source-refused");
+  });
+
+  it("refuses a forged loader record that does not describe the matched candidate", async () => {
+    const loaded = await loadUnoCandidateSource({ repoRoot: fixtureRoot, pathname: "/en-001/about" });
+    if (!loaded.accepted) throw new Error("fixture loader refused");
+
+    for (const forged of [
+      { accepted: true, candidate: { ...loaded.candidate, pageId: "home" }, kind: "markdown", text: "x" },
+      { accepted: false, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
+      { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text, extra: 1 },
+      { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text, sources: [] },
+    ]) {
+      expectRefused(await plan("/en-001/about", { loadedSource: forged }), "publication:source-refused");
+    }
+
+    // A forged *kind* is caught by the header projector, the authority on a body, and still refuses the plan.
+    // The body *text* itself is the confined loader's trust boundary: the serving adapter always forwards the
+    // loader's own result, and the adapter's own suite proves it reads only the declared path.
+    expectRefused(
+      await plan("/en-001/about", {
+        loadedSource: { accepted: true, candidate: loaded.candidate, kind: "json", text: loaded.text },
+      }),
+      "publication:header-invalid",
+    );
+  });
+});
+
+
+describe("the committed deployment refuses everything", () => {
+  it("serves no Page, lists no address, plans no discovery and emits no robots or sitemap", async () => {
+    // The committed Declaration is base-free and publishes no Page, so the server adapter must refuse before
+    // any of these surfaces can answer. This is the same truth the production HTTP gate observes.
+    const page = await planUnoServingPage("/en-001");
+    expect(page.status).toBe("not-served");
+    if (page.status === "not-served") expect(page.reason).toBe("serving:authority-unavailable");
+
+    expect(await listUnoServingAddresses()).toEqual([]);
+
+    const discovery = await planUnoServingDiscovery();
+    expect(discovery.status).toBe("unavailable");
+
+    expect(await renderUnoServingRobots()).toBeNull();
+    expect(await renderUnoServingSitemap()).toBeNull();
+  });
+
+  it("refuses an input that is not an absolute address", async () => {
+    for (const pathname of ["", "en-001", "/en-001?x=1", "/en-001#x", "/en-001/a%20b", 7, null]) {
+      const outcome = await planUnoServingPage(pathname);
+      expect(outcome.status).toBe("not-served");
+      if (outcome.status === "not-served") expect(outcome.reason).toBe("serving:input-invalid");
+    }
+  });
+});
+
+describe("hostile input and vocabulary", () => {
+  it("refuses a hostile request without invoking a getter", async () => {
+    let reads = 0;
+    const hostile = {
+      manifest: MANIFEST,
+      selection: SELECTION,
+      base: BASE,
+      pathname: "/en-001",
+      get loadedSource(): unknown {
+        reads += 1;
+        return { accepted: true };
+      },
+    };
+    expectRefused(planUnoPublishedPage(hostile), "publication:input-invalid");
+    expect(reads).toBe(0);
+
+    const withSymbol = {
+      manifest: MANIFEST,
+      selection: SELECTION,
+      base: BASE,
+      pathname: "/en-001",
+    } as Record<PropertyKey, unknown>;
+    withSymbol[Symbol("extra")] = true;
+    expectRefused(planUnoPublishedPage(withSymbol), "publication:input-invalid");
+
+    const throwingProxy = new Proxy(
+      {},
+      {
+        ownKeys(): string[] {
+          throw new Error("hostile");
+        },
+      },
+    );
+    expectRefused(planUnoPublishedPage(throwingProxy), "publication:unreadable");
+  });
+
+  it("refuses every wrong request shape", async () => {
+    for (const value of [null, [], "path", 0, true]) {
+      expectRefused(planUnoPublishedPage(value), "publication:input-invalid");
+    }
+    expectRefused(
+      planUnoPublishedPage({ manifest: MANIFEST, selection: SELECTION, base: BASE, pathname: "/en-001" }),
+      "publication:input-invalid",
+    );
+    expectRefused(
+      planUnoPublishedPage({
+        manifest: MANIFEST,
+        selection: SELECTION,
+        base: BASE,
+        pathname: "/en-001",
+        loadedSource: {},
+        extra: 1,
+      }),
+      "publication:input-invalid",
+    );
+    expectRefused(
+      planUnoPublishedPage({
+        manifest: MANIFEST,
+        selection: SELECTION,
+        base: BASE,
+        pathname: 7,
+        loadedSource: {},
+      }),
+      "publication:input-invalid",
+    );
+  });
+
+  it("keeps one frozen, complete vocabulary and echoes nothing when refusing", async () => {
+    expect(UNO_PUBLICATION_INPUT_KEYS).toEqual([
+      "manifest",
+      "selection",
+      "base",
+      "pathname",
+      "loadedSource",
+    ]);
+    expect(Object.isFrozen(UNO_PUBLICATION_INPUT_KEYS)).toBe(true);
+    expect(Object.isFrozen(UNO_PUBLICATION_REFUSAL_REASONS)).toBe(true);
+    expect(new Set(UNO_PUBLICATION_REFUSAL_REASONS).size).toBe(
+      UNO_PUBLICATION_REFUSAL_REASONS.length,
+    );
+
+    const refused = await plan("/en-001/secret-path");
+    expectRefused(refused, "publication:route-invalid");
+    expect(JSON.stringify(refused)).toBe('{"accepted":false,"reason":"publication:route-invalid"}');
+    expect(JSON.stringify(refused).includes("secret-path")).toBe(false);
+  });
+});

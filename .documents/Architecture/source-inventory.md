@@ -1223,6 +1223,46 @@ no markup; Markdown must begin with one `# ` heading and is always `public`; rep
 projection proves a Page is routed, public or indexable.
 
 
+## U03 publication, serving and discovery (UNO-WO-028 / R01)
+
+**Publication authority.** The manifest Page now accepts one optional own-data key, `publication`, whose only
+literals are `"draft"` and `"published"`. Absent and `"draft"` are not published; `"published"` alone lets a Page be
+*considered* after every other contract accepts. It is Page-scoped, has no Site default, no `public` property and
+no inference from a file, route candidate, selected Site, host or environment; an invalid literal refuses as one
+new closed code, `page:invalid-publication`. The committed `deployment/efs/manifest.json` declares none, so the one
+authored Home remains unpublished and no committed file was edited.
+
+**Planners.** `src/application/plan-uno-published-page.ts` composes the graph, the committed locale authority, the
+selection, a caller-proposed base, the matched candidate, the accepted delivery candidate and the header/discovery
+classifications into one deeply frozen `{identity, document, delivery}` — or one of fourteen closed `publication:`
+literals. Only the candidate's own validated Page with `publication: "published"` can be accepted.
+`src/application/plan-uno-public-discovery.ts` turns a complete, validated collection of those accepted decisions
+into sorted canonical sitemap entries and same-Page locale alternates, refusing duplicate URLs (case-insensitively),
+duplicate Page locales, mixed Sites, undeclared locales and unusable URLs, and excluding every `unlisted` Page.
+
+**Serving boundary.** `src/config/uno-serving.ts` is the only server-side IO boundary: it reads the two fixed
+declarations from `process.cwd()` (used once, never as a request value), resolves the committed base, loads one
+address through the confined loader and refuses to serve without a base, a published Page, a renderable body and a
+consistent authority. `src/app/[locale]/[[...segments]]/page.tsx`, `src/app/robots.txt/route.ts` and
+`src/app/sitemap.xml/route.ts` are thin consumers: a refused decision is a genuine 404, never an empty 200, and a
+JSON Page is refused for serving until its versioned document contract and renderer exist in U04.
+
+**Presentation.** `src/components/uno-safe-markdown-page.tsx` renders a small Markdown subset as React text nodes:
+no `dangerouslySetInnerHTML`, no raw HTML, image, link, table, block quote or second `h1`. Anything unsupported
+fails the whole document.
+
+**Non-binding.** No canonical domain was chosen, no committed Page was published, no `basePath`, rewrite, proxy,
+tenant gateway or provider setting changed, and U03 remains open.
+
+**Rights.** Original **Uno-owned** implementation, class **NEW / REWRITE concept**; the pinned Foundation GEO-03
+commit `c05c55ea61b5347cf5032211dd0bf37f2cc5083c` (`src/core/page-document.ts`, blob `a12d964c…`) is read-only
+comparison context only and **no code was copied**. No dependency, SDK, secret, asset or licence change; the
+17-family / 22-module map and Apache-2.0 notices are intact.
+
+**Limitations.** The frozen root layout renders `<html lang="en">`, so a served `en-001` Page cannot carry a truthful
+language attribute; that gate is **UNVERIFIED**, not passed. No positive public HTTP response exists in the committed
+deployment, which is why the new HTTP gate proves only fail-closed 404 behaviour.
+
 ## U03 declared canonical base (UNO-WO-027 / R02)
 
 **Mapping.** `src/core/efs/uno-config.ts` now accepts exactly one additional optional top-level key, `base`, on the

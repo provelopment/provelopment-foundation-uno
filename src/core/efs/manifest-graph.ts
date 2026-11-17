@@ -58,12 +58,30 @@ export interface UnoManifestRepresentation {
   readonly properties?: UnoPropertyBag;
 }
 
-/** One authored Page: its authoring id, its authoring route segments and its representations. */
+/**
+ * The two declared Page publication states. `draft` and an absent declaration are the same thing in
+ * effect — not published — but the spelling is preserved so an authored declaration is never rewritten.
+ */
+export const UNO_PAGE_PUBLICATIONS = Object.freeze(["draft", "published"] as const);
+
+/** An authored Page publication state. A declaration only; never a routing or serving instruction. */
+export type UnoPagePublication = (typeof UNO_PAGE_PUBLICATIONS)[number];
+
+/**
+ * One authored Page: its authoring id, its authoring route, its representations and, optionally, its
+ * explicit publication declaration.
+ *
+ * `publication` is the only publication authority in the manifest. It is Page-scoped, absent by default,
+ * and says nothing about a Site, a host, a route or a source file: a Page whose source exists, whose
+ * properties say `public` and whose Site is selected is still unpublished until it declares
+ * `publication: "published"` and every other contract accepts it.
+ */
 export interface UnoManifestPage {
   readonly id: string;
   readonly route: readonly string[];
   readonly representations: readonly UnoManifestRepresentation[];
   readonly properties?: UnoPropertyBag;
+  readonly publication?: UnoPagePublication;
 }
 
 /** One authored Site inside a Facet. */
@@ -117,6 +135,7 @@ export type UnoManifestRefusal =
   | "page:duplicate-id"
   | "page:invalid-route"
   | "page:duplicate-route"
+  | "page:invalid-publication"
   | "representation:invalid-locale"
   | "representation:duplicate-locale"
   | "source:invalid-kind"
@@ -149,6 +168,7 @@ export const REFUSAL_REASONS: readonly UnoManifestRefusal[] = Object.freeze([
   "page:duplicate-id",
   "page:invalid-route",
   "page:duplicate-route",
+  "page:invalid-publication",
   "representation:invalid-locale",
   "representation:duplicate-locale",
   "source:invalid-kind",
@@ -533,8 +553,13 @@ function readPage(
 ): Step<UnoManifestPage> {
   const page = ownData(raw);
   if (page === null) return { ok: false, reason: "shape:not-an-object" };
-  const shape = shapeIssue(page, ["id", "route", "representations"], ["properties"]);
+  const shape = shapeIssue(page, ["id", "route", "representations"], ["properties", "publication"]);
   if (shape) return { ok: false, reason: shape };
+
+  // Publication is Page-scoped and optional. Only the two declared literals are accepted, and an
+  // unreadable descriptor refuses rather than being skipped: publication is never inferred.
+  const publication = readPagePublication(page);
+  if (publication === null) return { ok: false, reason: "page:invalid-publication" };
 
   const pageProperties = readProperties(page);
   if (!pageProperties.ok) return pageProperties;
@@ -584,17 +609,39 @@ function readPage(
   seenIds.add(id);
   seenRoutes.add(routePath);
 
+  const validatedPage: {
+    id: string;
+    route: readonly string[];
+    representations: readonly UnoManifestRepresentation[];
+    publication?: UnoPagePublication;
+  } = {
+    id,
+    route: Object.freeze(segments.slice()),
+    representations: Object.freeze(representations),
+  };
+  if (publication !== undefined) validatedPage.publication = publication;
+
   return {
     ok: true,
-    value: withProperties(
-      {
-        id,
-        route: Object.freeze(segments.slice()),
-        representations: Object.freeze(representations),
-      },
-      pageProperties.value,
-    ),
+    value: withProperties(validatedPage, pageProperties.value),
   };
+}
+
+/**
+ * Read the optional Page publication declaration.
+ *
+ * `undefined` means the Page declared none (which is not published); a declared literal is returned
+ * unchanged; `null` reports an unusable declaration. The field is read by descriptor so an accessor
+ * can never run, and only the two declared literals are accepted — no boolean, no `public` property,
+ * no capitalised variant and no coercion.
+ */
+function readPagePublication(page: DataRecord): UnoPagePublication | undefined | null {
+  const descriptor = Object.getOwnPropertyDescriptor(page, "publication");
+  if (descriptor === undefined) return undefined;
+  if (!("value" in descriptor)) throw new HostileInput();
+  const value = descriptor.value;
+  if (value === "draft" || value === "published") return value;
+  return null;
 }
 
 /**

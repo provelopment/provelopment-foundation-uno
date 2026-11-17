@@ -1235,3 +1235,110 @@ test('the config validator delegates every base rule to the accepted canonical-b
     assert.equal(configSource.includes(restated), false, `uno-config must not restate ${restated}`);
   }
 });
+// --- U03 publication, serving and discovery (UNO-WO-028 / R01) -------------------
+
+const U03_APPLICATION = [
+  'src/application/plan-uno-published-page.ts',
+  'src/application/plan-uno-public-discovery.ts',
+];
+
+test('the U03 planners are scanned, inward-only and free of IO or framework imports', () => {
+  const authored = Object.keys(authoredSources());
+  for (const path of U03_APPLICATION) {
+    assert.equal(authored.includes(path), true, `${path} must be authored and scanned`);
+    const source = readFileSync(resolve(ROOT, path), 'utf8');
+    assert.deepEqual(scanSources({ [path]: source }), [], `${path} must have no forbidden import`);
+
+    const executable = stripComments(source);
+    const specifiers = [...executable.matchAll(/from\s+"([^"]+)"/gu)].map((match) => match[1]);
+    for (const specifier of specifiers) {
+      // Only inward, relative modules: a sibling use case or a core contract. Never an adapter, app,
+      // config, deployment or bare package specifier.
+      assert.match(specifier, /^\.{1,2}\//u, `${path} imports ${specifier}`);
+      for (const forbidden of ['adapters', '/app/', 'config/', 'deployment/']) {
+        assert.equal(specifier.includes(forbidden), false, `${path} imports ${specifier}`);
+      }
+    }
+    for (const forbidden of ['process.env', 'process.cwd', 'node:', 'deployment/', 'next/', 'react']) {
+      assert.equal(executable.includes(forbidden), false, `${path} must not gain ${forbidden}`);
+    }
+  }
+});
+
+test('one server-only composition owns the fixed root and the file read', () => {
+  const config = stripComments(readFileSync(resolve(ROOT, 'src/config/uno-serving.ts'), 'utf8'));
+
+  // Exactly one `process.cwd()`: the fixed deployment root, never a request value.
+  assert.equal((config.match(/process\.cwd\(\)/gu) ?? []).length, 1);
+  for (const forbidden of ['process.env', 'headers(', 'cookies(', 'next/headers', 'x-forwarded', 'host']) {
+    assert.equal(config.includes(forbidden), false, `the composition must not read ${forbidden}`);
+  }
+  for (const forbidden of ["from 'react'", 'from "react"', "from 'next", 'from "next']) {
+    assert.equal(config.includes(forbidden), false, `the composition must not import ${forbidden}`);
+  }
+
+  // Nothing inside the pure kernel or the application layer reads a file or the working directory.
+  for (const [path, body] of Object.entries({
+    ...readTree('src/core', 'src/core'),
+    ...readTree('src/application', 'src/application'),
+  })) {
+    const executable = stripComments(body);
+    for (const forbidden of ['process.cwd', 'node:fs', 'readFileSync']) {
+      assert.equal(executable.includes(forbidden), false, `${path} must not contain ${forbidden}`);
+    }
+  }
+});
+
+test('the locale, robots and sitemap surfaces consume only the server composition', () => {
+  const surfaces = [
+    'src/app/[locale]/[[...segments]]/page.tsx',
+    'src/app/robots.txt/route.ts',
+    'src/app/sitemap.xml/route.ts',
+  ];
+  for (const path of surfaces) {
+    const source = readFileSync(resolve(ROOT, path), 'utf8');
+    const executable = stripComments(source);
+
+    assert.match(executable, /config\/uno-serving/u, `${path} must use the server composition`);
+    for (const forbidden of [
+      'process.env',
+      'next/headers',
+      'cookies(',
+      'x-forwarded',
+      'searchParams',
+      'notFound() && redirect',
+    ]) {
+      assert.equal(executable.includes(forbidden), false, `${path} must not read ${forbidden}`);
+    }
+    for (const forbidden of ['node:fs', 'node:child_process', 'readFileSync', 'fetch(']) {
+      assert.equal(executable.includes(forbidden), false, `${path} must not perform ${forbidden}`);
+    }
+  }
+
+  // The frozen root surface stays a single static demonstration: no locale wiring was smuggled in.
+  for (const path of ['src/app/page.tsx', 'src/app/layout.tsx', 'src/app/not-found.tsx']) {
+    const source = stripComments(readFileSync(resolve(ROOT, path), 'utf8'));
+    for (const forbidden of ['uno-serving', 'plan-uno-', 'hreflang', 'rel="canonical"', 'redirect(']) {
+      assert.equal(source.includes(forbidden), false, `${path} must not gain ${forbidden}`);
+    }
+  }
+});
+
+test('the Markdown renderer never interprets authored input as markup', () => {
+  const source = stripComments(
+    readFileSync(resolve(ROOT, 'src/components/uno-safe-markdown-page.tsx'), 'utf8'),
+  );
+  for (const forbidden of [
+    'dangerouslySetInnerHTML',
+    'use client',
+    'eval(',
+    'new Function',
+    'innerHTML',
+    'href={',
+    'src={',
+  ]) {
+    assert.equal(source.includes(forbidden), false, `the renderer must not use ${forbidden}`);
+  }
+  assert.match(source, /parseUnoSafeMarkdown/u);
+  assert.match(source, /UNO_SAFE_MARKDOWN_LIMITS/u);
+});

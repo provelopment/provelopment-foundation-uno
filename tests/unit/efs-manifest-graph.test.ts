@@ -979,3 +979,103 @@ describe("declared Site locales (`UNO-WO-025 / R01`)", () => {
     expectRefused(sparseGraph, "input:unreadable");
   });
 });
+
+describe("the optional Page publication declaration (UNO-WO-028 / R01)", () => {
+  it("keeps an absent publication absent instead of defaulting one", () => {
+    const result = validateUnoManifestGraph(authoredGraph());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+
+    const page = result.graph.entities[0]?.facets[0]?.sites[0]?.pages[0];
+    expect(page).toBeDefined();
+    expect(Object.prototype.hasOwnProperty.call(page, "publication")).toBe(false);
+  });
+
+  it("keeps the two declared spellings verbatim and frozen", () => {
+    for (const publication of ["draft", "published"]) {
+      const graph = copy(authoredGraph());
+      setField(pageOf(graph), "publication", publication);
+
+      const result = validateUnoManifestGraph(graph);
+      expect(result.accepted).toBe(true);
+      if (!result.accepted) continue;
+
+      const page = result.graph.entities[0]?.facets[0]?.sites[0]?.pages[0];
+      expect(page?.publication).toBe(publication);
+      expect(Object.isFrozen(page)).toBe(true);
+      expect(Object.isFrozen(graph.entities[0]?.facets[0]?.sites[0]?.pages[0])).toBe(false);
+    }
+  });
+
+  it("refuses every other value with one closed publication code", () => {
+    for (const invalid of ["Published", "public", "true", true, 1, null, ["published"], { value: "published" }]) {
+      const graph = copy(authoredGraph());
+      setField(pageOf(graph), "publication", invalid);
+      expectRefused(graph, "page:invalid-publication");
+    }
+  });
+
+  it("refuses an unknown key next to a valid publication declaration", () => {
+    const graph = copy(authoredGraph());
+    setField(pageOf(graph), "publication", "published");
+    setField(pageOf(graph), "published", true);
+    expectRefused(graph, "shape:unsupported-field");
+  });
+
+  it("refuses a publication accessor without invoking it", () => {
+    const graph = authoredGraph();
+    let reads = 0;
+    Object.defineProperty(pageOf(graph), "publication", {
+      enumerable: true,
+      configurable: true,
+      get(): string {
+        reads += 1;
+        return "published";
+      },
+    });
+    expectRefused(graph, "input:unreadable");
+    expect(reads).toBe(0);
+  });
+
+  it("refuses symbol keys and exotic prototypes on a Page", () => {
+    const withSymbol = authoredGraph();
+    Object.defineProperty(pageOf(withSymbol), Symbol("extra"), { value: true, enumerable: true });
+    expectRefused(withSymbol, "input:unreadable");
+
+    const exotic = authoredGraph();
+    const page = pageOf(exotic);
+    Object.setPrototypeOf(page, { inherited: true });
+    expectRefused(exotic, "input:unreadable");
+  });
+
+  it("refuses publication on any node that is not a Page", () => {
+    const onEntity = authoredGraph();
+    setField(entityOf(onEntity), "publication", "published");
+    expectRefused(onEntity, "shape:unsupported-field");
+
+    const onFacet = authoredGraph();
+    setField(facetOf(onFacet), "publication", "published");
+    expectRefused(onFacet, "shape:unsupported-field");
+
+    const onSite = authoredGraph();
+    setField(siteOf(onSite), "publication", "published");
+    expectRefused(onSite, "shape:unsupported-field");
+  });
+
+  it("keeps the committed manifest unpublished", () => {
+    const parsed: unknown = JSON.parse(readFileSync(MANIFEST_URL, "utf8"));
+    const result = validateUnoManifestGraph(parsed);
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+
+    for (const entity of result.graph.entities) {
+      for (const facet of entity.facets) {
+        for (const site of facet.sites) {
+          for (const page of site.pages) {
+            expect(page.publication).not.toBe("published");
+          }
+        }
+      }
+    }
+  });
+});

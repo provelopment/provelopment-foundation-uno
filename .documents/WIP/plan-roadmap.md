@@ -119,12 +119,12 @@ nothing, no `src/app` source imports it, and `public` eligibility is not publica
 activation, safe HTTP error behaviour, metadata/SEO emission including canonical advertising and `hreflang`,
 real locale routing, and any optional base path. Each requires a later bounded Owner order.
 
-**Declared base (`UNO-WO-027 / R02`):** the selected-Site declaration may now state an optional canonical `base`,
-validated entirely by `validateUnoCanonicalBase` and surfaced as one new closed code (`config:invalid-base`),
-while `src/application/resolve-uno-committed-base.ts` reads the stored base or refuses with one of five
-`committed-base:` literals. The committed declaration still states no base, so the reader answers
-`committed-base:missing`; no domain is chosen, no route, redirect, metadata or publication appears, and U03 stays
-open.
+**Publication and serving (`UNO-WO-028 / R01`):** a Page may now declare `publication: "published"` and only that
+declaration, after every other contract accepts, lets `plan-uno-published-page` return a decision; a public discovery
+planner turns those decisions into sitemap URLs and same-Page `hreflang` alternates. A thin localized route,
+`robots.txt` and `sitemap.xml` exist but refuse everything: the committed declaration states no base and publishes no
+Page, so every localized address is a genuine 404 while `/` keeps its noindex demonstration. No domain was chosen,
+no committed Page was published, the locale language attribute is still UNVERIFIED, and U03 stays open.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct
 visibility behaviour.
