@@ -1087,3 +1087,64 @@ test('the scanner refuses forbidden imports in the committed-locale reader', () 
     [],
   );
 });
+
+// --- U03 prepared Page-delivery candidate (UNO-WO-026 / R01) -------------------
+
+const DELIVERY_CANDIDATE_SOURCE = 'src/application/prepare-uno-page-delivery-candidate.ts';
+
+test('the delivery-candidate use case is registered, pure and composes accepted policies', () => {
+  assert.equal(Object.keys(authoredSources()).includes(DELIVERY_CANDIDATE_SOURCE), true);
+
+  const source = readFileSync(resolve(ROOT, DELIVERY_CANDIDATE_SOURCE), 'utf8');
+  assert.deepEqual(scanSources({ [DELIVERY_CANDIDATE_SOURCE]: source }), []);
+
+  const executable = stripComments(source);
+  for (const reuse of [
+    'resolveUnoCommittedLocales',
+    'validateUnoSitePublicationInputs',
+    'matchUnoCandidateRoute',
+    'resolveUnoPageHeader',
+    'classifyUnoPageDiscoverability',
+  ]) {
+    assert.match(executable, new RegExp(reuse), `the use case must reuse ${reuse}`);
+  }
+  for (const forbidden of ['node:', '/adapters/', 'process.env', 'fetch(', 'deployment/', 'next/']) {
+    assert.equal(executable.includes(forbidden), false, `the use case must not gain ${forbidden}`);
+  }
+
+  // Serving nothing in this order: no app-layer source consumes it, and the pure kernel never depends on it.
+  for (const [path, body] of Object.entries(readTree('src/app', 'src/app'))) {
+    assert.equal(body.includes('prepare-uno-page-delivery-candidate'), false, `${path} must not consume it`);
+  }
+  for (const [path, body] of Object.entries(readTree('src/core', 'src/core'))) {
+    assert.equal(
+      body.includes('prepare-uno-page-delivery-candidate'),
+      false,
+      `${path} must not depend on an application use case`,
+    );
+  }
+});
+
+test('the scanner refuses forbidden imports in the delivery-candidate use case', () => {
+  const negativeCases = [
+    ["import { readFileSync } from 'node:fs';", 'Node I/O'],
+    ["import { headers } from 'next/headers';", 'request headers'],
+    ["import { NextResponse } from 'next/server';", 'framework response'],
+    ["import { createElement } from 'react';", 'React'],
+    ["import { loadUnoCandidateSource } from '../adapters/efs/uno-confined-source-reader';", 'adapter'],
+    ["import { m } from '../../deployment/efs/manifest.json';", 'deployment data'],
+  ];
+  for (const [line, label] of negativeCases) {
+    const violations = scanSources({ [DELIVERY_CANDIDATE_SOURCE]: `${line}\nexport const x = 1;\n` });
+    assert.equal(violations.length, 1, `${label} must be refused in ${DELIVERY_CANDIDATE_SOURCE}`);
+  }
+
+  // An approved core-only import stays clean, so the scanner is not simply refusing everything.
+  assert.deepEqual(
+    scanSources({
+      [DELIVERY_CANDIDATE_SOURCE]:
+        "import { matchUnoCandidateRoute } from '../core/efs/uno-route-address';\nexport const ok = matchUnoCandidateRoute;\n",
+    }),
+    [],
+  );
+});

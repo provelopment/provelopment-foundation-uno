@@ -119,11 +119,11 @@ nothing, no `src/app` source imports it, and `public` eligibility is not publica
 activation, safe HTTP error behaviour, metadata/SEO emission including canonical advertising and `hreflang`,
 real locale routing, and any optional base path. Each requires a later bounded Owner order.
 
-**Stored locales (`UNO-WO-025 / R01`):** the Site now declares its own `locales` in the manifest, the
-selection carries the explicit `en → en-001` mapping, and `src/application/resolve-uno-committed-locales.ts`
-reads the two stored authorities into one policy — a missing authority refuses rather than being defaulted. The
-Home Markdown was replaced with Owner-approved copy. This is a stored declaration plus corrected prose, **not**
-publication: no base, route, redirect, canonical/`hreflang` output or Site activation, and U03 stays open.
+**Prepared candidate (`UNO-WO-026 / R01`):** `src/application/prepare-uno-page-delivery-candidate.ts` gathers the
+stored Site/locale authority, the proposed canonical base, the exact matched candidate, the confined source
+load, the Page header and the discoverability intent into one deeply frozen, **non-serving** record — with ten
+closed `delivery:` refusals and a 384-byte canonical cap. It creates no route, response, metadata or publication
+flag, and U03 stays open.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct
 visibility behaviour.

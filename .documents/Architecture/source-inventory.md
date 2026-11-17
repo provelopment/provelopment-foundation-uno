@@ -1223,6 +1223,37 @@ no markup; Markdown must begin with one `# ` heading and is always `public`; rep
 projection proves a Page is routed, public or indexable.
 
 
+## U03 prepared Page-delivery candidate (UNO-WO-026 / R01)
+
+**Mapping.** `src/application/prepare-uno-page-delivery-candidate.ts` is the first use case that gathers what the
+repository already knows about one address into a single record. It reads the stored Site locale policy through
+`resolveUnoCommittedLocales`, hands that **stored** policy — never a caller-supplied one — to
+`validateUnoSitePublicationInputs` together with the proposed canonical base, takes the authoritative candidate
+from `matchUnoCandidateRoute`, and accepts the supplied confined-source load only when it describes that
+candidate field for field with the same declared sources in the same order. Header and discoverability then come
+from `resolveUnoPageHeader` and `classifyUnoPageDiscoverability`; this use case copies their answers and
+re-implements neither policy.
+
+**Shape.** The accepted record is `{accepted, identity, document, ifServed}`: identity carries the one Entity,
+Facet, Site, Page, authored locale tag and exact pathname; document carries the projected header and raw,
+deliberately unrendered Markdown; `ifServed` carries a **hypothetical** canonical URL built from the validated
+proposed base, the robots intent and the six eligibility booleans. Ten closed `delivery:` refusals cover request
+shape, hostile structure, stored authority, base, route, load, candidate identity, header, discovery and the
+384-byte canonical cap; no refusal echoes caller text.
+
+**Non-serving.** No route, redirect, response, status, rendered HTML, `hreflang` tag, sitemap entry, metadata or
+publication flag is produced; `src/app/**` does not import the use case and the pure kernel does not depend on it.
+
+**Rights.** Original **Uno-owned** implementation, class **NEW**; the pinned Foundation GEO-03 commit
+`c05c55ea…` remains conceptual context only. No Foundation, Solo or Connect code, media or brand imported; no
+dependency, workflow, asset or deployment file touched; Apache-2.0 notices intact.
+
+**Limitations.** A prepared candidate is not a served Page. No production origin is chosen, no route is
+activated and U03 remains open; `delivery:header-invalid` is the reachable Home/unlisted guard, while
+`delivery:discovery-invalid` stays a defensive code whose reachability through the accepted precedences is
+**UNVERIFIED**.
+
+## U03 stored Site-locale policy (UNO-WO-025 / R01)
 ## U03 stored Site-locale policy (UNO-WO-025 / R01)
 
 **Mapping.** The locale contract is now stored rather than only proposed. `src/core/efs/manifest-graph.ts`
