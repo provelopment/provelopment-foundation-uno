@@ -12,6 +12,12 @@
  * considered. The named Facet and Site must then exist under the one validated Entity. There is no
  * fallback to the first element of any array, no default and no repair: an unlisted Site refuses.
  *
+ * THE OPTIONAL DECLARED BASE. A declaration may also name a canonical base for its selected Site. That
+ * value is *declared intent only*: it binds no host, configures no runtime, builds no `basePath` and
+ * publishes nothing. Its URL, prefix, alias and overlap rules belong entirely to
+ * `validateUnoCanonicalBase`, which this module delegates to and never restates; a base that policy
+ * refuses becomes one closed `config:` code, and the rejected value is never returned or echoed.
+ *
  * PURITY. Framework-free and dependency-free within Uno's own core: no `fs`, no `process`,
  * environment, clock, network, adapter, Next.js, React or Node built-in. Importing this module
  * executes nothing and, deliberately, no `src/app` file imports it.
@@ -26,6 +32,7 @@ import { isContentSlug } from "../page-content";
 import { isEntityId } from "./identity";
 import { validateUnoManifestGraph } from "./manifest-graph";
 import { localePolicyIssue } from "./uno-locales";
+import { validateUnoCanonicalBase, type UnoCanonicalBase } from "./uno-canonical-base";
 
 /** The only accepted declaration version. */
 export const UNO_CONFIG_VERSION = 1;
@@ -54,7 +61,8 @@ export type UnoConfigRefusal =
   | "config:site-not-found"
   | "config:ambiguous-site"
   | "config:invalid-language-preferences"
-  | "config:locale-authority-missing";
+  | "config:locale-authority-missing"
+  | "config:invalid-base";
 
 /** The closed refusal vocabulary as data, for callers that must enumerate or document it. */
 export const CONFIG_REFUSAL_REASONS: readonly UnoConfigRefusal[] = Object.freeze([
@@ -72,12 +80,26 @@ export const CONFIG_REFUSAL_REASONS: readonly UnoConfigRefusal[] = Object.freeze
   "config:ambiguous-site",
   "config:invalid-language-preferences",
   "config:locale-authority-missing",
+  "config:invalid-base",
 ]);
 
 /** One declared future publication target: an authored Facet id and an authored Site id. */
 export interface UnoSelectedSite {
   readonly facetId: string;
   readonly siteId: string;
+}
+
+/**
+ * The optional canonical base a declaration may state for its selected Site.
+ *
+ * It is a *declaration*: one canonical absolute URL string plus explicit alias strings. Nothing here
+ * binds a host, sets a runtime base path, redirects a request or authorises publication; the accepted
+ * canonical-base contract owns every lexical and overlap rule, and this shape only carries its
+ * validated result back in the caller's own single-string form.
+ */
+export interface UnoDeclaredBase {
+  readonly canonical: string;
+  readonly aliases: readonly string[];
 }
 
 /** The validated declaration: a version, the one Entity and the one selected Site. */
@@ -93,6 +115,14 @@ export interface UnoSelectedSiteConfig {
    * refuses instead of being guessed.
    */
   readonly languagePreferences?: Readonly<Record<string, string>>;
+  /**
+   * The optional canonical base this declaration states for the selected Site.
+   *
+   * Absent means the declaration selects no base at all — never an implicit or inferred one, and never
+   * an environment or host default. When present it is the accepted canonical-base policy's own
+   * validated answer, re-expressed as one canonical string plus its aliases in validated order.
+   */
+  readonly base?: UnoDeclaredBase;
 }
 
 /** A tagged result: the validated declaration, or one closed reason and no partial selection. */
@@ -176,6 +206,42 @@ function deepFreeze<T>(value: T): T {
   return Object.freeze(value);
 }
 
+/** Re-express one validated base as the single canonical string form the declaration carries. */
+function declaredBaseString(base: UnoCanonicalBase): string {
+  return `${base.origin}${base.pathPrefix}`;
+}
+
+/** One internal verdict for the optional base: absent, accepted, or one closed config refusal. */
+type DeclaredBaseOutcome =
+  | { readonly state: "accepted"; readonly base: UnoDeclaredBase }
+  | { readonly state: "refused"; readonly reason: UnoConfigRefusal };
+
+/**
+ * Validate the optional declared base through the canonical-base policy and re-express its answer.
+ *
+ * Every URL, prefix, alias and overlap rule stays in `validateUnoCanonicalBase`; this function adds no
+ * lexical rule of its own. A policy refusal is reported as `config:invalid-base`, except the policy's
+ * own unreadable outcome, which keeps this module's existing `config:unreadable` meaning so a hostile
+ * structure is not misreported as an authored mistake. Neither branch returns the rejected value.
+ */
+function readDeclaredBase(value: unknown): DeclaredBaseOutcome {
+  const validated = validateUnoCanonicalBase(value);
+  if (!validated.accepted) {
+    if (validated.reason === "base:unreadable") {
+      return { state: "refused", reason: "config:unreadable" };
+    }
+    return { state: "refused", reason: "config:invalid-base" };
+  }
+
+  return {
+    state: "accepted",
+    base: Object.freeze({
+      canonical: declaredBaseString(validated.canonical),
+      aliases: Object.freeze(validated.aliases.map(declaredBaseString)),
+    }),
+  };
+}
+
 /**
  * Validate one selected-Site declaration against the authored manifest supplied by the caller.
  *
@@ -199,7 +265,7 @@ function analyzeSelection(input: unknown, manifest: unknown): UnoConfigValidatio
   const root = readOwnData(input);
   if (root === null) return refuse("config:invalid-shape");
 
-  const rootShape = shapeIssue(root, ["version", "entityId", "selectedSite"], ["languagePreferences"]);
+  const rootShape = shapeIssue(root, ["version", "entityId", "selectedSite"], ["languagePreferences", "base"]);
   if (rootShape) return refuse(rootShape);
 
   const version = root.version;
@@ -258,6 +324,7 @@ function analyzeSelection(input: unknown, manifest: unknown): UnoConfigValidatio
     entityId: string;
     selectedSite: UnoSelectedSite;
     languagePreferences?: Record<string, string>;
+    base?: UnoDeclaredBase;
   } = {
     version: UNO_CONFIG_VERSION,
     entityId,
@@ -269,6 +336,14 @@ function analyzeSelection(input: unknown, manifest: unknown): UnoConfigValidatio
       sorted[key] = languagePreferences[key] as string;
     }
     selected.languagePreferences = sorted;
+  }
+
+  // The base is optional but never inferred: when the declaration states one, the accepted canonical-base
+  // policy decides it, and its validated answer is the only thing stored.
+  if (Object.prototype.hasOwnProperty.call(root, "base")) {
+    const declaredBase = readDeclaredBase(root.base);
+    if (declaredBase.state === "refused") return refuse(declaredBase.reason);
+    selected.base = declaredBase.base;
   }
   return Object.freeze({ accepted: true, config: deepFreeze(selected) });
 }

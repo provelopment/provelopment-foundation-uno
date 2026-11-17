@@ -1148,3 +1148,90 @@ test('the scanner refuses forbidden imports in the delivery-candidate use case',
     [],
   );
 });
+
+// --- U03 committed canonical base (UNO-WO-027 / R02) ---------------------------
+
+const COMMITTED_BASE_SOURCE = 'src/application/resolve-uno-committed-base.ts';
+
+test('the committed-base reader is scanned, pure and depends inward only', () => {
+  assert.equal(Object.keys(authoredSources()).includes(COMMITTED_BASE_SOURCE), true);
+
+  const source = readFileSync(resolve(ROOT, COMMITTED_BASE_SOURCE), 'utf8');
+  assert.deepEqual(scanSources({ [COMMITTED_BASE_SOURCE]: source }), []);
+
+  const executable = stripComments(source);
+  assert.match(executable, /validateUnoSiteSelection/, 'the reader must delegate to the selection validator');
+
+  // The reader's whole import surface is one inward core contract: no third-party or provider package exists.
+  const specifiers = [...executable.matchAll(/from\s+"([^"]+)"/gu)].map((match) => match[1]);
+  assert.deepEqual(specifiers, ['../core/efs/uno-config']);
+
+  for (const forbidden of [
+    'node:',
+    '/adapters/',
+    'process.env',
+    'fetch(',
+    'deployment/',
+    'next/',
+    'react',
+    'readFileSync',
+  ]) {
+    assert.equal(executable.includes(forbidden), false, `the reader must not gain ${forbidden}`);
+  }
+
+  for (const [path, body] of Object.entries(readTree('src/core', 'src/core'))) {
+    assert.equal(
+      body.includes('resolve-uno-committed-base'),
+      false,
+      `${path} must not depend on an application use case`,
+    );
+  }
+});
+
+test('the scanner refuses outside imports in the committed-base reader, and the app layer ignores it', () => {
+  const negativeCases = [
+    ["import { readFileSync } from 'node:fs';", 'Node I/O'],
+    ["import { headers } from 'next/headers';", 'request headers'],
+    ["import { createElement } from 'react';", 'React'],
+    ["import { loadUnoCandidateSource } from '../adapters/efs/uno-confined-source-reader';", 'adapter'],
+    ["import { m } from '../../deployment/uno.config.json';", 'deployment data'],
+    ["import { layout } from '../../src/app/layout';", 'app/router layer'],
+  ];
+  for (const [line, label] of negativeCases) {
+    const violations = scanSources({ [COMMITTED_BASE_SOURCE]: `${line}\nexport const x = 1;\n` });
+    assert.equal(violations.length, 1, `${label} must be refused in ${COMMITTED_BASE_SOURCE}`);
+  }
+
+  assert.deepEqual(
+    scanSources({
+      [COMMITTED_BASE_SOURCE]:
+        "import { validateUnoSiteSelection } from '../core/efs/uno-config';\nexport const ok = validateUnoSiteSelection;\n",
+    }),
+    [],
+  );
+
+  // Still no publication surface: the app/router layer must not consume the reader.
+  for (const [path, body] of Object.entries(readTree('src/app', 'src/app'))) {
+    assert.equal(body.includes('resolve-uno-committed-base'), false, `${path} must not consume the reader`);
+  }
+});
+
+test('the config validator delegates every base rule to the accepted canonical-base policy', () => {
+  const configSource = stripComments(readFileSync(resolve(ROOT, 'src/core/efs/uno-config.ts'), 'utf8'));
+
+  // One imported policy, called from one place: no lexical URL, prefix, alias or overlap rule is restated.
+  assert.equal((configSource.match(/validateUnoCanonicalBase/gu) ?? []).length, 2);
+  assert.match(configSource, /config:invalid-base/u);
+  for (const restated of [
+    'new URL(',
+    'maxAliases',
+    'maxPrefixSegments',
+    'alias-overlap',
+    'alias-duplicate',
+    'canonical-url',
+    'startsWith("http',
+    'startsWith("https',
+  ]) {
+    assert.equal(configSource.includes(restated), false, `uno-config must not restate ${restated}`);
+  }
+});

@@ -119,11 +119,12 @@ nothing, no `src/app` source imports it, and `public` eligibility is not publica
 activation, safe HTTP error behaviour, metadata/SEO emission including canonical advertising and `hreflang`,
 real locale routing, and any optional base path. Each requires a later bounded Owner order.
 
-**Prepared candidate (`UNO-WO-026 / R01`):** `src/application/prepare-uno-page-delivery-candidate.ts` gathers the
-stored Site/locale authority, the proposed canonical base, the exact matched candidate, the confined source
-load, the Page header and the discoverability intent into one deeply frozen, **non-serving** record — with ten
-closed `delivery:` refusals and a 384-byte canonical cap. It creates no route, response, metadata or publication
-flag, and U03 stays open.
+**Declared base (`UNO-WO-027 / R02`):** the selected-Site declaration may now state an optional canonical `base`,
+validated entirely by `validateUnoCanonicalBase` and surfaced as one new closed code (`config:invalid-base`),
+while `src/application/resolve-uno-committed-base.ts` reads the stored base or refuses with one of five
+`committed-base:` literals. The committed declaration still states no base, so the reader answers
+`committed-base:missing`; no domain is chosen, no route, redirect, metadata or publication appears, and U03 stays
+open.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct
 visibility behaviour.

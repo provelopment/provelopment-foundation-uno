@@ -484,3 +484,176 @@ describe("explicit short-language mapping (`UNO-WO-025 / R01`)", () => {
     );
   });
 });
+
+describe("the optional declared canonical base", () => {
+  /** The eight aliases a declaration may carry, all distinct and none overlapping the canonical base. */
+  function eightAliases(): string[] {
+    return Array.from({ length: 8 }, (_unused, index) => `https://alias${index + 1}.example.net`);
+  }
+
+  it("keeps an absent base absent instead of defaulting one", () => {
+    const result = validateUnoSiteSelection(config(), manifest());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect(Object.prototype.hasOwnProperty.call(result.config, "base")).toBe(false);
+    expect(Object.keys(result.config).sort()).toEqual(["entityId", "selectedSite", "version"]);
+  });
+
+  it("accepts a root base and returns the declaration's own string form", () => {
+    const result = validateUnoSiteSelection(
+      { ...config(), base: { canonical: "https://example.org", aliases: [] } },
+      manifest(),
+    );
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect(result.config.base).toEqual({ canonical: "https://example.org", aliases: [] });
+    expect(Object.keys(result.config.base as object)).toEqual(["canonical", "aliases"]);
+  });
+
+  it("accepts one validated path-prefix base and an explicit loopback base", () => {
+    for (const canonical of ["https://example.org/site", "http://localhost:3000/site"]) {
+      const result = validateUnoSiteSelection({ ...config(), base: { canonical, aliases: [] } }, manifest());
+      expect(result.accepted).toBe(true);
+      if (!result.accepted) continue;
+      expect(result.config.base?.canonical).toBe(canonical);
+    }
+  });
+
+  it("accepts eight aliases in declared order and refuses a ninth", () => {
+    const aliases = eightAliases();
+    const accepted = validateUnoSiteSelection(
+      { ...config(), base: { canonical: "https://example.org", aliases } },
+      manifest(),
+    );
+    expect(accepted.accepted).toBe(true);
+    if (!accepted.accepted) return;
+    expect(accepted.config.base?.aliases).toEqual(aliases);
+    expect(accepted.config.base?.aliases).not.toBe(aliases);
+
+    expectRefused(
+      {
+        ...config(),
+        base: { canonical: "https://example.org", aliases: [...aliases, "https://alias9.example.net"] },
+      },
+      "config:invalid-base",
+    );
+  });
+
+  it("refuses a duplicate alias and an ancestor/descendant overlap", () => {
+    expectRefused(
+      {
+        ...config(),
+        base: { canonical: "https://example.org", aliases: ["https://a.example.net", "https://a.example.net"] },
+      },
+      "config:invalid-base",
+    );
+    expectRefused(
+      { ...config(), base: { canonical: "https://example.org/site", aliases: ["https://example.org"] } },
+      "config:invalid-base",
+    );
+  });
+});
+
+
+describe("the declared base under hostile and non-URL input", () => {
+  it("refuses malformed bases one family at a time", () => {
+    const malformed: unknown[] = [
+      { canonical: "ftp://example.org", aliases: [] },
+      { canonical: "https://user:pw@example.org", aliases: [] },
+      { canonical: "https://example.org/?a=1", aliases: [] },
+      { canonical: "https://example.org/#fragment", aliases: [] },
+      { canonical: "https://example.org/a%20b", aliases: [] },
+      { canonical: "https://exa_mple.org", aliases: [] },
+      { canonical: "https://example.org", aliases: [], path: "/site" },
+      { canonical: "https://example.org", aliases: "https://alias.example.net" },
+      "https://example.org",
+    ];
+    for (const base of malformed) {
+      expectRefused({ ...config(), base }, "config:invalid-base");
+    }
+  });
+
+  it("refuses base accessors, symbols, exotic prototypes and proxies without invoking them", () => {
+    let rootReads = 0;
+    expectRefused(
+      {
+        ...config(),
+        get base(): unknown {
+          rootReads += 1;
+          return { canonical: "https://example.org", aliases: [] };
+        },
+      },
+      "config:unreadable",
+    );
+    expect(rootReads).toBe(0);
+
+    // The canonical-base policy owns the nested reading: it reports hostile structure as its own
+    // not-plain refusal, which this validator maps to one closed `config:` code. Nothing is invoked.
+    let innerReads = 0;
+    expectRefused(
+      {
+        ...config(),
+        base: {
+          get canonical(): string {
+            innerReads += 1;
+            return "https://example.org";
+          },
+          aliases: [],
+        },
+      },
+      "config:invalid-base",
+    );
+    expect(innerReads).toBe(0);
+
+    const withSymbol = { canonical: "https://example.org", aliases: [] } as Record<PropertyKey, unknown>;
+    withSymbol[Symbol("extra")] = true;
+    expectRefused({ ...config(), base: withSymbol }, "config:invalid-base");
+
+    class ExoticBase {
+      canonical = "https://example.org";
+      aliases: string[] = [];
+    }
+    expectRefused({ ...config(), base: new ExoticBase() }, "config:invalid-base");
+
+    // A trap that throws a plain error is not hostile *structure*: it surfaces as the policy's own
+    // unreadable outcome, which this validator keeps as `config:unreadable`.
+    expectRefused(
+      {
+        ...config(),
+        base: new Proxy(
+          {},
+          {
+            ownKeys(): string[] {
+              throw new Error("hostile");
+            },
+          },
+        ),
+      },
+      "config:unreadable",
+    );
+  });
+
+  it("returns a freshly frozen base, never mutates the caller, and echoes nothing when refusing", () => {
+    const base = { canonical: "https://example.org/site", aliases: ["https://alias.example.net"] };
+    const input = { ...config(), base };
+    const snapshot = JSON.stringify(input);
+
+    const result = validateUnoSiteSelection(input, manifest());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+
+    expect(Object.isFrozen(result.config.base)).toBe(true);
+    expect(Object.isFrozen(result.config.base?.aliases)).toBe(true);
+    expect(result.config.base).not.toBe(base);
+    expect(result.config.base?.aliases).not.toBe(base.aliases);
+    expect(JSON.stringify(input)).toBe(snapshot);
+
+    const refused = validateUnoSiteSelection(
+      { ...config(), base: { canonical: "https://example.org/secret-path", aliases: [], extra: 1 } },
+      manifest(),
+    );
+    expect(refused.accepted).toBe(false);
+    expect(JSON.stringify(refused)).toBe('{"accepted":false,"reason":"config:invalid-base"}');
+    expect(JSON.stringify(refused).includes("secret-path")).toBe(false);
+  });
+});

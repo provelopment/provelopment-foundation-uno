@@ -1223,6 +1223,35 @@ no markup; Markdown must begin with one `# ` heading and is always `public`; rep
 projection proves a Page is routed, public or indexable.
 
 
+## U03 declared canonical base (UNO-WO-027 / R02)
+
+**Mapping.** `src/core/efs/uno-config.ts` now accepts exactly one additional optional top-level key, `base`, on the
+existing selected-Site declaration. When it is absent the validated config is unchanged and carries no `base`
+property; when it is present the module calls `validateUnoCanonicalBase(base)` and stores that policy's own
+answer, re-expressed as `canonical = origin + pathPrefix` and one string per alias in validated order. Every URL,
+scheme, credential, query, fragment, percent-encoding, host, prefix, alias-count, duplicate and overlap rule
+stays in the canonical-base contract; this validator restates none of them. A policy refusal becomes the single
+new closing code `config:invalid-base`, the policy's own unreadable outcome keeps the existing
+`config:unreadable`, and no rejected value is returned or echoed.
+
+**Reader.** `src/application/resolve-uno-committed-base.ts` is a pure use case over the caller's own `{manifest,
+selection}` data: it delegates to `validateUnoSiteSelection`, translates that validator's closed codes onto five
+`committed-base:` literals (`input-invalid`, `unreadable`, `selection-invalid`, `missing`, `invalid`) and returns a
+fresh, deeply frozen `{site, base}`. The committed declaration states no base, and the reader answers
+`committed-base:missing` — it never supplies, infers or defaults a domain.
+
+**Non-binding.** A declared base binds no host, sets no runtime `basePath`, performs no redirect, adds no
+metadata, chooses no production domain and publishes nothing; `src/app/**` does not import the reader and the
+pure kernel never depends on it.
+
+**Rights.** Original **Uno-owned** implementation, class **NEW**; the pinned Foundation GEO-03 commit
+`c05c55ea…` remains conceptual context with **no code imported**. No dependency, workflow, asset, deployment file
+or committed declaration changed; Apache-2.0 notices and the 17-family / 22-module map are intact.
+
+**Limitations.** A validated declaration is not a selected production domain. No Owner domain exists, no route is
+activated and U03 remains open; `committed-base:missing` is the committed reality, not a defect.
+
+## U03 prepared Page-delivery candidate (UNO-WO-026 / R01)
 ## U03 prepared Page-delivery candidate (UNO-WO-026 / R01)
 
 **Mapping.** `src/application/prepare-uno-page-delivery-candidate.ts` is the first use case that gathers what the
