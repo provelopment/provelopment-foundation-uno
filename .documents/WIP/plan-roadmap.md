@@ -119,12 +119,13 @@ nothing, no `src/app` source imports it, and `public` eligibility is not publica
 activation, safe HTTP error behaviour, metadata/SEO emission including canonical advertising and `hreflang`,
 real locale routing, and any optional base path. Each requires a later bounded Owner order.
 
-**Ownership hardening (`UNO-WO-031 / R01`):** exclusive creation is now the only ownership boundary and the OS-reported
-device/inode identity is the only proof for removal, so a file that appears between preflight and the create is never
-claimed and never deleted, and a file replaced before cleanup fails the restore closed with its recovery copies kept.
-Containment is component-aware, so a sibling whose name extends the root or a literal `..` traversal is refused before
-any mutation. Twenty-seven fault and ownership cases plus the unchanged 195-check publication proof confirm it; no domain,
-publication or provider change, and U03 stays open.
+**Integrated exit evidence (`UNO-WO-032 / R01`):** one synthetic fixture now proves the same production build serves an
+explicitly published Home, About and a **custom multi-segment Page** in two authored locales over real HTTP *and* a real
+headless Chromium DOM — truthful language, title, canonical/OG, same-Page alternates and `x-default`, a six-entry
+sitemap, crawler parity for two user agents, fifteen strict refusals and a genuine 404 document — with 530 checks passing,
+the original 195 preserved, the fixture restored byte-for-byte and the unpublished configuration rebuilt afterwards.
+`playwright@1.65.1` is Apache-2.0 and test-only, installed into the repository-local ignored browser path. No live origin,
+provider action or U04 rendering is claimed, and U03 stays open.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct
 visibility behaviour.

@@ -35,6 +35,7 @@ import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { prepareUnoU03FixtureTransaction } from "./uno-u03-fixture-transaction.mjs";
+import { verifyUnoU03Browser } from "./verify-u03-browser.mjs";
 
 // Node prints a benign "typeless package.json" notice for the repository's TypeScript modules. It is expected, is
 // classified in the report, and is deliberately NOT suppressed: this gate listens to no warning event and consumes no
@@ -75,13 +76,17 @@ const PINNED_DECLARATIONS = new Map([
   [SELECTION, "4f656c93a45873d85b133aa99adaec1b6821ac9983b9e9818452773952df9a0c"],
 ]);
 
-/** The five fixture sources: created only if absent, removed again in the same `finally`. */
+/** The nine fixture sources: created only if absent, removed again in the same `finally`. */
 const FIXTURE_SOURCES = Object.freeze([
   `${CONTENT}/wo029-home.de-de.md`,
   `${CONTENT}/wo029-about.en-001.md`,
   `${CONTENT}/wo029-about.de-de.md`,
   `${CONTENT}/wo029-draft.en-001.md`,
   `${CONTENT}/wo029-hidden.en-001.json`,
+  `${CONTENT}/wo032-events.en-001.md`,
+  `${CONTENT}/wo032-events.de-de.md`,
+  `${CONTENT}/wo032-broken.en-001.json`,
+  `${CONTENT}/wo032-broken.en-001.md`,
 ]);
 
 const failures = [];
@@ -178,6 +183,38 @@ const FIXTURE_MANIFEST = {
                     },
                   ],
                 },
+                {
+                  // A custom multi-segment Page: explicit ID, explicit nested route, two authored full locales.
+                  id: "events",
+                  route: ["programmes", "events"],
+                  publication: "published",
+                  representations: [
+                    {
+                      locale: "en-001",
+                      sources: [{ kind: "markdown", path: "deployment/efs/content/wo032-events.en-001.md" }],
+                    },
+                    {
+                      locale: "de-DE",
+                      sources: [{ kind: "markdown", path: "deployment/efs/content/wo032-events.de-de.md" }],
+                    },
+                  ],
+                },
+                {
+                  // Preferred JSON is declared and malformed, with a valid Markdown alternative: the declared
+                  // JSON-before-Markdown policy must refuse outright rather than rescue through Markdown.
+                  id: "broken",
+                  route: ["broken"],
+                  publication: "published",
+                  representations: [
+                    {
+                      locale: "en-001",
+                      sources: [
+                        { kind: "json", path: "deployment/efs/content/wo032-broken.en-001.json" },
+                        { kind: "markdown", path: "deployment/efs/content/wo032-broken.en-001.md" },
+                      ],
+                    },
+                  ],
+                },
               ],
             },
           ],
@@ -195,7 +232,7 @@ const FIXTURE_SELECTION = {
   base: { canonical: TEST_BASE, aliases: [] },
 };
 
-/** The five short, original fixture documents. ASCII only, no HTML, no links, no images. */
+/** The nine short, original fixture documents. ASCII only, no HTML, no links, no images. */
 const FIXTURE_CONTENT = new Map([
   [
     `${CONTENT}/wo029-home.de-de.md`,
@@ -214,23 +251,70 @@ const FIXTURE_CONTENT = new Map([
     `${CONTENT}/wo029-hidden.en-001.json`,
     '{ "title": "Hidden fixture page", "visibility": "unlisted" }\n',
   ],
+  [
+    `${CONTENT}/wo032-events.en-001.md`,
+    "# Programmes and events\n\nA synthetic events page for the published proof.\n\n- first synthetic event\n- second synthetic event\n",
+  ],
+  [
+    `${CONTENT}/wo032-events.de-de.md`,
+    "# Programme und Veranstaltungen\n\nEine synthetische Veranstaltungsseite fuer den veroeffentlichten Nachweis.\n",
+  ],
+  // Deliberately truncated JSON: it is declared *and* unparseable, so the policy must refuse the Page outright.
+  [`${CONTENT}/wo032-broken.en-001.json`, '{ "title": "Broken fixture page", "visibility": '],
+  [
+    `${CONTENT}/wo032-broken.en-001.md`,
+    "# Broken fixture page\n\nThis Markdown must never rescue a malformed JSON source.\n",
+  ],
 ]);
 
-/** The four public addresses the accepted discovery plan must advertise, and their authored titles. */
+/**
+ * The six public addresses the accepted discovery plan must advertise, with the authored title and one distinctive
+ * sentence of their own source, so every 200 is proven to serve its own content rather than a neighbour's.
+ */
 const PUBLIC_PAGES = Object.freeze([
-  { pathname: "/en-001", locale: "en-001", title: "Foundation Uno", canonical: `${TEST_BASE}/en-001` },
-  { pathname: "/de-de", locale: "de-DE", title: "Startseite", canonical: `${TEST_BASE}/de-de` },
+  {
+    pathname: "/en-001",
+    locale: "en-001",
+    title: "Foundation Uno",
+    body: "One organisation. One connected digital presence.",
+    xDefault: `${TEST_BASE}/en-001`,
+    canonical: `${TEST_BASE}/en-001`,
+  },
+  {
+    pathname: "/de-de",
+    locale: "de-DE",
+    title: "Startseite",
+    body: "Willkommen auf der Teststartseite von Foundation Uno.",
+    xDefault: `${TEST_BASE}/en-001`,
+    canonical: `${TEST_BASE}/de-de`,
+  },
   {
     pathname: "/en-001/about",
     locale: "en-001",
     title: "About this fixture",
+    body: "A short synthetic About page for the published proof.",
     canonical: `${TEST_BASE}/en-001/about`,
   },
   {
     pathname: "/de-de/about",
     locale: "de-DE",
     title: "Ueber diese Testseite",
+    body: "Eine kurze synthetische Seite fuer den veroeffentlichten Nachweis.",
     canonical: `${TEST_BASE}/de-de/about`,
+  },
+  {
+    pathname: "/en-001/programmes/events",
+    locale: "en-001",
+    title: "Programmes and events",
+    body: "A synthetic events page for the published proof.",
+    canonical: `${TEST_BASE}/en-001/programmes/events`,
+  },
+  {
+    pathname: "/de-de/programmes/events",
+    locale: "de-DE",
+    title: "Programme und Veranstaltungen",
+    body: "Eine synthetische Veranstaltungsseite fuer den veroeffentlichten Nachweis.",
+    canonical: `${TEST_BASE}/de-de/programmes/events`,
   },
 ]);
 
@@ -241,10 +325,15 @@ const REFUSED_PAGES = Object.freeze([
   "/en-001/hidden",
   "/de-de/hidden",
   "/en-001/wo029-about",
+  "/en-001/broken",
+  "/de-de/broken",
   "/xx-001",
   "/en-001/does-not-exist",
   "/en-us",
   "/en-001/about/extra",
+  "/en-001/programmes/events/extra",
+  "/en-001/programmes/about",
+  "/en-001/programmes",
   "/de",
 ]);
 
@@ -326,10 +415,11 @@ async function stopChild(child) {
 }
 
 /** One real HTTP request against the loopback production server. */
-async function request(url) {
+async function request(url, extraHeaders) {
   const response = await fetch(url, {
     redirect: "manual",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    ...(extraHeaders === undefined ? {} : { headers: extraHeaders }),
   });
   const body = await response.text();
   return {
@@ -338,6 +428,81 @@ async function request(url) {
     location: response.headers.get("location"),
     body,
   };
+}
+
+/** The two user agents the parity proof compares: an ordinary browser and a crawler-shaped one. */
+const CRAWLER_AGENTS = Object.freeze([
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/159.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+]);
+
+/** The policy facts that must never depend on who is asking. */
+function policyOf(html) {
+  const canonical = /<link rel="canonical" href="([^"]+)"/u.exec(html)?.[1] ?? "none";
+  const robots = /<meta name="robots" content="([^"]+)"/u.exec(html)?.[1] ?? "none";
+  const ogUrl = /<meta property="og:url" content="([^"]+)"/u.exec(html)?.[1] ?? "none";
+  const alternates = [...html.matchAll(/<link[^>]+rel="alternate"[^>]*hreflang="([^"]+)"[^>]*>/gu)]
+    .map((match) => match[1])
+    .sort()
+    .join(",");
+  return { canonical, robots, ogUrl, alternates };
+}
+
+/**
+ * Crawler parity: an ordinary browser and a crawler-shaped user agent must receive the same status, the same document
+ * and the same discovery policy. Nothing here claims a real search engine indexed the site.
+ */
+async function checkCrawlerParity(base) {
+  const [browserAgent, crawlerAgent] = CRAWLER_AGENTS;
+  for (const page of PUBLIC_PAGES) {
+    const asBrowser = await request(`${base}${page.pathname}`, { "user-agent": browserAgent });
+    const asCrawler = await request(`${base}${page.pathname}`, { "user-agent": crawlerAgent });
+    check(
+      `${page.pathname} answers both user agents identically`,
+      asBrowser.status === 200 && asCrawler.status === asBrowser.status,
+      `${asBrowser.status}/${asCrawler.status}`,
+    );
+    check(
+      `${page.pathname} serves the same document to both user agents`,
+      sha256Text(asCrawler.body) === sha256Text(asBrowser.body),
+    );
+    check(
+      `${page.pathname} applies the same discovery policy to both user agents`,
+      JSON.stringify(policyOf(asCrawler.body)) === JSON.stringify(policyOf(asBrowser.body)),
+    );
+    check(
+      `${page.pathname} serves its own source text to both user agents`,
+      normalise(visibleHtml(asBrowser.body)).includes(page.body) &&
+        normalise(visibleHtml(asCrawler.body)).includes(page.body),
+    );
+    // A cookie or a forged hint must not change what is served.
+    const withCookie = await request(`${base}${page.pathname}`, {
+      "user-agent": crawlerAgent,
+      cookie: "uno_locale=de-DE; uno_site=other",
+    });
+    check(
+      `${page.pathname} ignores a forged cookie hint`,
+      withCookie.status === 200 && sha256Text(withCookie.body) === sha256Text(asBrowser.body),
+    );
+  }
+
+  const refusedPath = "/en-001/broken";
+  const refusedBrowser = await request(`${base}${refusedPath}`, { "user-agent": browserAgent });
+  const refusedCrawler = await request(`${base}${refusedPath}`, { "user-agent": crawlerAgent });
+  check(
+    "a malformed-source address is a 404 for both user agents",
+    refusedBrowser.status === 404 && refusedCrawler.status === 404,
+    `${refusedBrowser.status}/${refusedCrawler.status}`,
+  );
+  check(
+    "a malformed-source refusal is identical for both user agents",
+    sha256Text(refusedCrawler.body) === sha256Text(refusedBrowser.body),
+  );
+}
+
+/** SHA-256 of one string, used only for byte-level comparisons inside this gate. */
+function sha256Text(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 /** Collapse whitespace and decode the entities Next emits, for prose assertions. */
@@ -379,6 +544,7 @@ function checkPublicPage(pathname, page, response) {
   check(`${pathname} is served as HTML`, /text\/html/i.test(response.contentType), response.contentType);
   check(`${pathname} serves exactly one h1`, headings.length === 1, `${headings.length} h1 elements`);
   check(`${pathname} serves the authored title`, text.includes(page.title), page.title);
+  check(`${pathname} serves its own source text`, text.includes(page.body), page.body);
   check(`${pathname} declares its authored language`, raw.includes(`<html lang="${page.locale}"`));
   check(
     `${pathname} declares the exact canonical URL`,
@@ -493,18 +659,41 @@ async function validateFixtureInProcess() {
   check("the serving discovery plan is accepted", discovery.status === "planned");
   if (discovery.status === "planned") {
     check(
-      "the discovery plan holds exactly the four public entries",
-      discovery.plan.sitemapUrls.length === 4,
+      "the discovery plan holds exactly the six public entries",
+      discovery.plan.sitemapUrls.length === 6,
       discovery.plan.sitemapUrls.join(","),
     );
     check(
       "the discovery plan never advertises draft or unlisted content",
       !discovery.plan.sitemapUrls.some((url) => url.includes("/draft") || url.includes("/hidden")),
     );
+    check(
+      "the discovery plan never advertises the malformed-source Page",
+      !discovery.plan.sitemapUrls.some((url) => url.includes("/broken")),
+    );
   }
 
   const addresses = await listUnoServingAddresses();
-  check("the build-time address set holds the four Pages and the alias", addresses.length === 5, `${addresses.length}`);
+  check("the build-time address set holds the six Pages and the alias", addresses.length === 7, `${addresses.length}`);
+
+  // A declared-but-malformed JSON source refuses even though a valid Markdown alternative exists: no rescue.
+  const brokenLoaded = await loadUnoCandidateSource({ repoRoot: ROOT, pathname: "/en-001/broken" });
+  const broken = brokenLoaded.accepted
+    ? planUnoPublishedPage({
+        manifest,
+        selection,
+        base,
+        pathname: "/en-001/broken",
+        loadedSource: {
+          accepted: true,
+          candidate: brokenLoaded.candidate,
+          kind: brokenLoaded.kind,
+          text: brokenLoaded.text,
+        },
+      })
+    : { accepted: false };
+  check("the confined loader refuses the malformed preferred JSON", brokenLoaded.accepted === false);
+  check("the planner never rescues the malformed JSON through Markdown", broken.accepted === false);
 }
 
 
@@ -546,7 +735,7 @@ function preflight() {
 
 
 /**
- * Build the exact fixture bytes this transaction installs: two declarations and five short, original sources.
+ * Build the exact fixture bytes this transaction installs: two declarations and nine short, original sources.
  */
 function fixturePlan() {
   return {
@@ -609,10 +798,15 @@ async function assertOverHttp(base, child) {
   check("/sitemap.xml returns 200", sitemap.status === 200, `status ${sitemap.status}`);
   check("/sitemap.xml is XML", /application\/xml/i.test(sitemap.contentType), sitemap.contentType);
   const locations = [...sitemap.body.matchAll(/<loc>([^<]+)<\/loc>/gu)].map((match) => match[1]);
-  check("/sitemap.xml lists exactly the four public URLs", locations.length === 4, locations.join(","));
+  check("/sitemap.xml lists exactly the six public URLs", locations.length === 6, locations.join(","));
   for (const page of PUBLIC_PAGES) {
     check(`/sitemap.xml lists ${page.canonical}`, locations.includes(page.canonical));
   }
+  check(
+    "/sitemap.xml lists the custom nested-route Page",
+    locations.includes(`${TEST_BASE}/en-001/programmes/events`) &&
+      locations.includes(`${TEST_BASE}/de-de/programmes/events`),
+  );
   check(
     "/sitemap.xml alternates both authored locales",
     sitemap.body.includes('hreflang="en-001"') && sitemap.body.includes('hreflang="de-DE"'),
@@ -648,6 +842,22 @@ async function assertOverHttp(base, child) {
 
   for (const pathname of REFUSED_PAGES) {
     await checkRefusal(base, pathname);
+  }
+
+  await checkCrawlerParity(base);
+
+  // --- Real browser proof on the same running production server ---------------------------------
+  // Every assertion below comes from a real Chromium DOM. A launch failure or a failed assertion is a failure of this
+  // gate, never a skip, and the surrounding `finally` still restores the fixture.
+  const browserProof = await verifyUnoU03Browser({
+    base,
+    pages: PUBLIC_PAGES,
+    refusedPaths: REFUSED_PAGES,
+  });
+  for (const name of browserProof.passes) check(name, true);
+  for (const failure of browserProof.failures) {
+    failures.push(failure);
+    process.stdout.write(`  FAIL  ${failure}\n`);
   }
 
   check("server stayed up for the whole run", child.exitCode === null && child.signalCode === null);

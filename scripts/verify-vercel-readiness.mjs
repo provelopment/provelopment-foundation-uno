@@ -253,6 +253,12 @@ export const REASONS = Object.freeze([
   'workflow:provider-command',
   'workflow:secret-reference',
   'workflow:stale-http-label',
+  'workflow:no-browser-install',
+  'workflow:no-browser-path',
+  'workflow:no-browser-runner',
+  'workflow:browser-system-deps',
+  'package:playwright-not-dev-only',
+  'package:playwright-wrong-pin',
 ]);
 
 /**
@@ -583,6 +589,31 @@ export function analyzeReadiness(snapshot) {
   );
   expect(!/secrets\.|VERCEL_TOKEN/.test(workflowText), 'workflow:secret-reference');
   expect(!/technical placeholder/i.test(workflowText), 'workflow:stale-http-label');
+
+  // --- 8b. The test-only browser proof must be installed hermetically inside Uno -------------
+  // The pinned Playwright browser stays a *dev* dependency with one exact version; it is installed only into the
+  // repository's ignored `.temp` path (never a shared user cache, never an OS package), and the publication runner that
+  // drives it stays in its blocking place.
+  expect(
+    workflowText.includes('pnpm exec playwright install --only-shell chromium'),
+    'workflow:no-browser-install',
+  );
+  expect(countOf(workflowText, 'PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers') >= 2, 'workflow:no-browser-path');
+  expect(workflowText.includes('node scripts/verify-u03-published-http.mjs'), 'workflow:no-browser-runner');
+  expect(!/(?:install-deps|--with-deps)/.test(stripComments(workflowText)), 'workflow:browser-system-deps');
+  let declaredPackage = {};
+  try {
+    declaredPackage = asRecord(JSON.parse(packageText)) ?? {};
+  } catch {
+    declaredPackage = {};
+  }
+  const declaredDependencies = asRecord(declaredPackage.dependencies) ?? {};
+  const declaredDevDependencies = asRecord(declaredPackage.devDependencies) ?? {};
+  // Only judge the browser pin when the package metadata parsed: malformed metadata is already reported once above.
+  if (Object.keys(declaredDevDependencies).length > 0) {
+    expect(declaredDependencies.playwright === undefined, 'package:playwright-not-dev-only');
+    expect(declaredDevDependencies.playwright === '1.65.1', 'package:playwright-wrong-pin');
+  }
 
   return finish(checks, reasons);
 }

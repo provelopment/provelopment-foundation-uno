@@ -72,6 +72,17 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
         shell: bash
 
+      # Hermetic, test-only headless Chromium for the blocking browser proof (UNO-WO-032 / R01). The browser is
+      # downloaded into the repository's ignored `.temp/uno-u03-browsers`, so nothing is written to a shared user cache
+      # or to an OS package store. `--only-shell` installs exactly the headless shell the proof drives; the
+      # dependency-installing variants are deliberately not used, because they would write OS packages outside Uno. No
+      # credentials and no provider account are involved: this is tool setup, not a deployment.
+      - name: Install pinned headless Chromium (test-only, repo-local)
+        run: pnpm exec playwright install --only-shell chromium
+        shell: bash
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers
+
       # Blocking Node 26 / security-floor / analytics-provenance gate (UNO-WO-014 / R01).
       # Node-native and dependency-free: it reads committed text only and fails on a Node 24
       # regression, a missing or drifted security floor, a wrong analytics pin, an unapproved
@@ -135,13 +146,18 @@ jobs:
         run: node --test tests/deployment/u03-fixture-transaction.test.mjs
         shell: bash
 
-      # Blocking positive U03 publication gate (UNO-WO-029 / R01, hardened by UNO-WO-030 / R01). It installs a
-      # temporary, restore-in-finally synthetic publication fixture, builds and serves the REAL production output on
-      # loopback, asserts published Pages, truthful locale documents, canonical/hreflang/OG, robots and sitemap plus
-      # strict refusals, then restores the committed declarations byte-for-byte and re-runs the two gates above.
-      - name: Run production HTTP (U03 published Pages, restored afterwards)
+      # Blocking positive U03 publication gate (UNO-WO-029 / R01, hardened by UNO-WO-030 and UNO-WO-031 / R01, extended
+      # by UNO-WO-032 / R01). It installs a temporary, restore-in-finally synthetic publication fixture, builds and
+      # serves the REAL production output on loopback, asserts six published Pages including a custom nested-route
+      # Page, truthful locale documents, canonical/hreflang/OG, robots and sitemap, crawler parity, strict refusals and
+      # a real headless Chromium DOM at desktop and mobile viewports, then restores the committed declarations
+      # byte-for-byte and re-runs the two gates above. The browser path is the same repository-local one installed
+      # above, so the proof can never silently fall back to an HTTP-only substitute.
+      - name: Run production HTTP and browser (U03 published Pages, restored afterwards)
         run: node scripts/verify-u03-published-http.mjs
         shell: bash
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers
 
       # Offline deployment-readiness gate (UNO-WO-012 / R02). Reads only committed text from
       # this checkout: no network, no provider call, no credential and no deployment. It fails

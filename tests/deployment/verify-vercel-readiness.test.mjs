@@ -42,7 +42,7 @@ function validSnapshot() {
         react: '19.2.9',
         'react-dom': '19.2.9',
       },
-      devDependencies: { typescript: '5.9.3', vitest: '4.1.12' },
+      devDependencies: { typescript: '5.9.3', vitest: '4.1.12', playwright: '1.65.1' },
     },
     null,
     2,
@@ -134,6 +134,10 @@ function validSnapshot() {
     '        run: node scripts/verify-governance-docs.mjs',
     '      - name: Install (frozen lockfile)',
     '        run: pnpm install --frozen-lockfile --ignore-scripts',
+    '      - name: Install pinned headless Chromium (test-only, repo-local)',
+    '        run: pnpm exec playwright install --only-shell chromium',
+    '        env:',
+    '          PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers',
     '      - name: Node 26 and dependency security floors',
     '        run: node --test tests/deployment/node26-security-floor.test.mjs',
     '      - name: Brand and copy contract',
@@ -154,6 +158,10 @@ function validSnapshot() {
     '        run: pnpm build',
     '      - name: Production HTTP (English demonstration)',
     '        run: pnpm test:http',
+    '      - name: Production HTTP and browser (U03 published Pages, restored afterwards)',
+    '        run: node scripts/verify-u03-published-http.mjs',
+    '        env:',
+    '          PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers',
     '      - name: Deployment readiness fixtures',
     '        run: node --test tests/deployment/verify-vercel-readiness.test.mjs',
     '      - name: Deployment readiness (offline)',
@@ -598,6 +606,60 @@ test('refuses a workflow without the blocking brand and copy step', () => {
   );
   assertRefused(analyzeReadiness(snapshot), 'workflow:no-brand-test');
 });
+
+// --- UNO-WO-032 / R01: the test-only browser proof must not be lost or bypassed ----------
+
+test('refuses a workflow without the hermetic browser install step', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text.replace('pnpm exec playwright install --only-shell chromium', 'echo skipped'),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-browser-install');
+});
+
+test('refuses a browser install that escapes the repository-local path', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text
+      .replace('PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers', 'PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright')
+      .replace('PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers', 'PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright'),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-browser-path');
+});
+
+test('refuses a browser proof that is no longer driven by the publication runner', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text.replace('run: node scripts/verify-u03-published-http.mjs', 'run: echo skipped'),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-browser-runner');
+});
+
+test('refuses a browser install that would write OS packages outside Uno', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    `${text}      - name: Extra\\n        run: pnpm exec playwright install --with-deps chromium\\n`,
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:browser-system-deps');
+});
+
+test('refuses Playwright promoted into the production dependency set', () => {
+  const snapshot = withChange('packageJson', (text) =>
+    text.replace('"react": "19.2.9",', '"react": "19.2.9",\n    "playwright": "1.65.1",'),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'package:playwright-not-dev-only');
+});
+
+test('refuses a drifted Playwright pin', () => {
+  // A different but still pinned version: only the pin itself is wrong, so the refusal stays single-coded.
+  const snapshot = withChange('packageJson', (text) => text.replace('"playwright": "1.65.1"', '"playwright": "1.64.0"'));
+  assertRefused(analyzeReadiness(snapshot), 'package:playwright-wrong-pin');
+});
+
+test('refuses an unpinned Playwright range', () => {
+  const snapshot = withChange('packageJson', (text) => text.replace('"playwright": "1.65.1"', '"playwright": "^1.60.0"'));
+  const result = analyzeReadiness(snapshot);
+  assert.equal(result.accepted, false);
+  assert.equal(result.reasons.includes('package:playwright-wrong-pin'), true, 'package:playwright-wrong-pin');
+  assert.equal(result.reasons.includes('package:unpinned-dependency'), true, 'package:unpinned-dependency');
+});
+
 
 // --- UNO-WO-016 / R01: official vector and benefits-copy regressions -----------------
 

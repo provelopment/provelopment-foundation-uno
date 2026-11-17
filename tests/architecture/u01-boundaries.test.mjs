@@ -1436,6 +1436,32 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
     }
   }
 
+  // The real-browser helper is test-only too: the publication runner drives it through exactly one bounded entry point,
+  // the runner never imports the browser package itself, and no runtime module may name either.
+  const browserHelper = 'verify-u03-browser.mjs';
+  assert.match(runner, /from "\.\/verify-u03-browser\.mjs"/u);
+  assert.match(runner, /verifyUnoU03Browser\(/u);
+  assert.equal(
+    /from\s+"playwright"/u.test(runner),
+    false,
+    'the runner must reach the browser only through the sanctioned test-only helper',
+  );
+  const helperSource = stripComments(doc('scripts/verify-u03-browser.mjs'));
+  assert.match(helperSource, /export async function verifyUnoU03Browser\(/u);
+  assert.match(helperSource, /chromium\.launch\(\{ headless: true/u);
+  assert.equal(
+    /node_modules|process\.cwd\(\)|deployment\/efs/u.test(helperSource),
+    false,
+    'the browser helper must receive its loopback base and expectations, never resolve repository paths itself',
+  );
+  for (const layer of ['src/app', 'src/core', 'src/application', 'src/adapters']) {
+    for (const [path, content] of Object.entries(readTree(layer, layer))) {
+      const source = stripComments(content);
+      assert.equal(source.includes(browserHelper), false, `${path} must not reference the browser helper`);
+      assert.equal(/from\s+"playwright"/u.test(source), false, `${path} must not import the browser package`);
+    }
+  }
+
   // The existing provider boundary is unchanged: the approved analytics import stays the single sanctioned exception,
   // already policed by `scanAnalyticsUsage`, and no route names a deployment path of its own.
   const serving = stripComments(doc('src/config/uno-serving.ts'));

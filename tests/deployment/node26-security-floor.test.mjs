@@ -18,6 +18,14 @@ const NODE26_ENGINE = '26.x';
 const APPROVED_ANALYTICS = Object.freeze({ name: '@vercel/analytics', version: '2.0.1' });
 
 /**
+ * The only approved browser driver: test-only, Apache-2.0, exactly pinned, and never permitted in
+ * `dependencies`. It exists so the U03 publication proof can drive a real Chromium DOM; anything
+ * else that pretends to be a browser driver is refused by name.
+ */
+const APPROVED_BROWSER = Object.freeze({ name: 'playwright', version: '1.65.1' });
+const REFUSED_DRIVERS = Object.freeze(['puppeteer', 'puppeteer-core', 'cypress', 'webdriverio', 'selenium-webdriver']);
+
+/**
  * Minimum resolved versions that carry the documented security fixes. A resolution below its
  * floor is refused; these are the advisories that actually touch Uno's dependency graph.
  */
@@ -84,6 +92,27 @@ export function inspectProject(snapshot) {
     violations.push('package.json: a postinstall script is not permitted');
   }
 
+  // --- The one approved test-only browser: dev-only, exact, and no rival driver -------
+  const productionNames = Object.keys(pkg?.dependencies ?? {});
+  const developmentNames = Object.keys(pkg?.devDependencies ?? {});
+  const browserPin = pkg?.devDependencies?.[APPROVED_BROWSER.name];
+  if (productionNames.includes(APPROVED_BROWSER.name)) {
+    violations.push(`package.json: ${APPROVED_BROWSER.name} must never be a production dependency`);
+  }
+  if (browserPin !== APPROVED_BROWSER.version) {
+    violations.push(
+      `package.json: ${APPROVED_BROWSER.name} must be exactly ${APPROVED_BROWSER.version} as a dev dependency`,
+    );
+  }
+  if (typeof browserPin === 'string' && !/^\d+\.\d+\.\d+$/.test(browserPin)) {
+    violations.push(`package.json: ${APPROVED_BROWSER.name} must be an exact version, not a range`);
+  }
+  for (const name of [...productionNames, ...developmentNames]) {
+    if (REFUSED_DRIVERS.includes(name)) {
+      violations.push(`package.json: unapproved browser driver "${name}"`);
+    }
+  }
+
   // --- Both workflows: Node 26 only, no bypass, floors and audit present -------------
   for (const [name, text] of [
     ['verify-bootstrap.yml', snapshot.bootstrapWorkflow],
@@ -118,6 +147,15 @@ export function inspectProject(snapshot) {
       if (compareVersions(version, floor) < 0) {
         violations.push(`pnpm-lock.yaml: ${name}@${version} is below the security floor ${floor}`);
       }
+    }
+  }
+  // The test-only browser must resolve at exactly one pinned version, in the lockfile as well.
+  for (const name of [APPROVED_BROWSER.name, `${APPROVED_BROWSER.name}-core`]) {
+    const versions = lockVersions(lock, name);
+    if (versions.length !== 1 || versions[0] !== APPROVED_BROWSER.version) {
+      violations.push(
+        `pnpm-lock.yaml: ${name} must resolve only ${APPROVED_BROWSER.version}, found ${versions.join(', ') || 'none'}`,
+      );
     }
   }
 
@@ -293,6 +331,68 @@ test('negative fixture: a duplicated analytics render is refused by name', () =>
   const violations = inspectProject(snapshot);
   assert.equal(
     violations.some((line) => line.includes('<Analytics /> must be rendered exactly once, found 2')),
+    true,
+  );
+});
+
+// --- The approved test-only browser: one exact dev pin, never production, no rival ---------
+
+test('the approved browser is a single exact dev dependency', () => {
+  const pkg = JSON.parse(read('package.json'));
+  assert.equal(pkg.devDependencies[APPROVED_BROWSER.name], APPROVED_BROWSER.version);
+  assert.equal(Object.prototype.hasOwnProperty.call(pkg.dependencies, APPROVED_BROWSER.name), false);
+  const lock = read('pnpm-lock.yaml');
+  assert.deepEqual(lockVersions(lock, APPROVED_BROWSER.name), [APPROVED_BROWSER.version]);
+  assert.deepEqual(lockVersions(lock, `${APPROVED_BROWSER.name}-core`), [APPROVED_BROWSER.version]);
+  assert.equal(lock.includes(`playwright-core@${APPROVED_BROWSER.version}:`), true);
+});
+
+test('negative fixture: the browser promoted to a production dependency is refused by name', () => {
+  const snapshot = withChange('packageJson', (text) =>
+    text.replace('"react": "19.2.9",', '"react": "19.2.9",\n    "playwright": "1.65.1",'),
+  );
+  const violations = inspectProject(snapshot);
+  assert.equal(
+    violations.some((line) => line.includes('playwright must never be a production dependency')),
+    true,
+  );
+});
+
+test('negative fixture: a drifted browser pin is refused by name', () => {
+  const snapshot = withChange('packageJson', (text) =>
+    text.replace('"playwright": "1.65.1"', '"playwright": "1.64.0"'),
+  );
+  const violations = inspectProject(snapshot);
+  assert.equal(
+    violations.some((line) => line.includes('playwright must be exactly 1.65.1 as a dev dependency')),
+    true,
+  );
+});
+
+test('negative fixture: an unpinned browser range is refused by name', () => {
+  const snapshot = withChange('packageJson', (text) =>
+    text.replace('"playwright": "1.65.1"', '"playwright": "^1.65.1"'),
+  );
+  const violations = inspectProject(snapshot);
+  assert.equal(
+    violations.some((line) => line.includes('playwright must be an exact version, not a range')),
+    true,
+  );
+});
+
+test('negative fixture: a second browser driver is refused by name', () => {
+  const snapshot = withChange('packageJson', (text) =>
+    text.replace('"playwright": "1.65.1",', '"playwright": "1.65.1",\n    "puppeteer": "24.0.0",'),
+  );
+  const violations = inspectProject(snapshot);
+  assert.equal(violations.some((line) => line.includes('unapproved browser driver "puppeteer"')), true);
+});
+
+test('negative fixture: a drifted browser resolution in the lockfile is refused by name', () => {
+  const snapshot = withChange('lockfile', (text) => `${text}\n  playwright-core@1.64.0:\n`);
+  const violations = inspectProject(snapshot);
+  assert.equal(
+    violations.some((line) => line.includes('playwright-core must resolve only 1.65.1')),
     true,
   );
 });

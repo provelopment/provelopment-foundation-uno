@@ -1223,7 +1223,56 @@ no markup; Markdown must begin with one `# ` heading and is always `public`; rep
 projection proves a Page is routed, public or indexable.
 
 
-## U03 fixture ownership safety (UNO-WO-031 / R01)
+## U03 integrated browser exit proof (UNO-WO-032 / R01)
+
+**One fixture, one production build.** The positive gate now declares a custom multi-segment Page (`events`, route
+`["programmes","events"]`, published, authored `en-001` and `de-DE` Markdown) and a Page whose preferred JSON is
+declared and **malformed** with a valid Markdown alternative (`broken`). Nine task-owned sources
+`deployment/efs/content/wo032-*.{md,json}` are created and removed by the existing transaction, which still arms before
+the first destructive write and restores in an unconditional `finally`. Six public addresses are asserted — Home, About
+and the custom Page, each in two authored full locales — each serving its own source text under its own title, with one
+`h1`, truthful `<html lang>`, exact canonical and OG, same-Page alternates and the accepted `x-default` policy (present
+on both Home representations, pointing at the default-locale Home; absent on About and the custom Page).
+`/sitemap.xml` lists exactly six `<loc>` values with same-Page alternates; `/robots.txt` names the test-only sitemap and
+reveals nothing unlisted; `/en` stays a 307 to the test-only canonical Home. Fifteen refusal addresses are real 404s with
+no canonical, alternate or OG, including the malformed-JSON Page, a cross-Page route, an extra segment, a short locale, a
+bare locale and the previous fixture URL.
+
+**Crawler parity.** Two distinct user agents — an ordinary browser and a Googlebot-shaped one — receive identical
+statuses, byte-identical documents and identical canonical/robots/OG/alternate policy for all six Pages and for the
+malformed-source refusal, and a forged cookie changes nothing. This is a no-authority proof, **not** an indexing claim.
+
+**A real browser, not a substitute.** `scripts/verify-u03-browser.mjs` is original Uno-owned, test-only code with one
+bounded export, `verifyUnoU03Browser({ base, pages, refusedPaths })`. It refuses any non-loopback base before launching,
+drives the pinned headless Chromium against the same running production server, and closes pages, contexts and browser in
+`finally`. Observed facts come from the rendered DOM: document status, a unique visible `h1` with the authored text, the
+own-source paragraph, `<html lang>`, `document.title`, canonical and `og:url`, indexability, same-Page public alternates,
+the `x-default` policy, list semantics where the Markdown declares a list, heading hierarchy, no horizontal overflow
+(2 px tolerance), no page error, no console error and no request outside loopback. It repeats the essential visibility
+checks under `prefers-reduced-motion: reduce`, proves the demonstration's skip link is reachable by keyboard `Tab`, and
+proves the global refusal is a real 404 document with one `h1`, a language, `noindex`, no canonical, no alternate, no
+leaked authored text and a keyboard-focusable return link.
+
+**Measured evidence.** In one run of the same build: 530 checks pass and none fail — the preserved 195 baseline
+assertions expanded with the custom Page, the six-entry sitemap, the additional refusals, 33 crawler-parity checks and the
+whole browser suite (104 desktop assertions, 104 mobile assertions, 2 reduced-motion, 11 refusal-document and 2 keyboard
+assertions, plus a successful Chromium launch). Every one of the six Pages therefore carries at least 17 independent
+desktop and 17 independent mobile browser assertions. The gate then restores the declarations byte-for-byte, rebuilds the
+**unpublished** configuration and re-runs the original U01 (103/0) and U03 (91/0) fail-closed suites.
+
+**Dependency provenance and rights.** Exactly one dependency is added, `playwright@1.65.1`, **Apache-2.0**, under
+`devDependencies` only, resolved by pnpm to `playwright-core@1.65.1` and nothing else (19 lockfile lines, no other
+resolution changed). It is never in `dependencies`, `src/**`, a production page, the client bundle or the Vercel runtime,
+it adds no analytics or provider, and it introduces no postinstall script. The Chromium **headless shell** is fetched by
+`pnpm exec playwright install --only-shell chromium` into the repository-local ignored `.temp/uno-u03-browsers`, in CI
+and locally alike, so no shared user cache and no OS package is touched; the dependency-installing variants are never
+used. Browser distribution downloads are tool setup, not provider operations. No screenshot, video or trace is
+committed. The browser helper, the fixture text and the assertions are original Uno work under Apache-2.0; no Foundation,
+Geo, Solo or Connect source, asset or capability was imported, and no brand, licence or provider authority changed.
+
+**Still not verified, and not claimed.** A screen-reader audit, a live HTTPS origin, real search-engine indexing, a
+production provider, browser behaviour on real devices and any U04 JSON rendering remain outside this evidence.
+
 
 **Why.** The transaction armed its recovery correctly but recorded a fixture as its own *before* the exclusive create
 succeeded. If an unrelated file appeared between the successful preflight and that create, `wx` failed `EEXIST` and the
