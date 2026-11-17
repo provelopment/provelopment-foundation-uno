@@ -1223,6 +1223,37 @@ no markup; Markdown must begin with one `# ` heading and is always `public`; rep
 projection proves a Page is routed, public or indexable.
 
 
+## U03 fixture transaction safety (UNO-WO-030 / R01)
+
+**Why.** The positive HTTP gate's first version armed its recovery flag only after the whole fixture had been installed,
+so an exception between the first destructive write and that assignment skipped restoration and then discarded the
+backups. That failure window is now closed.
+
+**The module.** `scripts/uno-u03-fixture-transaction.mjs` owns the entire fixture lifecycle as one armed transaction:
+`prepareUnoU03FixtureTransaction()` proves the physical root and every target (no symlink, junction or reparse escape),
+the pinned SHA-256 of each declaration, the `lstat`-proven absence of every fixture source, the unique private scratch and
+the verified recovery copies — then returns an **armed** transaction. `install()` records its intent *before* each write,
+so a failure during or after the manifest, the config or any of the five creations rolls back in place; `restore()` is
+idempotent, re-verifies the original bytes, removes only what it created, and on failure **preserves** the recovery
+copies and reports a bounded, path-free reason while never claiming success. The `writer` seam exists only so an isolated
+fault suite can fail a specific filesystem call; production always uses the real operations, and no serving code may
+import the module at all.
+
+**The proof.** `tests/deployment/u03-fixture-transaction.test.mjs` runs nineteen named cases against isolated
+`.temp/wo030-*` roots and drives the same exported operations: the happy path, idempotent restore, a wrong original
+digest, a pre-existing fixture path (whose unknown bytes survive), a dangling symlink, a symlinked parent, an absent
+scratch root, a write failure at **every** write position (before the first write, after the manifest, after the config,
+and at each of the five creations), a caller exception after a complete install, a second transaction refusing a
+mid-fixture root, a restore that cannot write (fail-closed with both backups retained and only transaction-owned scratch
+removed once the fault is gone), scratch hygiene, and the exported surface. Both symlink fixtures report `NOT
+APPLICABLE` on a host without symlink privilege while the rest of the suite still runs. A blocking CI step and a narrow
+architecture assertion ("importable only by the sanctioned runner and its suite") keep it that way.
+
+**Unchanged.** No route, component, core rule, application use case, declaration, content file, dependency or provider
+setting changed. The positive gate still proves the same four published Pages, the alias redirect, canonical/hreflang/OG,
+`robots.txt`, `sitemap.xml`, the preserved `/` demonstration and ten strict refusals, and it still rebuilds the
+unpublished configuration and re-runs the original U01 and U03 gates afterwards.
+
 ## U03 positive publication, locale documents and SEO (UNO-WO-029 / R01)
 
 **Two root layouts.** `src/app/(demo)/page.tsx` and `src/app/(demo)/layout.tsx` (moved, content byte-identical apart

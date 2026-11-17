@@ -128,10 +128,17 @@ jobs:
         run: node scripts/verify-u03-http.mjs
         shell: bash
 
-      # Blocking positive U03 publication gate (UNO-WO-029 / R01). It installs a temporary, restore-in-finally
-      # synthetic publication fixture, builds and serves the REAL production output on loopback, asserts published
-      # Pages, truthful locale documents, canonical/hreflang/OG, robots and sitemap plus strict refusals, then
-      # restores the committed declarations byte-for-byte and re-runs the two gates above against them.
+      # Blocking fixture-transaction fault-injection gate (UNO-WO-030 / R01). It drives the SAME transaction the
+      # positive HTTP gate uses through isolated roots: every preflight refusal, every write position, a failed
+      # restore that must fail closed with its recovery copies kept, and scratch hygiene.
+      - name: Run fixture transaction fault injection
+        run: node --test tests/deployment/u03-fixture-transaction.test.mjs
+        shell: bash
+
+      # Blocking positive U03 publication gate (UNO-WO-029 / R01, hardened by UNO-WO-030 / R01). It installs a
+      # temporary, restore-in-finally synthetic publication fixture, builds and serves the REAL production output on
+      # loopback, asserts published Pages, truthful locale documents, canonical/hreflang/OG, robots and sitemap plus
+      # strict refusals, then restores the committed declarations byte-for-byte and re-runs the two gates above.
       - name: Run production HTTP (U03 published Pages, restored afterwards)
         run: node scripts/verify-u03-published-http.mjs
         shell: bash

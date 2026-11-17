@@ -26,17 +26,17 @@ import {
   mkdirSync,
   readFileSync,
   rmSync,
-  statSync,
-  writeFileSync,
 } from "node:fs";
 import { registerHooks } from "node:module";
 import { createServer } from "node:net";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
-// Node prints a "typeless package.json" notice for the repository's TypeScript modules. It is expected and benign;
-// this handler keeps the gate's own output readable without hiding a real warning from another module.
-process.on("warning", () => {});
+import { prepareUnoU03FixtureTransaction } from "./uno-u03-fixture-transaction.mjs";
+
+// Node prints a benign "typeless package.json" notice for the repository's TypeScript modules. It is expected, is
+// classified in the report, and is deliberately NOT suppressed: this gate listens to no warning event and consumes no
+// stderr, so a real warning or audit failure can never be hidden.
 
 // The repository's own TypeScript uses TypeScript-style extensionless relative imports, which Node's type stripping
 // does not resolve. This hook adds the `.ts` extension for relative specifiers only, so the gate can call the REAL
@@ -106,13 +106,10 @@ function sha256Of(relativePath) {
   }
 }
 
-/** A collision-resistant, task-owned scratch directory under the ignored `.temp/`. */
-function scratchDir() {
-  const name = `.temp/wo029-published-${process.pid}-${Date.now().toString(36)}`;
-  const absolute = resolve(ROOT, name);
-  mkdirSync(absolute, { recursive: true });
-  return absolute;
-}
+/**
+ * Every mutation below belongs to the transaction module: it proves the preconditions, backs the declarations up, arms
+ * recovery before the first destructive write, installs the fixture exclusively and restores it again.
+ */
 
 /** The temporary publication fixture, declared as data. Never a public deployment. */
 const FIXTURE_MANIFEST = {
@@ -545,58 +542,23 @@ function preflight() {
   check("the private ACTIVE stays ignored", active.status === 0);
 }
 
-/** Replace the two declarations and create the five fixture sources. */
-function installFixture() {
-  writeFileSync(resolve(ROOT, MANIFEST), `${JSON.stringify(FIXTURE_MANIFEST, null, 2)}\n`, "utf8");
-  writeFileSync(resolve(ROOT, SELECTION), `${JSON.stringify(FIXTURE_SELECTION, null, 2)}\n`, "utf8");
-  for (const [relativePath, contents] of FIXTURE_CONTENT) {
-    writeFileSync(resolve(ROOT, relativePath), contents, "utf8");
-  }
-  check("the fixture manifest is installed", sha256Of(MANIFEST) !== PINNED_DECLARATIONS.get(MANIFEST));
-  check("the fixture declaration is installed", sha256Of(SELECTION) !== PINNED_DECLARATIONS.get(SELECTION));
+
+/**
+ * Build the exact fixture bytes this transaction installs: two declarations and five short, original sources.
+ */
+function fixturePlan() {
+  return {
+    declarations: [...PINNED_DECLARATIONS].map(([path, digest]) => ({ path, digest })),
+    replacements: [
+      { path: MANIFEST, bytes: Buffer.from(`${JSON.stringify(FIXTURE_MANIFEST, null, 2)}\n`, "utf8") },
+      { path: SELECTION, bytes: Buffer.from(`${JSON.stringify(FIXTURE_SELECTION, null, 2)}\n`, "utf8") },
+    ],
+    fixtureSources: [...FIXTURE_CONTENT].map(([path, contents]) => ({
+      path,
+      bytes: Buffer.from(contents, "utf8"),
+    })),
+  };
 }
-
-/** Restore the exact original bytes and remove only the fixture-created sources. Never throws. */
-function restore(scratch) {
-  const problems = [];
-  for (const [relativePath] of PINNED_DECLARATIONS) {
-    const backup = join(scratch, relativePath.replace(/[\\/]/gu, "__"));
-    try {
-      writeFileSync(resolve(ROOT, relativePath), readFileSync(backup));
-    } catch {
-      problems.push(`restore:${relativePath}`);
-    }
-  }
-  for (const relativePath of FIXTURE_SOURCES) {
-    try {
-      rmSync(resolve(ROOT, relativePath), { force: true });
-    } catch {
-      problems.push(`remove:${relativePath}`);
-    }
-  }
-  for (const [relativePath, digest] of PINNED_DECLARATIONS) {
-    if (sha256Of(relativePath) !== digest) problems.push(`digest:${relativePath}`);
-    if (statSync(resolve(ROOT, relativePath)).size === 0) problems.push(`empty:${relativePath}`);
-  }
-  for (const relativePath of FIXTURE_SOURCES) {
-    if (existsSync(resolve(ROOT, relativePath))) problems.push(`leftover:${relativePath}`);
-  }
-  return problems;
-}
-
-/** Back the two declarations up into task-owned scratch before anything is replaced. */
-function backup(scratch) {
-  for (const [relativePath] of PINNED_DECLARATIONS) {
-    const backupPath = join(scratch, relativePath.replace(/[\\/]/gu, "__"));
-    writeFileSync(backupPath, readFileSync(resolve(ROOT, relativePath)));
-    check(
-      `the backup of ${relativePath} is byte-identical`,
-      createHash("sha256").update(readFileSync(backupPath)).digest("hex") === PINNED_DECLARATIONS.get(relativePath),
-    );
-  }
-}
-
-
 /** All real HTTP assertions against the running production server. */
 async function assertOverHttp(base, child) {
   const alternatesByPath = new Map();
@@ -700,10 +662,10 @@ async function main() {
     return 1;
   }
 
-  const scratch = scratchDir();
+  mkdirSync(resolve(ROOT, ".temp"), { recursive: true });
   let child = null;
   let port = 0;
-  let installed = false;
+  let transaction = null;
   let restored = false;
 
   try {
@@ -713,9 +675,33 @@ async function main() {
       return 1;
     }
 
-    backup(scratch);
-    installFixture();
-    installed = true;
+    // --- Armed transaction: preconditions, verified backups, exclusive writes -------------------
+    // Restoration is armed before the first destructive write, so no failure position can leave a modified
+    // declaration without a recovery path.
+    const plan = fixturePlan();
+    transaction = await prepareUnoU03FixtureTransaction({
+      root: ROOT,
+      declarations: plan.declarations,
+      replacements: plan.replacements,
+      fixtureSources: plan.fixtureSources,
+      scratchRoot: resolve(ROOT, ".temp"),
+    });
+    if (transaction.status !== "armed") {
+      for (const refusal of transaction.reasons) {
+        check(`the fixture transaction refuses to start (${refusal})`, false, refusal);
+      }
+      process.stderr.write("verify-u03-published-http: the transaction refused; nothing was changed.\n");
+      return 1;
+    }
+    check("the fixture transaction is armed before any write", true);
+
+    const installed = await transaction.install();
+    if (!check("the fixture installs without a write failure", installed.ok === true, installed.cause ?? "")) {
+      // install() already rolled back; the outer finally verifies and cleans up.
+      return 1;
+    }
+    check("the fixture manifest is installed", sha256Of(MANIFEST) !== PINNED_DECLARATIONS.get(MANIFEST));
+    check("the fixture declaration is installed", sha256Of(SELECTION) !== PINNED_DECLARATIONS.get(SELECTION));
 
     await validateFixtureInProcess();
     if (failures.length > 0) {
@@ -768,17 +754,30 @@ async function main() {
     if (port !== 0) {
       check("loopback port released after shutdown", (await portStillOpen(port)) === false);
     }
-    const problems = installed ? restore(scratch) : [];
-    restored = problems.length === 0;
+
+    // Unconditional verification: the originals must be byte-exact and only transaction-created files may be gone.
+    let restoreOutcome = null;
+    if (transaction !== null && transaction.status === "armed") {
+      restoreOutcome = await transaction.restore();
+    }
+    const problems = restoreOutcome !== null && restoreOutcome.ok === false ? restoreOutcome.reasons : [];
+    restored = transaction === null ? failures.length > 0 : restoreOutcome !== null && restoreOutcome.ok === true;
     for (const problem of problems) {
       failures.push(problem);
       process.stdout.write(`  FAIL  ${problem}\n`);
     }
-    rmSync(scratch, { recursive: true, force: true });
+
+    if (restored && transaction !== null && transaction.status === "armed") {
+      const disposed = await transaction.dispose();
+      if (!disposed.ok) {
+        restored = false;
+        process.stdout.write("  FAIL  the transaction scratch could not be removed\n");
+      }
+    }
     process.stdout.write(
       restored
         ? "  PASS  the committed declarations and sources are restored byte-for-byte\n"
-        : "  FAIL  restoration could not be proven\n",
+        : "  FAIL  restoration could not be proven; the recovery copies are preserved and the run must STOP\n",
     );
     if (restored) passes.push("restoration");
   }

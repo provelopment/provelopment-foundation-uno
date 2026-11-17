@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -1364,4 +1364,62 @@ test('the Markdown renderer never interprets authored input as markup', () => {
   }
   assert.match(source, /parseUnoSafeMarkdown/u);
   assert.match(source, /UNO_SAFE_MARKDOWN_LIMITS/u);
+});
+
+/**
+ * The publication-fixture transaction is test-only tooling (`UNO-WO-030 / R01`). It may be imported by the sanctioned
+ * positive HTTP gate and by its own fault-injection suite, and by nothing else: no route, no core rule and no
+ * application use case may reach a module that rewrites the committed deployment declarations.
+ */
+test('the U03 fixture transaction is used only by the sanctioned test runner', () => {
+  const transactionPath = 'scripts/uno-u03-fixture-transaction.mjs';
+  const moduleName = 'uno-u03-fixture-transaction';
+  assert.equal(existsSync(resolve(ROOT, transactionPath)), true, 'the helper exists');
+
+  // Its own dependency surface is Node built-ins and relative sibling modules only.
+  const transactionSource = stripComments(readFileSync(resolve(ROOT, transactionPath), 'utf8'));
+  const specifiers = [...transactionSource.matchAll(/from\s+["']([^"']+)["']/gu)].map((match) => match[1]);
+  assert.ok(specifiers.length > 0);
+  for (const specifier of specifiers) {
+    assert.equal(
+      specifier.startsWith('node:') || specifier.startsWith('./'),
+      true,
+      `${transactionPath} may import only node built-ins or siblings, found ${specifier}`,
+    );
+  }
+
+  // Exactly the two sanctioned importers, and no product layer. This checker file names the module only to police it,
+  // so it is excluded — it imports nothing from the helper.
+  const scanned = { ...readTree('src', 'src'), ...readTree('scripts', 'scripts'), ...readTree('tests', 'tests') };
+  const CHECKER = 'tests/architecture/u01-boundaries.test.mjs';
+  const importers = Object.entries(scanned)
+    .filter(([path]) => path.split('\\').join('/') !== CHECKER)
+    .filter(([, content]) => stripComments(content).includes(moduleName))
+    .map(([path]) => path.split('\\').join('/'))
+    .sort();
+  assert.deepEqual(importers, [
+    'scripts/verify-u03-published-http.mjs',
+    'tests/deployment/u03-fixture-transaction.test.mjs',
+  ]);
+
+  // The product layers cannot reach it, directly or by name.
+  for (const layer of ['src/app', 'src/core', 'src/application']) {
+    for (const [path, content] of Object.entries(readTree(layer, layer))) {
+      assert.equal(
+        stripComments(content).includes(moduleName),
+        false,
+        `${path} must not reference the fixture transaction`,
+      );
+    }
+  }
+
+  // The existing provider boundary is unchanged: the approved analytics import stays the single sanctioned exception,
+  // already policed by `scanAnalyticsUsage`, and no route names a deployment path of its own.
+  const serving = stripComments(doc('src/config/uno-serving.ts'));
+  assert.match(serving, /process\.cwd\(\)/u);
+  const appSources = readTree('src/app', 'src/app');
+  for (const [path, content] of Object.entries(appSources)) {
+    const source = stripComments(content);
+    assert.equal(source.includes('deployment/efs'), false, `${path} must not name a deployment path`);
+  }
 });

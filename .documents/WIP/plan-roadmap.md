@@ -119,13 +119,13 @@ nothing, no `src/app` source imports it, and `public` eligibility is not publica
 activation, safe HTTP error behaviour, metadata/SEO emission including canonical advertising and `hreflang`,
 real locale routing, and any optional base path. Each requires a later bounded Owner order.
 
-**Positive publication proof (`UNO-WO-029 / R01`):** the demonstration and the published Site now have separate root
-layouts, so a served Page carries the authored `<html lang>` (`en-001`, `de-DE`) while `/` keeps its English noindex
-document. A public Page's canonical, same-Page `hreflang` alternates and single `x-default` come from the same accepted
-discovery plan behind `robots.txt` and `sitemap.xml`. A temporary, restore-in-`finally` fixture proves this over a real
-production build: four published Pages answer 200 with correct metadata, `/en` answers a 307 to the canonical Home, and
-draft, unlisted, unknown, undeclared and malformed addresses stay real 404s with the approved document. No domain is
-chosen, no committed Page is published, no browser proof exists, and U03 stays open.
+**Recovery hardening (`UNO-WO-030 / R01`):** the temporary fixture the positive HTTP proof uses is now one armed
+transaction. Recovery is armed before the first destructive write, every failure position — before the first write,
+between the two declarations, and at each of the five fixture creations — rolls back to the exact original bytes, and a
+restoration that cannot be verified fails closed with its recovery copies preserved rather than reporting success.
+Nineteen fault-injection cases drive the same exported operations in isolated roots; the published-Page behaviour, the
+canonical/hreflang/robots/sitemap contract and the strict refusals are unchanged. No domain, publication or provider
+change, and U03 stays open.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct
 visibility behaviour.
