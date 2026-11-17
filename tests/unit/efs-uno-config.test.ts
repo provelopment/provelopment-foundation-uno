@@ -365,3 +365,122 @@ describe("Site ownership and hostile input", () => {
     expect(JSON.stringify(result)).not.toContain("preview");
   });
 });
+
+describe("explicit short-language mapping (`UNO-WO-025 / R01`)", () => {
+  /** The shared minimal manifest, with one declared Site locale policy injected. */
+  function manifestWith(locales: unknown): unknown {
+    const base = manifest() as {
+      entities: { facets: { sites: Record<string, unknown>[] }[] }[];
+    };
+    base.entities[0]!.facets[0]!.sites[0]!.locales = locales;
+    return base;
+  }
+
+  const LOCALES_EN = { supportedLocales: ["en-001"], defaultLocale: "en-001" };
+
+  it("reads the committed mapping as an explicit, frozen declaration", () => {
+    const result = validateUnoSiteSelection(readConfig(), readManifest());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect({ ...result.config.languagePreferences }).toEqual({ en: "en-001" });
+    expect(Object.isFrozen(result.config.languagePreferences)).toBe(true);
+    expect(result.config.version).toBe(1);
+    expect(result.config.selectedSite).toEqual({ facetId: "foundation", siteId: "main" });
+  });
+
+  it("keeps a legacy declaration without a mapping valid and mapping-free", () => {
+    const result = validateUnoSiteSelection(config(), manifest());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect(Object.keys(result.config)).toEqual(["version", "entityId", "selectedSite"]);
+  });
+
+  it("accepts an explicit empty mapping and a valid explicit alias", () => {
+    const empty = validateUnoSiteSelection({ ...config(), languagePreferences: {} }, manifestWith(LOCALES_EN));
+    expect(empty.accepted).toBe(true);
+    if (!empty.accepted) return;
+    expect(Object.keys(empty.config.languagePreferences ?? {})).toEqual([]);
+
+    const aliased = validateUnoSiteSelection(
+      { ...config(), languagePreferences: { en: "en-001" } },
+      manifestWith(LOCALES_EN),
+    );
+    expect(aliased.accepted).toBe(true);
+    if (!aliased.accepted) return;
+    expect({ ...aliased.config.languagePreferences }).toEqual({ en: "en-001" });
+  });
+
+  it("refuses a mapping the declared Site locales cannot satisfy", () => {
+    const declared = { supportedLocales: ["en-001", "de-DE"], defaultLocale: "en-001" };
+    expectRefused(
+      { ...config(), languagePreferences: { en: "de-DE" } },
+      "config:invalid-language-preferences",
+      manifestWith(declared),
+    );
+    expectRefused(
+      { ...config(), languagePreferences: { fr: "fr-001" } },
+      "config:invalid-language-preferences",
+      manifestWith(declared),
+    );
+    expectRefused(
+      { ...config(), languagePreferences: { en: "EN-001" } },
+      "config:invalid-language-preferences",
+      manifestWith(declared),
+    );
+    expectRefused(
+      { ...config(), languagePreferences: { EN: "en-001" } },
+      "config:invalid-language-preferences",
+      manifestWith(declared),
+    );
+    expectRefused(
+      { ...config(), languagePreferences: JSON.parse('{"__proto__": "en-001"}') },
+      "config:invalid-language-preferences",
+      manifestWith(declared),
+    );
+    expectRefused(
+      { ...config(), languagePreferences: ["en-001"] },
+      "config:invalid-language-preferences",
+      manifestWith(declared),
+    );
+  });
+
+  it("refuses a mapping longer than the declared bound", () => {
+    const many: Record<string, string> = {};
+    for (let index = 0; index < 17; index += 1) many[`a${String.fromCharCode(97 + index)}`] = "en-001";
+    expectRefused(
+      { ...config(), languagePreferences: many },
+      "config:invalid-language-preferences",
+      manifestWith(LOCALES_EN),
+    );
+  });
+
+  it("refuses a mapping with no declared Site locale authority to check it against", () => {
+    expectRefused(
+      { ...config(), languagePreferences: { en: "en-001" } },
+      "config:locale-authority-missing",
+      manifest(),
+    );
+  });
+
+  it("refuses a mapping accessor without invoking it, and still refuses unknown config keys", () => {
+    let reads = 0;
+    const hostile = {
+      get en(): string {
+        reads += 1;
+        return "en-001";
+      },
+    };
+    expectRefused(
+      { ...config(), languagePreferences: hostile },
+      "config:unreadable",
+      manifestWith(LOCALES_EN),
+    );
+    expect(reads).toBe(0);
+
+    expectRefused(
+      { ...config(), schemaVersion: 1, languagePreferences: { en: "en-001" } },
+      "config:unknown-field",
+      manifestWith(LOCALES_EN),
+    );
+  });
+});

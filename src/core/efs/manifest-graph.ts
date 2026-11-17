@@ -30,7 +30,7 @@ import { HOME_CONTENT_SLUG, isContentSlug } from "../page-content";
 import { PAGE_ROUTE_PATH_MAX_SEGMENTS, pageRoutePath } from "../page-route-path";
 import { isEntityId } from "./identity";
 import { validateUnoPropertyBag, type UnoPropertyBag, type UnoPropertyRefusal } from "./properties";
-import { canonicalLocaleTag, localeTagIssue } from "./uno-locales";
+import { canonicalLocaleTag, localePolicyIssue, localeTagIssue } from "./uno-locales";
 
 /** The only source candidate kinds this increment declares. */
 export type UnoManifestSourceKind = "json" | "markdown";
@@ -39,6 +39,16 @@ export type UnoManifestSourceKind = "json" | "markdown";
 export interface UnoManifestSource {
   readonly kind: UnoManifestSourceKind;
   readonly path: string;
+}
+
+/**
+ * The locale policy one Site declares for itself: the full-region locales it authors, and the one
+ * default it answers for. Stored declaration only — it establishes no route, no served locale and
+ * no publication authority.
+ */
+export interface UnoSiteLocales {
+  readonly supportedLocales: readonly string[];
+  readonly defaultLocale: string;
 }
 
 /** One authored locale representation and the candidates declared for it. */
@@ -60,6 +70,7 @@ export interface UnoManifestPage {
 export interface UnoManifestSite {
   readonly id: string;
   readonly pages: readonly UnoManifestPage[];
+  readonly locales?: UnoSiteLocales;
   readonly properties?: UnoPropertyBag;
 }
 
@@ -101,6 +112,7 @@ export type UnoManifestRefusal =
   | "facet:duplicate-id"
   | "site:invalid-id"
   | "site:duplicate-id"
+  | "site:invalid-locales"
   | "page:invalid-id"
   | "page:duplicate-id"
   | "page:invalid-route"
@@ -132,6 +144,7 @@ export const REFUSAL_REASONS: readonly UnoManifestRefusal[] = Object.freeze([
   "facet:duplicate-id",
   "site:invalid-id",
   "site:duplicate-id",
+  "site:invalid-locales",
   "page:invalid-id",
   "page:duplicate-id",
   "page:invalid-route",
@@ -165,6 +178,7 @@ export const MANIFEST_GRAPH_LIMITS = Object.freeze({
   facetsPerEntity: 8,
   sitesPerFacet: 8,
   pagesPerSite: 64,
+  siteLocales: 32,
   representationsPerPage: 16,
   sourcesPerRepresentation: 2,
   routeSegments: PAGE_ROUTE_PATH_MAX_SEGMENTS,
@@ -391,11 +405,20 @@ function analyzeGraph(input: unknown): UnoManifestValidationResult {
       for (const rawSite of siteValue as readonly unknown[]) {
         const site = ownData(rawSite);
         if (site === null) return refuse("shape:not-an-object");
-        const siteShape = shapeIssue(site, ["id", "pages"], ["properties"]);
+        const siteShape = shapeIssue(site, ["id", "pages"], ["properties", "locales"]);
         if (siteShape) return refuse(siteShape);
 
         const siteProperties = readProperties(site);
         if (!siteProperties.ok) return refuse(siteProperties.reason);
+
+        // A Site may declare its locale policy; an older in-memory fixture that omits it stays a valid
+        // unpublished authoring declaration, and the committed-policy composer refuses that absence.
+        let siteLocales: UnoSiteLocales | null = null;
+        if (Object.prototype.hasOwnProperty.call(site, "locales")) {
+          const readLocales = readSiteLocales(site.locales);
+          if (!readLocales.ok) return refuse(readLocales.reason);
+          siteLocales = readLocales.value;
+        }
 
         const siteId = site.id;
         if (!isContentSlug(siteId)) return refuse("site:invalid-id");
@@ -415,7 +438,26 @@ function analyzeGraph(input: unknown): UnoManifestValidationResult {
           pages.push(page.value);
         }
 
-        sites.push(Object.freeze(withProperties({ id: siteId, pages: Object.freeze(pages) }, siteProperties.value)));
+        // A declared Site policy also bounds which locales its own Pages may author: a Page locale
+        // outside the Site's list would promise a locale the Site never declared, so it refuses.
+        if (siteLocales !== null) {
+          const supported = new Set(siteLocales.supportedLocales);
+          for (const page of pages) {
+            for (const representation of page.representations) {
+              if (!supported.has(representation.locale)) {
+                return refuse("site:invalid-locales");
+              }
+            }
+          }
+        }
+
+        const authoredSite: { id: string; pages: readonly UnoManifestPage[]; locales?: UnoSiteLocales } = {
+          id: siteId,
+          pages: Object.freeze(pages),
+        };
+        if (siteLocales !== null) authoredSite.locales = siteLocales;
+
+        sites.push(Object.freeze(withProperties(authoredSite, siteProperties.value)));
       }
 
       facets.push(Object.freeze(withProperties({ id: facetId, sites: Object.freeze(sites) }, facetProperties.value)));
@@ -430,6 +472,50 @@ function analyzeGraph(input: unknown): UnoManifestValidationResult {
   });
 }
 
+
+/**
+ * Validate one Site's declared locale policy: `{supportedLocales, defaultLocale}` and nothing else.
+ *
+ * The Site list is bounded to `siteLocales` and must be non-empty, unique, canonical full-region tags;
+ * the default must belong to it. Those tag rules are the accepted locale contract's, not this module's,
+ * so a descriptor-checked copy is handed to `localePolicyIssue` with an empty short-language mapping —
+ * a Site declares no alias of its own. Any failure is the one closed `site:invalid-locales` code; nothing
+ * is repaired, defaulted or echoed.
+ */
+function readSiteLocales(raw: unknown): Step<UnoSiteLocales> {
+  const record = ownData(raw);
+  if (record === null) return { ok: false, reason: "site:invalid-locales" };
+  const shape = shapeIssue(record, ["supportedLocales", "defaultLocale"]);
+  if (shape) return { ok: false, reason: "site:invalid-locales" };
+
+  const supportedValue = record.supportedLocales;
+  if (!Array.isArray(supportedValue)) return { ok: false, reason: "site:invalid-locales" };
+  if (Object.getPrototypeOf(supportedValue) !== Array.prototype) throw new HostileInput();
+  if (Object.getOwnPropertySymbols(supportedValue).length > 0) throw new HostileInput();
+
+  const supported: string[] = [];
+  for (let index = 0; index < supportedValue.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(supportedValue, String(index));
+    if (descriptor === undefined || !("value" in descriptor)) throw new HostileInput();
+    if (typeof descriptor.value !== "string") return { ok: false, reason: "site:invalid-locales" };
+    supported.push(descriptor.value);
+  }
+  if (supported.length === 0 || supported.length > MANIFEST_GRAPH_LIMITS.siteLocales) {
+    return { ok: false, reason: "site:invalid-locales" };
+  }
+
+  const defaultLocale = record.defaultLocale;
+  if (typeof defaultLocale !== "string") return { ok: false, reason: "site:invalid-locales" };
+
+  const issue = localePolicyIssue({
+    supportedLocales: supported,
+    defaultLocale,
+    languagePreferences: {},
+  });
+  if (issue !== null) return { ok: false, reason: "site:invalid-locales" };
+
+  return { ok: true, value: { supportedLocales: Object.freeze(supported), defaultLocale } };
+}
 
 /**
  * Validate one Page: authoring slug id, bounded route segments, exactly one canonical locale

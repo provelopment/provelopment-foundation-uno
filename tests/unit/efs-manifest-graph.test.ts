@@ -51,6 +51,8 @@ interface MutablePage {
 interface MutableSite {
   id: string;
   pages: MutablePage[];
+  /** Optional declared Site locale policy; typed loosely because refusal cases install wrong types. */
+  locales?: unknown;
 }
 interface MutableFacet {
   id: string;
@@ -871,5 +873,109 @@ describe("property inheritance over the validated graph", () => {
       { kind: "json", path: HOME_PATH },
     ]);
     expectRefused(graph, "source:invalid-path");
+  });
+});
+
+describe("declared Site locales (`UNO-WO-025 / R01`)", () => {
+  it("accepts a Site that declares a frozen locale policy", () => {
+    const graph = authoredGraph();
+    setField(siteOf(graph), "locales", { supportedLocales: ["en-001"], defaultLocale: "en-001" });
+
+    const result = validateUnoManifestGraph(graph);
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    const site = result.graph.entities[0]!.facets[0]!.sites[0]!;
+    expect(site.locales).toEqual({ supportedLocales: ["en-001"], defaultLocale: "en-001" });
+    expect(Object.isFrozen(site.locales)).toBe(true);
+    expect(Object.isFrozen(site.locales?.supportedLocales)).toBe(true);
+    expect(site.locales).not.toBe(graph.entities[0]!.facets[0]!.sites[0]!.locales);
+  });
+
+  it("accepts a Site whose declared list covers every authored Page locale", () => {
+    const graph = authoredGraph();
+    pageOf(graph).representations.push({
+      locale: "de-DE",
+      sources: [{ kind: "json", path: "deployment/efs/content/home.de-DE.json" }],
+    });
+    setField(siteOf(graph), "locales", { supportedLocales: ["en-001", "de-DE"], defaultLocale: "de-DE" });
+
+    const result = validateUnoManifestGraph(graph);
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect(result.graph.entities[0]!.facets[0]!.sites[0]!.locales?.defaultLocale).toBe("de-DE");
+  });
+
+  it("keeps an absent locales declaration valid for older in-memory fixtures", () => {
+    const result = validateUnoManifestGraph(authoredGraph());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect(result.graph.entities[0]!.facets[0]!.sites[0]!.locales).toBeUndefined();
+  });
+
+  it("refuses empty, duplicated, non-canonical or non-full locales", () => {
+    const cases: unknown[] = [
+      { supportedLocales: [], defaultLocale: "en-001" },
+      { supportedLocales: ["en-001", "en-001"], defaultLocale: "en-001" },
+      { supportedLocales: ["EN-001"], defaultLocale: "EN-001" },
+      { supportedLocales: ["en"], defaultLocale: "en" },
+      { supportedLocales: ["zh-Hans"], defaultLocale: "zh-Hans" },
+    ];
+    for (const locales of cases) {
+      const graph = authoredGraph();
+      setField(siteOf(graph), "locales", locales);
+      expectRefused(graph, "site:invalid-locales");
+    }
+  });
+
+  it("refuses a default outside the list and an incomplete or unknown declaration", () => {
+    const cases: unknown[] = [
+      { supportedLocales: ["en-001"], defaultLocale: "de-DE" },
+      { supportedLocales: ["en-001"] },
+      { defaultLocale: "en-001" },
+      { supportedLocales: ["en-001"], defaultLocale: "en-001", extra: true },
+      { supportedLocales: "en-001", defaultLocale: "en-001" },
+      [],
+    ];
+    for (const locales of cases) {
+      const graph = authoredGraph();
+      setField(siteOf(graph), "locales", locales);
+      expectRefused(graph, "site:invalid-locales");
+    }
+  });
+
+  it("refuses more declared locales than the bounded limit", () => {
+    const graph = authoredGraph();
+    setField(siteOf(graph), "locales", {
+      supportedLocales: Array.from({ length: 33 }, (_, index) => `aa-${String(index + 1).padStart(3, "0")}`),
+      defaultLocale: "aa-001",
+    });
+    expectRefused(graph, "site:invalid-locales");
+  });
+
+  it("refuses a Page locale the declaring Site does not support", () => {
+    const graph = authoredGraph();
+    setField(siteOf(graph), "locales", { supportedLocales: ["de-DE"], defaultLocale: "de-DE" });
+    expectRefused(graph, "site:invalid-locales");
+  });
+
+  it("refuses hostile locale structure without reading it", () => {
+    let reads = 0;
+    const hostile: Record<string, unknown> = {
+      get supportedLocales(): string[] {
+        reads += 1;
+        return ["en-001"];
+      },
+      defaultLocale: "en-001",
+    };
+    const graph = authoredGraph();
+    setField(siteOf(graph), "locales", hostile);
+    expectRefused(graph, "input:unreadable");
+    expect(reads).toBe(0);
+
+    const sparse = ["en-001"];
+    sparse.length = 2;
+    const sparseGraph = authoredGraph();
+    setField(siteOf(sparseGraph), "locales", { supportedLocales: sparse, defaultLocale: "en-001" });
+    expectRefused(sparseGraph, "input:unreadable");
   });
 });

@@ -14,6 +14,10 @@
           "sites": [
             {
               "id": "main",
+              "locales": {
+                "supportedLocales": ["en-001"],
+                "defaultLocale": "en-001"
+              },
               "pages": [
                 {
                   "id": "home",

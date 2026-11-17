@@ -1027,3 +1027,63 @@ test('the boundary scanner refuses Node, framework, adapter, deployment and prov
     [],
   );
 });
+
+// --- U03 stored Site-locale policy (UNO-WO-025 / R01) --------------------------
+
+const COMMITTED_LOCALES_SOURCE = 'src/application/resolve-uno-committed-locales.ts';
+
+test('the committed-locale reader is registered, pure and composes the accepted authorities', () => {
+  assert.equal(Object.keys(authoredSources()).includes(COMMITTED_LOCALES_SOURCE), true);
+
+  const source = readFileSync(resolve(ROOT, COMMITTED_LOCALES_SOURCE), 'utf8');
+  assert.deepEqual(scanSources({ [COMMITTED_LOCALES_SOURCE]: source }), []);
+
+  const executable = stripComments(source);
+  for (const authority of [
+    'validateUnoManifestGraph',
+    'validateUnoSiteSelection',
+    'localePolicyIssue',
+  ]) {
+    assert.match(executable, new RegExp(authority), `the reader must reuse ${authority}`);
+  }
+  for (const forbidden of ['node:', '/adapters/', 'process.env', 'fetch(', 'deployment/']) {
+    assert.equal(executable.includes(forbidden), false, `the reader must not gain ${forbidden}`);
+  }
+
+  // Serving nothing in this order: no app-layer source consumes it, and the pure kernel never depends on it.
+  for (const [path, body] of Object.entries(readTree('src/app', 'src/app'))) {
+    assert.equal(body.includes('resolve-uno-committed-locales'), false, `${path} must not consume it`);
+  }
+  for (const [path, body] of Object.entries(readTree('src/core', 'src/core'))) {
+    assert.equal(
+      body.includes('resolve-uno-committed-locales'),
+      false,
+      `${path} must not depend on an application use case`,
+    );
+  }
+});
+
+test('the scanner refuses forbidden imports in the committed-locale reader', () => {
+  const negativeCases = [
+    ["import { readFileSync } from 'node:fs';", 'Node I/O'],
+    ["import Link from 'next/link';", 'framework'],
+    ["import { headers } from 'next/headers';", 'request headers'],
+    ["import { createElement } from 'react';", 'React'],
+    ["import { loadUnoCandidateSource } from '../adapters/efs/uno-confined-source-reader';", 'adapter'],
+    ["import { send } from '@/adapters/providers/notification';", 'provider adapter'],
+    ["import { m } from '../../deployment/efs/manifest.json';", 'deployment data'],
+  ];
+  for (const [line, label] of negativeCases) {
+    const violations = scanSources({ [COMMITTED_LOCALES_SOURCE]: `${line}\nexport const x = 1;\n` });
+    assert.equal(violations.length, 1, `${label} must be refused in ${COMMITTED_LOCALES_SOURCE}`);
+  }
+
+  // An approved core-only import stays clean, so the scanner is not simply refusing everything.
+  assert.deepEqual(
+    scanSources({
+      [COMMITTED_LOCALES_SOURCE]:
+        "import { localePolicyIssue } from '../core/efs/uno-locales';\nexport const ok = localePolicyIssue;\n",
+    }),
+    [],
+  );
+});

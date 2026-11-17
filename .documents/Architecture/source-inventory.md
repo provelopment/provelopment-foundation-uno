@@ -1223,6 +1223,37 @@ no markup; Markdown must begin with one `# ` heading and is always `public`; rep
 projection proves a Page is routed, public or indexable.
 
 
+## U03 stored Site-locale policy (UNO-WO-025 / R01)
+
+**Mapping.** The locale contract is now stored rather than only proposed. `src/core/efs/manifest-graph.ts`
+accepts one optional `locales` record on a Site — `{supportedLocales, defaultLocale}`, 1..32 unique canonical
+full-region tags with the default inside the list — reusing `localePolicyIssue` on a descriptor-checked copy
+with an empty mapping, refusing as the closed `site:invalid-locales`, and additionally refusing a Page locale
+the declaring Site does not support. `src/core/efs/uno-config.ts` accepts one optional top-level
+`languagePreferences` mapping (0..16 short keys to canonical full-region tags), refuses it as the closed
+`config:invalid-language-preferences`, and refuses it as `config:locale-authority-missing` when the selected
+Site declares no locale authority to check it against. `src/application/resolve-uno-committed-locales.ts`
+composes the two stored authorities into one fresh, deeply frozen policy using seven closed
+`committed-locales:` codes, refusing a missing Site policy, a missing mapping and any policy the accepted
+locale contract rejects.
+
+**Committed data.** `deployment/efs/manifest.json` declares `locales` for the one `main` Site
+(`["en-001"]`, default `en-001`); `deployment/uno.config.json` adds only
+`languagePreferences: { "en": "en-001" }`. No base, publication flag, second Site or `schemaVersion` was
+introduced, and `validateUnoSiteSelection` remains a selection validator rather than a publication decision.
+
+**Authored Home.** `deployment/efs/content/home.en-001.md` was replaced with the Owner-approved copy (UTF-8 LF,
+no BOM, one final LF, 1,165 bytes); its title, source declaration and single representation are unchanged and
+`/en-001` still returns 404.
+
+**Rights.** Original **Uno-owned** implementation and prose, class **NEW / REWRITE concept**; the pinned
+Foundation GEO-03 commit `c05c55ea…` remains conceptual context only. No Foundation, Solo or Connect code,
+media or brand imported; no dependency, workflow or asset added; Apache-2.0 notices intact.
+
+**Limitations.** Stored locales and mapped aliases are declarations, not publication: no production base is
+chosen, no route, redirect, canonical URL, `hreflang` or sitemap is emitted, and U03 remains open.
+
+## U03 publication-inputs composition (UNO-WO-024 / R01)
 ## U03 publication-inputs composition (UNO-WO-024 / R01)
 
 **Mapping.** `src/application/validate-uno-site-publication-inputs.ts` (application layer) composes four

@@ -11,6 +11,7 @@ import {
   type UnoSitePublicationInputsRefusal,
   type UnoSitePublicationResult,
 } from "../../src/application/validate-uno-site-publication-inputs";
+import { resolveUnoCommittedLocales } from "../../src/application/resolve-uno-committed-locales";
 
 /**
  * U03 Site publication-inputs tests (`UNO-WO-024 / R01`).
@@ -541,5 +542,52 @@ describe("request shape and hostile values", () => {
     for (const leak of ["LEAK", "example.org", "/site"]) {
       expect(serialised.includes(leak)).toBe(false);
     }
+  });
+});
+
+describe("the stored policy composes with this validator (`UNO-WO-025 / R01`)", () => {
+  it("accepts the committed policy derived from the committed files with a test-only loopback base", () => {
+    const manifest = readJson(MANIFEST_URL);
+    const selection = readJson(CONFIG_URL);
+
+    const stored = resolveUnoCommittedLocales({ manifest, selection });
+    expect(stored.accepted).toBe(true);
+    if (!stored.accepted) return;
+
+    const checked = validateUnoSitePublicationInputs({
+      manifest,
+      selection,
+      base: { canonical: "http://localhost:3000", aliases: [] },
+      localePolicy: stored.localePolicy,
+    });
+    expectAccepted(checked);
+
+    expect(checked.site).toEqual({ entityId: ENTITY_ID, facetId: "foundation", siteId: "main" });
+    expect(checked.localePolicy.supportedLocales).toEqual(["en-001"]);
+    expect(checked.localePolicy.defaultLocale).toBe("en-001");
+    expect({ ...checked.localePolicy.languagePreferences }).toEqual({ en: "en-001" });
+    expect(checked.candidateCount).toBe(1);
+    expect(JSON.stringify(checked).includes("https://")).toBe(false);
+    for (const forbidden of ["published", "authorized", "ready", "canonicalUrl", "hreflang", "sitemap"]) {
+      expect(Object.keys(checked)).not.toContain(forbidden);
+    }
+  });
+
+  it("fails when either stored authority is deleted, without inventing an alias", () => {
+    const manifest = readJson(MANIFEST_URL) as {
+      entities: { facets: { sites: Record<string, unknown>[] }[] }[];
+    };
+    const selection = readJson(CONFIG_URL) as Record<string, unknown>;
+
+    delete manifest.entities[0]!.facets[0]!.sites[0]!.locales;
+    expect(
+      resolveUnoCommittedLocales({ manifest, selection: readJson(CONFIG_URL) }).accepted,
+    ).toBe(false);
+
+    const withoutMapping = { ...selection };
+    delete withoutMapping.languagePreferences;
+    expect(resolveUnoCommittedLocales({ manifest: readJson(MANIFEST_URL), selection: withoutMapping }).accepted).toBe(
+      false,
+    );
   });
 });
