@@ -100,6 +100,18 @@ function identityMatches(claimed, observed) {
 }
 
 /**
+ * The bytes this transaction last observed on an owned file, used together with the OS identity.
+ *
+ * Identity alone is not enough on a POSIX filesystem: an inode freed by an unlink may be handed straight back to the
+ * next file created at the same path, so a replacement could carry the very same device/inode pair. Removal therefore
+ * requires the identity *and* the exact bytes the transaction itself wrote (or observed on its own handle after a
+ * partial write). A stranger would have to reproduce both to be mistaken for ours.
+ */
+function digestUsable(digest) {
+  return typeof digest === "string" && digest.length === 64;
+}
+
+/**
  * Component-aware containment. A string prefix test would accept a sibling such as `<root>-other`, so the target is
  * expressed relative to the verified root and rejected when it is empty, absolute, or begins with `..`.
  * Returns the relative component list, or `null` when the target is outside the root.
@@ -378,6 +390,20 @@ export async function prepareUnoU03FixtureTransaction(options) {
         problems.push(reason("restore:identity:foreign", created.relativePath));
         continue;
       }
+      // An inode may be reused, so the bytes must still be the ones this transaction wrote on that very file.
+      if (!digestUsable(created.digest)) {
+        problems.push(reason("restore:content:unprovable", created.relativePath));
+        continue;
+      }
+      try {
+        if (digestOf(writer.readFile(created.absolutePath)) !== created.digest) {
+          problems.push(reason("restore:content:foreign", created.relativePath));
+          continue;
+        }
+      } catch {
+        problems.push(reason("restore:content:unreadable", created.relativePath));
+        continue;
+      }
       try {
         writer.removeFile(created.absolutePath);
       } catch (error) {
@@ -433,9 +459,24 @@ export async function prepareUnoU03FixtureTransaction(options) {
           writer.closeHandle(handle);
           throw new Error("identity-unprovable");
         }
-        intent.fixtures.push({ absolutePath: fixture.absolutePath, relativePath: fixture.relativePath, identity });
+        intent.fixtures.push({
+          absolutePath: fixture.absolutePath,
+          relativePath: fixture.relativePath,
+          identity,
+          digest: null,
+        });
+        const record = intent.fixtures[intent.fixtures.length - 1];
         try {
           writer.writeToHandle(handle, fixture.bytes);
+          record.digest = digestOf(fixture.bytes);
+        } catch (error) {
+          // A partial write is still this transaction's file: record exactly what landed on it, then let rollback run.
+          try {
+            record.digest = digestOf(writer.readFile(fixture.absolutePath));
+          } catch {
+            record.digest = null; // Unprovable content can never be removed; the rollback will fail closed.
+          }
+          throw error;
         } finally {
           writer.closeHandle(handle);
         }

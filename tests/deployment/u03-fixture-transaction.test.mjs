@@ -605,7 +605,12 @@ test('a transaction-owned file replaced before restore is preserved and the rest
 
     const restored = await transaction.restore();
     assert.equal(restored.ok, false, 'an unprovable identity is never a clean restore');
-    assert.ok(restored.reasons.some((entry) => entry.startsWith('restore:identity:foreign')));
+    // A POSIX host may hand the freed inode to the replacement, so either refusal is the correct outcome.
+    assert.ok(
+      restored.reasons.some(
+        (entry) => entry.startsWith('restore:identity:foreign') || entry.startsWith('restore:content:foreign'),
+      ),
+    );
     assert.equal(sha256(readFileSync(ownedPath)), sha256(foreignBytes), 'the replacement survives');
     assert.deepEqual(identityOfPath(ownedPath), foreignIdentity, 'the replacement identity survives');
 
@@ -684,6 +689,59 @@ test('a duplicate fixture path and a fixture colliding with a declaration are bo
     assert.equal(colliding.status, 'refused');
     assert.ok(colliding.reasons.some((entry) => entry.startsWith('fixture:collides-with-declaration')));
     assertDeclarationsRestored(sandbox.root);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test('a replacement that reuses the freed inode is still refused, by its content', async () => {
+  const sandbox = makeSandbox();
+  try {
+    // ext4 hands a freed inode straight back to the next file created at the same path, so identity alone can agree
+    // between this transaction's file and a stranger's replacement. This writer reproduces exactly that: for one path
+    // it reports the *claimed* device/inode even though the file there is a different one.
+    const base = makeWriter();
+    let forced = null;
+    const writer = {
+      ...base,
+      lstat: (path) => {
+        if (forced !== null && path.toLowerCase() === forced.path.toLowerCase()) {
+          const stats = lstatSync(path);
+          return {
+            dev: forced.identity.dev,
+            ino: forced.identity.ino,
+            size: stats.size,
+            isSymbolicLink: () => false,
+            isFile: () => true,
+          };
+        }
+        return lstatSync(path);
+      },
+    };
+
+    const transaction = await prepareUnoU03FixtureTransaction({ ...sandbox, writer });
+    assert.equal(transaction.status, 'armed');
+    assert.equal((await transaction.install()).ok, true);
+
+    const ownedPath = join(sandbox.root, FIXTURE_SOURCES[2]);
+    const claimedIdentity = identityOfPath(ownedPath);
+    unlinkSync(ownedPath);
+    const foreignBytes = Buffer.from('# stranger occupying the recycled inode\n', 'utf8');
+    writeFileSync(ownedPath, foreignBytes);
+
+    forced = { path: ownedPath, identity: claimedIdentity };
+
+    const restored = await transaction.restore();
+    assert.equal(restored.ok, false, 'content, not identity alone, decides ownership');
+    assert.ok(
+      restored.reasons.some(
+        (entry) => entry.startsWith('restore:content:foreign') || entry.startsWith('restore:identity:foreign'),
+      ),
+      `expected a foreign-content refusal, saw ${JSON.stringify(restored.reasons)}`,
+    );
+    assert.equal(sha256(readFileSync(ownedPath)), sha256(foreignBytes), 'the stranger survives');
+    assert.equal(restored.backupsPreserved, 2);
+    assert.equal(transaction.describe().verified, false);
   } finally {
     sandbox.cleanup();
   }

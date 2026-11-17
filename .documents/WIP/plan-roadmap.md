@@ -123,7 +123,7 @@ real locale routing, and any optional base path. Each requires a later bounded O
 device/inode identity is the only proof for removal, so a file that appears between preflight and the create is never
 claimed and never deleted, and a file replaced before cleanup fails the restore closed with its recovery copies kept.
 Containment is component-aware, so a sibling whose name extends the root or a literal `..` traversal is refused before
-any mutation. Twenty-six fault and ownership cases plus the unchanged 195-check publication proof confirm it; no domain,
+any mutation. Twenty-seven fault and ownership cases plus the unchanged 195-check publication proof confirm it; no domain,
 publication or provider change, and U03 stays open.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct

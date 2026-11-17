@@ -1237,11 +1237,13 @@ refused to grant is never recorded, never removed and never reported as owned. C
 handle, not through the path.
 
 **Restore removes only proven ownership.** For each record, `restore()` re-`lstat`s the path and unlinks the file only
-when it is not a link and still carries the claimed device/inode pair. A replacement file, a symlink or an identity the
-platform cannot prove is left untouched and turns the restore into a fail-closed result: `preserveScratch`, both
-recovery copies kept, `dispose()` refused, and a bounded reason list that names no absolute path. `prepare()` proves the
-platform can even distinguish two files at one path — an identity probe in private scratch — and refuses with
-`identity:unprovable` rather than ever unlinking by pathname alone.
+when it is not a link, still carries the claimed device/inode pair, **and** still holds exactly the bytes this
+transaction wrote there. Identity alone is not a proof on a POSIX host: a freed inode can be handed straight back to the
+next file created at the same path, so content is the second, independent check. A replacement file, a symlink, a reused
+inode carrying foreign bytes, or an identity the platform cannot prove is left untouched and turns the restore into a
+fail-closed result: `preserveScratch`, both recovery copies kept, `dispose()` refused, and a bounded reason list naming
+no absolute path. `prepare()` proves the platform can even distinguish two files at one path — an identity probe in
+private scratch — and refuses with `identity:unprovable` rather than ever unlinking by pathname alone.
 
 **Containment is component-aware.** `componentsWithin()` expresses each target as `path.relative()` from the verified
 root and rejects empty, absolute or `..`-bearing results before the physical `lstat`/`realpath` walk, so a sibling whose
@@ -1249,7 +1251,7 @@ name extends the root, a literal `../` traversal and any unknown reparse outcome
 itself must be a real directory that is its own canonical path. Duplicate fixture paths and any fixture colliding with a
 declaration are refused.
 
-**The proof.** Twenty-six named cases drive the same exported operations in isolated `.temp/wo031-*` roots: the original
+**The proof.** Twenty-seven named cases drive the same exported operations in isolated `.temp/wo031-*` roots: the original
 nineteen (happy path, idempotence, five preflight refusals including both symlink fixtures, all seven write positions,
 caller exception, mid-fixture refusal, fail-closed retention and recovery, scratch hygiene, exported surface) plus seven
 ownership cases — an intervening `EEXIST` at the first path, an `EEXIST` at the fifth after four owned files were
