@@ -1,222 +1,185 @@
-# UNO-WO-028 / R01 — Explicit Page publication, locale serving and discovery integrated; nothing published
+# UNO-WO-029 / R01 — Positive publication proved over a real production build; committed deployment still unpublished
 
-**Work order:** `UNO-WO-028 / R01` · **Edition:** FINAL — EXECUTE · **Stage:** U03, **OPEN**.
-**Installed ACTIVE:** 21,685 bytes, SHA-256 `503d2cde8b3b10e0fb35bc4d40c887f45f93bdb9d1d63a9cc052a8d3eff47fe0`,
-heading `UNO-WO-028 / R01 — Integrate explicit Page publication, locale serving and SEO`; verified byte-for-byte
-before any write; ignored, untracked, unstaged, never printed, never committed.
-**Owner decision:** the activation approves the integrated U03 contract in §3.
+**Work order:** `UNO-WO-029 / R01` · **Edition:** FINAL — EXECUTE · **Stage:** U03, **OPEN**.
+**Installed ACTIVE:** 26,154 bytes, SHA-256 `f14294f9d97e5e67cbbd126efe9c5ebe4f83308de8d9f09ab685fe38d187d584`,
+heading `UNO-WO-029 / R01 — Positive U03 publication HTTP, locale layouts and SEO`; verified byte-for-byte before any
+write; ignored, untracked, unstaged, never printed, never staged.
 **Push authorization:** the activation contains `AUTHORIZE_GIT_PUSH_TRIGGERED_PRODUCTION_DEPLOYMENTS=YES`.
-**Required start = actual start:** `f86817f2c704ca90d293c111de91bae4eee23daf`.
+**Required start = actual start:** `7a3ccbab5cfb3703c50d48635ed31957eb286118`.
 
 ## 1. Status
 
 | Fact | Status | Evidence |
 | --- | --- | --- |
-| `PUBLICATION_AUTHORITY` | **PASS** | optional Page key `publication: "draft" \| "published"`; absent and `draft` are not published; one new closed code `page:invalid-publication` |
-| `NO_INFERENCE` | **PASS** | no Site default, no `public` property, no file/route/Site/host inference; committed manifest declares none and was not edited |
-| `PUBLISHED_PAGE_PLAN` | **PASS** | `plan-uno-published-page` composes six accepted contracts; the candidate's own validated Page must declare `published` |
-| `DISCOVERY_PLAN` | **PASS** | `plan-uno-public-discovery` emits sorted canonical entries and same-Page alternates; unlisted Pages excluded everywhere; `x-default` only for a public default-locale Home |
-| `SERVING_BOUNDARY` | **PASS** | `src/config/uno-serving.ts` is the only server IO boundary; one `process.cwd()`, no env, host, proxy header or geo fallback |
-| `REAL_ROUTES` | **PASS** | localized segment, `robots.txt` and `sitemap.xml` exist and refuse everything the committed declaration does not publish |
-| `SAFE_MARKDOWN` | **PASS** | React text nodes only; no `dangerouslySetInnerHTML`, no raw HTML, image, link, table or block quote; unsupported input fails the whole document |
-| `PRODUCTION_404_TRUTH` | **PASS** | `/en`, `/en-001`, `/en-001/about`, `/en-001/home`, `/de`, unknown, `/robots.txt`, `/sitemap.xml` all real 404 (§5) |
-| `PUBLIC_DEMONSTRATION_INTACT` | **PASS** | U01 HTTP **103 / 0** unchanged; `/` still 200, noindex, one `h1`, no canonical or `hreflang` |
-| `FOCUSED_TESTS` | **PASS** | **34** new cases (94 / 17 / 11 across the three suites) with real confined fixtures |
-| `BASELINE_PRESERVED` | **PASS** | 733 unit tests over 23 files (697 + 36); 40 architecture checks (36 + 4); no skipped or weakened test |
-| `LOCALE_LANGUAGE_ATTRIBUTE` | **UNVERIFIED** | the byte-frozen root layout renders `<html lang="en">`; a truthful per-Page attribute is impossible without changing it |
-| `POSITIVE_PUBLIC_HTTP` | **NOT CLAIMED** | no committed Page is published and no domain exists; positive decisions are proved against fixtures only |
-| `PROVIDER_ACTIONS` | **ZERO** | no provider call, deploy, alias, domain, promotion or settings change |
-| `STAGE` | U03 **OPEN** | no domain chosen, no committed Page published, no release or closure |
+| `POSITIVE_PRODUCTION_HTTP` | **PASS** | four published Pages answered **200** over a real `next build`/`next start` loopback server with the authored title, one `h1` and a safe body |
+| `TRUTHFUL_LOCALE_DOCUMENT` | **PASS** | `<html lang="en-001">` and `<html lang="de-DE">` from the stored, validated locale authority |
+| `CANONICAL_AND_HREFLANG` | **PASS** | exact canonical and OG URLs; same-Page `en-001`/`de-DE` alternates; **one** `x-default`, on the published default Home only, never on About |
+| `ALIAS_REDIRECT` | **PASS** | `/en` answers **307** to `http://localhost:3000/en-001`; no other alias, no host or language guess |
+| `ROBOTS_AND_SITEMAP` | **PASS** | `robots.txt` 200 `text/plain` naming the canonical sitemap and disallowing nothing; `sitemap.xml` 200 `application/xml` with exactly the four public URLs, both locales and no draft/unlisted URL |
+| `STRICT_REFUSALS` | **PASS** | ten addresses refused with **404**, no redirect, no canonical/`hreflang`/OG and the approved 404 document |
+| `FIXTURE_RESTORED` | **PASS** | both declarations restored byte-for-byte with matching SHA-256 and Git blobs; five fixture sources removed; `deployment/**` clean |
+| `COMMITTED_UNPUBLISHED` | **PASS** | committed manifest still declares no `publication`; `uno.config.json` still states no base |
+| `DEMONSTRATION_PRESERVED` | **PASS** | `/` unchanged: one `h1`, approved copy, `lang="en"`, noindex/nofollow, no canonical or `hreflang` |
+| `BASELINE_PRESERVED` | **PASS** | unit 733/733, architecture 40/40, U01 HTTP **103/0**, U03 HTTP **91/0**, brand 29/29, security 16/16, readiness **101** checks, fixtures 69/69 |
+| `HOSTED_CI` | **PASS** | product head: 4 jobs `success`, 26 steps, 0 failures; report head repeated below |
+| `PROVIDER_ACTIONS` | **ZERO** | no Vercel/provider call, deployment, alias, domain or setting change |
+| `STAGE` | U03 **OPEN** | no production origin, no permanent publication, no browser/accessibility proof, no U04 renderer |
 
-## 2. Authorized commits and the exact ledger
+## 2. Commits and the exact ledger
 
 | Role | Commit | Content |
 | --- | --- | --- |
-| Product | **`61fdf762f0beec9580b0e052aa542a5f0d6ffd2e`** | exactly seventeen ledger paths; direct child of `f86817f` |
+| Product | **`d4cad1f49dd066ab3a080b5953d52799801bc034`** | exactly the seventeen ledger operations; direct child of `7a3ccba` |
 | Report | the report-only child of the product commit; its SHA is returned privately to the Owner | `.documents/Reports/execution-report.md` only |
 
 | # | Op | Path | Blob | Bytes |
 | ---: | --- | --- | --- | ---: |
-| 1 | EDIT | `src/core/efs/manifest-graph.ts` | `d08d213e…` → `76e9ef09…` | 30,457 |
-| 2 | EDIT | `tests/unit/efs-manifest-graph.test.ts` | `2b166c66…` → `3891e4b0…` | 38,998 |
-| 3 | CREATE | `src/application/plan-uno-published-page.ts` | ABSENT → `ef1dd48e…` | 14,897 |
-| 4 | CREATE | `tests/unit/efs-uno-published-page.test.ts` | ABSENT → `376581a2…` | 17,638 |
-| 5 | CREATE | `src/application/plan-uno-public-discovery.ts` | ABSENT → `c98aca51…` | 15,706 |
-| 6 | CREATE | `tests/unit/efs-uno-public-discovery.test.ts` | ABSENT → `8417cee5…` | 12,714 |
-| 7 | CREATE | `src/config/uno-serving.ts` | ABSENT → `3a89bf92…` | 17,337 |
-| 8 | CREATE | `src/app/[locale]/[[...segments]]/page.tsx` | ABSENT → `97948ac2…` | 6,122 |
-| 9 | CREATE | `src/app/robots.txt/route.ts` | ABSENT → `e29bcc4b…` | 1,189 |
-| 10 | CREATE | `src/app/sitemap.xml/route.ts` | ABSENT → `ec329af3…` | 1,157 |
-| 11 | CREATE | `src/components/uno-safe-markdown-page.tsx` | ABSENT → `8f3b95ac…` | 7,921 |
-| 12 | CREATE | `scripts/verify-u03-http.mjs` | ABSENT → `efb9ff48…` | 9,971 |
-| 13 | EDIT | `.github/workflows/verify-u01.yml` | `e373acef…` → `ac55b963…` | 5,137 |
-| 14 | EDIT | `tests/architecture/u01-boundaries.test.mjs` | `bb048eea…` → `664f1e1f…` | 54,108 |
-| 15 | EDIT | `.documents/Architecture/source-inventory.md` | `d7864318…` → `56b6d895…` | 119,830 |
-| 16 | EDIT | `.documents/WIP/plan-roadmap.md` | `d052728c…` → `1c7a005c…` | 10,202 |
-| 17 | OVERWRITE | `.documents/WIP/plan-next.md` | `80a1b6d9…` → `913e0519…` | 1,602 |
+| 1 | MOVE | `src/app/page.tsx` → `src/app/(demo)/page.tsx` | `837aad87…` (unchanged) | 9,335 |
+| 2 | MOVE + CSS import | `src/app/layout.tsx` → `src/app/(demo)/layout.tsx` | `c7dc9392…` → `fd862652…` | 2,361 |
+| 3 | MOVE + EDIT | `src/app/[locale]/[[...segments]]/page.tsx` → `src/app/(site)/[locale]/[[...segments]]/page.tsx` | `97948ac2…` → `edd31fcd…` | 7,813 |
+| 4 | CREATE | `src/app/(site)/[locale]/layout.tsx` | ABSENT → `1df44e05…` | 2,661 |
+| 5 | CREATE | `src/app/global-not-found.tsx` | ABSENT → `5bac4074…` | 1,632 |
+| 6 | EDIT | `next.config.ts` | `ad198a02…` → `271506a1…` | 937 |
+| 7 | EDIT | `src/config/uno-serving.ts` | `3a89bf92…` → `f36dc9d2…` | 19,450 |
+| 8 | CREATE | `scripts/verify-u03-published-http.mjs` | ABSENT → `3c56a603…` | 33,374 |
+| 9 | EDIT | `.github/workflows/verify-u01.yml` | `ac55b963…` → `d37bcc4f…` | 5,732 |
+| 10 | EDIT | `scripts/verify-vercel-readiness.mjs` | `47f9a994…` → `8d71b515…` | 25,742 |
+| 11 | EDIT | `tests/deployment/verify-vercel-readiness.test.mjs` | `6fa970ba…` → `9edb1271…` | 28,222 |
+| 12 | EDIT | `tests/deployment/node26-security-floor.test.mjs` | `4df7910b…` → `001ec3fc…` | 12,454 |
+| 13 | EDIT | `tests/deployment/uno-brand-copy.test.mjs` | `e3bc6321…` → `30f892c8…` | 17,636 |
+| 14 | EDIT | `tests/architecture/u01-boundaries.test.mjs` | `664f1e1f…` → `4194e920…` | 55,521 |
+| 15 | EDIT | `.documents/Architecture/source-inventory.md` | `56b6d895…` → `f8e8f0a7…` | 123,489 |
+| 16 | EDIT | `.documents/WIP/plan-roadmap.md` | `1c7a005c…` → `9ffc7fc4…` | 10,320 |
+| 17 | OVERWRITE | `.documents/WIP/plan-next.md` | `913e0519…` → `2e6318f9…` | 1,676 |
 
-Seven editable start blobs matched, all ten CREATE destinations were absent, `git diff --cached --check` was clean,
-ACTIVE was never staged, and the working tree was clean at the product head.
+The three moved sources are staged as renames; the old paths are absent from the final tree.
 
 ## 3. Guards (sanitized)
 
 | Guard | Result |
 | --- | --- |
-| ACTIVE | one private file at the expected path, 21,685 bytes, digest and heading matching the activation, ignored, untracked, unstaged, absent from every diff |
+| ACTIVE | one private file, 26,154 bytes, digest and heading matching the activation, ignored, untracked, unstaged, absent from every diff |
 | Physical root | the single Uno checkout resolved physically; no symlink, junction or reparse alias on the checkout or its ancestors |
-| Parent and siblings | parent-owned anchored `/00.foundation-uno/` ignore rule verified and unchanged; parent, Foundation, Solo and every sibling path and remote strictly read-only |
-| Git | one worktree, `main`, exactly one fetch/push remote `origin` for `provelopment/provelopment-foundation-uno`, no mirror; no reset, rebase, force, clean or amend |
-| Head and remote | `HEAD` = `origin/main` = `f86817f` at start and re-read immediately before the push, where it had not moved |
-| WIP slots | exactly four: `plan-roadmap.md`, `plan-next.md`, the ignored private ACTIVE, `plan-outlook.md` |
-| Pins | **29 / 29** immutable anchors byte-identical; **7 / 7** editable start blobs matched; **10 / 10** CREATE paths ABSENT |
-| Runtime | Node 26.13.1 and pnpm 11.6.0; frozen install in-root; `package.json` and `pnpm-lock.yaml` blobs unchanged |
+| Parent and siblings | parent-owned anchored `/00.foundation-uno/` ignore rule unchanged; parent, Foundation, Solo and every sibling read-only |
+| Git | one worktree, `main`, exactly one fetch/push remote `origin`, no mirror; remote re-read immediately before the push and unchanged |
+| Head | `HEAD` = `origin/main` = `7a3ccba` at start; product head `d4cad1f` pushed non-force |
+| Pins | **20 / 20** immutable anchors byte-identical; **15 / 15** editable and move sources matched their start blobs; **6 / 6** destinations untracked before the write |
+| Runtime | Node 26.13.1, pnpm 11.6.0; `package.json` and `pnpm-lock.yaml` blobs unchanged |
 
 ## 4. What was built
 
-**A. Explicit publication authority (3A).** The manifest Page validator accepts exactly one additional optional
-own-data key, `publication`, whose only literals are `"draft"` and `"published"`. Absent and `"draft"` are not
-published; a declared literal is kept verbatim and frozen on the validated Page. An invalid value refuses as the one
-new closed code `page:invalid-publication`; unknown keys still refuse as `shape:unsupported-field`; an accessor is
-refused with **zero invocations**; symbol keys and exotic prototypes refuse as `input:unreadable`. There is no
-Site-level publisher, no manifest default, no `public` property and no inference from a file, a route candidate, a
-selected Site, a host or an environment. `deployment/efs/manifest.json`, `deployment/uno.config.json` and the Home
-Markdown were **not edited**: the authored Home remains unpublished and the declaration remains base-free.
+**A. Two root layouts, one truthful language per document.** The demonstration moved intact into the `(demo)` route
+group (`page.tsx` byte-identical, `layout.tsx` changed only in one CSS import depth), and the published Site moved into
+its own `(site)` root. `src/app/(site)/[locale]/layout.tsx` owns `<html>` and `<body>` for a published Page and renders
+the **authored** full tag it gets from `resolveUnoServingLocaleTag`: `de-de` maps back to `de-DE`, `en-001` to `en-001`,
+and only an explicitly stored short alias (`en`) is reported as an alias for a redirect-only request. No Host, cookie,
+`Accept-Language`, environment value or raw path is authority; an unknown or hostile key renders the 404.
+`src/app/global-not-found.tsx` is the complete HTML 404 for an address matching no route — the approved visible copy, one
+`h1`, the return link, `lang="en"`, `noindex, nofollow`, the same stylesheet, no analytics — enabled by the one approved
+Next 16 flag `experimental.globalNotFound` beside the existing `devIndicators: false`.
 
-**B. Published-Page planner (3B).** `planUnoPublishedPage` takes exactly `{manifest, selection, base, pathname,
-loadedSource}` and composes — never duplicating — the manifest graph, the stored locale authority, the selection, a
-caller-proposed base, the route matcher, the accepted delivery candidate with its header and discoverability
-classifications. It returns a deeply frozen `{identity, document, delivery}` with the exact canonical URL, public and
-unlisted flags, robots intent, indexability and eligibility, or one of fourteen closed `publication:` literals. The
-publication gate is the candidate's **own validated Page**, so a valid file, a `public` property, a matched route, a
-selected Site or an accepted delivery candidate can never publish anything by itself.
+**B. One source of SEO truth in the real HTML.** A public Page's `generateMetadata` consumes
+`planUnoServingDiscovery()` — the same plan behind `robots.txt` and `sitemap.xml` — and emits the exact canonical URL,
+the matching OG URL, the same-Page public locale alternates and the `x-default` the plan declares (Home only). A public
+Page that cannot be found in that plan is refused rather than served with invented links; an unlisted Page keeps its own
+canonical and `noindex,nofollow` with no alternate; a JSON body is still refused until U04's renderer exists. The
+`[locale]` layout enumerates the published locales and the page enumerates the published route shapes, both from the same
+publication gate, with `dynamicParams = false`, so an address that was never enumerated takes the router's 404 document
+instead of streaming a shell.
 
-**C. Discovery planner (3B).** `planUnoPublicDiscovery` takes exactly `{decisions, locales}` and emits sorted
-canonical entries with same-Page locale alternates. It refuses mixed Sites, undeclared locales, duplicate URLs
-(case-insensitively too), duplicate Page locales, unusable or non-ASCII URLs, oversized collections and contradictory
-decisions. Only `public` Pages appear; `unlisted` Pages are absent from every entry, every alternate and every
-`x-default`, and `x-default` is emitted only for a published public default-locale Home.
+**C. Restore-in-finally positive proof.** `scripts/verify-u03-published-http.mjs` (Node built-ins only, no shell, no
+dependency, no network beyond loopback) refuses to start unless both committed declarations match their pinned SHA-256
+and the five fixture sources are absent; backs both declarations up into ignored `.temp/wo029-*` scratch; installs the
+synthetic fixture (two locales, four Pages, a short alias, base `http://localhost:3000`); validates it through the **real**
+confined loader, planner and serving composition; builds and serves the real production output on `127.0.0.1` with an
+ephemeral port; proves the positive and negative surface over real HTTP; then restores both declarations byte-for-byte and
+removes exactly the five fixture files in an unconditional `finally`, rebuilds the **unpublished** configuration and
+re-runs the two original HTTP gates against it.
 
-**D. Serving integration (3C).** `src/config/uno-serving.ts` is the only server IO boundary: it reads the two fixed
-declarations from `process.cwd()` — used once, never from a request — resolves the committed base through
-`resolveUnoCommittedBase`, loads one address through the confined loader and refuses unless the base, the Page's own
-publication, the source and the authority all agree. `src/app/[locale]/[[...segments]]/page.tsx` renders one visible
-`h1`, the description and the inert Markdown body, with per-Page title, description, canonical, OG URL and robots;
-a JSON Page is refused for serving until its versioned contract and renderer exist in U04. `robots.txt` and
-`sitemap.xml` are generated only from a valid base and a public discovery plan, XML-escaped, bounded and `no-store`;
-without them both are real 404s. No `basePath`, rewrite, proxy, tenant gateway, provider call or domain exists.
-
-**E. Safe Markdown (3C).** `src/components/uno-safe-markdown-page.tsx` parses a small subset (headings `##`–`######`,
-paragraphs, lists, fenced code) into inert blocks and renders them as React children. Raw HTML, images, links, block
-quotes, tables, a second `h1`, an unclosed fence, an unsupported language and any cap breach fail the whole document,
-and the caller answers 404 rather than rendering a partial page.
-
-**F. Route honesty note.** The segment declares `generateStaticParams` over the addresses the *same* gate accepts and
-`dynamicParams = false`, so an address the committed declaration does not publish is refused by the router with the
-ordinary fully rendered 404 document. This was deliberate: a purely streaming `notFound()` produced a 404 whose
-visible page required hydration, which degraded the approved 404 copy and broke the frozen U01 HTTP contract. The
-address set is derived from the same declarations at build time, so publication still controls it; the committed
-build produces an empty set.
-
-
-## 5. Test evidence — 34 new cases, real confined fixtures, both HTTP truths
-
-| Suite | Cases | What is proved |
-| --- | ---: | --- |
-| `efs-manifest-graph` | 94 (86 + 8) | absent publication stays absent; both literals kept and frozen; eight invalid spellings refused as `page:invalid-publication`; unknown key refused; accessor with zero invocations; symbol and exotic prototype; publication refused on Entity, Facet and Site; the committed manifest is unpublished |
-| `efs-uno-published-page` | 17 | **real synthetic fixture root** (`deployment/efs/manifest.json`, `deployment/uno.config.json`, three Markdown and two JSON sources) read through the **real confined loader**: published public Home, published Markdown About, published **unlisted** JSON Page; exact canonical URLs and robots intent; the planner's own decisions fed into discovery (unlisted excluded, `x-default` correct); absent/draft/invalid publication refused; invalid base; unknown and wrong-locale addresses; invalid JSON with a declared Markdown fallback refused; forged loader records (`pageId`, `accepted:false`, extra key, empty sources) refused as `publication:source-refused`; forged kind and body refused by the header projector; hostile accessor with zero getter calls; throwing proxy; vocabulary frozen; refusal echoes nothing; the committed deployment serves no Page, lists no address, plans no discovery and emits no robots or sitemap |
-| `efs-uno-public-discovery` | 11 | sorted canonical entries and same-Page alternates; unlisted excluded from entries, alternates and `x-default`; duplicate URL (case-insensitive); duplicate Page locale; second Site; undeclared locale; invalid locale policy; five unusable URLs; malformed and contradictory decisions; empty and oversized requests; order-independent, fresh and frozen output; hostile accessor, symbol and proxy |
-
-**Broad local gates.**
+## 5. Test evidence
 
 | Gate | Result |
 | --- | --- |
-| `pnpm install --frozen-lockfile --ignore-scripts --store-dir .pnpm-store` | PASS — both dependency blobs unchanged |
-| Focused suites | **122 / 122** (3 files) |
-| `node scripts/verify-governance-docs.mjs` | PASS — three frozen files match Owner-frozen bytes |
-| `node --test tests/governance-docs.test.mjs` | **9 / 9** |
+| Positive/negative production HTTP (`verify-u03-published-http`) | **195 passed, 0 failed**, exit 0 |
+| Original U01 HTTP, re-run inside that gate after restoration | **103 passed, 0 failed** |
+| Original U03 fail-closed HTTP, re-run after restoration | **91 passed, 0 failed** |
+| `pnpm test` | **733 / 733**, 23 files |
+| `pnpm test:architecture` | **40 / 40** |
 | `pnpm test:bootstrap` | **19 / 19** |
-| `pnpm test:architecture` | **40 / 40** (36 + 4) |
-| `pnpm lint` | exit 0 — 0 errors, 0 warnings |
-| `pnpm typecheck` | exit 0 |
-| `pnpm test` | **733 passed / 733**, 23 files — 697 previous + **36 new** |
-| `pnpm build` | PASS — `/`, `/_not-found`, `/icon.svg` static; `/[locale]/[[...segments]]`, `/robots.txt`, `/sitemap.xml` present |
-| `pnpm test:http` | **103 passed, 0 failed** — every prior assertion, including the 404 page's own copy |
-| `node scripts/verify-u03-http.mjs` | **91 passed, 0 failed** |
-| readiness fixtures / CLI | 66 pass / **100 checks, 0 failed** (`VERCEL_NOT_DEPLOYED_BY_AGENT`) |
-| security floors / brand contract | 16 pass / 29 pass |
+| governance docs + fixtures | PASS, **9 / 9** |
+| `pnpm lint` / `pnpm typecheck` | exit 0 / exit 0 |
+| `pnpm build` | PASS |
+| readiness fixtures / CLI | **69 / 69** / **101 checks, 0 failed** (`VERCEL_NOT_DEPLOYED_BY_AGENT`) |
+| security floors / brand contract | **16 / 16** / **29 / 29** |
 | `pnpm audit --audit-level high` | exit 0 — **0 high, 0 critical, 2 moderate** |
 | `git diff --check` | clean |
 
-**Real production HTTP statuses (loopback, production build).** `/` **200** with its approved copy, one `h1` and
-`noindex, nofollow`, and no canonical or `hreflang`. `/en`, `/en-001`, `/en-001/about`, `/en-001/home`, `/de`,
-`/en-001/does-not-exist`, `/robots.txt` and `/sitemap.xml` each **404**, with no `Location`, no `rel="canonical"`, no
-`hreflang`, no `<urlset`, no `Disallow:`, no `Sitemap:` and no `<article>` body. The refused documents advertise no
-document content type and never claim an indexable response; the HTML 404s carry the approved not-found page.
+**Real HTTP statuses in the fixture run.** `/en-001`, `/de-de`, `/en-001/about`, `/de-de/about` **200** with the authored
+title, one `h1`, `lang` = `en-001`/`de-DE`, exact canonical and OG URLs and correct alternates. `/en` **307** →
+`http://localhost:3000/en-001`. `/robots.txt` **200** `text/plain`; `/sitemap.xml` **200** `application/xml` with exactly
+four `<loc>` entries and one `x-default`. `/` **200** with the unchanged demonstration. `/en-001/draft`, `/de-de/draft`,
+`/en-001/hidden`, `/de-de/hidden`, `/en-001/wo029-about`, `/xx-001`, `/en-001/does-not-exist`, `/en-us`,
+`/en-001/about/extra` and `/de` each **404**, with no redirect and no advertised link. In the committed configuration every
+localized address remains a **404** with the approved document.
 
-**Warnings, disclosed.** Two **moderate** advisories remain — the same dev-only `minimatch` denial-of-service family
-(`>=7.0.0 <11.0.1`, patched `>=11.0.1`) reached only through the ESLint toolchain, never a runtime or production
-dependency path. They are recorded, not waived: the blocking threshold is zero high or critical, and zero is what the
-gate reports.
-
-**Gates not claimed.** `LOCALE_LANGUAGE_ATTRIBUTE` is **UNVERIFIED**: the frozen root layout renders `<html lang="en">`
-and this order forbids editing it, so a served `en-001` Page would carry a wrong language attribute. No positive public
-HTTP response is claimed, because the committed declaration publishes nothing.
+**Warnings, disclosed.** Two **moderate** advisories remain — the same dev-only `minimatch` denial-of-service family,
+reachable only through the ESLint toolchain. Zero high and zero critical is what the blocking gate reports. Turbopack
+reports a benign "dynamic filesystem access" tracing warning for the serving composition; it is expected because that
+module deliberately reads the fixed declarations, and it changes no content or routing.
 
 
 ## 6. Hosted CI
 
-**Product head `61fdf762f0beec9580b0e052aa542a5f0d6ffd2e` — four jobs, all `success`:**
+**Product head `d4cad1f49dd066ab3a080b5953d52799801bc034` — four jobs, all `success`:**
 
 | Workflow | Run | ubuntu-24.04 | windows-2025 | Steps / non-success |
 | --- | --- | --- | --- | --- |
-| Verify U01 baseline | `44032323343` | success | success | 25 / **0** |
-| Uno Bootstrap Verify | `44032323521` | success | success | 10 / **0** |
+| Verify U01 baseline | `44037758112` | success | success | **26** / **0** |
+| Uno Bootstrap Verify | `44037758182` | success | success | 10 / **0** |
 
-The U01 workflow now runs the new blocking `node scripts/verify-u03-http.mjs` step after the production build and the
-existing English-demonstration HTTP gate; every prior step is preserved and none uses `continue-on-error`. The
-bootstrap workflow is byte-identical. Log **text** is **UNVERIFIED** — this client reads job and step conclusions only.
-The report-only head repeats the same four jobs; its run IDs are returned privately to the Owner.
+The U01 workflow runs the new blocking `node scripts/verify-u03-published-http.mjs` step after `pnpm build`,
+`pnpm test:http` and `node scripts/verify-u03-http.mjs`, before the readiness gates, on **both** hosts. No prior step was
+removed, skipped, muted or made non-blocking; the bootstrap workflow is byte-identical. Actual log **text** is
+**UNVERIFIED** — this client reads job and step conclusions only. The report head repeats the same four jobs; its run IDs
+are returned privately to the Owner.
 
 ## 7. Rights, privacy and cleanup
 
-**Provenance.** All new files are original **Uno-owned** work, class **NEW** (with a **REWRITE concept** for the
-composition); the pinned read-only Foundation GEO-03 commit `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`
-(`src/core/page-document.ts`, blob `a12d964c…`) remains comparison context with **no code copied**. No Foundation,
-Solo or Connect source, image, brand, fixture or licence-uncleared asset was used; Apache-2.0 `LICENSE`/`NOTICE` and
-the 17-family / 22-module requirements are intact.
+**Provenance.** All new and changed files are original **Uno-owned** work, class **NEW / REWRITE concept**; the pinned
+read-only Foundation GEO-03 commit `c05c55ea61b5347cf5032211dd0bf37f2cc5083c` remains comparison context with **no code
+copied**. The five fixture documents are short original test text with no external link, image or HTML. No dependency,
+SDK, asset, secret or licence changed; Apache-2.0 `LICENSE`/`NOTICE`, the brand ledger and the 17-family / 22-module
+obligations are intact and explicitly **not** delivered by this order.
 
-**Privacy.** No secret, token, absolute personal path, private ACTIVE byte or unpublished external content appears in
-the product commit, CI or this report. No guard was weakened, no threshold raised, no workflow bypassed and no test
-skipped. The committed declaration, the committed manifest and the Home Markdown were not edited; no domain, origin
-or placeholder was installed. `deployment/**`, `src/app/page.tsx`, `src/app/layout.tsx`, `src/app/not-found.tsx`,
-`next.config.ts`, `package.json`, the lockfile and every brand asset are byte-identical.
+**Privacy.** No secret, token, absolute personal path, private ACTIVE byte or fixture publication content appears in the
+product commit, the workflow, CI output or this report. The fixture base is the literal test-only
+`http://localhost:3000` and was never committed: `deployment/efs/manifest.json` and `deployment/uno.config.json` are at
+their original blobs (`84866290…`, `fda8188c…`) with no `publication` and no base.
 
 **Provider actions: zero.** No provider API call, deployment, promotion, alias, domain or settings change; the only
 external effect was the authorized non-force Git push and any build the existing Git integration starts from it.
 
-**Cleanup.** Task-owned `.temp/` scratch (fixture probe, pin script, command logs, fixture roots) removed; `.next`,
-`node_modules` and the package store stay ignored; no unknown file was deleted; the tree is clean at the product head;
-the private ACTIVE remains ignored and unstaged.
+**Cleanup.** Task-owned `.temp/` scratch (probe scripts, pin script, command logs, fixture backups) removed; `.next`,
+`node_modules` and the package store stay ignored; no unknown file was deleted; the tree is clean at the product head; the
+private ACTIVE remains ignored and unstaged.
 
-## 8. What remains unimplemented — U03 stays OPEN
+## 8. What remains — U03 stays OPEN
 
-1. **No canonical domain.** The committed declaration states no base; choosing the real HTTPS origin is an Owner
-   decision this Agent must not infer.
-2. **No published Page.** The committed manifest declares no publication, so the committed deployment serves no
-   localized page, no `robots.txt` and no `sitemap.xml`.
-3. **No positive live HTTP or browser proof.** Positive decisions are proved against synthetic confined fixtures; a
-   positive *public* response requires a domain and an explicit publication first.
-4. **No JSON Page rendering.** A JSON body is classified but refused for serving until its versioned document
-   contract and renderer exist (U04).
-5. **Wrong language attribute.** The frozen root layout forces `<html lang="en">`; a truthful per-Page attribute needs
-   an Owner-approved change to that file. Reported **UNVERIFIED**, never claimed.
-6. **Build-time address set.** The localized route enumerates its addresses from the same declarations at build time,
-   so publishing a new Page requires a rebuild, exactly as a file-based site does. This is disclosed as a design
-   consequence, not hidden.
-7. **Provider state.** Production SHA, build log and analytics remain **UNVERIFIED** by this Agent.
+1. **No production origin.** The committed declaration still states no base; choosing the real HTTPS canonical origin is
+   an Owner decision this Agent must not infer. The proof above uses a test-only loopback base.
+2. **No permanent publication.** The committed manifest declares no `publication`, so the deployed site serves the
+   demonstration only and answers real 404s everywhere else.
+3. **No browser, accessibility or crawler proof.** The HTTP gate inspects real responses, not a rendered browser, and
+   claims no Lighthouse, assistive-technology or search-engine behaviour.
+4. **Rebuild-to-publish.** A published address exists only after a build enumerates it, exactly as a file-based site
+   does; the operational trigger for that rebuild is an Owner release decision.
+5. **No JSON renderer.** A published-but-unlisted JSON Page is classified and refused; U04's versioned document contract
+   and renderer are still required before any JSON body may be served.
+6. **Provider state.** Production SHA, build log and analytics remain **UNVERIFIED** by this Agent.
 
-Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`** for this bounded U03 checkpoint:
-explicit Page publication authority with one closed code, two composed planners, one server boundary, three real
-surfaces that refuse the unpublished committed deployment with fully rendered 404s, safe Markdown presentation, 34 new
-fixture-driven cases, 733 unit tests and 40 architecture checks green, U01 HTTP 103/0 preserved, U03 HTTP 91/0,
-zero provider actions and U03 still open.
+Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`** for this bounded U03 checkpoint: two
+truthful root layouts, a validated per-locale document, canonical/`hreflang`/OG taken from the same discovery plan behind
+`robots.txt` and `sitemap.xml`, one temporary alias redirect, four published Pages proved over a real production build
+with ten strict refusals, a fixture restored byte-for-byte in `finally`, 195 positive/negative checks green, the original
+103 and 91 fail-closed checks still green afterwards, 733 unit tests and 40 architecture checks passing, four hosted jobs
+successful on Ubuntu and Windows, zero provider actions, and the committed deployment still unpublished.
