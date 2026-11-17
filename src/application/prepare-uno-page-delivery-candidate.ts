@@ -18,6 +18,11 @@
  */
 import { HOME_CONTENT_SLUG } from "../core/page-content";
 import type { PageSourceKind, PageVisibility } from "../core/page-authoring-policy";
+import {
+  readUnoPageDocument,
+  type UnoPageDocument,
+  type UnoPageDocumentRefusal,
+} from "../core/page-document";
 import { matchUnoCandidateRoute } from "../core/efs/uno-route-address";
 import { classifyUnoPageDiscoverability } from "../core/efs/uno-discovery-policy";
 import { resolveUnoCommittedLocales } from "./resolve-uno-committed-locales";
@@ -39,6 +44,7 @@ export type UnoDeliveryRefusal =
   | "delivery:load-refused"
   | "delivery:candidate-mismatch"
   | "delivery:header-invalid"
+  | "delivery:document-invalid"
   | "delivery:discovery-invalid"
   | "delivery:canonical-too-long";
 
@@ -52,6 +58,7 @@ export const UNO_DELIVERY_REFUSAL_REASONS: readonly UnoDeliveryRefusal[] = Objec
   "delivery:load-refused",
   "delivery:candidate-mismatch",
   "delivery:header-invalid",
+  "delivery:document-invalid",
   "delivery:discovery-invalid",
   "delivery:canonical-too-long",
 ] as const);
@@ -96,13 +103,23 @@ export interface UnoDeliveryIdentity {
   readonly pathname: string;
 }
 
-/** The authored document as declared: a header plus raw, deliberately unrendered Markdown where present. */
+/** The authored document as declared: a header, raw unrendered Markdown, and the validated JSON Page. */
 export interface UnoDeliveryDocument {
   readonly kind: PageSourceKind;
   readonly title: string;
   readonly description?: string;
   readonly visibility: PageVisibility;
   readonly markdownBody?: string;
+  /**
+   * The accepted version-1 JSON Page document, present only when the selected JSON source also validated as a
+   * Page document. A JSON Page without it is not renderable and must not be served.
+   */
+  readonly pageDocument?: UnoPageDocument;
+  /**
+   * Why a present JSON source is not a renderable Page document. Carried so the serving gate can refuse with the
+   * exact closed reason instead of collapsing every document failure into one opaque message.
+   */
+  readonly pageDocumentRefusal?: UnoPageDocumentRefusal;
 }
 
 /** What a *future* server would be allowed to advertise, if the Owner ever published this Page. */
@@ -313,6 +330,32 @@ export function prepareUnoPageDeliveryCandidate(input: unknown): UnoDeliveryResu
     if (!header.accepted) return refuseDelivery("delivery:header-invalid");
     if (header.kind !== loadedKind) return refuseDelivery("delivery:header-invalid");
 
+    // A selected JSON source must also be a complete version-1 Page document. The header projection above only
+    // reads three bounded keys, so this is the step that decides whether a JSON Page has any renderable body at
+    // all. A refusal is carried as a closed reason rather than thrown: publication authority (the manifest
+    // `publication` gate) and renderability are separate decisions, and the serving gate is what refuses to emit
+    // an unrenderable Page.
+    let jsonDocument: UnoPageDocument | undefined;
+    let jsonRefusal: UnoPageDocumentRefusal | undefined;
+    if (loadedKind === "json") {
+      const validated = readUnoPageDocument(loadedText, {
+        reservedHome: candidate.pageId === HOME_CONTENT_SLUG,
+      });
+      if (!validated.accepted) {
+        jsonRefusal = validated.reason;
+      } else if (
+        validated.document.title !== header.title ||
+        validated.document.visibility !== header.visibility ||
+        validated.document.description !== header.description
+      ) {
+        // The document and the accepted header are two projections of the same bytes; if they disagree, the
+        // bytes are not one authority and the Page is refused instead of silently preferring one projection.
+        return refuseDelivery("delivery:document-invalid");
+      } else {
+        jsonDocument = validated.document;
+      }
+    }
+
     const discovery = classifyUnoPageDiscoverability({
       kind: header.kind,
       routePath: candidate.pageId === HOME_CONTENT_SLUG ? HOME_CONTENT_SLUG : candidate.routePath,
@@ -332,9 +375,13 @@ export function prepareUnoPageDeliveryCandidate(input: unknown): UnoDeliveryResu
       description?: string;
       visibility: PageVisibility;
       markdownBody?: string;
+      pageDocument?: UnoPageDocument;
+      pageDocumentRefusal?: UnoPageDocumentRefusal;
     } = { kind: header.kind, title: header.title, visibility: header.visibility };
     if (header.description !== undefined) document.description = header.description;
     if (header.markdownBody !== undefined) document.markdownBody = header.markdownBody;
+    if (jsonDocument !== undefined) document.pageDocument = jsonDocument;
+    if (jsonRefusal !== undefined) document.pageDocumentRefusal = jsonRefusal;
 
     const eligibility = discovery.eligibleIfPublished;
     return deepFreeze({

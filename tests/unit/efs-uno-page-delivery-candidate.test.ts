@@ -258,7 +258,12 @@ describe("ordinary candidates in a scratch repository", () => {
       title: "Offers",
       description: "Offers summary.",
       visibility: "unlisted",
+      // The fixture is a valid *header* but not a version-1 Page document (no `version`, no `sections`), so the
+      // candidate carries the closed document outcome instead of a renderable body. This is the new, stronger
+      // assertion of `UNO-WO-035 / R01`: publication and renderability are separate decisions.
+      pageDocumentRefusal: "document:unsupported-version",
     });
+    expect(result.document.pageDocument).toBeUndefined();
     expect(result.ifServed.canonicalUrl).toBe("https://example.org/site/en-001/offers/home");
     expect(result.ifServed.robots).toBe("noindex,nofollow");
     expect(result.ifServed.eligibleIfPublished).toEqual({
@@ -653,8 +658,10 @@ describe("header, discoverability and request-shape refusals", () => {
   });
 
   it("keeps one closed duplicate-free vocabulary and echoes nothing", () => {
-    expect(UNO_DELIVERY_REFUSAL_REASONS).toHaveLength(10);
-    expect(new Set(UNO_DELIVERY_REFUSAL_REASONS).size).toBe(10);
+    expect(UNO_DELIVERY_REFUSAL_REASONS).toHaveLength(11);
+    expect(new Set(UNO_DELIVERY_REFUSAL_REASONS).size).toBe(11);
+    // The one literal this order adds, so a document/header mismatch can never be silently repaired.
+    expect(UNO_DELIVERY_REFUSAL_REASONS).toContain("delivery:document-invalid");
     expect(Object.isFrozen(UNO_DELIVERY_REFUSAL_REASONS)).toBe(true);
     expect(UNO_DELIVERY_INPUT_KEYS).toEqual(["manifest", "selection", "base", "pathname", "loadedSource"]);
     expect(UNO_DELIVERY_LOADED_SOURCE_KEYS).toEqual(["accepted", "candidate", "kind", "text"]);
@@ -692,10 +699,50 @@ describe("record freshness and the canonical byte boundary", () => {
     });
     expect(result.accepted).toBe(true);
     if (!result.accepted) return;
-    expect(Object.keys(result.document)).toEqual(["kind", "title", "visibility"]);
+    // The header keys are unchanged; the candidate now also carries the closed document outcome, which is what the
+    // serving gate reads before it will render a JSON Page.
+    expect(Object.keys(result.document)).toEqual(["kind", "title", "visibility", "pageDocumentRefusal"]);
+    expect(result.document.pageDocument).toBeUndefined();
+    expect(result.document.pageDocumentRefusal).toBe("document:unsupported-version");
     expect(result.document.description).toBeUndefined();
     expect(result.document.markdownBody).toBeUndefined();
     expect(result.ifServed.robots).toBeNull();
+  });
+
+  it("carries a validated version-1 JSON document and freezes it", async () => {
+    const document = {
+      version: 1,
+      title: "Notice",
+      sections: [{ id: "body", module: "content.prose", props: { text: "Published body." } }],
+    };
+    const root = makeRepo(
+      manifestWith([
+        pageOf("home", ["home"], [{ kind: "markdown", path: HOME_SOURCE }]),
+        pageOf("notice", ["notice"], [{ kind: "json", path: "deployment/efs/content/notice.en-001.json" }]),
+      ]),
+      scratchSelection(),
+      {
+        "home.en-001.md": "# Scratch home\n\nScratch home body.\n",
+        "notice.en-001.json": JSON.stringify(document),
+      },
+    );
+    const loaded = await loadUnoCandidateSource({ repoRoot: root, pathname: "/en-001/notice" });
+    const result = prepareUnoPageDeliveryCandidate({
+      manifest: readJsonFrom(root, MANIFEST_SOURCE),
+      selection: readJsonFrom(root, SELECTION_SOURCE),
+      base: SITE_BASE,
+      pathname: "/en-001/notice",
+      loadedSource: loaded,
+    });
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    // The contract materializes the default `public` visibility, so the accepted document is fully explicit and
+    // byte-deterministic rather than depending on an absent key.
+    expect(result.document.pageDocument).toEqual({ ...document, visibility: "public" });
+    expect(result.document.pageDocumentRefusal).toBeUndefined();
+    expect(Object.isFrozen(result.document.pageDocument)).toBe(true);
+    expect(Object.isFrozen(result.document.pageDocument?.sections)).toBe(true);
+    expect(Object.isFrozen(result.document.pageDocument?.sections[0]?.props)).toBe(true);
   });
 
   it("returns a fresh record that no caller reference can reach", async () => {

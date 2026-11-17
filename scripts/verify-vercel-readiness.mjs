@@ -256,6 +256,7 @@ export const REASONS = Object.freeze([
   'workflow:no-browser-install',
   'workflow:no-browser-path',
   'workflow:no-browser-runner',
+  'workflow:no-u04-slice',
   'workflow:browser-system-deps',
   'package:playwright-not-dev-only',
   'package:playwright-wrong-pin',
@@ -607,6 +608,18 @@ export function analyzeReadiness(snapshot) {
   );
   expect(countOf(workflowText, 'PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers') >= 2, 'workflow:no-browser-path');
   expect(workflowText.includes('node scripts/verify-u03-published-http.mjs'), 'workflow:no-browser-runner');
+
+  // --- 8b2. The U04 JSON-slice gate must stay installed, blocking and browser-backed (UNO-WO-035 / R01) ------
+  // Deleting the step, renaming it away from the order's name, replacing its command with a no-op or dropping its
+  // browser path is refused by name, so a missing increment can never look like a pass.
+  expect(workflowText.includes('Verify U04 A1 JSON Page vertical slice'), 'workflow:no-u04-slice');
+  expect(workflowText.includes('node scripts/verify-u04-json-slice.mjs'), 'workflow:no-u04-slice');
+  expect(
+    /name: Verify U04 A1 JSON Page vertical slice[\s\S]{0,400}PLAYWRIGHT_BROWSERS_PATH: \.temp\/uno-u03-browsers/u.test(
+      stripComments(workflowText),
+    ),
+    'workflow:no-u04-slice',
+  );
   expect(!/(?:install-deps|--with-deps)/.test(stripComments(workflowText)), 'workflow:browser-system-deps');
   let declaredPackage = {};
   try {

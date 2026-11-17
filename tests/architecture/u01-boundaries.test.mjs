@@ -233,6 +233,7 @@ export const CORE_AUTHORED_FILES = Object.freeze([
   'src/core/modules/capability-registry.ts',
   'src/core/page-authoring-policy.ts',
   'src/core/page-content.ts',
+  'src/core/page-document.ts',
   'src/core/page-route-path.ts',
   'src/core/safe-author-url.ts',
 ]);
@@ -1399,7 +1400,9 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
     .sort();
   assert.deepEqual(importers, [
     'scripts/verify-u03-published-http.mjs',
+    'scripts/verify-u04-json-slice.mjs',
     'tests/deployment/u03-fixture-transaction.test.mjs',
+    'tests/deployment/u04-json-slice.test.mjs',
   ]);
 
   // The product layers cannot reach it, directly or by name.
@@ -1508,4 +1511,55 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
     if (path.replaceAll('\\', '/') === 'src/config/uno-serving.ts') continue;
     assert.equal(/node:fs/u.test(stripComments(content)), false, `${path} must not touch the filesystem directly`);
   }
+});
+
+// --- U04 JSON Page slice (UNO-WO-035 / R01) --------------------------------------------------------------
+// The slice must stay exactly what the order authorised: five renderable IDs from the immutable 22, one pure
+// contract, one server renderer, no new client island and no framework or filesystem reach inside `src/core`.
+
+test('the U04 slice declares exactly the five renderable IDs and implements each one', () => {
+  const contract = stripComments(doc('src/core/page-document.ts'));
+  const renderer = stripComments(doc('src/components/uno-page-sections.tsx'));
+
+  const block = /UNO_RENDERABLE_MODULES = Object\.freeze\(\[([\s\S]*?)\] as const\)/u.exec(contract)?.[1] ?? '';
+  const ids = [...block.matchAll(/"([a-z]+\.[a-z]+)"/gu)].map((match) => match[1]);
+  assert.deepEqual(ids, ["layout.stack", "layout.grid", "content.heading", "content.prose", "content.actions"]);
+
+  for (const id of ids) {
+    assert.ok(renderer.includes(`case "${id}":`), `${id} has no renderer case`);
+  }
+  assert.equal((renderer.match(/case "[a-z]+\.[a-z]+":/gu) ?? []).length, 5, 'the renderer must cover exactly five IDs');
+});
+
+test('the U04 contract stays framework-free and the renderer stays a server component', () => {
+  const contract = stripComments(doc('src/core/page-document.ts'));
+  for (const forbidden of ['next/', 'react', 'node:', 'https://', 'fetch(']) {
+    assert.equal(contract.includes(forbidden), false, `src/core/page-document.ts must not reference ${forbidden}`);
+  }
+  assert.ok(contract.includes('isCapabilityId'), 'the contract must reuse the immutable registry predicate');
+
+  const renderer = stripComments(doc('src/components/uno-page-sections.tsx'));
+  for (const forbidden of ['"use client"', 'dangerouslySetInnerHTML', 'useState', 'useEffect', 'fetch(']) {
+    assert.equal(renderer.includes(forbidden), false, `the renderer must not contain ${forbidden}`);
+  }
+  assert.equal(renderer.includes('<main'), false, 'the App Router page owns the single main landmark');
+  assert.equal(/<h1[\s>]/u.test(renderer), false, 'a document may never author the Page h1');
+});
+
+test('no new client island was added with the U04 slice', () => {
+  const components = Object.entries(readTree('src/components', 'src/components'));
+  const clientComponents = components
+    .filter(([, content]) => stripComments(content).includes('"use client"'))
+    .map(([path]) => path.replaceAll('\\', '/'));
+  assert.deepEqual(clientComponents, [], 'the JSON slice must not introduce a client component');
+});
+
+test('only the localized Page segment imports the JSON section renderer', () => {
+  const importers = Object.entries(readTree('src', 'src'))
+    .filter(([path, content]) =>
+      path.replaceAll('\\', '/') !== 'src/components/uno-page-sections.tsx' &&
+      /components\/uno-page-sections/u.test(content),
+    )
+    .map(([path]) => path.replaceAll('\\', '/'));
+  assert.deepEqual(importers, ['src/app/(site)/[locale]/[[...segments]]/page.tsx']);
 });

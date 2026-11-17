@@ -132,7 +132,17 @@ visibility behaviour.
 
 ### U04 — One owner, one presentation shell
 
-Not started. Blocked on U03 exit.
+**OPEN.** Started by the Owner at `bc4763c`; the stage is not closed and this run does not close it.
+
+**Bounded progress (`UNO-WO-035 / R01`).** The version-1 JSON Page document contract exists
+(`src/core/page-document.ts`, closed envelope, closed refusals, strict duplicate-key JSON reading,
+bounded caps) with **5 of the 22** approved module renderers — `layout.stack`, `layout.grid`,
+`content.heading`, `content.prose`, `content.actions` — served end to end by the real Next.js
+production build, including a two-card semantic article grid, an unlisted Page with its own
+`noindex,nofollow` and zero discovery leakage, and sixteen distinct refusals as genuine 404s.
+Family composition coverage is **0 of 17**: the typed `uno-family-composition.ts` translator,
+the remaining seventeen module renderers, `deployment/site.config.json`, the presentation shell,
+the client interaction island and the owned-asset policy remain mandatory U04 obligations.
 
 Scope: one owner and **one** presentation shell — assets, responsive navigation and
 accessibility.

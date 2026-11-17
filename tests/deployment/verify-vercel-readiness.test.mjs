@@ -186,6 +186,10 @@ function validSnapshot() {
     '        run: node scripts/verify-u03-published-http.mjs',
     '        env:',
     '          PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers',
+    '      - name: Verify U04 A1 JSON Page vertical slice',
+    '        run: node scripts/verify-u04-json-slice.mjs',
+    '        env:',
+    '          PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers',
     '      - name: Deployment readiness fixtures',
     '        run: node --test tests/deployment/verify-vercel-readiness.test.mjs',
     '      - name: Deployment readiness (offline)',
@@ -659,6 +663,27 @@ test('refuses a browser install that would write OS packages outside Uno', () =>
     `${text}      - name: Extra\\n        run: pnpm exec playwright install --with-deps chromium\\n`,
   );
   assertRefused(analyzeReadiness(snapshot), 'workflow:browser-system-deps');
+});
+
+test('refuses a U04 JSON-slice gate that was removed from the workflow', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text
+      .replace('name: Verify U04 A1 JSON Page vertical slice', 'name: Skipped slice')
+      .replace('run: node scripts/verify-u04-json-slice.mjs', 'run: echo skipped'),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-u04-slice');
+});
+
+test('refuses a U04 JSON-slice gate that lost its repository-local browser path', () => {
+  const snapshot = withChange('u01Workflow', (text) => {
+    const marker = 'name: Verify U04 A1 JSON Page vertical slice';
+    const start = text.indexOf(marker);
+    if (start < 0) return text;
+    const end = text.indexOf('\n\n', start);
+    const block = text.slice(start, end < 0 ? text.length : end);
+    return text.replace(block, block.replace('PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers', 'PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright'));
+  });
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-u04-slice');
 });
 
 test('refuses Playwright promoted into the production dependency set', () => {

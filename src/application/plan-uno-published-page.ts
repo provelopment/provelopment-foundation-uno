@@ -22,6 +22,7 @@
  * Solo or Connect code, media, brand or fixture is imported, and Apache-2.0 notices are unchanged.
  */
 import type { PageSourceKind, PageVisibility } from "../core/page-authoring-policy";
+import type { UnoPageDocument, UnoPageDocumentRefusal } from "../core/page-document";
 import { validateUnoManifestGraph } from "../core/efs/manifest-graph";
 import { matchUnoCandidateRoute } from "../core/efs/uno-route-address";
 import { validateUnoCanonicalBase } from "../core/efs/uno-canonical-base";
@@ -50,6 +51,7 @@ export type UnoPublicationRefusal =
   | "publication:route-invalid"
   | "publication:source-refused"
   | "publication:header-invalid"
+  | "publication:document-invalid"
   | "publication:discovery-invalid"
   | "publication:canonical-too-long"
   | "publication:page-missing"
@@ -67,6 +69,7 @@ export const UNO_PUBLICATION_REFUSAL_REASONS: readonly UnoPublicationRefusal[] =
   "publication:route-invalid",
   "publication:source-refused",
   "publication:header-invalid",
+  "publication:document-invalid",
   "publication:discovery-invalid",
   "publication:canonical-too-long",
   "publication:page-missing",
@@ -94,13 +97,17 @@ export interface UnoPublishedPageIdentity {
   readonly pathname: string;
 }
 
-/** The authored document: a header plus raw, deliberately unrendered Markdown where present. */
+/** The authored document: a header, raw unrendered Markdown, and the validated JSON Page where present. */
 export interface UnoPublishedPageDocument {
   readonly kind: PageSourceKind;
   readonly title: string;
   readonly description?: string;
   readonly visibility: PageVisibility;
   readonly markdownBody?: string;
+  /** The accepted version-1 JSON Page document; its presence is what makes a JSON Page renderable. */
+  readonly pageDocument?: UnoPageDocument;
+  /** The closed reason a present JSON source is not a renderable Page document. */
+  readonly pageDocumentRefusal?: UnoPageDocumentRefusal;
 }
 
 /** What a server may advertise for this accepted Page — still not a publication of anything. */
@@ -143,6 +150,7 @@ const DELIVERY_REFUSAL_MAP: Readonly<Record<UnoDeliveryRefusal, UnoPublicationRe
   "delivery:load-refused": "publication:source-refused",
   "delivery:candidate-mismatch": "publication:source-refused",
   "delivery:header-invalid": "publication:header-invalid",
+  "delivery:document-invalid": "publication:document-invalid",
   "delivery:discovery-invalid": "publication:discovery-invalid",
   "delivery:canonical-too-long": "publication:canonical-too-long",
 });
@@ -278,6 +286,8 @@ export function planUnoPublishedPage(input: unknown): UnoPublishedPageResult {
       description?: string;
       visibility: PageVisibility;
       markdownBody?: string;
+      pageDocument?: UnoPageDocument;
+      pageDocumentRefusal?: UnoPageDocumentRefusal;
     } = {
       kind: candidate.document.kind,
       title: candidate.document.title,
@@ -285,6 +295,10 @@ export function planUnoPublishedPage(input: unknown): UnoPublishedPageResult {
     };
     if (candidate.document.description !== undefined) document.description = candidate.document.description;
     if (candidate.document.markdownBody !== undefined) document.markdownBody = candidate.document.markdownBody;
+    if (candidate.document.pageDocument !== undefined) document.pageDocument = candidate.document.pageDocument;
+    if (candidate.document.pageDocumentRefusal !== undefined) {
+      document.pageDocumentRefusal = candidate.document.pageDocumentRefusal;
+    }
 
     const languagePreferences = Object.create(null) as Record<string, string>;
     for (const key of Object.keys(stored.localePolicy.languagePreferences).sort()) {

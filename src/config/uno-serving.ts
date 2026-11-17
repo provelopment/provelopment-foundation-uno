@@ -17,8 +17,9 @@
  * are constants, so no incoming value can redirect the read.
  *
  * WHAT THIS IS NOT. No provider SDK, no outbound request, no deployment action, no domain selection, no
- * `basePath`, no rewrite or proxy. A JSON Page is classified by the planner but refused for serving until its
- * versioned document contract and renderer exist in U04.
+ * `basePath`, no rewrite or proxy. A JSON Page is served only when its versioned document contract validates and
+ * every module in it has a real renderer; otherwise this boundary answers `serving:renderer-unavailable` and the
+ * route resolves to a genuine 404.
  */
 import { readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
@@ -134,9 +135,9 @@ function normalizePathname(pathname: unknown): string | null {
  * Decide whether one absolute address may be served as a published Page of the selected Site.
  *
  * The order is deliberate: authority first (a missing base can never be worked around), then the confined
- * source load, then the published-Page planner, then the renderer capability. A JSON Page is refused here
- * because this version has no versioned JSON document contract or renderer; its visibility is still
- * classified by the planner in tests.
+ * source load, then the published-Page planner, then the renderer capability. A JSON Page whose document
+ * validates and whose modules all render is served on the same terms as Markdown; a registered-but-unrenderable
+ * or invalid JSON document is refused with `serving:renderer-unavailable`.
  */
 export async function planUnoServingPage(pathname: unknown): Promise<UnoServingPageOutcome> {
   const target = normalizePathname(pathname);
@@ -156,7 +157,10 @@ export async function planUnoServingPage(pathname: unknown): Promise<UnoServingP
     loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
   });
   if (!planned.accepted) return { status: "not-served", reason: "serving:publication-refused" };
-  if (planned.document.kind === "json") {
+  // A JSON Page is served only when the selected source is also a fully validated, renderable version-1 Page
+  // document. Publication (the manifest gate above) and renderability are separate decisions, so an accepted
+  // but unrenderable JSON Page is refused here with its own closed reason and no partial content.
+  if (planned.document.kind === "json" && planned.document.pageDocument === undefined) {
     return { status: "not-served", reason: "serving:renderer-unavailable" };
   }
 
@@ -233,7 +237,9 @@ export async function planUnoServingDiscovery(): Promise<UnoServingDiscoveryOutc
       loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
     });
     if (!planned.accepted) continue;
-    if (planned.document.kind !== "markdown") continue;
+    // Discovery follows the same renderability rule as serving: a JSON Page that is not a validated document
+    // cannot be a sitemap entry or an alternate, exactly as Markdown cannot be discovered without a valid body.
+    if (planned.document.kind === "json" && planned.document.pageDocument === undefined) continue;
     decisions.push(planned);
   }
 
@@ -339,7 +345,10 @@ export async function listUnoServingAddresses(): Promise<readonly UnoServingAddr
       loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
     });
     if (!planned.accepted) continue;
-    if (planned.document.kind !== "markdown") continue;
+    // Routing enumeration includes a JSON Page only when it is a validated, renderable document; an unlisted Page
+    // is enumerated here (so the build can serve its exact full-locale address) but stays out of every discovery
+    // surface by its own visibility policy.
+    if (planned.document.kind === "json" && planned.document.pageDocument === undefined) continue;
 
     const segments = planned.identity.routePath === "" ? [] : planned.identity.routePath.split("/");
     remember(planned.identity.localePathKey, segments);

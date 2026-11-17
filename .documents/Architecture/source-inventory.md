@@ -1654,3 +1654,59 @@ are untouched here.
 **Limitations.** The classifier proves only what a future publisher would be *eligible* to do. It does not
 prove a Page is served, indexed, linked, translated or redirectable, and a forged `visibility` on a Markdown
 projection refuses as a mismatch rather than being reclassified.
+
+## U04 first JSON Page slice — `UNO-WO-035 / R01`
+
+**Coverage, measured rather than promised: 5 / 22 module renderers, 0 / 17 Foundation family compositions.**
+
+**New Uno-owned sources.** `src/core/page-document.ts` (the version-1 document contract) and
+`src/components/uno-page-sections.tsx` (the server renderer). Class **NEW / COMPOSE**; the read-only Foundation
+GEO-03 commit `c05c55ea61b5347cf5032211dd0bf37f2cc5083c` (`src/core/page-document.ts`, blob
+`a12d964c43626c6313a621bf628f5cc24b65d444`, and the composer `src/components/site/page-document-content.tsx`,
+blob `fc35a52d6cfc5f114e50470e8286a89916cde801`) was read for semantics and bounds only. No code, markup, class
+name, fixture, asset or family vocabulary was copied.
+
+**The closed envelope.** `{ version: 1, title, description?, visibility?, sections }` — nothing else. `title`
+is required, nonempty and bounded to 160 code points; `description` is optional and bounded to 320;
+`visibility` is `public` (the default) or `unlisted`, and the reserved Home Page can never be `unlisted`;
+`sections` holds 1–32 nodes, at most 128 nodes in total, at most four levels deep, with 1–8 typed children per
+layout. A section is exactly `{ id, module, props }` plus `children` for the two layouts. Identifiers are
+`[a-z][a-z0-9-]{0,47}`, unique across the document, and every `content.actions` target must resolve to a section
+in the same document. Text is capped at 4,000 code points; a JSON source is capped at 64 KiB.
+
+Documented refusals, all closed literals: `document:input-not-plain`, `text-not-a-string`, `text-too-large`,
+`json-parse`, `json-duplicate-key`, `json-unsafe`, `not-an-object`, `unexpected-key`, `unsupported-version`,
+`invalid-title`, `invalid-description`, `invalid-visibility`, `invalid-sections`, `unknown-module`,
+`renderer-unavailable`, `invalid-section`, `invalid-section-id`, `duplicate-section-id`, `invalid-props`,
+`invalid-children`, `too-deep`, `too-many-nodes`, `too-many-sections`, `heading-order`, `unsafe-text`,
+`unsafe-link`, `unresolved-target`, `home-cannot-be-unlisted`, `cyclic`, `unreadable`. `unknown-module` (not one
+of the immutable 22 IDs) and `renderer-unavailable` (registered but outside this five-module slice) are
+deliberately distinct, and both refuse the entire Page before any renderer or discovery plan sees it.
+
+**Authority is untouched.** The document carries no Entity, Facet, Site, Page, locale, route, canonical, host,
+base path, publication, robots, analytics or provider field, and any such key refuses as `unexpected-key`.
+Publication remains the manifest Page's own `publication: "published"`; visibility is the selected source's own
+intent; presentation is a later authority. A valid **unlisted** JSON Page is served only at its exact full-locale
+address with its own canonical and `noindex,nofollow`, and is absent from the sitemap, `hreflang`, `x-default`,
+navigation and alias redirects. A present-but-invalid JSON source refuses the Page outright; Markdown answers only
+when no JSON is declared at all.
+
+**Rights.** All code, CSS, tests and fixture text in this slice are original Uno-owned Apache-2.0. No Rukita,
+Foundation, Solo or Connect implementation, brand, screenshot, image, listing data or marketplace integration is
+included; the cited reference contributed only the general listing-card, information-hierarchy and
+responsive-grid pattern. No dependency, font, CDN or remote asset was added, and the renderer emits no client
+JavaScript.
+
+**Evidence.** `scripts/verify-u04-json-slice.mjs` installs a restore-in-finally synthetic fixture through the
+accepted U03 transaction helper, builds and serves the real production output on loopback, and asserts over real
+HTTP and a real headless Chromium DOM: one `h1`, two semantic `<article>` cards with unique headings and bodies,
+real same-page anchors, exact canonical/OG, truthful `<html lang>`, the unlisted Page's own privacy with zero
+discovery leakage, sixteen distinct refusals as genuine 404s with no metadata echo, crawler parity, no console
+error, no page error, no external request, and no horizontal overflow at 320, 390, 768 and 1280 CSS pixels in
+light and dark with reduced motion (239 checks, 0 failed), then restores the committed declarations byte for byte
+and re-runs the committed build, the bounded trace inspection and the original U03 gate.
+
+**Still deferred, and still mandatory.** The typed 17-family composition layer, the remaining 17 module
+renderers (including the single tabs/modal/carousel client island and the honest display-only contact state),
+`deployment/site.config.json` and the presentation shell, and the four-zone owned-asset policy and reader. This
+run does not close U04 and does not claim 22/22 or 17/17 parity.

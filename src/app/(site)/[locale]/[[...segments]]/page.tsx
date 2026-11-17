@@ -20,8 +20,10 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
+import type { ReactNode } from 'react';
 
 import type { UnoPublishedPageAccepted } from '../../../../application/plan-uno-published-page';
+import { UnoPageSections } from '../../../../components/uno-page-sections';
 import {
   UnoSafeMarkdownPage,
   parseUnoSafeMarkdown,
@@ -161,7 +163,7 @@ export async function generateMetadata({
   return metadata;
 }
 
-/** Render the one visible `h1`, the optional description and the inert Markdown body. */
+/** Render the one visible `h1`, the optional description and exactly one body: the inert Markdown or the JSON Page. */
 export default async function LocalizedPage({ params }: { params: Promise<LocalizedRouteParams> }) {
   const resolvedRoute = await resolveRoute(params);
 
@@ -169,14 +171,24 @@ export default async function LocalizedPage({ params }: { params: Promise<Locali
   if (resolvedRoute.kind === 'refused') notFound();
 
   const { page } = resolvedRoute;
-  const parsed = parseUnoSafeMarkdown(page.document.markdownBody);
-  if (!parsed.ok) notFound();
+
+  // Exactly one body renderer is chosen, from the selected source kind alone. A JSON Page without an accepted
+  // document is refused rather than guessed at, and Markdown is never a fallback for it.
+  let body: ReactNode;
+  if (page.document.kind === 'json') {
+    if (page.document.pageDocument === undefined) notFound();
+    body = <UnoPageSections document={page.document.pageDocument} />;
+  } else {
+    const parsed = parseUnoSafeMarkdown(page.document.markdownBody);
+    if (!parsed.ok) notFound();
+    body = <UnoSafeMarkdownPage blocks={parsed.blocks} />;
+  }
 
   return (
     <main className="uno-shell uno-narrow">
       <h1>{page.document.title}</h1>
       {page.document.description !== undefined ? <p>{page.document.description}</p> : null}
-      <UnoSafeMarkdownPage blocks={parsed.blocks} />
+      {body}
     </main>
   );
 }
