@@ -27,6 +27,26 @@ after(() => {
   }
 });
 
+/**
+ * The accepted gate proves dark mode and reduced motion from a **single** browser context. This extracts the arguments
+ * of that exact `const darkContext = await browser.newContext({ ... });` construction, so the guard below can require
+ * both preferences on that one call instead of accepting a matching fragment anywhere else in the file.
+ */
+const DARK_CONTEXT_ARGUMENTS = /const darkContext = await browser\.newContext\(\{([\s\S]*?)\}\);/u;
+
+/** The argument object of the gate's one dark-context creation, or `null` when it is absent. */
+function darkContextArguments(source) {
+  return DARK_CONTEXT_ARGUMENTS.exec(source)?.[1] ?? null;
+}
+
+/** True only while the one dark-context call carries the dark colour scheme and reduced motion together. */
+function holdsDarkContextContract(source) {
+  const argument = darkContextArguments(source);
+  return (
+    argument !== null && /colorScheme: "dark"/u.test(argument) && /reducedMotion: "reduce"/u.test(argument)
+  );
+}
+
 /** One fresh scratch directory that is not the Uno checkout. */
 function scratchDirectory() {
   const directory = mkdtempSync(join(tmpdir(), "uno-u04-gate-"));
@@ -96,8 +116,35 @@ describe("the U04 JSON-slice gate — mandatory evidence, no escape hatch", () =
     assert.ok(SOURCE.includes("[1280, 768, 390, 320]"), "missing the four responsive widths");
     assert.ok(SOURCE.includes("noindex,nofollow"));
     assert.ok(SOURCE.includes('reducedMotion: "reduce"'));
-    assert.ok(SOURCE.includes('emulateMedia({ colorScheme: "dark"'));
+    // The dark proof is one context created with both preferences (UNO-WO-036 / R02). The predecessor assertion looked
+    // for an `emulateMedia({ colorScheme: "dark" ... })` call that the accepted runner never had, so it was stale
+    // against this very file and proved nothing; this guard is tied to the real construction instead.
+    assert.equal(holdsDarkContextContract(SOURCE), true, "the gate must create one context with dark and reduced motion");
     assert.ok(SOURCE.includes("chromium.launch()"));
+  });
+
+  it("keeps both dark-context preferences on one call and refuses drift in either", () => {
+    // Baseline: the real source satisfies the same-call guard.
+    assert.equal(holdsDarkContextContract(SOURCE), true);
+
+    // Negative 1 — only the colour scheme drifts: the same-call guard must fail, not fall back to a stray fragment.
+    const lightDrift = SOURCE.replace('colorScheme: "dark"', 'colorScheme: "light"');
+    assert.notEqual(lightDrift, SOURCE, "the fixture must actually change the colour scheme");
+    assert.equal(holdsDarkContextContract(lightDrift), false, "a light colour scheme must not satisfy the guard");
+
+    // Negative 2 — only the motion preference drifts: the same-call guard must fail.
+    const motionDrift = SOURCE.replace('reducedMotion: "reduce"', 'reducedMotion: "no-preference"');
+    assert.notEqual(motionDrift, SOURCE, "the fixture must actually change the motion preference");
+    assert.equal(
+      holdsDarkContextContract(motionDrift),
+      false,
+      "an unreduced motion preference must not satisfy the guard",
+    );
+
+    // Negative 3 — a wholly removed dark-context creation must be refused as well.
+    const removed = SOURCE.replace(DARK_CONTEXT_ARGUMENTS, "chromium.launch()");
+    assert.notEqual(removed, SOURCE, "the fixture must actually remove the dark context");
+    assert.equal(holdsDarkContextContract(removed), false, "a missing dark context must not satisfy the guard");
   });
 
   it("has no skip, no muted warning, no retry and no fallback path", () => {

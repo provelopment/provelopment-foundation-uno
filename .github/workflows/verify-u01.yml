@@ -123,6 +123,15 @@ jobs:
         run: pnpm test
         shell: bash
 
+      # Blocking hermetic U04 contract gate (UNO-WO-036 / R02). The browser runner below proves what the product
+      # actually renders; this dependency-free test proves that runner's own contract — its mandatory evidence, the
+      # absence of any skip or bypass, its fixture restoration, the 27-case transaction suite it reuses — and that the
+      # single dark browser context it relies on keeps both the dark colour scheme and reduced motion. It is a separate
+      # blocking step on both hosts, because a contract test that never runs in CI cannot fail.
+      - name: U04 JSON-slice hermetic contract and refusal tests
+        run: node --test tests/deployment/u04-json-slice.test.mjs
+        shell: bash
+
       - name: Production build
         run: pnpm build
         shell: bash

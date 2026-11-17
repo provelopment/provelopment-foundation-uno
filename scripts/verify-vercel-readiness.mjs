@@ -257,6 +257,7 @@ export const REASONS = Object.freeze([
   'workflow:no-browser-path',
   'workflow:no-browser-runner',
   'workflow:no-u04-slice',
+  'workflow:no-u04-hermetic-test',
   'workflow:browser-system-deps',
   'package:playwright-not-dev-only',
   'package:playwright-wrong-pin',
@@ -621,6 +622,29 @@ export function analyzeReadiness(snapshot) {
     'workflow:no-u04-slice',
   );
   expect(!/(?:install-deps|--with-deps)/.test(stripComments(workflowText)), 'workflow:browser-system-deps');
+
+  // --- 8b3. The hermetic U04 contract test must stay a separate blocking CI step (UNO-WO-036 / R02) ----------
+  // The browser runner proves real rendering; the hermetic test proves the runner's own contract and its refusals.
+  // They are complementary and both mandatory, so a deleted, renamed, muted or replaced step is refused by name.
+  const uncommentedWorkflow = stripComments(workflowText);
+  const hermeticStepName = 'U04 JSON-slice hermetic contract and refusal tests';
+  const hermeticCommand = 'node --test tests/deployment/u04-json-slice.test.mjs';
+  const hermeticStepIndex = uncommentedWorkflow.indexOf(`name: ${hermeticStepName}`);
+  const hermeticCommandIndex = uncommentedWorkflow.indexOf(
+    `run: ${hermeticCommand}`,
+    Math.max(hermeticStepIndex, 0),
+  );
+  const buildStepIndex = uncommentedWorkflow.indexOf('name: Production build');
+  // The named step must exist, carry its exact command inside its own block, and run before the production build.
+  expect(hermeticStepIndex >= 0, 'workflow:no-u04-hermetic-test');
+  expect(
+    hermeticCommandIndex > hermeticStepIndex && hermeticCommandIndex - hermeticStepIndex <= 400,
+    'workflow:no-u04-hermetic-test',
+  );
+  expect(buildStepIndex > hermeticStepIndex, 'workflow:no-u04-hermetic-test');
+  // A muted condition would keep the command but never run it, so any false guard in uncommented text is refused.
+  expect(!uncommentedWorkflow.toLowerCase().includes('if: false'), 'workflow:no-u04-hermetic-test');
+
   let declaredPackage = {};
   try {
     declaredPackage = asRecord(JSON.parse(packageText)) ?? {};

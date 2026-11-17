@@ -176,6 +176,8 @@ function validSnapshot() {
     '        run: pnpm typecheck',
     '      - name: Unit tests',
     '        run: pnpm test',
+    '      - name: U04 JSON-slice hermetic contract and refusal tests',
+    '        run: node --test tests/deployment/u04-json-slice.test.mjs',
     '      - name: Production build',
     '        run: pnpm build',
     '      - name: Bounded output tracing (committed build)',
@@ -684,6 +686,32 @@ test('refuses a U04 JSON-slice gate that lost its repository-local browser path'
     return text.replace(block, block.replace('PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers', 'PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright'));
   });
   assertRefused(analyzeReadiness(snapshot), 'workflow:no-u04-slice');
+});
+
+test('refuses a workflow that dropped the hermetic U04 contract step', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text
+      .replace('      - name: U04 JSON-slice hermetic contract and refusal tests\n', '')
+      .replace('        run: node --test tests/deployment/u04-json-slice.test.mjs\n', ''),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-u04-hermetic-test');
+});
+
+test('refuses a hermetic U04 contract step whose command was replaced', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text.replace('run: node --test tests/deployment/u04-json-slice.test.mjs', 'run: echo skipped'),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-u04-hermetic-test');
+});
+
+test('refuses a hermetic U04 contract step muted by a false condition', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text.replace(
+      '      - name: U04 JSON-slice hermetic contract and refusal tests\n',
+      '      - name: U04 JSON-slice hermetic contract and refusal tests\n        if: false\n',
+    ),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-u04-hermetic-test');
 });
 
 test('refuses Playwright promoted into the production dependency set', () => {
