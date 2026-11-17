@@ -1,212 +1,211 @@
-# UNO-WO-024 / R01 — Site publication-inputs composition
+# UNO-WO-025 / R01 — Persisted Site locales and corrected Home
 
-**Work order:** `UNO-WO-024 / R01` · **Edition:** FINAL — EXECUTE · **Stage:** U03, **OPEN**.
-**Installed ACTIVE:** 24,949 bytes, SHA-256 `d2fec044338cd6e0ac5f8df8df4dfcf49b29cf332e5c6028919e830babb61b20`,
-first heading `UNO-WO-024 / R01`, matched before any write, ignored, untracked, unstaged, never printed or
-committed.
-**Owner decision:** the activation states **`I APPROVE THE U03 PUBLICATION-INPUTS CONTRACT IN §4 OF UNO-WO-024 /
-R01.`**
+**Work order:** `UNO-WO-025 / R01` · **Edition:** FINAL — EXECUTE · **Stage:** U03, **OPEN**.
+**Installed ACTIVE:** 17,007 bytes, SHA-256 `cb8628bd147b4c88821b8890f580a738691d3bce635ca9a2d300550dd313257b`,
+heading `UNO-WO-025 / R01`, verified byte-for-byte before any write; ignored, untracked, unstaged, never printed,
+never committed.
+**Owner decision:** the activation approves the exact Site-locale configuration contract (§3) and the Home
+content replacement (§4).
 **Push authorization:** the activation contains **`AUTHORIZE_GIT_PUSH_TRIGGERED_PRODUCTION_DEPLOYMENTS=YES`**,
 covering only an incidental Git-linked build — never a manual provider action.
-**Required start = actual start:** `4f19ea9b1a73e0a5df9f62ac7043bb2644972b39`.
+**Required start = actual start:** `9f829e710f1972a164a7b0ceaffe569aa9e1a718`.
 
 ## 1. Status
 
 | Fact | Status | Evidence |
 | --- | --- | --- |
-| `PUBLICATION_INPUTS_COMPOSITION` | **PASS** | `src/application/validate-uno-site-publication-inputs.ts`, 15,808 B, blob `c0d22f63…`; pure, fail-closed, 11-code closed vocabulary |
-| `REAL_FIXTURE_INTEGRATION` | **PASS** | committed manifest + committed selection → the authored one Entity / `foundation` / `main`, **one** candidate, `en-001` |
-| `FOCUSED_TESTS` | **PASS** | **32** cases in one new suite with **39** exact-code refusal assertions, each also asserting vocabulary membership |
-| `LAYERING` | **PASS** | registered as a scanned source; scanner refuses Node/Next/React/adapter/provider/deployment imports; no `src/app` consumer; no `src/core` dependency upward |
-| `NONPUBLICATION` | **PASS** | manifest, selection, Home Markdown and every deployment/app/script/workflow path byte-identical; build route table unchanged |
-| `BASELINE_PRESERVED` | **PASS** | 620 unit tests over 18 files (588 + 32); 29 architecture checks (27 + 2); 27 protected paths byte-identical |
-| `PUBLIC_404_PRESERVED` | **PASS** | `/` 200; `/en`, `/en-001`, `/about`, unknown, `robots.txt`, `sitemap.xml` 404 |
-| `HOSTED_CI_AT_PRODUCT_HEAD` | **PASS** | four jobs on two hosts, zero non-success steps (§6) |
-| `PROVIDER_ACTIONS` | **ZERO** | no provider call, manual deploy, alias, domain or settings change; only the authorized Git push |
-| `STAGE` | U03 **OPEN** | no closure, release, merge or publication authority is asserted |
+| `SITE_LOCALE_AUTHORITY` | **PASS** | optional Site `locales` in `src/core/efs/manifest-graph.ts`, blob `d08d213e…`, closed `site:invalid-locales` |
+| `SHORT_LANGUAGE_MAPPING` | **PASS** | optional `languagePreferences` in `src/core/efs/uno-config.ts`, blob `b1b6a2fb…`, closed `config:invalid-language-preferences` / `config:locale-authority-missing` |
+| `COMMITTED_POLICY_READER` | **PASS** | `src/application/resolve-uno-committed-locales.ts`, blob `c7306266…`, 8,772 B, seven closed codes |
+| `COMMITTED_DECLARATIONS` | **PASS** | manifest `locales` for the one `main` Site; config adds only `languagePreferences` — no base, flag, second Site or `schemaVersion` |
+| `HOME_COPY_REPLACED` | **PASS** | 1,165 bytes, UTF-8 LF, no BOM, exactly one final LF, ASCII only, title unchanged |
+| `FOCUSED_TESTS` | **PASS** | **32** added cases (15 + 8 + 7 + 2), **27** distinct refusal assertions, no existing test dropped |
+| `BASELINE_PRESERVED` | **PASS** | 652 unit tests over 19 files (620 + 32); 31 architecture checks (29 + 2) |
+| `PUBLIC_BEHAVIOUR_UNCHANGED` | **PASS** | `/` 200 with the approved headline; `/en`, `/en-001`, `/about`, unknown, `robots.txt`, `sitemap.xml` 404; build still three routes |
+| `HOSTED_CI_AT_PRODUCT_HEAD` | **PASS** | four jobs, two hosts, zero non-success steps (§6) |
+| `PROVIDER_ACTIONS` | **ZERO** | no provider call, manual deploy, alias, domain or settings change |
+| `STAGE` | U03 **OPEN** | no closure, release, merge or publication authority asserted |
 
 ## 2. Authorized commits and the exact ledger
 
 | Role | Commit | Content |
 | --- | --- | --- |
-| Product | **`6cefe2c9cb473b382e097b53845d4100df05f42f`** | exactly six ledger paths; direct child of `4f19ea9` |
+| Product | **`b33ad76365fa7e12b3cee4c6a0d4686b0eb0f35a`** | exactly fourteen ledger paths; direct child of `9f829e7` |
 | Report | the report-only child of the product commit; its SHA is returned privately to the Owner | `.documents/Reports/execution-report.md` only |
 
 | # | Path | Op | Blob | Bytes |
 | ---: | --- | --- | --- | ---: |
-| 1 | `src/application/validate-uno-site-publication-inputs.ts` | CREATE | ABSENT → `c0d22f63…` | 15,808 |
-| 2 | `tests/unit/efs-uno-site-publication-inputs.test.ts` | CREATE | ABSENT → `b3c618dd…` | 21,996 |
-| 3 | `tests/architecture/u01-boundaries.test.mjs` | EDIT (additive) | `d1002cd6…` → `fce74d54…` | 40,407 |
-| 4 | `.documents/Architecture/source-inventory.md` | EDIT (additive) | `9f95fedc…` → `b9b02294…` | 109,590 |
-| 5 | `.documents/WIP/plan-roadmap.md` | EDIT | `33ecaf64…` → `94fb3b1c…` | 10,194 |
-| 6 | `.documents/WIP/plan-next.md` | OVERWRITE | `bf87eeb7…` → `5b33bd48…` | 1,366 |
+| 1 | `src/core/efs/manifest-graph.ts` | EDIT | `6aac111b…` → `d08d213e…` | 28,081 |
+| 2 | `src/core/efs/uno-config.ts` | EDIT | `c1d0e8db…` → `b1b6a2fb…` | 12,014 |
+| 3 | `src/application/resolve-uno-committed-locales.ts` | CREATE | ABSENT → `c7306266…` | 8,772 |
+| 4 | `deployment/efs/manifest.json` | EDIT | `13d38f20…` → `84866290…` | 1,029 |
+| 5 | `deployment/uno.config.json` | EDIT | `71147d24…` → `fda8188c…` | 185 |
+| 6 | `deployment/efs/content/home.en-001.md` | OVERWRITE | `1b062fb3…` → `ef4254a3…` | 1,165 |
+| 7 | `tests/unit/efs-manifest-graph.test.ts` | EDIT | `fc4f7d54…` → `2b166c66…` | 35,311 |
+| 8 | `tests/unit/efs-uno-config.test.ts` | EDIT | `b1f5ee9e…` → `a3ac711f…` | 16,153 |
+| 9 | `tests/unit/efs-uno-committed-locales.test.ts` | CREATE | ABSENT → `5eb2d7a0…` | 12,781 |
+| 10 | `tests/unit/efs-uno-site-publication-inputs.test.ts` | EDIT | `b3c618dd…` → `ad5999c9…` | 24,089 |
+| 11 | `tests/architecture/u01-boundaries.test.mjs` | EDIT | `fce74d54…` → `b030201d…` | 43,115 |
+| 12 | `.documents/Architecture/source-inventory.md` | EDIT (additive) | `b9b02294…` → `7b6a6c02…` | 111,930 |
+| 13 | `.documents/WIP/plan-roadmap.md` | EDIT | `94fb3b1c…` → `3329dcc1…` | 10,070 |
+| 14 | `.documents/WIP/plan-next.md` | OVERWRITE | `5b33bd48…` → `99d0298c…` | 1,110 |
 
-Both CREATE paths were absent at start; the inventory addition is 28 insertions and 0 deletions; the
-architecture addition is 65 lines with no existing assertion altered; `git diff --cached --check` was clean
-before the commit. No other tracked path changed.
+Both CREATE paths were absent at start. The three conditional repair paths
+(`efs-confined-source-reader.test.ts`, `efs-source-resolution-pipeline.test.ts`,
+`efs-page-header-pipeline.test.ts`) were **not** needed and were **not** touched: no obsolete exact Home-text
+assertion existed. `git diff --cached --check` was clean; no other tracked path changed.
 
-## 3. Physical, parent, Git and privacy preflight (sanitized)
+## 3. Guards (sanitized)
 
 | Guard | Result |
 | --- | --- |
-| Physical root | the sole Uno checkout resolved physically; Git toplevel equals the checkout path; no symlink, junction or reparse alias |
-| Ancestors and parent | the parent's anchored `/00.foundation-uno/` ignore rule verified and untouched; parent, Foundation, Solo and every sibling strictly read-only — never written, built, tested, installed or reconfigured |
-| Worktrees / remotes | exactly one worktree, `main` checked out, one remote `origin` fetching and pushing only `provelopment/provelopment-foundation-uno`; no mirror; no reset, rebase, force, clean, amend or merge |
-| Head and remote | local `HEAD` = `origin/main` = `4f19ea9`, re-read immediately before the push and still `4f19ea9` |
-| Acting tree | clean before work; clean after the product push; no unexpected tracked, untracked or staged path |
-| ACTIVE privacy | exactly one private ACTIVE, bytes and digest as above, ignored, untracked, unstaged, absent from every diff, never printed |
+| Physical root | the single Uno checkout resolved physically; Git toplevel equal; no symlink, junction or reparse alias |
+| Parent and siblings | the parent anchored `/00.foundation-uno/` ignore rule verified and untouched; parent, Foundation, Solo and every sibling strictly read-only |
+| Worktrees / remotes | one worktree, `main`, one remote `origin` for `provelopment/provelopment-foundation-uno` (fetch and push), no mirror; no reset, rebase, force, clean or amend |
+| Head and remote | `HEAD` = `origin/main` = `9f829e7` at start, re-read immediately before the push; clean index and worktree |
+| ACTIVE | one private file at the expected path, matching bytes and digest, ignored, untracked, unstaged, absent from every diff |
 | WIP slots | exactly four: `plan-roadmap.md`, `plan-next.md`, the ignored private ACTIVE, `plan-outlook.md` |
-| Pins | **27 / 27** protected blobs matched before the first write and again at the product candidate; all five editable/starting ledger blobs matched their required starting IDs; both CREATE paths confirmed ABSENT |
-| Runtime | Node 26.x and pnpm 11.6.0 from the committed `package.json`; in-root install with an in-root store; no package, lockfile or dependency change |
+| Pins | **14 / 14** immutable blobs byte-identical; **12 / 12** editable starting blobs matched; both CREATE destinations ABSENT |
+| Runtime | Node 26.x and pnpm 11.6.0; in-root install `--frozen-lockfile --ignore-scripts --store-dir .pnpm-store`; `package.json` and `pnpm-lock.yaml` blobs unchanged |
 
-## 4. The composition
+## 4. What was built
 
-`validateUnoSitePublicationInputs({manifest, selection, base, localePolicy})` accepts exactly that plain
-own-data record and returns either a freshly copied, deeply frozen
-`{accepted: true, site, canonicalBase, aliases, localePolicy, candidateCount}` or one of eleven closed
-`publication-inputs:` codes:
+**Site locale authority.** A Site may declare one optional `locales` record —
+`{supportedLocales, defaultLocale}` — bounded to 1..32 unique canonical full-region tags with the default inside
+the list. The tag rules stay the accepted locale contract's: a descriptor-checked copy is handed to
+`localePolicyIssue` with an empty short-language mapping, so a Site declares no alias of its own. The value is
+validated **before** its Pages, and a Page locale the Site does not support refuses, because it would promise a
+locale the Site never declared. Every failure is the one closed `site:invalid-locales`; hostile structure
+(accessor, symbol, exotic prototype, sparse or accessor array) refuses as `input:unreadable` without reading it.
+An **absent** declaration stays valid for older in-memory fixtures — a legacy authoring declaration — and the
+committed reader refuses that absence instead of inventing a default.
 
-`input-not-plain` · `input-shape` · `unreadable` · `manifest-invalid` · `selection-invalid` · `base-invalid` ·
-`locale-policy-invalid` · `unsupported-representation` · `unrepresented-supported-locale` ·
-`default-home-missing` · `route-index-invalid`
+**Explicit short-language mapping.** The declaration may carry one optional top-level `languagePreferences`
+mapping of 0..16 lowercase short keys to canonical full-region tags. When a mapping is stated, the selected Site
+must own a declared `locales` authority to check it against — otherwise `config:locale-authority-missing` — and
+the accepted locale contract then decides key spelling, membership, target canonicality and the single approved
+`en → en-001` alias: `config:invalid-language-preferences`. An empty `{}` is an explicit "no mapping"; an absent
+field means the declaration states none, and no alias is ever inferred. `version:1`, `entityId`, `selectedSite`
+and every legacy call are unchanged, and no `schemaVersion`, `publicSite`, `base` or second Site selection was
+introduced.
 
-- **One authority per domain.** It calls `validateUnoManifestGraph`, then `validateUnoSiteSelection`, then
-  `validateUnoCanonicalBase`, then `localePolicyIssue` on a descriptor-checked plain-data copy of exactly the
-  three policy fields, then `buildUnoCandidateRouteIndex` **once**. It restates no rule, weakens none and adds
-  no fifth validator; a sub-validator's `*:unreadable` maps to `publication-inputs:unreadable`.
-- **Hostile values first.** The root record is read by descriptor: accessors are refused instead of invoked,
-  symbols and exotic prototypes are refused before any value, a throwing trap becomes one closed code, sparse or
-  accessor arrays refuse, and nothing is coerced, stringified or mutated.
-- **One selected Site only.** The Site comes from the validated selection, never from the first array element;
-  the index is built once and a refusal yields no partial candidate.
-- **Locale agreement both ways.** Every authored representation locale must be promised by the policy
-  (`unsupported-representation`), and every promised locale must be authored by that same Site
-  (`unrepresented-supported-locale`). A locale authored only under a sibling Site therefore refuses. The
-  declared default must additionally own a reserved Home — `pageId: "home"`, `routePath: ""` — in that exact
-  full locale (`default-home-missing`), and a missing Home is never repaired from another locale or by
-  manufacturing a Page.
-- **No inferred locale.** Supported locales are compared as sets, so order never matters and no locale is
-  auto-enrolled; canonical spelling, case collisions and the explicit `en: "en-001"` alias remain the policy's
-  own rules; no language is guessed from geography.
-- **Bounded output.** `supportedLocales` is copied and sorted by code point, `languagePreferences` keys are
-  sorted into a fresh null-prototype map, aliases keep validated input order, and `candidateCount` counts
-  declared candidate addresses — not published Pages. No `published`, `authorized`, `ready`, redirect, canonical
-  URL, `hreflang`, visibility, sitemap, body or secret field exists in the result, and no file, socket, clock,
-  environment or provider is touched.
+**Committed policy reader.** `resolveUnoCommittedLocales({manifest, selection})` accepts exactly those two keys,
+composes `validateUnoManifestGraph` and `validateUnoSiteSelection`, finds the Site in the validated frozen graph
+only, refuses a missing Site policy or a missing mapping, assembles one fresh policy, re-confirms it through
+`localePolicyIssue`, and returns it deeply frozen. Its seven closed codes are
+`input-invalid`, `unreadable`, `manifest-invalid`, `selection-invalid`, `site-locales-missing`,
+`mapping-missing` and `policy-invalid`. It imports no `fs`, network, environment, framework, adapter or provider,
+re-implements no source precedence, selection or canonical-base rule, and echoes no caller value.
+
+**Committed data.** The committed manifest declares for the one `main` Site exactly
+`{"supportedLocales":["en-001"],"defaultLocale":"en-001"}`; the committed selection adds exactly
+`"languagePreferences": { "en": "en-001" }`.
+
+**Authored Home.** The stale prose was replaced with the Owner-approved copy; the title `Foundation Uno`, the
+source declaration and the single representation are unchanged, the file is 1,165 bytes of UTF-8 LF with exactly
+one final line feed, and `/en-001` still returns **404**. The file remains an authored source, not a served Page.
 
 
 ## 5. Test evidence
 
-**Real committed integration (PASS).** The committed `deployment/efs/manifest.json` and
-`deployment/uno.config.json` are read as read-only data, with a synthetic `http://localhost:3000` base and the
-policy `{supportedLocales:["en-001"], defaultLocale:"en-001", languagePreferences:{en:"en-001"}}`. The result
-identifies the authored one Entity / `foundation` / `main`, reports `candidateCount: 1` and `en-001`, carries no
-publication flag and no `https://` value, and a before/after SHA-256 comparison of the manifest, selection and
-`deployment/efs/content/home.en-001.md` proves all three files stayed byte-identical.
+**Real committed integration (PASS).** The committed manifest and selection are read as data, resolved by
+`resolveUnoCommittedLocales`, and the resulting policy is fed to `validateUnoSitePublicationInputs` with the
+**test-only** loopback base `http://localhost:3000`: the result identifies the one Entity / `foundation` / `main`
+with `en-001`, mapping `en → en-001`, `candidateCount: 1`, deep-frozen output, and no `published`, `authorized`,
+`ready`, canonical URL, `hreflang` or sitemap field. Deleting the Site `locales` or the selection mapping makes
+the read fail, and no `en` alias is invented. Digests of manifest, selection and Home source are unchanged
+across validation.
 
-**Focused suite — 32 cases, all passing, 39 exact-code refusals.** Required distinctions are proven separately:
-`unsupported-representation` (an authored locale the policy omits), `unrepresented-supported-locale` (a promised
-locale the selected Site never authors, including one authored only under a sibling Site) and
-`default-home-missing` (a default whose Site has no reserved Home in that locale, including the case where
-another locale *does* own a Home, so no fallback repair can hide it).
+**Focused suites — 32 added cases, all passing, 27 distinct refusals.**
 
-| Family | Observed |
-| --- | --- |
-| Acceptances | real committed fixture; path-prefixed base with two aliases in input order; eight-alias bound; two locales of one Site with a default Home; order-independent permutation; a canonical `zh-Hans-CN`; a non-default locale with a representation but no Home; the named Site chosen over the first Site of a Facet; fresh deep-frozen results with no caller mutation |
-| Domain refusals | two-Entity manifest; manifest with a nested accessor (zero reads); wrong version, absent Site and absent Facet selections; `ftp://`, trailing-slash and uppercase-alias bases; bare `en`, unknown policy field, missing `defaultLocale`, empty `supportedLocales`; non-canonical / duplicate / case-colliding locales; `en` mapped to a non-approved target and to an unsupported locale; 33 supported locales; 17 preference keys |
-| Request refusals | eight non-object roots; missing and extra keys; four wrong field kinds; accessor root and policy accessor with **zero** getter invocations; symbol key; exotic prototype; throwing Proxy (`unreadable`); sparse and accessor locale arrays; no-echo proof (`{"accepted":false,"reason":"publication-inputs:base-invalid"}` with no host, path or scheme) |
+| Suite | Added | Coverage |
+| --- | ---: | --- |
+| `efs-uno-committed-locales.test.ts` (new) | 15 | committed policy read, freshness/freezing, no mutation, empty mapping, non-first Site, missing Site policy, missing mapping, seven invalid Site declarations, Page locale outside the Site, unsatisfiable/invalid/prototype-keyed/over-long mappings, wrong version and absent Site, two-Entity manifest, six non-object roots, missing/extra keys, accessor with zero reads, symbol, exotic prototype, throwing Proxy, nested hostile manifest, vocabulary completeness, no-echo |
+| `efs-manifest-graph.test.ts` | 8 | accepted Site policy frozen and copied; list covering every authored locale; absent declaration still valid; empty/duplicate/non-canonical/bare/script-only locales; default outside list; incomplete or unknown declaration; over-limit; Page locale outside the Site; hostile getter (zero reads) and sparse array |
+| `efs-uno-config.test.ts` | 7 | committed mapping read and frozen; legacy mapping-free declaration unchanged; explicit empty mapping; valid alias; `en`→non-approved target, unlisted target, non-canonical target, uppercase key, prototype key and array; over-long mapping; mapping without Site authority; mapping accessor (zero reads); unknown config key still refused |
+| `efs-uno-site-publication-inputs.test.ts` | 2 | derived committed policy composes with the loopback base; either deleted authority fails |
 
-`publication-inputs:route-index-invalid` is a **mapped defensive code with no reachable construction**: the
-manifest validator already refuses every construct the candidate index rejects (canonical locale spelling,
-duplicate route, duplicate locale, reserved-Home pairing) and the pathname bound exceeds the maximum possible
-pathname, so no honest test can produce it. Its mapping exists and its membership is asserted; its reachability
-is **UNVERIFIED**, never faked.
+No existing test was dropped, skipped, weakened or mocked; the committed fixtures are read as data, never
+replaced by substitutes.
 
 **Broad local gates.**
 
 | Gate | Result |
 | --- | --- |
-| `pnpm install --frozen-lockfile --ignore-scripts --store-dir .pnpm-store` | PASS — no package or lockfile change |
-| `pnpm exec vitest run tests/unit/efs-uno-site-publication-inputs.test.ts` | **32 / 32** |
+| `pnpm install --frozen-lockfile --ignore-scripts --store-dir .pnpm-store` | PASS — lockfile and `package.json` blobs unchanged |
+| Four focused suites | **32 / 32** added cases passing |
 | `node scripts/verify-governance-docs.mjs` | PASS — three frozen files match Owner-frozen bytes |
 | `node --test tests/governance-docs.test.mjs` | **9 / 9** |
-| `pnpm test:bootstrap` | **19 / 19**; CLI reports 11 required files, licence verified, four-slot WIP discipline, private authority screened, no credential or private-path leaks |
-| `pnpm test:architecture` | **29 / 29** (27 preserved + 2 new) |
+| `pnpm test:bootstrap` | **19 / 19**; CLI: 11 required files, licence verified, four-slot discipline, no credential or private-path leak |
+| `pnpm test:architecture` | **31 / 31** (29 preserved + 2 new) |
 | `pnpm lint` | exit 0 — 0 errors, 0 warnings |
 | `pnpm typecheck` | exit 0 |
-| `pnpm test` | **620 passed / 620**, 18 files — 588 previous + **32 new** |
+| `pnpm test` | **652 passed / 652**, 19 files — 620 previous + **32 new** |
 | `pnpm build` | PASS — exactly `/`, `/_not-found`, `/icon.svg`; no `en-001` route |
-| `pnpm test:http` | **103 passed, 0 failed** — `/` 200; `/en`, `/en-001`, `/about`, unknown, `robots.txt`, `sitemap.xml` 404 |
+| `pnpm test:http` | **103 passed, 0 failed** — `/` 200 with the approved headline; `/en`, `/en-001`, `/about`, unknown, `/robots.txt`, `/sitemap.xml` 404 |
 | readiness fixtures / CLI | 66 pass / **100 checks, 0 failed** (`VERCEL_NOT_DEPLOYED_BY_AGENT`) |
 | security floors / brand contract | 16 pass / 29 pass |
-| `pnpm audit --audit-level high` | exit 0 — **0 high, 0 critical**; the known dev-only **moderate** `minimatch` advisory remains disclosed, not waived |
-| `git diff --check` | clean before the commit and clean after |
-| Protected paths | 27 re-checked at the product head: 0 changed |
+| `pnpm audit --audit-level high` | exit 0 — **0 high, 0 critical, 2 moderate** |
+| `git diff --check` | clean before the commit and after |
+| Protected pins | 14 immutable blobs byte-identical; 12 starting blobs matched |
 
-Composing these inputs is **not** HTTP evidence: no route, redirect, canonical tag or `hreflang` was served or
-emitted anywhere.
+**Warnings, disclosed.** Two **moderate** advisories remain, both the same dev-only `minimatch` denial-of-service
+family (`>=7.0.0 <11.0.1`, patched `>=11.0.1`), reached only through the ESLint toolchain
+(`eslint-config-next` → `eslint-import-resolver-typescript` / `eslint-plugin-import` → `@typescript-eslint/*` →
+`minimatch`), never through a runtime or production dependency path. They are recorded, not waived or silenced;
+the blocking threshold is zero high or critical, and zero is what the gate reports. Local Windows execution is
+**PASS**; WSL was not used and is **NOT APPLICABLE**.
+
+**Nonpublication.** No canonical tag, `hreflang`, sitemap, robots header, redirect, alias, base or config
+migration was created; no `src/app` source consumes the new reader; the landing page, logo, favicon, CSS, root
+noindex, analytics and both workflows are byte-identical; no dependency, asset or schema was added.
 
 
-## 6. Hosted CI at the product head
+## 6. Hosted CI
 
-**`6cefe2c9cb473b382e097b53845d4100df05f42f` — four jobs, all `success`:**
+**Product head `b33ad76365fa7e12b3cee4c6a0d4686b0eb0f35a` — four jobs, all `success`:**
 
 | Workflow | Run | ubuntu-24.04 | windows-2025 | Steps / non-success |
 | --- | --- | --- | --- | --- |
-| Verify U01 baseline | `43900937417` | success | success | 24 / **0** |
-| Uno Bootstrap Verify | `43900937348` | success | success | 10 / **0** |
+| Verify U01 baseline | `44011266332` | success | success | 24 / **0** |
+| Uno Bootstrap Verify | `44011266324` | success | success | 10 / **0** |
 
-Both hosts ran the governance verifier, the architecture suite and the blocking unit step that includes the new
-composition suite. **Full log text is UNVERIFIED** — this client reads job and step conclusions only. The
-report-only head repeats the same four jobs; its run IDs are returned privately to the Owner.
+Both hosts ran the governance verifier, the architecture suite and the blocking unit step that includes the four
+focused suites. **Full log text is UNVERIFIED** — this client reads job and step conclusions only. The report-only
+head repeats the same four jobs; its run IDs are returned privately to the Owner.
 
-## 7. Rights, warnings, cleanup and nonpublication
+## 7. Rights and cleanup
 
-**Provenance and rights.** `src/application/validate-uno-site-publication-inputs.ts` is original **Uno-owned**
-implementation, class **NEW / REWRITE concept**; the read-only Foundation GEO-03 commit `c05c55ea…` informed the
-*idea* only and granted no import or write permission. The 17-family / 22-ID capability mapping, Apache-2.0
-obligations and pinned source history are unchanged; no Foundation, Solo Rust, GEO-04, Connect, mark or asset was
-imported and no dependency, workflow, schema, asset or lockfile line was added.
+**Provenance.** All new implementation and the replaced Home prose are original **Uno-owned** work, class
+**NEW / REWRITE concept**. The pinned read-only Foundation GEO-03 commit `c05c55ea…` remains conceptual context
+only; no Foundation, Solo or Connect code, media or brand was copied. Apache-2.0 notices are intact and the
+licence files are unchanged.
 
-**Warnings.** One **moderate** dev-only `minimatch` advisory (GHSA-g3hv-75wg-m249) remains disclosed and
-unwaived; zero high or critical findings, so the blocking gate passes on its own threshold. Local Windows
-execution is **PASS**; WSL was not used and is **NOT APPLICABLE**.
+**Privacy.** No secret, token, absolute personal path, private ACTIVE byte or unpublished external content
+appears in either commit, in CI or in this report. No guard was weakened, no threshold raised, no workflow edited
+and no test skipped.
 
-**Privacy.** No secret, token, absolute personal path, private ACTIVE byte or unpublished Foundation content
-appears in either commit, in CI or in this report. No guard was weakened, no threshold raised, no workflow job
-edited, and no test skipped, mocked or excluded.
+**Provider actions: zero.** No provider API call, manual deployment, promotion, alias, domain or settings change;
+the only external effect was the authorized non-force Git push and any build the existing Git integration starts
+from it.
 
-**Provider actions: zero.** No provider API call, manual deployment, promotion, alias, domain, analytics or
-settings change. The only external effect was the authorized non-force Git push and any build the existing Git
-integration starts from it.
-
-**Nonpublication is preserved.** `deployment/efs/manifest.json`, `deployment/uno.config.json`,
-`deployment/efs/content/home.en-001.md`, every `src/app/**` file, the landing page, logo, favicon, CSS, root
-noindex, analytics and both workflows are byte-identical. The build still emits exactly `/`, `/_not-found` and
-`/icon.svg`; no `en-001` route exists; `/` stays 200 and `/en`, `/en-001`, `/about`, unknown paths,
-`robots.txt` and `sitemap.xml` stay 404. No canonical tag, `hreflang`, sitemap, robots header, redirect, alias or
-config migration was created, and no `src/app` source imports the composition.
-
-**Cleanup.** Task scratch (`.temp/`) removed; ignored package store and build outputs remain ignored; no unknown
-file was deleted; `git status` is clean at the product head; the private ACTIVE remains ignored and unstaged.
+**Cleanup.** Task scratch under the ignored `.temp/` directory removed; build and store outputs stay ignored; no
+unknown file was deleted; `git status` is clean at the product head; the private ACTIVE remains ignored and
+unstaged.
 
 ## 8. What remains unimplemented — U03 stays OPEN
 
-A consistent composition is not a published Site. Still open, each requiring its own Owner order:
-
-1. An Owner-selected **real** canonical base and the single-Site configuration migration that installs it —
-   `deployment/uno.config.json` is deliberately unchanged, so no validated base is live.
-2. The **Site locale authorities** the manifest still lacks; this order proves agreement with an *explicit
-   caller policy*, not a stored per-Site locale authority.
-3. An explicit **Page/Site publication decision** and real HTTP behaviour — status and error handling for
-   unmatched, invalid and unlisted addresses — plus emitted metadata with canonical advertising and `hreflang`,
-   and real locale routing.
-4. The **stale Home Markdown**, recorded in `plan-next.md` as **not approved for publication as-is**; correcting
-   it needs an Owner-approved content change.
-5. Provider state (production SHA, build log, analytics) remains **UNVERIFIED** by this Agent.
+1. **A real canonical base.** No production origin has been chosen or installed; `deployment/uno.config.json`
+   deliberately still carries no base, so the proposed-base validator has nothing live to bind.
+2. **An explicit publication decision.** Stored locales and mapped aliases are declarations: no Site or Page is
+   published, no route is activated and no address is served.
+3. **Real production proof.** Status and error behaviour for unmatched, invalid and unlisted addresses, emitted
+   metadata with canonical advertising and `hreflang`, locale routing for the declared locales, and sitemap and
+   robots policy are all still unimplemented.
+4. **Provider state.** Production SHA, build log and analytics remain **UNVERIFIED** by this Agent.
 
 Requesting the Chief Master Architect's single **`ACCEPT` / `REVISE` / `STOP`** for this bounded U03 checkpoint:
-one pure application composition of four already-validated inputs with an eleven-code closed vocabulary, 32
-focused cases and 39 exact-code refusals, real committed-fixture integration with byte-identical inputs, a
-preserved baseline of 620 unit tests and 29 architecture checks, unchanged public 404 behaviour, zero provider
-actions and U03 still open.
+an optional validated Site locale authority, an optional explicit short-language mapping, one pure committed
+policy reader, two exact committed declarations, the Owner-approved Home replacement, 32 added focused cases with
+27 exact-code refusals, a preserved baseline of 652 unit tests and 31 architecture checks, unchanged public
+behaviour, zero provider actions and U03 still open.
