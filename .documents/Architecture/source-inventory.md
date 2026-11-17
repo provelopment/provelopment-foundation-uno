@@ -1223,7 +1223,58 @@ no markup; Markdown must begin with one `# ` heading and is always `public`; rep
 projection proves a Page is routed, public or indexable.
 
 
-## U03 integrated browser exit proof (UNO-WO-032 / R01)
+## U03 clean Vercel build and bounded payload (UNO-WO-033 / R01)
+
+**The defect.** The confined EFS reader built its content-root prefix at runtime — `join(root.root, ...UNO_CONTENT_ROOT.split("/"))`
+— and joined declared file segments dynamically. Turbopack's static analysis cannot see a scope in that shape, so it
+reported `Dynamic filesystem access causes tracing of the whole project` twice and traced **the entire repository** into
+the server payload: the site route's `.nft.json` listed `AGENTS.md`, `README.md`, `LICENSE`, `eslint.config.mjs`,
+`tsconfig.json`, `pnpm-lock.yaml`, `public/uno-logo.svg`, eight `scripts/` files and thirty `tests/` files — 228 entries,
+including the private work-order directory's siblings and the whole test harness.
+
+**The treatment.** Uno-owned, in two halves, with no publication, routing, locale or refusal semantics changed:
+
+1. **A static tracing boundary in the reader.** Both joins now spell the prefix with literal components
+   (`join(root.root, "deployment", "efs", "content", ...contentRelativeSegments(...))`). The declared-path rule already
+   confines every source to `deployment/efs/content/`, so the final path is byte-identical to before; what changes is
+   that the bundler can now see the scope. `UNO_CONTENT_ROOT_COMPONENTS` states the literals in source, a unit test pins
+   it to `UNO_CONTENT_ROOT`, and the architecture test pins the literal join and forbids the runtime-split form.
+2. **An explicit, narrow include list in `next.config.ts`.** With the prefix static, the two fixed declarations are no
+   longer discovered by static analysis, and the site route is prerendered (`SSG`) so Next applies per-route includes
+   only to the dynamic routes. `outputFileTracingIncludes` therefore lists exactly four project-relative globs —
+   `deployment/efs/manifest.json`, `deployment/uno.config.json`, `deployment/efs/content/**/*.md`,
+   `deployment/efs/content/**/*.json` — for exactly the three routes that read them (`/[locale]/[[...segments]]`,
+   `/sitemap.xml`, `/robots.txt`). No `outputFileTracingRoot`, no `outputFileTracingExcludes`, no root-wide glob, no
+   `turbopackIgnore` annotation, no `--webpack` escape, no warning filter and no logger override.
+
+**Result.** The build prints **zero** Next/Turbopack warnings and zero errors, and the whole server payload's
+project-owned content is four entries: `deployment/efs/manifest.json`, `deployment/uno.config.json`,
+`deployment/efs/content/home.en-001.md` and `src/config/uno-serving.ts` — down from 228.
+
+**The inspector.** `scripts/verify-u03-trace.mjs` is original Uno-owned, dependency-free, read-only test tooling. It reads
+every `.nft.json` under a given build, resolves each entry against that manifest's own directory, normalizes Windows and
+POSIX separators, and refuses: a missing or empty trace, malformed or unreadable evidence, any path outside the physical
+root, any private prefix (`.documents/`, `.temp/`, `.git/`, `tests/`, `scripts/`, `public/`), any root documentation or
+lockfile, an undeclared deployment file, an unexpected project path, a payload beyond the ceilings, and any published
+source the declarations name but the build does not ship. It never reads source bytes, never decides publication and
+never re-implements the reader's authorization: it compares what was traced against what the declarations name, so it
+serves both the committed unpublished build (`--expect committed`) and the synthetic publication build
+(`--expect fixture`) without new authority. `tests/deployment/u03-trace.test.mjs` proves each refusal with a synthetic
+root, including a root-wide trace with **no warning text at all** and a fake empty-output success.
+
+**Gates added.** The positive publication gate now fails on any build warning or error and runs the inspector against
+both the fixture build and the restored rebuild; the U01 workflow gains a blocking `Bounded output tracing (committed
+build)` step on both hosts; the readiness gate refuses a lost inspector step, a widened or root-wide include, a tracing
+root override, an exclude list or a dropped include block; the architecture gate confines `node:fs` to the reader and
+the serving composition and forbids the runtime-split prefix.
+
+**Rights.** All of the above is original Uno work under Apache-2.0. No Foundation GEO-03 source or asset was copied; the
+reference provenance stays pinned at `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`. No dependency was added or upgraded, no
+provider, domain or deployment setting was touched, and `deployment/site.config.json` remains absent.
+
+**Still not verified, and not claimed.** A screen-reader audit, a live HTTPS origin's warning-free build (that is the
+Owner's Vercel observation), real search-engine indexing and any U04 JSON rendering.
+
 
 **One fixture, one production build.** The positive gate now declares a custom multi-segment Page (`events`, route
 `["programmes","events"]`, published, authored `en-001` and `de-DE` Markdown) and a Page whose preferred JSON is

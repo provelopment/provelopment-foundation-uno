@@ -119,13 +119,13 @@ nothing, no `src/app` source imports it, and `public` eligibility is not publica
 activation, safe HTTP error behaviour, metadata/SEO emission including canonical advertising and `hreflang`,
 real locale routing, and any optional base path. Each requires a later bounded Owner order.
 
-**Integrated exit evidence (`UNO-WO-032 / R01`):** one synthetic fixture now proves the same production build serves an
-explicitly published Home, About and a **custom multi-segment Page** in two authored locales over real HTTP *and* a real
-headless Chromium DOM — truthful language, title, canonical/OG, same-Page alternates and `x-default`, a six-entry
-sitemap, crawler parity for two user agents, fifteen strict refusals and a genuine 404 document — with 530 checks passing,
-the original 195 preserved, the fixture restored byte-for-byte and the unpublished configuration rebuilt afterwards.
-`playwright@1.65.1` is Apache-2.0 and test-only, installed into the repository-local ignored browser path. No live origin,
-provider action or U04 rendering is claimed, and U03 stays open.
+**Clean build and bounded payload (`UNO-WO-033 / R01`):** the two `Dynamic filesystem access causes tracing of the whole
+project` warnings are gone at their cause, not their text — the confined reader now spells its content-root prefix with
+literal components and `next.config.ts` lists exactly four narrow deployment inputs for the three routes that read them.
+The build prints zero warnings and zero errors, and the server payload's project-owned content is four files instead of
+the whole repository. A new blocking inspector reads the build's own `.nft.json` evidence on both hosts and refuses a
+root-wide trace even when no warning is printed; the positive gate now also fails on any build warning. No dependency,
+provider, domain, publication or routing change, and U03 stays open.
 
 **Exit gate:** the approved route schema serves correctly, with declared locales and correct
 visibility behaviour.

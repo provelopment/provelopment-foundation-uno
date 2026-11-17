@@ -259,6 +259,13 @@ export const REASONS = Object.freeze([
   'workflow:browser-system-deps',
   'package:playwright-not-dev-only',
   'package:playwright-wrong-pin',
+  'workflow:no-trace-inspector',
+  'workflow:trace-root-override',
+  'trace:no-includes',
+  'trace:root-override',
+  'trace:excludes',
+  'trace:include-allowlist',
+  'trace:root-wide-include',
 ]);
 
 /**
@@ -613,6 +620,32 @@ export function analyzeReadiness(snapshot) {
   if (Object.keys(declaredDevDependencies).length > 0) {
     expect(declaredDependencies.playwright === undefined, 'package:playwright-not-dev-only');
     expect(declaredDevDependencies.playwright === '1.65.1', 'package:playwright-wrong-pin');
+  }
+
+  // --- 8c. The bounded file-trace gate must exist and stay narrow (UNO-WO-033 / R01) -------
+  // The traced payload is only trustworthy while three things hold: the blocking inspector step exists, the Next
+  // config declares *exactly* the narrow deployment inputs for the routes that read them, and no root-wide or
+  // escaping override appears. Each is refused by name, so deleting a gate cannot look like a pass.
+  expect(workflowText.includes('node scripts/verify-u03-trace.mjs --expect committed'), 'workflow:no-trace-inspector');
+  expect(!/outputFileTracingRoot/u.test(workflowText), 'workflow:trace-root-override');
+  const nextConfigSource = typeof nextConfig === 'string' ? nextConfig : '';
+  expect(nextConfigSource.includes('outputFileTracingIncludes'), 'trace:no-includes');
+  expect(!/outputFileTracingRoot/u.test(nextConfigSource), 'trace:root-override');
+  expect(!/outputFileTracingExcludes/u.test(nextConfigSource), 'trace:excludes');
+  const includeBlock = /UNO_DEPLOYMENT_INPUTS\s*=\s*\[([\s\S]*?)\]/u.exec(nextConfigSource)?.[1] ?? '';
+  const includeGlobs = [...includeBlock.matchAll(/'(\.[^']*)'/gu)].map((match) => match[1]).sort();
+  expect(
+    JSON.stringify(includeGlobs) ===
+      JSON.stringify([
+        './deployment/efs/content/**/*.json',
+        './deployment/efs/content/**/*.md',
+        './deployment/efs/manifest.json',
+        './deployment/uno.config.json',
+      ]),
+    'trace:include-allowlist',
+  );
+  for (const glob of includeGlobs) {
+    expect(!/^\.?\/?\*\*/u.test(glob) && !glob.includes('..'), 'trace:root-wide-include');
   }
 
   return finish(checks, reasons);

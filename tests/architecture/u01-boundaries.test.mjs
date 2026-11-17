@@ -1471,4 +1471,41 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
     const source = stripComments(content);
     assert.equal(source.includes('deployment/efs'), false, `${path} must not name a deployment path`);
   }
+
+  // The build-visible tracing boundary (UNO-WO-033 / R01). The confined reader must spell its content-root prefix
+  // literally: a runtime-split prefix hides the scope from the bundler, and the build then traced the whole
+  // repository into the server payload. The literal and the declaration are pinned together by the unit test.
+  const readerSource = stripComments(doc('src/adapters/efs/uno-confined-source-reader.ts'));
+  assert.match(readerSource, /join\(root\.root, "deployment", "efs", "content"/u);
+  assert.equal(
+    readerSource.includes('UNO_CONTENT_ROOT.split("/")'),
+    false,
+    'the reader must not build its tracing prefix at runtime',
+  );
+  assert.match(readerSource, /export const UNO_CONTENT_ROOT_COMPONENTS/u);
+
+  // Runtime filesystem access is confined to the two sanctioned modules: the reader and the server-only serving
+  // composition. No route, and no other config module, may open a file of its own.
+  const fsModules = new Set();
+  for (const layer of ['src/app', 'src/config', 'src/core', 'src/application', 'src/adapters']) {
+    for (const [path, content] of Object.entries(readTree(layer, layer))) {
+      if (/(?:from|import)\s*\(?\s*["']node:fs["']/u.test(stripComments(content))) fsModules.add(path.replaceAll('\\', '/'));
+    }
+  }
+  assert.deepEqual(
+    [...fsModules].sort(),
+    ['src/adapters/efs/uno-confined-source-reader.ts', 'src/config/uno-serving.ts'],
+    'only the confined reader and the fixed-declaration serving composition may touch the filesystem',
+  );
+  for (const [path, content] of Object.entries(appSources)) {
+    assert.equal(
+      /node:fs/u.test(stripComments(content)),
+      false,
+      `${path} must not touch the filesystem directly; it must use the confined reader`,
+    );
+  }
+  for (const [path, content] of Object.entries(readTree('src/config', 'src/config'))) {
+    if (path.replaceAll('\\', '/') === 'src/config/uno-serving.ts') continue;
+    assert.equal(/node:fs/u.test(stripComments(content)), false, `${path} must not touch the filesystem directly`);
+  }
 });

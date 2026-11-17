@@ -75,6 +75,19 @@ export const UNO_SELECTION_PATH = "deployment/uno.config.json";
 export const UNO_CONTENT_ROOT = "deployment/efs/content";
 
 /**
+ * The content root as literal path components, kept in source so the **build-time file trace** stays
+ * scoped to the authored content subtree.
+ *
+ * Turbopack decides what to ship inside a server function by looking at the *static* prefix of a
+ * filesystem path. Building that prefix at runtime (`...UNO_CONTENT_ROOT.split("/")`) hides it, and the
+ * build then traced the entire repository into the server payload — the
+ * `Dynamic filesystem access causes tracing of the whole project` warning. The two reads in
+ * `observeWithCode` therefore spell the prefix literally, and an architecture test plus a unit test pin
+ * these components to `UNO_CONTENT_ROOT` so the literal and the declaration cannot drift apart.
+ */
+export const UNO_CONTENT_ROOT_COMPONENTS: readonly string[] = Object.freeze(["deployment", "efs", "content"]);
+
+/**
  * The closed diagnostic vocabulary.
  *
  * It exists so tests can prove *why* an observation failed without the adapter ever echoing a path,
@@ -366,6 +379,11 @@ function declarationSegments(path: string): readonly string[] {
   return path.split("/");
 }
 
+/** The same segments relative to the content root, so the build-time trace prefix stays literal. */
+function contentRelativeSegments(path: string): readonly string[] {
+  return path.slice(UNO_CONTENT_ROOT.length + 1).split("/");
+}
+
 
 /**
  * Read one ordinary file with a hard byte budget, refusing anything but a regular file.
@@ -563,7 +581,7 @@ function observeWithCode(input: unknown): Verdict {
   const walkIssue = componentIssue(root.root, segmentList);
   if (walkIssue !== null) return walkIssue === "path:absent" ? ABSENT : invalid(walkIssue);
 
-  const contentRootPath = join(root.root, ...UNO_CONTENT_ROOT.split("/"));
+  const contentRootPath = join(root.root, "deployment", "efs", "content");
   let physicalContentRoot: string;
   try {
     physicalContentRoot = realpathSync(contentRootPath);
@@ -573,7 +591,7 @@ function observeWithCode(input: unknown): Verdict {
   }
   if (!isContained(root.root, physicalContentRoot)) return invalid("path:outside-content-root");
 
-  const absolutePath = join(root.root, ...segmentList);
+  const absolutePath = join(root.root, "deployment", "efs", "content", ...contentRelativeSegments(declaredPath as string));
   let physicalFile: string;
   try {
     physicalFile = realpathSync(absolutePath);

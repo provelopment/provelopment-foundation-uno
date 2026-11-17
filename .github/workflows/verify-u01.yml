@@ -127,6 +127,14 @@ jobs:
         run: pnpm build
         shell: bash
 
+      # Blocking bounded-payload gate (UNO-WO-033 / R01). It reads the build's own `.nft.json` tracing evidence and
+      # fails unless the server payload contains exactly the declared deployment inputs and authored sources — no
+      # `.documents/`, no private ACTIVE, no `.temp/`, no test harness, no scripts, no public folder, no parent or
+      # sibling path. A silently unbounded trace fails here even when the build printed no warning at all.
+      - name: Bounded output tracing (committed build)
+        run: node scripts/verify-u03-trace.mjs --expect committed
+        shell: bash
+
       - name: Run production HTTP (English demonstration)
         run: pnpm test:http
         shell: bash

@@ -49,7 +49,29 @@ function validSnapshot() {
   );
 
   const lockfile = "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n";
-  const nextConfig = "const nextConfig = { devIndicators: false };\nexport default nextConfig;\n";
+  const nextConfig = [
+    "const UNO_DEPLOYMENT_INPUTS = [",
+    "  './deployment/efs/manifest.json',",
+    "  './deployment/uno.config.json',",
+    "  './deployment/efs/content/**/*.md',",
+    "  './deployment/efs/content/**/*.json',",
+    "];",
+    '',
+    'const nextConfig = {',
+    '  devIndicators: false,',
+    '  experimental: {',
+    '    globalNotFound: true,',
+    '  },',
+    '  outputFileTracingIncludes: {',
+    "    '/[locale]/[[...segments]]': UNO_DEPLOYMENT_INPUTS,",
+    "    '/sitemap.xml': UNO_DEPLOYMENT_INPUTS,",
+    "    '/robots.txt': UNO_DEPLOYMENT_INPUTS,",
+    '  },',
+    '};',
+    '',
+    'export default nextConfig;',
+    '',
+  ].join("\n");
 
   const page = [
     '<div className="uno-page">',
@@ -156,6 +178,8 @@ function validSnapshot() {
     '        run: pnpm test',
     '      - name: Production build',
     '        run: pnpm build',
+    '      - name: Bounded output tracing (committed build)',
+    '        run: node scripts/verify-u03-trace.mjs --expect committed',
     '      - name: Production HTTP (English demonstration)',
     '        run: pnpm test:http',
     '      - name: Production HTTP and browser (U03 published Pages, restored afterwards)',
@@ -313,14 +337,13 @@ test('refuses a lockfile without a lockfileVersion', () => {
 });
 
 test('refuses a static export configuration', () => {
-  const snapshot = withChange('nextConfig', () => "const nextConfig = { output: 'export' };\nexport default nextConfig;\n");
+  const snapshot = withChange('nextConfig', (text) => text.replace('devIndicators: false,', "output: 'export',\n  devIndicators: false,"));
   assertRefused(analyzeReadiness(snapshot), 'next-config:static-export');
 });
 
 test('refuses suppressed type errors', () => {
-  const snapshot = withChange(
-    'nextConfig',
-    () => 'const nextConfig = { typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;\n',
+  const snapshot = withChange('nextConfig', (text) =>
+    text.replace('devIndicators: false,', 'devIndicators: false,\n  typescript: { ignoreBuildErrors: true },'),
   );
   assertRefused(analyzeReadiness(snapshot), 'next-config:ignored-build-errors');
 });
@@ -402,9 +425,8 @@ test('refuses an upload exclusion that hides the build inputs', () => {
 });
 
 test('refuses redirect or rewrite rules in the deployment configuration', () => {
-  const snapshot = withChange(
-    'nextConfig',
-    () => 'const nextConfig = { async redirects() { return []; }, redirects: [] };\nexport default nextConfig;\n',
+  const snapshot = withChange('nextConfig', (text) =>
+    text.replace('devIndicators: false,', 'devIndicators: false,\n  redirects: [],'),
   );
   assertRefused(analyzeReadiness(snapshot), 'next-config:redirects-or-rewrites');
 });
@@ -660,6 +682,44 @@ test('refuses an unpinned Playwright range', () => {
   assert.equal(result.reasons.includes('package:unpinned-dependency'), true, 'package:unpinned-dependency');
 });
 
+// --- UNO-WO-033 / R01: the bounded file-trace gate must not be lost or widened ------------
+
+test('refuses a workflow without the blocking bounded-trace step', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text.replace('node scripts/verify-u03-trace.mjs --expect committed', 'echo skipped'),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-trace-inspector');
+});
+
+test('refuses a next config that drops the bounded tracing includes', () => {
+  const snapshot = withChange('nextConfig', (text) => text.replace('outputFileTracingIncludes:', 'someIncludeBlock:'));
+  assertRefused(analyzeReadiness(snapshot), 'trace:no-includes');
+});
+
+test('refuses a next config that excludes traced files', () => {
+  const snapshot = withChange('nextConfig', (text) =>
+    text.replace('outputFileTracingIncludes: {', 'outputFileTracingExcludes: {},\n  outputFileTracingIncludes: {'),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'trace:excludes');
+});
+
+test('refuses a tracing root override that would widen the payload', () => {
+  const snapshot = withChange('nextConfig', (text) =>
+    text.replace('devIndicators: false,', "outputFileTracingRoot: './',\n  devIndicators: false,"),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'trace:root-override');
+});
+
+test('refuses a root-wide include glob inside the allowlist', () => {
+  const snapshot = withChange('nextConfig', (text) =>
+    text.replace("'./deployment/efs/manifest.json'", "'./**/*'"),
+  );
+  const result = analyzeReadiness(snapshot);
+  assert.equal(result.accepted, false);
+  assert.equal(result.reasons.includes('trace:include-allowlist'), true, 'trace:include-allowlist');
+  assert.equal(result.reasons.includes('trace:root-wide-include'), true, 'trace:root-wide-include');
+});
+
 
 // --- UNO-WO-016 / R01: official vector and benefits-copy regressions -----------------
 
@@ -715,19 +775,14 @@ test('refuses a page whose benefit sentence is missing', () => {
   assertRefused(analyzeReadiness(snapshot), 'page:hero-lead');
 });
 test('refuses an unapproved experimental Next flag', () => {
-  const snapshot = withChange(
-    'nextConfig',
-    () => "const nextConfig = { devIndicators: false, experimental: { ppr: true } };\nexport default nextConfig;\n",
+  const snapshot = withChange('nextConfig', (text) =>
+    text.replace('globalNotFound: true,', 'globalNotFound: true,\n    ppr: true,'),
   );
   assertRefused(analyzeReadiness(snapshot), 'next-config:unapproved-experimental-flag');
 });
 
 test('accepts only the approved global not-found flag', () => {
-  const snapshot = withChange(
-    'nextConfig',
-    () =>
-      "const nextConfig = { devIndicators: false, experimental: { globalNotFound: true } };\nexport default nextConfig;\n",
-  );
+  const snapshot = withChange('nextConfig', (text) => text.replace('globalNotFound: true,', 'globalNotFound: true,'));
   assert.deepEqual(analyzeReadiness(snapshot).reasons, []);
 });
 

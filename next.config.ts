@@ -12,11 +12,32 @@ import type { NextConfig } from 'next';
  * so an address that matches no route needs one explicit global 404 document rather than a root
  * layout. It changes no routing: nothing is rewritten, redirected, exported or resolved from the
  * environment, and an unknown address stays a real status 404.
+ *
+ * `outputFileTracingIncludes` (`UNO-WO-033 / R01`) is the *bounded* half of the file-tracing fix. The
+ * confined EFS reader now reads its authored content through a statically scoped prefix, so the build
+ * no longer traces the whole repository into the server payload — but the two fixed declarations and the
+ * authored content are then no longer discovered by static analysis either. They are therefore listed
+ * here, explicitly and narrowly, for exactly the three server routes that read them at runtime. Nothing
+ * else is included: no `.documents/`, no private ACTIVE, no `.temp/`, no test harness, no parent or
+ * sibling path, and no wildcard that could reach them. `scripts/verify-u03-trace.mjs` refuses a build
+ * where this list is missing, widened or ineffective.
  */
+const UNO_DEPLOYMENT_INPUTS = [
+  './deployment/efs/manifest.json',
+  './deployment/uno.config.json',
+  './deployment/efs/content/**/*.md',
+  './deployment/efs/content/**/*.json',
+];
+
 const nextConfig: NextConfig = {
   devIndicators: false,
   experimental: {
     globalNotFound: true,
+  },
+  outputFileTracingIncludes: {
+    '/[locale]/[[...segments]]': UNO_DEPLOYMENT_INPUTS,
+    '/sitemap.xml': UNO_DEPLOYMENT_INPUTS,
+    '/robots.txt': UNO_DEPLOYMENT_INPUTS,
   },
 };
 

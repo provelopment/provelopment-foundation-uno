@@ -505,6 +505,56 @@ function sha256Text(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/**
+ * Build output that must never appear (`UNO-WO-033 / R01`): a Next/Turbopack warning or error means the build is not
+ * clean, and the whole-project tracing banner proves the server payload was unbounded even if the text is cosmetic.
+ */
+const BUILD_WARNING_MARKERS = Object.freeze([
+  "Dynamic filesystem access causes tracing of the whole project",
+  "Turbopack build encountered",
+]);
+
+/** Assert that one real production build printed neither warnings nor errors. */
+function checkBuildClean(label, output) {
+  const warningLines = (output.match(/^\s*Warning:/gmu) ?? []).length;
+  const errorLines = (output.match(/^\s*Error:/gmu) ?? []).length;
+  check(`${label} prints no build warning`, warningLines === 0, `${warningLines} warning lines`);
+  check(`${label} prints no build error`, errorLines === 0, `${errorLines} error lines`);
+  for (const marker of BUILD_WARNING_MARKERS) {
+    check(`${label} never reports "${marker}"`, !output.includes(marker));
+  }
+}
+
+/**
+ * Run the bounded trace inspector against one real build. `expectation` is `fixture` for the synthetic publication
+ * build (every published source must be shipped) and `committed` for the restored unpublished build.
+ */
+function checkTrace(label, expectation) {
+  const result = spawnSync(
+    process.execPath,
+    [resolve(ROOT, "scripts/verify-u03-trace.mjs"), "--root", ROOT, "--expect", expectation, "--json"],
+    { cwd: ROOT, encoding: "utf8" },
+  );
+  let report = null;
+  try {
+    report = JSON.parse(result.stdout);
+  } catch {
+    report = null;
+  }
+  check(
+    `${label} passes the bounded trace inspection`,
+    result.status === 0 && report !== null && report.accepted === true,
+    report === null ? `exit ${result.status}` : report.reasons.join(","),
+  );
+  if (report !== null && typeof report.notes === "object" && report.notes !== null) {
+    check(
+      `${label} ships a bounded project payload`,
+      report.notes.projectEntries <= 250,
+      `${report.notes.projectEntries} project entries`,
+    );
+  }
+}
+
 /** Collapse whitespace and decode the entities Next emits, for prose assertions. */
 function normalise(html) {
   return html
@@ -930,6 +980,15 @@ async function main() {
       process.stderr.write(build.output.slice(-4000));
       return 1;
     }
+    // A warning-free build is required here, not merely a zero exit code, and the payload must stay bounded with every
+    // published source shipped. Either failure stops before any HTTP or browser evidence is claimed.
+    checkBuildClean("the fixture production build", build.output);
+    checkTrace("the fixture production build", "fixture");
+    if (failures.length > 0) {
+      process.stderr.write(build.output.slice(-4000));
+      process.stderr.write("verify-u03-published-http: the fixture build is not clean or not bounded.\n");
+      return 1;
+    }
 
     const port_ = await freeLoopbackPort();
     port = port_;
@@ -1011,6 +1070,8 @@ if (outcome === 0 && declarationsRestored) {
   rmSync(resolve(ROOT, ".next"), { recursive: true, force: true });
   const rebuild = await runChild([nextBin, "build"], BUILD_TIMEOUT_MS);
   check("the rebuild of the committed configuration succeeds", rebuild.code === 0, `exit ${rebuild.code}`);
+  checkBuildClean("the committed rebuild", rebuild.output);
+  checkTrace("the committed rebuild", "committed");
 
   const u01 = await runChild([resolve(ROOT, "scripts/verify-u01-http.mjs")], BUILD_TIMEOUT_MS);
   check("the original U01 HTTP gate still passes", u01.code === 0, `exit ${u01.code}`);

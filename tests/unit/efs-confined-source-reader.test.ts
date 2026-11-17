@@ -13,6 +13,8 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 import {
+  UNO_CONTENT_ROOT,
+  UNO_CONTENT_ROOT_COMPONENTS,
   UNO_SOURCE_LIMITS,
   UNO_SOURCE_READER_CODES,
   diagnoseUnoConfinedSource,
@@ -585,5 +587,65 @@ describe("hostile request input", () => {
       expect(() => observeUnoConfinedSource(value)).not.toThrow();
       expect(diagnoseUnoConfinedSource(value).state).not.toBe("valid");
     }
+  });
+});
+
+describe("the static tracing boundary (`UNO-WO-033 / R01`)", () => {
+  it("keeps the literal content-root components identical to the declared root", () => {
+    // The reader spells the build-visible prefix literally; this pins the literal to the declaration so the
+    // two cannot drift and silently widen or break the trace.
+    expect(UNO_CONTENT_ROOT_COMPONENTS.join("/")).toBe(UNO_CONTENT_ROOT);
+    expect(UNO_CONTENT_ROOT_COMPONENTS).toEqual(["deployment", "efs", "content"]);
+  });
+
+  it("reads a nested authored source through the scoped prefix", () => {
+    const root = scratchRoot();
+    mkdirSync(join(contentDir(root), "nested", "deeper"), { recursive: true });
+    const declaration = writeSource(root, "nested/deeper/events.en-001.md", "# Nested events\n\nA nested body.\n");
+    const observation = observeUnoConfinedSource({ repoRoot: root, declaration: { kind: "markdown", path: declaration } });
+    expect(observation.state).toBe("valid");
+    if (observation.state === "valid") expect(observation.source.text).toContain("A nested body.");
+  });
+
+  it("still refuses a sibling directory whose name only extends the content root", () => {
+    const root = scratchRoot();
+    mkdirSync(join(root, "deployment", "efs", "content-other"), { recursive: true });
+    writeFileSync(join(root, "deployment", "efs", "content-other", "x.md"), "# X\n\nbody\n");
+    expectDiagnosis(
+      root,
+      { kind: "markdown", path: "deployment/efs/content-other/x.md" },
+      "invalid",
+      "path:outside-content-root",
+    );
+  });
+
+  it("still refuses an in-repository file outside the content root", () => {
+    const root = scratchRoot();
+    mkdirSync(join(root, "deployment", "efs"), { recursive: true });
+    writeFileSync(join(root, "deployment", "efs", "manifest.json"), "{}\n");
+    expectDiagnosis(
+      root,
+      { kind: "json", path: "deployment/efs/manifest.json" },
+      "invalid",
+      "path:outside-content-root",
+    );
+  });
+
+  it("refuses the content root itself rather than reading a directory", () => {
+    const root = scratchRoot();
+    contentDir(root);
+    // The declaration must name a file *inside* the content root; the root alone is outside it.
+    expectDiagnosis(root, { kind: "markdown", path: "deployment/efs/content" }, "invalid", "path:outside-content-root");
+  });
+
+  it("reports a genuinely absent nested source as absent, not invalid", () => {
+    const root = scratchRoot();
+    contentDir(root);
+    expectDiagnosis(
+      root,
+      { kind: "markdown", path: "deployment/efs/content/programmes/events.en-001.md" },
+      "absent",
+      "path:absent",
+    );
   });
 });
