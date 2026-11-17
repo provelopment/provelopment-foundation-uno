@@ -47,6 +47,44 @@ function holdsDarkContextContract(source) {
   );
 }
 
+/**
+ * The real evidence the extended gate must keep for the three modules added by `UNO-WO-037 / R01`.
+ *
+ * Every marker is a literal from the runner itself: the fixture nodes, the served-markup assertions, the Chromium
+ * DOM measurements, the three unique negative Pages and their bound refusal reasons. Removing any one of them makes
+ * the predicate false, so a deleted module can never hide behind a green total.
+ */
+const ADDED_MODULE_EVIDENCE = Object.freeze([
+  'module: "content.hero"',
+  'module: "content.stats"',
+  'module: "content.testimonials"',
+  "Increment overview",
+  'href="#figures"',
+  'aria-labelledby="figures-title"',
+  'class="uno-json-stat-label"',
+  'class="uno-json-testimonial-quote"',
+  'figcaption class="uno-json-testimonial-caption"',
+  "dt.uno-json-stat-label",
+  "figcaption.uno-json-testimonial-caption",
+  "the hero action targets the statistics section",
+  "the statistics list holds three terms and three descriptions",
+  "only the attributed quotation carries a caption",
+  '["content.hero", JSON_DOCUMENTS.heroBodyMissing, "document:invalid-props"]',
+  '["content.stats", JSON_DOCUMENTS.statsHeadingSkip, "document:heading-order"]',
+  '["content.testimonials", JSON_DOCUMENTS.quoteMarkup, "document:unsafe-text"]',
+  'pathname: "/en-001/herobody"',
+  'pathname: "/en-001/statslevel"',
+  'pathname: "/en-001/quotemarkup"',
+  "wo037-herobody.en-001.json",
+  "wo037-statslevel.en-001.json",
+  "wo037-quotemarkup.en-001.json",
+]);
+
+/** True only while every added-module marker is still present in the gate. */
+function holdsAddedModuleEvidence(source) {
+  return ADDED_MODULE_EVIDENCE.every((marker) => source.includes(marker));
+}
+
 /** One fresh scratch directory that is not the Uno checkout. */
 function scratchDirectory() {
   const directory = mkdtempSync(join(tmpdir(), "uno-u04-gate-"));
@@ -145,6 +183,57 @@ describe("the U04 JSON-slice gate — mandatory evidence, no escape hatch", () =
     const removed = SOURCE.replace(DARK_CONTEXT_ARGUMENTS, "chromium.launch()");
     assert.notEqual(removed, SOURCE, "the fixture must actually remove the dark context");
     assert.equal(holdsDarkContextContract(removed), false, "a missing dark context must not satisfy the guard");
+  });
+
+  it("pins the real HTTP and Chromium evidence for the three added modules", () => {
+    // Baseline: the real runner carries every marker.
+    assert.equal(holdsAddedModuleEvidence(SOURCE), true);
+
+    // Removing a module from the fixture must fail, one module at a time.
+    for (const marker of ['module: "content.hero"', 'module: "content.stats"', 'module: "content.testimonials"']) {
+      // Every occurrence must go, otherwise a leftover node would keep the guard green and prove nothing.
+      const removed = SOURCE.replaceAll(marker, 'module: "content.prose"');
+      assert.notEqual(removed, SOURCE, `the gate must actually contain ${marker}`);
+      assert.equal(holdsAddedModuleEvidence(removed), false, `removing ${marker} must fail this gate`);
+    }
+
+    // Deleting a served-markup assertion, a DOM measurement or a bound negative fixture must fail too.
+    for (const marker of [
+      'aria-labelledby="figures-title"',
+      "figcaption.uno-json-testimonial-caption",
+      "only the attributed quotation carries a caption",
+      '["content.stats", JSON_DOCUMENTS.statsHeadingSkip, "document:heading-order"]',
+      'pathname: "/en-001/quotemarkup"',
+    ]) {
+      const removed = SOURCE.replace(marker, "REMOVED");
+      assert.notEqual(removed, SOURCE, `the gate must actually contain ${marker}`);
+      assert.equal(holdsAddedModuleEvidence(removed), false, `removing ${marker} must fail this gate`);
+    }
+  });
+
+  it("binds each added module to its own negative Page, its own reason and the shared restoration", () => {
+    // Each negative is unique per module: a shared placeholder would be a weaker proof, so it is refused here.
+    const negatives = [
+      { module: "content.hero", body: "heroBodyMissing", reason: "document:invalid-props", page: "herobody" },
+      { module: "content.stats", body: "statsHeadingSkip", reason: "document:heading-order", page: "statslevel" },
+      { module: "content.testimonials", body: "quoteMarkup", reason: "document:unsafe-text", page: "quotemarkup" },
+    ];
+    const reasons = new Set();
+    for (const negative of negatives) {
+      assert.ok(
+        SOURCE.includes(
+          `["${negative.module}", JSON_DOCUMENTS.${negative.body}, "${negative.reason}"]`,
+        ),
+        `${negative.module} must bind its own negative document and reason`,
+      );
+      assert.ok(SOURCE.includes(`pathname: "/en-001/${negative.page}"`), `missing refused Page ${negative.page}`);
+      assert.ok(SOURCE.includes(`wo037-${negative.page}.en-001.json`), `missing fixture source ${negative.page}`);
+      reasons.add(negative.reason);
+    }
+    assert.equal(reasons.size, 3, "the three negatives must use three distinct reasons");
+    // The added sources are claimed and restored by the accepted transaction, exactly like the original eighteen.
+    assert.match(SOURCE, /fixtureSources: sources\.map/u);
+    assert.match(SOURCE, /await transaction\.restore\(\)/u);
   });
 
   it("has no skip, no muted warning, no retry and no fallback path", () => {

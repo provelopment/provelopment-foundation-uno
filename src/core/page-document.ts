@@ -14,10 +14,12 @@
  * Publication remains the manifest Page's `publication: "published"` declaration; visibility is the selected
  * source's own `public`/`unlisted` intent; presentation is `deployment/site.config.json`.
  *
- * RENDERABILITY. This run implements exactly five module renderers. A `module` literal that is not one of the
- * immutable 22 IDs is `document:unknown-module`; one that *is* registered but has no renderer yet in this slice
- * is `document:renderer-unavailable`. Both refuse the entire Page, so no partially supported document can ever
- * reach a renderer or a discovery plan.
+ * RENDERABILITY. This run implements exactly eight module renderers: the five accepted layout/heading/prose/action
+ * modules plus `content.hero`, `content.stats` and `content.testimonials` (`UNO-WO-037 / R01`). A `module` literal
+ * that is not one of the immutable 22 IDs is `document:unknown-module`; one that *is* registered but has no
+ * renderer yet in this slice is `document:renderer-unavailable`. Both refuse the entire Page, so no partially
+ * supported document can ever reach a renderer or a discovery plan. The fourteen remaining registered IDs stay
+ * unrenderable, and this tuple remains a local availability discriminator — never a second registry.
  *
  * TRUST BOUNDARY. `input` is untrusted `unknown` (plain own data, or raw JSON text). It is classified before any
  * field is read, so a getter, a symbol key, an exotic prototype, a sparse array, a cyclic graph or a throwing
@@ -49,6 +51,9 @@ export const UNO_RENDERABLE_MODULES = Object.freeze([
   "content.heading",
   "content.prose",
   "content.actions",
+  "content.hero",
+  "content.stats",
+  "content.testimonials",
 ] as const);
 
 /** One renderable module ID of this slice. */
@@ -71,6 +76,11 @@ export const UNO_PAGE_DOCUMENT_LIMITS = Object.freeze({
   descriptionCodePoints: 320,
   actionItems: 8,
   labelCodePoints: 160,
+  heroActions: 3,
+  statItems: 6,
+  testimonialItems: 6,
+  statValueCodePoints: 48,
+  statDetailCodePoints: 320,
   sectionIdLength: 48,
   jsonDepth: 16,
   jsonNodes: 2048,
@@ -118,7 +128,58 @@ export interface UnoContentActionsProps {
   readonly items: readonly UnoActionItem[];
 }
 
-/** One validated module node. Layouts own typed children; the three content modules own none. */
+/** The three closed section surfaces. Adopted as *values* from the audited Foundation schema (see the ledger). */
+export type UnoSectionSurface = "plain" | "muted" | "bordered";
+
+/** The two closed section alignments. */
+export type UnoSectionAlign = "start" | "center";
+
+/**
+ * `content.hero` props: an optional eyebrow, at least one authored body field, closed styling and optional
+ * same-document actions. A hero is content, not a publication declaration, and it never carries a heading level.
+ */
+export interface UnoContentHeroProps {
+  readonly eyebrow?: string;
+  readonly lede?: string;
+  readonly support?: string;
+  readonly align?: UnoSectionAlign;
+  readonly surface?: UnoSectionSurface;
+  readonly actions?: readonly UnoActionItem[];
+}
+
+/** One factual statistic: a value, the label that names it, and optional bounded detail. */
+export interface UnoStatItem {
+  readonly value: string;
+  readonly label: string;
+  readonly detail?: string;
+}
+
+/**
+ * `content.stats` props: 1–6 authored figures and an optional section heading. `level` is required exactly when a
+ * heading is present, so a stray level can never imply a heading that does not exist.
+ */
+export interface UnoContentStatsProps {
+  readonly items: readonly UnoStatItem[];
+  readonly heading?: string;
+  readonly level?: 2 | 3 | 4 | 5 | 6;
+  readonly surface?: UnoSectionSurface;
+}
+
+/** One authored quotation with optional attribution and role. Absent fields stay absent; none is ever invented. */
+export interface UnoTestimonialItem {
+  readonly quote: string;
+  readonly attribution?: string;
+  readonly role?: string;
+}
+
+/** `content.testimonials` props: 1–6 bounded authored quotations. */
+export interface UnoContentTestimonialsProps {
+  readonly items: readonly UnoTestimonialItem[];
+  readonly align?: UnoSectionAlign;
+  readonly surface?: UnoSectionSurface;
+}
+
+/** One validated module node. Layouts own typed children; the six content modules own none. */
 export type UnoSectionNode =
   | {
       readonly id: string;
@@ -134,7 +195,14 @@ export type UnoSectionNode =
     }
   | { readonly id: string; readonly module: "content.heading"; readonly props: UnoContentHeadingProps }
   | { readonly id: string; readonly module: "content.prose"; readonly props: UnoContentProseProps }
-  | { readonly id: string; readonly module: "content.actions"; readonly props: UnoContentActionsProps };
+  | { readonly id: string; readonly module: "content.actions"; readonly props: UnoContentActionsProps }
+  | { readonly id: string; readonly module: "content.hero"; readonly props: UnoContentHeroProps }
+  | { readonly id: string; readonly module: "content.stats"; readonly props: UnoContentStatsProps }
+  | {
+      readonly id: string;
+      readonly module: "content.testimonials";
+      readonly props: UnoContentTestimonialsProps;
+    };
 
 /** The accepted, deeply frozen version-1 Page document. */
 export interface UnoPageDocument {
@@ -545,9 +613,13 @@ function readChildren(
 }
 
 /** One closed `content.actions` list: bounded, plain, and every target a valid identifier shape. */
-function readActionItems(value: unknown, state: WalkState): UnoActionItem[] {
+function readActionItems(
+  value: unknown,
+  state: WalkState,
+  max: number = UNO_PAGE_DOCUMENT_LIMITS.actionItems,
+): UnoActionItem[] {
   if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
-  if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.actionItems) {
+  if (value.length < 1 || value.length > max) {
     throw new RefusedDocument("document:invalid-props");
   }
   const items: UnoActionItem[] = [];
@@ -584,6 +656,101 @@ function optionalGridSemantics(itemSemantics: unknown): UnoGridItemSemantics | u
   if (itemSemantics === undefined) return undefined;
   if (itemSemantics === "plain" || itemSemantics === "article") return itemSemantics;
   throw new RefusedDocument("document:invalid-props");
+}
+
+/** The closed optional surface of the three new content modules. */
+function optionalSurface(surface: unknown): UnoSectionSurface | undefined {
+  if (surface === undefined) return undefined;
+  if (surface === "plain" || surface === "muted" || surface === "bordered") return surface;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/** The closed optional alignment of the three new content modules. */
+function optionalAlign(align: unknown): UnoSectionAlign | undefined {
+  if (align === undefined) return undefined;
+  if (align === "start" || align === "center") return align;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/**
+ * One optional authored text: absent stays absent, and a present value must be safe and non-empty.
+ *
+ * `undefined` is the ONLY way to be absent. An empty or whitespace-only string is an authored mistake that would
+ * render an empty element, so it refuses instead of disappearing silently.
+ */
+function optionalBoundedText(
+  value: unknown,
+  maxCodePoints: number,
+  allowNewlines: boolean,
+): string | undefined {
+  if (value === undefined) return undefined;
+  return readBoundedText(value, maxCodePoints, "document:invalid-props", false, allowNewlines);
+}
+
+/** 1–6 factual statistics, each exactly `{value, label, detail?}`. Numbers are authored text, never computed. */
+function readStatItems(value: unknown): UnoStatItem[] {
+  if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
+  if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.statItems) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const items: UnoStatItem[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) throw new RefusedDocument("document:invalid-props");
+    const item = readPlainData(value[index]);
+    if (item === null) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(item, ["value", "label"], ["detail"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const statValue = readBoundedText(
+      item["value"],
+      UNO_PAGE_DOCUMENT_LIMITS.statValueCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const label = readBoundedText(
+      item["label"],
+      UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const detail = optionalBoundedText(item["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints, false);
+    items.push(detail === undefined ? { value: statValue, label } : { value: statValue, label, detail });
+  }
+  return items;
+}
+
+/** 1–6 bounded authored quotations, each exactly `{quote, attribution?, role?}`; nothing is ever fabricated. */
+function readTestimonialItems(value: unknown): UnoTestimonialItem[] {
+  if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
+  if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.testimonialItems) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const items: UnoTestimonialItem[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) throw new RefusedDocument("document:invalid-props");
+    const item = readPlainData(value[index]);
+    if (item === null) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(item, ["quote"], ["attribution", "role"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const quote = readBoundedText(
+      item["quote"],
+      UNO_PAGE_DOCUMENT_LIMITS.textCodePoints,
+      "document:invalid-props",
+      false,
+      true,
+    );
+    const attribution = optionalBoundedText(item["attribution"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, false);
+    const role = optionalBoundedText(item["role"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, false);
+    items.push({
+      quote,
+      ...(attribution === undefined ? {} : { attribution }),
+      ...(role === undefined ? {} : { role }),
+    });
+  }
+  return items;
 }
 
 /**
@@ -684,6 +851,75 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
     if (!hasExactlyKeys(props, ["items"], [])) throw new RefusedDocument("document:invalid-props");
     const items = readActionItems(props["items"], state);
     return { id, module: "content.actions", props: { items } };
+  }
+
+  if (moduleName === "content.hero") {
+    if (!hasExactlyKeys(props, [], ["eyebrow", "lede", "support", "align", "surface", "actions"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const eyebrow = optionalBoundedText(props["eyebrow"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, false);
+    const lede = optionalBoundedText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
+    const support = optionalBoundedText(props["support"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
+    // A hero with no authored body would be an empty decorative band, so at least one body field is required.
+    if (lede === undefined && support === undefined) throw new RefusedDocument("document:invalid-props");
+    const align = optionalAlign(props["align"]);
+    const surface = optionalSurface(props["surface"]);
+    const actions =
+      props["actions"] === undefined
+        ? undefined
+        : readActionItems(props["actions"], state, UNO_PAGE_DOCUMENT_LIMITS.heroActions);
+    return {
+      id,
+      module: "content.hero",
+      props: {
+        ...(eyebrow === undefined ? {} : { eyebrow }),
+        ...(lede === undefined ? {} : { lede }),
+        ...(support === undefined ? {} : { support }),
+        ...(align === undefined ? {} : { align }),
+        ...(surface === undefined ? {} : { surface }),
+        ...(actions === undefined ? {} : { actions }),
+      },
+    };
+  }
+
+  if (moduleName === "content.stats") {
+    if (!hasExactlyKeys(props, ["items"], ["heading", "level", "surface"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const items = readStatItems(props["items"]);
+    const surface = optionalSurface(props["surface"]);
+    const heading = optionalBoundedText(props["heading"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, true);
+    const rawLevel = props["level"];
+    if (heading === undefined) {
+      // A level without a heading would imply a heading this module does not render.
+      if (rawLevel !== undefined) throw new RefusedDocument("document:invalid-props");
+      return { id, module: "content.stats", props: { items, ...(surface === undefined ? {} : { surface }) } };
+    }
+    if (rawLevel !== 2 && rawLevel !== 3 && rawLevel !== 4 && rawLevel !== 5 && rawLevel !== 6) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    // The same incremental heading contract the heading module obeys, so a stats heading cannot skip a level.
+    if (rawLevel > state.lastHeadingLevel + 1) throw new RefusedDocument("document:heading-order");
+    state.lastHeadingLevel = rawLevel;
+    return {
+      id,
+      module: "content.stats",
+      props: { items, heading, level: rawLevel, ...(surface === undefined ? {} : { surface }) },
+    };
+  }
+
+  if (moduleName === "content.testimonials") {
+    if (!hasExactlyKeys(props, ["items"], ["align", "surface"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const items = readTestimonialItems(props["items"]);
+    const align = optionalAlign(props["align"]);
+    const surface = optionalSurface(props["surface"]);
+    return {
+      id,
+      module: "content.testimonials",
+      props: { items, ...(align === undefined ? {} : { align }), ...(surface === undefined ? {} : { surface }) },
+    };
   }
 
   // Unreachable: the renderable tuple and this switch are kept in step by the `document:renderer-unavailable`

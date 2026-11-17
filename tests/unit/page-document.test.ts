@@ -64,6 +64,42 @@ function full(): Record<string, unknown> {
         module: "content.actions",
         props: { items: [{ label: "Read card A", targetId: "card-a" }] },
       },
+      {
+        id: "hero",
+        module: "content.hero",
+        props: {
+          eyebrow: "Overview",
+          lede: "A bounded lede.",
+          support: "A bounded support line.",
+          align: "center",
+          surface: "muted",
+          actions: [{ label: "Read card A", targetId: "card-a" }],
+        },
+      },
+      {
+        id: "figures",
+        module: "content.stats",
+        props: {
+          heading: "Figures",
+          level: 2,
+          surface: "bordered",
+          items: [
+            { value: "3", label: "Modules", detail: "Added in this increment." },
+            { value: "8", label: "Renderable IDs" },
+          ],
+        },
+      },
+      {
+        id: "voices",
+        module: "content.testimonials",
+        props: {
+          align: "start",
+          items: [
+            { quote: "A bounded quotation.", attribution: "Contributor A", role: "Reviewer" },
+            { quote: "A second bounded quotation." },
+          ],
+        },
+      },
     ],
   };
 }
@@ -100,13 +136,16 @@ describe("readUnoPageDocument — accepted documents", () => {
     expect(JSON.parse(JSON.stringify(first.document))).toEqual(first.document);
   });
 
-  it("accepts all five renderable module IDs and nothing else as renderable", () => {
+  it("accepts all eight renderable module IDs and nothing else as renderable", () => {
     expect([...UNO_RENDERABLE_MODULES]).toEqual([
       "layout.stack",
       "layout.grid",
       "content.heading",
       "content.prose",
       "content.actions",
+      "content.hero",
+      "content.stats",
+      "content.testimonials",
     ]);
     expect(readUnoPageDocument(full()).accepted).toBe(true);
   });
@@ -382,6 +421,175 @@ describe("readUnoPageDocument — per-module props and hostile input", () => {
     });
     expect(link.accepted).toBe(false);
     if (!link.accepted) expect(link.reason).not.toContain(marker);
+  });
+});
+
+/**
+ * The three modules this increment adds (`UNO-WO-037 / R01`). Each has several accepted shapes and its own closed
+ * negative case, so a regression in one module can never be mistaken for a regression in another.
+ */
+describe("readUnoPageDocument — content.hero, content.stats and content.testimonials", () => {
+  /** One accepted document whose single section is the module under test. */
+  function single(module: string, props: Record<string, unknown>): Record<string, unknown> {
+    return { ...minimal(), sections: [section("probe", module, props)] };
+  }
+
+  it("content.hero: accepts a lede-only, a support-only and a fully styled variant", () => {
+    expect(readUnoPageDocument(single("content.hero", { lede: "A bounded lede." })).accepted).toBe(true);
+    expect(readUnoPageDocument(single("content.hero", { support: "A bounded support line." })).accepted).toBe(true);
+    const styled = readUnoPageDocument(
+      single("content.hero", {
+        eyebrow: "Overview",
+        lede: "A bounded lede.",
+        support: "A bounded support line.",
+        align: "center",
+        surface: "bordered",
+        actions: [{ label: "Go to the hero", targetId: "probe" }],
+      }),
+    );
+    expect(styled.accepted).toBe(true);
+    if (!styled.accepted) return;
+    const node = styled.document.sections[0];
+    expect(node?.module).toBe("content.hero");
+    expect(Object.isFrozen(node?.props)).toBe(true);
+  });
+
+  it("content.hero: refuses a body-less hero, empty text, a fourth action and any heading attempt", () => {
+    // Unique hero negative: an eyebrow alone is not an authored body.
+    expectRefusal(single("content.hero", { eyebrow: "Only an eyebrow" }), "document:invalid-props");
+    expectRefusal(single("content.hero", { lede: "   " }), "document:invalid-props");
+    expectRefusal(
+      single("content.hero", {
+        lede: "Body.",
+        actions: [1, 2, 3, 4].map((index) => ({ label: `Go ${index}`, targetId: "probe" })),
+      }),
+      "document:invalid-props",
+    );
+    expectRefusal(single("content.hero", { lede: "Body.", title: "An h1 attempt" }), "document:invalid-props");
+    expectRefusal(single("content.hero", { lede: "Body.", level: 2 }), "document:invalid-props");
+    expectRefusal(single("content.hero", { lede: "<b>HTML</b>" }), "document:unsafe-text");
+    expectRefusal(single("content.hero", { lede: "Body.", align: "left" }), "document:invalid-props");
+    expectRefusal(single("content.hero", { lede: "Body.", surface: "dark" }), "document:invalid-props");
+    expectRefusal(
+      single("content.hero", { lede: "Body.", actions: [{ label: "Go", targetId: "missing" }] }),
+      "document:unresolved-target",
+    );
+    expectRefusal(
+      single("content.hero", { lede: "Body.", actions: [{ label: "Go", targetId: "probe", href: "https://x.test" }] }),
+      "document:invalid-props",
+    );
+  });
+
+  it("content.stats: accepts one to six items, with and without a linked heading", () => {
+    expect(readUnoPageDocument(single("content.stats", { items: [{ value: "1", label: "One" }] })).accepted).toBe(true);
+    expect(
+      readUnoPageDocument(single("content.stats", { items: [{ value: "2", label: "Two", detail: "A bounded detail." }] }))
+        .accepted,
+    ).toBe(true);
+    expect(
+      readUnoPageDocument(
+        single("content.stats", { heading: "Figures", level: 2, items: [{ value: "3", label: "Three" }] }),
+      ).accepted,
+    ).toBe(true);
+    const six = Array.from({ length: 6 }, (_value, index) => ({
+      value: String(index + 1),
+      label: `Label ${index + 1}`,
+    }));
+    const bounded = readUnoPageDocument(single("content.stats", { surface: "muted", items: six }));
+    expect(bounded.accepted).toBe(true);
+    if (!bounded.accepted) return;
+    const node = bounded.document.sections[0];
+    if (node?.module !== "content.stats") throw new Error("expected a stats node");
+    expect(node.props.items.length).toBe(6);
+    expect(node.props.surface).toBe("muted");
+  });
+
+  it("content.stats: refuses zero, seven, empty text, a stray level and a skipped heading level", () => {
+    expectRefusal(single("content.stats", { items: [] }), "document:invalid-props");
+    expectRefusal(
+      single("content.stats", {
+        items: Array.from({ length: 7 }, (_value, index) => ({ value: `${index}`, label: `L${index}` })),
+      }),
+      "document:invalid-props",
+    );
+    expectRefusal(single("content.stats", { items: [{ value: "", label: "Label" }] }), "document:invalid-props");
+    expectRefusal(single("content.stats", { items: [{ value: "1", label: "   " }] }), "document:invalid-props");
+    expectRefusal(single("content.stats", { items: [{ value: "1", label: "L", unit: "kg" }] }), "document:invalid-props");
+    expectRefusal(single("content.stats", { level: 2, items: [{ value: "1", label: "L" }] }), "document:invalid-props");
+    expectRefusal(
+      single("content.stats", { heading: "Figures", items: [{ value: "1", label: "L" }] }),
+      "document:invalid-props",
+    );
+    expectRefusal(
+      single("content.stats", { heading: "Figures", level: 7, items: [{ value: "1", label: "L" }] }),
+      "document:invalid-props",
+    );
+    // Unique stats negative: a level-4 heading directly under the Page h1 skips a level.
+    expectRefusal(
+      single("content.stats", { heading: "Figures", level: 4, items: [{ value: "1", label: "L" }] }),
+      "document:heading-order",
+    );
+    expectRefusal(single("content.stats", { items: [{ value: "<b>1</b>", label: "L" }] }), "document:unsafe-text");
+  });
+
+  it("content.testimonials: accepts a bare quote and attributed variants", () => {
+    expect(
+      readUnoPageDocument(single("content.testimonials", { items: [{ quote: "A bounded quotation." }] })).accepted,
+    ).toBe(true);
+    const attributed = readUnoPageDocument(
+      single("content.testimonials", {
+        align: "center",
+        surface: "bordered",
+        items: [{ quote: "A bounded quotation.", attribution: "Contributor A", role: "Reviewer" }],
+      }),
+    );
+    expect(attributed.accepted).toBe(true);
+    if (!attributed.accepted) return;
+    const node = attributed.document.sections[0];
+    if (node?.module !== "content.testimonials") throw new Error("expected a testimonials node");
+    expect(node.props.items[0]?.attribution).toBe("Contributor A");
+    expect(node.props.items[0]?.role).toBe("Reviewer");
+    expect(node.props.align).toBe("center");
+  });
+
+  it("content.testimonials: refuses empty, unbounded, fabricated and hostile items", () => {
+    expectRefusal(single("content.testimonials", { items: [] }), "document:invalid-props");
+    expectRefusal(
+      single("content.testimonials", { items: Array.from({ length: 7 }, () => ({ quote: "Q" })) }),
+      "document:invalid-props",
+    );
+    expectRefusal(single("content.testimonials", { items: [{ quote: "   " }] }), "document:invalid-props");
+    expectRefusal(
+      single("content.testimonials", { items: [{ quote: "Q", author: "Invented" }] }),
+      "document:invalid-props",
+    );
+    expectRefusal(
+      single("content.testimonials", { items: [{ quote: "Q", attribution: "" }] }),
+      "document:invalid-props",
+    );
+    expectRefusal(single("content.testimonials", { items: [{ quote: "Q" }], reviews: 5 }), "document:invalid-props");
+    expectRefusal(single("content.testimonials", { align: "end", items: [{ quote: "Q" }] }), "document:invalid-props");
+    // Unique testimonials negative: authored markup inside a quotation.
+    expectRefusal(
+      single("content.testimonials", { items: [{ quote: "<script>alert(1)</script>" }] }),
+      "document:unsafe-text",
+    );
+  });
+
+  it("refuses hostile structure inside the new item lists", () => {
+    // A `__proto__` own key can only arrive as JSON text, so the reader is proved on its real threat surface.
+    const hostile =
+      '{"version":1,"title":"Hostile","sections":[{"id":"probe","module":"content.stats","props":{"items":[{"value":"1","label":"L","__proto__":{"polluted":true}}]}}]}';
+    expectRefusal(hostile, "document:json-unsafe");
+
+    const sparse: unknown[] = new Array(1);
+    expectRefusal(single("content.testimonials", { items: sparse }), "document:invalid-props");
+
+    const accessor: Record<string, unknown> = { quote: "Q" };
+    Object.defineProperty(accessor, "role", { get: () => "R", enumerable: true });
+    expectRefusal(single("content.testimonials", { items: [accessor] }), "document:input-not-plain");
+
+    expectRefusal(single("content.hero", { lede: "Body.", actions: "none" }), "document:invalid-props");
   });
 });
 

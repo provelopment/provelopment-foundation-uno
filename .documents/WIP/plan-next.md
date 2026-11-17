@@ -4,19 +4,21 @@ No item in this slot is authorised. It is a planning note, never executable auth
 
 ## One unissued candidate: the rest of U04
 
-U04 is **OPEN**. The bounded slice that just landed delivers the version-1 JSON Page document contract and five of
-the twenty-two approved module renderers (`layout.stack`, `layout.grid`, `content.heading`, `content.prose`,
-`content.actions`), served end to end by the real production build with a two-card semantic article grid, an
-unlisted Page that is canonical to itself with `noindex,nofollow` and no discovery leakage, sixteen distinct
-refusals as genuine 404s, and a byte-exact restoration of the committed unpublished declarations. Family
-composition coverage is **0 of 17**. Nothing here is a reduction of the Owner-approved 22/17 obligation.
+U04 is **OPEN**. The landed slice delivers the version-1 JSON Page document contract and **8 of the twenty-two**
+approved module renderers — `layout.stack`, `layout.grid`, `content.heading`, `content.prose`,
+`content.actions`, and now `content.hero`, `content.stats`, `content.testimonials` — served end to end by the real
+production build with a two-card semantic article grid, a linked statistics description list, quoted figures with
+optional authored attribution, an unlisted Page that is canonical to itself with `noindex,nofollow` and no
+discovery leakage, nineteen distinct refusals as genuine 404s, and a byte-exact restoration of the committed
+unpublished declarations. Family composition coverage is **0 of 17**. Nothing here is a reduction of the
+Owner-approved 22/17 obligation.
 
 **The single next candidate for the Owner to authorise** is one further U04 increment containing, in this order:
 
 1. the typed, versioned `src/core/modules/uno-family-composition.ts` translator covering all seventeen pinned
    Foundation Page families as compositions of the approved twenty-two IDs — with a positive and a unique
    negative real-DOM proof per family, and a `KEEP`/`ADAPT`/`REWRITE`/`COMPOSE` decision recorded for each;
-2. the remaining seventeen module renderers, including the one tightly scoped client island for tabs, modal and
+2. the remaining fourteen module renderers, including the one tightly scoped client island for tabs, modal and
    carousel with its keyboard, focus and reduced-motion contract, and the display-only honest contact state;
 3. `deployment/site.config.json` as the third, disjoint presentation authority, with its strict schema, safe
    defaults for older installations and fail-closed behaviour on an invalid present file;

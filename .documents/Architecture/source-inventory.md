@@ -1710,3 +1710,83 @@ and re-runs the committed build, the bounded trace inspection and the original U
 renderers (including the single tabs/modal/carousel client island and the honest display-only contact state),
 `deployment/site.config.json` and the presentation shell, and the four-zone owned-asset policy and reader. This
 run does not close U04 and does not claim 22/22 or 17/17 parity.
+
+## U04 hero, statistics and testimonials — `UNO-WO-037 / R01`
+
+**What landed.** Three further approved IDs become renderable — `content.hero`, `content.stats` and
+`content.testimonials` — raising live module coverage from 5 to **8 of the immutable 22**. Each has closed typed
+props, bounded caps, a unique closed negative refusal, several accepted variants, and real production HTTP plus
+real Chromium proof. The fourteen remaining registered IDs still refuse as `document:renderer-unavailable`, the
+root version-1 envelope and every existing cap are unchanged, and the family-composition layer is still **0 of 17**.
+
+**Audit-first reuse, as the Owner required.** The read-only source of potential reuse was
+`provelopment/provelopment-foundation` at the approved GEO-03 pin `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`. The
+pin and every audited blob fingerprint were verified through the read-only API and each decoded file re-hashed to
+its pinned SHA-1 before any concept was adopted:
+
+| Audited Foundation file | Pinned blob | Verified |
+| --- | --- | --- |
+| `LICENSE` (Apache License 2.0) | `d645695673349e3947e8e5ae42332d0ac3164cd7` | round-trip |
+| `src/core/page-document.ts` | `a12d964c43626c6313a621bf628f5cc24b65d444` | round-trip |
+| `src/components/site/page-sections/media-sections.tsx` (hero) | `e3f3a12e5e26cb6af9133bef79f5fa2dc0680bb2` | round-trip |
+| `src/components/site/page-sections/items-sections.tsx` (stats) | `bc729d6a2e6484dc2c26ed997e65ee644bc8a7e6` | round-trip |
+| `src/components/site/page-sections/text-sections.tsx` (quote) | `caeee57798bdd533867e5bef350422618187612f` | round-trip |
+| `src/components/site/page-sections/section-support.tsx` | `19c9bee3b3b200af2455813e5f842c30b062a6ac` | round-trip |
+| `src/components/site/page-document-content.tsx` | `fc35a52d6cfc5f114e50470e8286a89916cde801` | round-trip |
+
+**Adoption decision per target.** `KEEP`, `ADAPT`, `REWRITE` and `REJECT` are recorded with the dependency chain
+that decides it, not with a preference:
+
+| Target | Decision | Dependency chain and reason |
+| --- | --- | --- |
+| Foundation `hero` presentation order (eyebrow → lede → actions → support) | **ADAPT** | The *ordering* and the closed `align`/`surface` vocabulary are adopted as behaviour. Foundation renders `lede`/`support` through `MarkdownField` with a link resolver and actions through `ActionLinks` (`locale` + `PageLinkIdResolver`); Uno's contract refuses authored Markdown/HTML and allows only same-document section anchors, so the markup is rewritten in Uno's own CSS and React text. |
+| Foundation `stats` item shape (`{value,label,detail?}`) and the six-item bound | **ADAPT** | The bounded shape, the six-item ceiling and the closed `surface` value are adopted. Foundation renders `<ul>` with Tailwind classes and Markdown `detail`; the order requires `<dl>/<dt>/<dd>` with `aria-labelledby`, so the element semantics, heading-order rule and styling are rewritten. |
+| Foundation `quote` semantics (`<figure>` + `<blockquote>` + optional `<figcaption>`) | **ADAPT** | The semantic skeleton is adopted, including an optional caption that appears only when attribution data exists. Foundation concatenates `attribution` and `role` into one Markdown-free string and routes the body through `MarkdownField`; Uno keeps the two values as separate inert nodes and never fabricates either. |
+| Foundation `page-document.ts` section schemas (`hero`, `stats`, `quote`) | **REWRITE** | Foundation validates with `zod` inside a Markdown/link-aware document model. Uno's contract is framework-free, dependency-free and closed, and must refuse the whole Page with one literal; the bounds are re-expressed as Uno caps (`heroActions: 3`, `statItems: 6`, `testimonialItems: 6`, `statValueCodePoints: 48`), and no schema text is copied. |
+| `section-support.tsx` (`SectionHeading`, `MarkdownField`, `ActionLinks`, `columnsClass`, `sectionClassName`) | **REJECT** | It hard-depends on Markdown rendering, an application-link resolver, the Tailwind design system and Foundation's heading objects. None of those exist in Uno's A1 boundary, and importing the dependency chain would be a larger change than rewriting the five small presentation cases. |
+| `page-document-content.tsx` family dispatch | **REJECT as a registry** | It is an exhaustive *source-family* dispatcher, not a module-ID registry. Adopting it would duplicate the immutable 22-ID vocabulary and pre-empt the separately authorised 17-family composition layer, which this order explicitly does not implement. |
+| Rukita property-listing page | **REJECT** | Visual-composition reference only. No source, design, asset, copy, trademark, login, inventory, booking, payment or search-provider code was read into Uno. |
+
+**Rights.** The audited repository's root `LICENSE` is the Apache License, Version 2.0, covering its `src/`
+tree. Because this run adopted *behaviour, bounds and semantic structure* and copied **no source text, markup,
+class name, schema, fixture or asset**, no Foundation file is redistributed here and no additional notice is
+required; the attribution above records the provenance and the audit trail anyway. No `modules/connect/**`,
+Solo, Rust, Hub/Spoke, proprietary brand asset or provider integration was consulted or copied, and no
+dependency, font, CDN or remote resource was added on account of this audit.
+
+**Exact contract added.** `content.hero` accepts closed keys `{eyebrow?,lede?,support?,align?,surface?,actions?}`,
+requires at least one authored body field, caps `actions` at three same-document targets and refuses a heading,
+title, level, raw markup, an empty body, a fourth action, an unresolved or unsafe target and any extra key.
+`content.stats` accepts `{items,heading?,level?,surface?}`, 1–6 items of exactly `{value,label,detail?}`, and
+requires `level` 2–6 exactly when a heading is present, obeying the same incremental heading-order contract as
+`content.heading`; a stray level, an empty value or label, a seventh item, an extra item key and authored markup
+each refuse. `content.testimonials` accepts `{items,align?,surface?}` with 1–6 items of exactly
+`{quote,attribution?,role?}`; an empty quote, a seventh item, an invented `author` key, an empty attribution, an
+unknown props key and authored markup each refuse. Every one of those refusals is a closed literal from the
+existing vocabulary — no new reason was invented for this increment.
+
+**Renderer and style.** Three exhaustive server cases in `src/components/uno-page-sections.tsx`: a `<section>`
+hero with inert eyebrow/lede/support text and accessible same-document anchors; a `<section>` statistics block
+whose heading is linked by `aria-labelledby` and whose figures are a real `<dl>` of `<dt>` labels and `<dd>`
+values with an optional detail span; and a `<section>` of `<figure>`/`<blockquote>` quotations with one optional
+`<figcaption>` that appears only when authored attribution or role data exists. No `"use client"`, no
+`dangerouslySetInnerHTML`, no inline style, no `<main>` and no second `<h1>`. `.uno-json-hero`,
+`.uno-json-stats` and `.uno-json-testimonials` rules in `src/app/globals.css` use only the existing `--uno-*`
+palette tokens, handle 320/390/768/1280 without horizontal overflow, keep the shared focus ring and add no motion
+beyond the reduced-motion guard.
+
+**Evidence.** `scripts/verify-u04-json-slice.mjs` keeps its accepted synthetic two-locale publication, exclusive
+fixture claims, `finally` restoration and post-restore committed rebuild, and now also proves the three modules
+with the real contract in-process, over real production HTTP and in a real Chromium DOM: authored eyebrow/lede/
+support text, the same-document hero action and its keyboard focus, the statistics `<dt>`/`<dd>` structure and
+`aria-labelledby` link, three distinct quoted figures with exactly one caption, one `h1`, one `main`, two article
+cards, 4.5:1 dark-mode contrast for the statistic value, and no horizontal overflow at all four widths. Three
+task-owned negative Pages (`/en-001/herobody`, `/en-001/statslevel`, `/en-001/quotemarkup`) answer genuine 404s
+with `invalid-props`, `heading-order` and `unsafe-text` respectively, alongside the retained sixteen. The gate
+reports **308 checks, 0 failed**, and `tests/deployment/u04-json-slice.test.mjs` carries **9** hermetic guards
+including the retained dark-context contract and new drift checks that fail if any added evidence is removed.
+
+**Still deferred, and still mandatory.** The typed 17-family composition layer (**0 of 17**), the remaining
+fourteen module renderers (including the single tabs/modal/carousel client island and the honest display-only
+contact state), `deployment/site.config.json` and the presentation shell, and the four-zone owned-asset policy and
+reader. This increment does not close U04 and does not claim 22/22 or 17/17 parity.

@@ -144,6 +144,14 @@ Family composition coverage is **0 of 17**: the typed `uno-family-composition.ts
 the remaining seventeen module renderers, `deployment/site.config.json`, the presentation shell,
 the client interaction island and the owned-asset policy remain mandatory U04 obligations.
 
+**Bounded progress (`UNO-WO-037 / R01`).** Three further approved renderers land — `content.hero`,
+`content.stats`, `content.testimonials` — raising live module coverage to **8 of 22**, each with closed typed
+props, a unique closed negative refusal and real production HTTP plus Chromium proof over the same two-locale
+synthetic Page (308 checks, including dark-mode contrast, 320/390/768/1280 overflow, `<figure>`/`<blockquote>`/
+`<figcaption>` quotation semantics and a `<dl>`/`<dt>`/`<dd>` statistics list). The fourteen remaining registered
+IDs still refuse as `document:renderer-unavailable`. Family composition coverage remains **0 of 17**; this
+increment does not close U04 and does not substitute for the family-composition layer.
+
 Scope: one owner and **one** presentation shell — assets, responsive navigation and
 accessibility.
 

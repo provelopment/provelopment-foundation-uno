@@ -1513,22 +1513,46 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
   }
 });
 
-// --- U04 JSON Page slice (UNO-WO-035 / R01) --------------------------------------------------------------
-// The slice must stay exactly what the order authorised: five renderable IDs from the immutable 22, one pure
+// --- U04 JSON Page slice (UNO-WO-035 / R01, extended by UNO-WO-037 / R01) ---------------------------------
+// The slice must stay exactly what the orders authorised: eight renderable IDs from the immutable 22, one pure
 // contract, one server renderer, no new client island and no framework or filesystem reach inside `src/core`.
 
-test('the U04 slice declares exactly the five renderable IDs and implements each one', () => {
-  const contract = stripComments(doc('src/core/page-document.ts'));
-  const renderer = stripComments(doc('src/components/uno-page-sections.tsx'));
+test("the U04 slice declares exactly the eight renderable IDs and implements each one", () => {
+  const contract = stripComments(doc("src/core/page-document.ts"));
+  const renderer = stripComments(doc("src/components/uno-page-sections.tsx"));
 
-  const block = /UNO_RENDERABLE_MODULES = Object\.freeze\(\[([\s\S]*?)\] as const\)/u.exec(contract)?.[1] ?? '';
+  const block = /UNO_RENDERABLE_MODULES = Object\.freeze\(\[([\s\S]*?)\] as const\)/u.exec(contract)?.[1] ?? "";
   const ids = [...block.matchAll(/"([a-z]+\.[a-z]+)"/gu)].map((match) => match[1]);
-  assert.deepEqual(ids, ["layout.stack", "layout.grid", "content.heading", "content.prose", "content.actions"]);
+  // Independently enumerated — never a threshold — so a silent addition or removal of a renderable ID fails here.
+  assert.deepEqual(ids, [
+    "layout.stack",
+    "layout.grid",
+    "content.heading",
+    "content.prose",
+    "content.actions",
+    "content.hero",
+    "content.stats",
+    "content.testimonials",
+  ]);
 
   for (const id of ids) {
     assert.ok(renderer.includes(`case "${id}":`), `${id} has no renderer case`);
   }
-  assert.equal((renderer.match(/case "[a-z]+\.[a-z]+":/gu) ?? []).length, 5, 'the renderer must cover exactly five IDs');
+  assert.equal((renderer.match(/case "[a-z]+\.[a-z]+":/gu) ?? []).length, 8, "the renderer must cover exactly eight IDs");
+
+  // Every one of the 22 registry IDs stays immutable and the fourteen unimplemented ones stay unrenderable.
+  const registry = stripComments(doc("src/core/modules/capability-registry.ts"));
+  const registryIds = [...registry.matchAll(/_CAPABILITY_IDS = Object\.freeze\(\[([\s\S]*?)\] as const\)/gu)].flatMap(
+    (blockMatch) => [...blockMatch[1].matchAll(/"([a-z]+\.[a-z]+)"/gu)].map((match) => match[1]),
+  );
+  assert.equal(registryIds.length, 22, "the immutable registry must still hold exactly 22 IDs");
+  const unrenderable = registryIds.filter((id) => !ids.includes(id));
+  assert.equal(unrenderable.length, 14, "exactly fourteen registered IDs must remain unrenderable");
+  // The retained `renderer-unavailable` negative fixture must still name a registered but unimplemented ID.
+  assert.ok(unrenderable.includes("media.image"), "media.image must stay registered and unrenderable");
+  for (const id of ids) {
+    assert.ok(registryIds.includes(id), `${id} is not an immutable registry ID`);
+  }
 });
 
 test('the U04 contract stays framework-free and the renderer stays a server component', () => {

@@ -151,3 +151,140 @@ describe("UnoPageSections — static server markup", () => {
     expect(render(invalid)).toBe("");
   });
 });
+
+/**
+ * The three modules added by `UNO-WO-037 / R01`. Every assertion here is made on the real server markup string, so
+ * the semantics are proved on what a reader actually receives — not on a source-code convention.
+ */
+describe("UnoPageSections — hero, statistics and testimonials", () => {
+  it("renders a semantic hero with an inert eyebrow, lede, support and a same-page action", () => {
+    const document = accept({
+      version: 1,
+      title: "Hero fixture",
+      sections: [
+        {
+          id: "opening",
+          module: "content.hero",
+          props: {
+            eyebrow: "Overview",
+            lede: "A lede with & and \"quotes\" and an apostrophe's mark.",
+            support: "A support line.",
+            align: "center",
+            surface: "bordered",
+            actions: [{ label: "Jump to the figures", targetId: "figures" }],
+          },
+        },
+        {
+          id: "figures",
+          module: "content.stats",
+          props: { items: [{ value: "8", label: "Renderable IDs" }] },
+        },
+      ],
+    });
+    const markup = render(document);
+    expect(markup).toContain('<section class="uno-json-hero"');
+    expect(markup).toContain('data-uno-align="center"');
+    expect(markup).toContain('data-uno-surface="bordered"');
+    expect(markup).toContain('<p class="uno-json-eyebrow">Overview</p>');
+    expect(markup).toContain("A lede with &amp; and &quot;quotes&quot; and an apostrophe&#x27;s mark.");
+    expect(markup).toContain('<p class="uno-json-hero-support">A support line.</p>');
+    expect(markup).toContain('<a class="uno-json-action" href="#figures">');
+    expect(markup).not.toContain("<h1");
+    expect(markup).not.toContain("<main");
+    expect(markup).not.toContain("<script");
+  });
+
+  it("renders a hero without optional parts, using the default alignment and surface", () => {
+    const document = accept({
+      version: 1,
+      title: "Hero defaults",
+      sections: [{ id: "opening", module: "content.hero", props: { lede: "Body only." } }],
+    });
+    const markup = render(document);
+    expect(markup).toContain('data-uno-align="start"');
+    expect(markup).toContain('data-uno-surface="plain"');
+    expect(markup).toContain('<p class="uno-json-hero-lede">Body only.</p>');
+    expect(markup).not.toContain("uno-json-eyebrow");
+    expect(markup).not.toContain("uno-json-actions");
+    expect((markup.match(/<section /gu) ?? []).length).toBe(1);
+  });
+
+  it("renders statistics as a real description list linked to its heading", () => {
+    const document = accept({
+      version: 1,
+      title: "Stats fixture",
+      sections: [
+        {
+          id: "figures",
+          module: "content.stats",
+          props: {
+            heading: "Programme figures",
+            level: 2,
+            surface: "muted",
+            items: [
+              { value: "3", label: "New modules", detail: "Hero, stats, testimonials." },
+              { value: "8", label: "Renderable IDs" },
+            ],
+          },
+        },
+      ],
+    });
+    const markup = render(document);
+    expect(markup).toContain('<section class="uno-json-stats"');
+    expect(markup).toContain('data-uno-surface="muted"');
+    expect(markup).toContain('aria-labelledby="figures-title"');
+    expect(markup).toContain('<h2 class="uno-json-stats-heading" id="figures-title">Programme figures</h2>');
+    expect(markup).toContain('<dl class="uno-json-stats-list">');
+    expect(markup).toContain('<dt class="uno-json-stat-label">New modules</dt>');
+    expect(markup).toContain('<dd class="uno-json-stat-value">3');
+    expect(markup).toContain('<span class="uno-json-stat-detail">Hero, stats, testimonials.</span>');
+    expect((markup.match(/<dt /gu) ?? []).length).toBe(2);
+    expect((markup.match(/<dd /gu) ?? []).length).toBe(2);
+    expect(markup).not.toContain("uno-json-heading");
+  });
+
+  it("renders statistics without a heading and without a dangling label reference", () => {
+    const document = accept({
+      version: 1,
+      title: "Stats defaults",
+      sections: [{ id: "figures", module: "content.stats", props: { items: [{ value: "1", label: "One" }] } }],
+    });
+    const markup = render(document);
+    expect(markup).toContain('data-uno-surface="plain"');
+    expect(markup).not.toContain("aria-labelledby");
+    expect(markup).not.toContain("uno-json-stats-heading");
+  });
+
+  it("renders quotations as figure, blockquote and an optional caption", () => {
+    const document = accept({
+      version: 1,
+      title: "Quote fixture",
+      sections: [
+        {
+          id: "voices",
+          module: "content.testimonials",
+          props: {
+            align: "center",
+            items: [
+              { quote: "A quoted & escaped line.", attribution: "Contributor A", role: "Reviewer" },
+              { quote: "An unattributed line." },
+              { quote: "A role only line.", role: "Editor" },
+            ],
+          },
+        },
+      ],
+    });
+    const markup = render(document);
+    expect(markup).toContain('<section class="uno-json-testimonials"');
+    expect(markup).toContain('data-uno-align="center"');
+    expect((markup.match(/<figure class="uno-json-testimonial">/gu) ?? []).length).toBe(3);
+    expect((markup.match(/<blockquote class="uno-json-testimonial-quote">/gu) ?? []).length).toBe(3);
+    expect(markup).toContain("A quoted &amp; escaped line.");
+    expect(markup).toContain('<span class="uno-json-testimonial-attribution">Contributor A</span>');
+    expect(markup).toContain('<span class="uno-json-testimonial-role">Reviewer</span>');
+    expect(markup).toContain('<span class="uno-json-testimonial-role">Editor</span>');
+    // Two of the three items carry a caption; the unattributed one must not invent a person.
+    expect((markup.match(/<figcaption /gu) ?? []).length).toBe(2);
+    expect(markup).not.toContain("cite");
+  });
+});

@@ -57,7 +57,7 @@ const PINNED_DECLARATIONS = new Map([
   [SELECTION, "4f656c93a45873d85b133aa99adaec1b6821ac9983b9e9818452773952df9a0c"],
 ]);
 
-/** The eighteen synthetic sources: created only if absent, removed again in the same `finally`. */
+/** The twenty-one synthetic sources: created only if absent, removed again in the same `finally`. */
 const FIXTURE_SOURCES = Object.freeze([
   `${CONTENT}/wo035-home.en-001.json`,
   `${CONTENT}/wo035-home.de-de.json`,
@@ -78,6 +78,9 @@ const FIXTURE_SOURCES = Object.freeze([
   `${CONTENT}/wo035-broken.en-001.md`,
   `${CONTENT}/wo035-draft.en-001.md`,
   `${CONTENT}/wo035-other.en-001.json`,
+  `${CONTENT}/wo037-herobody.en-001.json`,
+  `${CONTENT}/wo037-statslevel.en-001.json`,
+  `${CONTENT}/wo037-quotemarkup.en-001.json`,
 ]);
 
 const failures = [];
@@ -96,10 +99,24 @@ function check(name, condition, detail) {
   return false;
 }
 
-/** One valid two-card article grid: the listing pattern this slice is proved on. */
+/** One valid two-card article grid plus the three added modules (`UNO-WO-037 / R01`). */
 function componentSections(locale) {
   const german = locale === "de-DE";
   return [
+    {
+      id: "opening",
+      module: "content.hero",
+      props: {
+        eyebrow: german ? "Ueberblick zum Schritt" : "Increment overview",
+        lede: german ? "Drei Module ergaenzen den geprueften Schnitt." : "Three modules join the validated slice here.",
+        support: german
+          ? "Jeder Wert unten ist verfasster Text, keine Live-Zahl."
+          : "Every figure below is authored text, never a live number.",
+        align: "center",
+        surface: "bordered",
+        actions: [{ label: german ? "Zu den Zahlen" : "Jump to the figures", targetId: "figures" }],
+      },
+    },
     {
       id: "listing",
       module: "layout.grid",
@@ -132,6 +149,46 @@ function componentSections(locale) {
           ],
         },
       ],
+    },
+    {
+      id: "figures",
+      module: "content.stats",
+      props: {
+        heading: german ? "Zahlen zum Schritt" : "Increment figures",
+        level: 2,
+        surface: "muted",
+        items: [
+          {
+            value: "8",
+            label: german ? "Darstellbare Modul-IDs" : "Renderable module IDs",
+            detail: german ? "Fuenf akzeptiert, drei hier ergaenzt." : "Five accepted, three added here.",
+          },
+          { value: "14", label: german ? "Weiterhin ohne Renderer" : "Still unrenderable" },
+          { value: "0", label: german ? "Erfundene Werte" : "Fabricated values" },
+        ],
+      },
+    },
+    {
+      id: "voices",
+      module: "content.testimonials",
+      props: {
+        align: "center",
+        surface: "bordered",
+        items: [
+          {
+            quote: german
+              ? "Die Ablehnungen des Vertrags sind die Funktion, nicht das Hindernis."
+              : "The contract refusals are the feature, not the obstacle.",
+            attribution: german ? "Pruefnotiz A" : "Review note A",
+            role: german ? "Architekturpruefung" : "Architecture review",
+          },
+          {
+            quote: german
+              ? "Verfasster Text bleibt vom Dokument bis zum DOM inaktiv."
+              : "Authored text stays inert from the document to the DOM.",
+          },
+        ],
+      },
     },
     {
       id: "listing-actions",
@@ -207,6 +264,33 @@ const JSON_DOCUMENTS = Object.freeze({
     sections: [
       { id: "same", module: "content.prose", props: { text: "One." } },
       { id: "same", module: "content.prose", props: { text: "Two." } },
+    ],
+  },
+  heroBodyMissing: {
+    version: 1,
+    title: "Hero without body",
+    sections: [{ id: "opening", module: "content.hero", props: { eyebrow: "No body authored" } }],
+  },
+  statsHeadingSkip: {
+    version: 1,
+    title: "Stats heading skip",
+    sections: [
+      {
+        id: "figures",
+        module: "content.stats",
+        props: { heading: "Skips a level", level: 4, items: [{ value: "1", label: "One" }] },
+      },
+    ],
+  },
+  quoteMarkup: {
+    version: 1,
+    title: "Quote with markup",
+    sections: [
+      {
+        id: "voices",
+        module: "content.testimonials",
+        props: { items: [{ quote: "<b>Bold</b> quotation." }] },
+      },
     ],
   },
   tooDeep: {
@@ -323,6 +407,15 @@ function fixturePages() {
       publication: "draft",
       representations: [representation("en-001", [markdownSource(`${CONTENT}/wo035-draft.en-001.md`)])],
     },
+    published("herobody", ["herobody"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo037-herobody.en-001.json`)]),
+    ]),
+    published("statslevel", ["statslevel"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo037-statslevel.en-001.json`)]),
+    ]),
+    published("quotemarkup", ["quotemarkup"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo037-quotemarkup.en-001.json`)]),
+    ]),
   ];
 }
 
@@ -569,6 +662,10 @@ const REFUSED_PAGES = Object.freeze([
   { pathname: "/de-de/notes", reason: "missing-locale" },
   { pathname: "/en-001/missing", reason: "unknown-page" },
   { pathname: "/en-001/NOTES", reason: "case-mismatch" },
+  // The three unique negatives of the modules added by UNO-WO-037 / R01.
+  { pathname: "/en-001/herobody", reason: "invalid-props" },
+  { pathname: "/en-001/statslevel", reason: "heading-order" },
+  { pathname: "/en-001/quotemarkup", reason: "unsafe-text" },
 ]);
 
 /**
@@ -622,6 +719,34 @@ async function validateFixtureInProcess() {
     check("the unlisted Page is not indexable", preview.planned.delivery.indexable === false);
     check("the unlisted Page is excluded from the sitemap", preview.planned.delivery.eligible.sitemap === false);
     check("the unlisted Page advertises no alternate", preview.planned.delivery.eligible.hreflang === false);
+  }
+
+  // The three modules added by UNO-WO-037 / R01 are proved with the REAL contract, not a string match.
+  const components = await plan("/en-001/programmes/components");
+  const componentModules =
+    components.accepted && components.planned.document.pageDocument !== undefined
+      ? components.planned.document.pageDocument.sections.map((node) => node.module)
+      : [];
+  for (const moduleId of ["content.hero", "content.stats", "content.testimonials"]) {
+    check(`the accepted components Page carries ${moduleId}`, componentModules.includes(moduleId));
+  }
+  check(
+    "the accepted components Page keeps exactly one actions module",
+    componentModules.filter((moduleId) => moduleId === "content.actions").length === 1,
+  );
+
+  // Each added module refuses its OWN negative document with its own closed reason.
+  for (const [moduleId, negativeDocument, reason] of [
+    ["content.hero", JSON_DOCUMENTS.heroBodyMissing, "document:invalid-props"],
+    ["content.stats", JSON_DOCUMENTS.statsHeadingSkip, "document:heading-order"],
+    ["content.testimonials", JSON_DOCUMENTS.quoteMarkup, "document:unsafe-text"],
+  ]) {
+    const verdict = readUnoPageDocument(negativeDocument);
+    check(
+      `${moduleId} refuses its unique negative with ${reason}`,
+      verdict.accepted === false && verdict.reason === reason,
+      verdict.accepted ? "accepted" : verdict.reason,
+    );
   }
 
   for (const refused of REFUSED_PAGES) {
@@ -686,6 +811,69 @@ async function assertPublicPage(base, entry) {
     );
     check(`${entry.pathname} renders a real same-page action link`, body.includes('href="#card-one"'));
     check(`${entry.pathname} renders both card headings`, countOf(body, /class="uno-json-heading"/gu) === 2);
+
+    // --- The three modules added by UNO-WO-037 / R01, proved in the REAL served markup ----------------
+    const german = entry.locale === "de-DE";
+    check(`${entry.pathname} renders the hero section`, body.includes('class="uno-json-hero"'));
+    check(
+      `${entry.pathname} renders the hero with its closed alignment and surface`,
+      body.includes('data-uno-align="center"') && body.includes('data-uno-surface="bordered"'),
+    );
+    check(
+      `${entry.pathname} renders the authored hero eyebrow`,
+      body.includes(german ? "Ueberblick zum Schritt" : "Increment overview"),
+    );
+    check(
+      `${entry.pathname} renders the authored hero lede`,
+      body.includes(german ? "Drei Module ergaenzen den geprueften Schnitt." : "Three modules join the validated slice here."),
+    );
+    check(
+      `${entry.pathname} renders the authored hero support line`,
+      body.includes(
+        german ? "Jeder Wert unten ist verfasster Text, keine Live-Zahl." : "Every figure below is authored text, never a live number.",
+      ),
+    );
+    check(
+      `${entry.pathname} renders the hero action as a same-document anchor`,
+      body.includes('href="#figures"') && body.includes(german ? "Zu den Zahlen" : "Jump to the figures"),
+    );
+    check(`${entry.pathname} renders the statistics description list`, body.includes('class="uno-json-stats-list"'));
+    check(
+      `${entry.pathname} links the statistics section to its own heading`,
+      body.includes('aria-labelledby="figures-title"') && body.includes('id="figures-title"'),
+    );
+    check(
+      `${entry.pathname} renders the authored statistics heading`,
+      body.includes(german ? "Zahlen zum Schritt" : "Increment figures"),
+    );
+    check(`${entry.pathname} renders three statistic labels`, countOf(body, /<dt class="uno-json-stat-label">/gu) === 3);
+    check(`${entry.pathname} renders three statistic values`, countOf(body, /<dd class="uno-json-stat-value">/gu) === 3);
+    check(
+      `${entry.pathname} renders the authored statistic detail`,
+      body.includes(german ? "Fuenf akzeptiert, drei hier ergaenzt." : "Five accepted, three added here."),
+    );
+    check(
+      `${entry.pathname} renders two semantic quotation figures`,
+      countOf(body, /<figure class="uno-json-testimonial">/gu) === 2,
+    );
+    check(
+      `${entry.pathname} renders two quotation blockquotes`,
+      countOf(body, /<blockquote class="uno-json-testimonial-quote">/gu) === 2,
+    );
+    check(
+      `${entry.pathname} renders one quotation caption and no invented second one`,
+      countOf(body, /<figcaption class="uno-json-testimonial-caption">/gu) === 1,
+    );
+    check(
+      `${entry.pathname} keeps the authored quotation text`,
+      body.includes(
+        german ? "Die Ablehnungen des Vertrags sind die Funktion, nicht das Hindernis." : "The contract refusals are the feature, not the obstacle.",
+      ),
+    );
+    check(
+      `${entry.pathname} keeps authored markup out of the quotation`,
+      !body.includes("<b>Bold</b>") && !body.includes("&lt;b&gt;Bold&lt;/b&gt;"),
+    );
   }
 }
 
@@ -800,7 +988,7 @@ async function assertInBrowser(base) {
       articles: document.querySelectorAll("article.uno-json-card").length,
       headings: [...document.querySelectorAll(".uno-json-heading")].map((node) => node.textContent),
       gridColumns: document.querySelector(".uno-json-grid")?.getAttribute("data-uno-columns") ?? null,
-      actionHref: document.querySelector("a.uno-json-action")?.getAttribute("href") ?? null,
+      actionHref: document.querySelector("#listing-actions a.uno-json-action")?.getAttribute("href") ?? null,
     }));
     check("the browser DOM holds exactly one h1", structure.h1 === 1);
     check("the browser DOM holds exactly one main landmark", structure.main === 1);
@@ -809,8 +997,81 @@ async function assertInBrowser(base) {
     check("the grid declares two columns", structure.gridColumns === "2");
     check("the action is a real same-page anchor", structure.actionHref === "#card-one");
 
+    // The three modules added by UNO-WO-037 / R01, measured in the real rendered DOM.
+    const added = await page.evaluate(() => {
+      const hero = document.querySelector("section.uno-json-hero");
+      const stats = document.querySelector("section.uno-json-stats");
+      const voices = document.querySelector("section.uno-json-testimonials");
+      const heroAction = hero?.querySelector("a.uno-json-action") ?? null;
+      const statsHeading = stats?.querySelector(".uno-json-stats-heading") ?? null;
+      return {
+        heroAlign: hero?.getAttribute("data-uno-align") ?? null,
+        heroSurface: hero?.getAttribute("data-uno-surface") ?? null,
+        eyebrow: hero?.querySelector(".uno-json-eyebrow")?.textContent ?? null,
+        lede: hero?.querySelector(".uno-json-hero-lede")?.textContent ?? null,
+        support: hero?.querySelector(".uno-json-hero-support")?.textContent ?? null,
+        heroActionHref: heroAction?.getAttribute("href") ?? null,
+        statsLabelledBy: stats?.getAttribute("aria-labelledby") ?? null,
+        statsHeadingId: statsHeading?.getAttribute("id") ?? null,
+        statsHeadingText: statsHeading?.textContent ?? null,
+        terms: stats?.querySelectorAll("dt.uno-json-stat-label").length ?? 0,
+        definitions: stats?.querySelectorAll("dd.uno-json-stat-value").length ?? 0,
+        details: stats?.querySelectorAll(".uno-json-stat-detail").length ?? 0,
+        figures: voices?.querySelectorAll("figure.uno-json-testimonial").length ?? 0,
+        quotes: voices?.querySelectorAll("blockquote.uno-json-testimonial-quote").length ?? 0,
+        captions: voices?.querySelectorAll("figcaption.uno-json-testimonial-caption").length ?? 0,
+        attribution: voices?.querySelector(".uno-json-testimonial-attribution")?.textContent ?? null,
+        role: voices?.querySelector(".uno-json-testimonial-role")?.textContent ?? null,
+        h1: document.querySelectorAll("h1").length,
+        main: document.querySelectorAll("main").length,
+        articles: document.querySelectorAll("article.uno-json-card").length,
+      };
+    });
+    check(
+      "the hero renders in the DOM with its closed alignment and surface",
+      added.heroAlign === "center" && added.heroSurface === "bordered",
+    );
+    check(
+      "the hero carries its authored eyebrow, lede and support text",
+      added.eyebrow === "Increment overview" &&
+        (added.lede ?? "").includes("Three modules join the validated slice here.") &&
+        (added.support ?? "").includes("Every figure below is authored text"),
+    );
+    check("the hero action targets the statistics section", added.heroActionHref === "#figures");
+    check(
+      "the statistics heading labels its own section without a dangling reference",
+      added.statsHeadingId !== null && added.statsLabelledBy === added.statsHeadingId,
+      `${added.statsLabelledBy}/${added.statsHeadingId}`,
+    );
+    check("the statistics heading text is the authored heading", added.statsHeadingText === "Increment figures");
+    check(
+      "the statistics list holds three terms and three descriptions",
+      added.terms === 3 && added.definitions === 3,
+      `${added.terms}/${added.definitions}`,
+    );
+    check("exactly one statistic carries authored detail", added.details === 1);
+    check("the quotations render as figures with blockquotes", added.figures === 2 && added.quotes === 2);
+    check("only the attributed quotation carries a caption", added.captions === 1, `${added.captions}`);
+    check(
+      "the attribution and role are rendered as authored data",
+      added.attribution === "Review note A" && added.role === "Architecture review",
+    );
+    check(
+      "the added modules keep one h1, one main landmark and two article cards",
+      added.h1 === 1 && added.main === 1 && added.articles === 2,
+      `${added.h1}/${added.main}/${added.articles}`,
+    );
+
+    const heroFocused = await page.evaluate(() => {
+      const anchor = document.querySelector("section.uno-json-hero a.uno-json-action");
+      if (anchor === null) return null;
+      anchor.focus();
+      return document.activeElement === anchor ? anchor.getAttribute("href") : null;
+    });
+    check("the hero action receives keyboard focus", heroFocused === "#figures");
+
     const focused = await page.evaluate(() => {
-      const anchor = document.querySelector("a.uno-json-action");
+      const anchor = document.querySelector("#listing-actions a.uno-json-action");
       if (anchor === null) return null;
       anchor.focus();
       return document.activeElement === anchor ? anchor.getAttribute("href") : null;
@@ -869,12 +1130,21 @@ async function assertInBrowser(base) {
       const foreground = parse(prose === null ? body.color : getComputedStyle(prose).color);
       const lighter = Math.max(luminance(background), luminance(foreground));
       const darker = Math.min(luminance(background), luminance(foreground));
+      // The statistics value is the largest new text on the Page, so it carries its own contrast proof.
+      const statSection = document.querySelector(".uno-json-stats");
+      const statValue = document.querySelector(".uno-json-stat-value");
+      const statBackground = parse(statSection === null ? "" : getComputedStyle(statSection).backgroundColor);
+      const statForeground = parse(statValue === null ? "" : getComputedStyle(statValue).color);
+      const statContrast =
+        Number(((Math.max(luminance(statBackground), luminance(statForeground)) + 0.05) /
+          (Math.min(luminance(statBackground), luminance(statForeground)) + 0.05)).toFixed(2));
       return {
         prefersDark: matchMedia("(prefers-color-scheme: dark)").matches,
         prefersReduced: matchMedia("(prefers-reduced-motion: reduce)").matches,
         token,
         background,
         contrast: Number(((lighter + 0.05) / (darker + 0.05)).toFixed(2)),
+        statContrast,
         transition: action === null ? "none" : getComputedStyle(action).transitionDuration,
       };
     });
@@ -885,10 +1155,15 @@ async function assertInBrowser(base) {
     check("dark mode resolves the dark background token", dark.token.toLowerCase() === "#0c1118", dark.token);
     check("dark mode paints a dark background", dark.background.length === 3 && dark.background[0] < 60, dark.background.join(","));
     check("dark mode keeps body text above a 4.5:1 contrast ratio", dark.contrast >= 4.5, `${dark.contrast}`);
+    check(
+      "dark mode keeps the statistic value above a 4.5:1 contrast ratio",
+      dark.statContrast >= 4.5,
+      `${dark.statContrast}`,
+    );
     // The accepted demo already collapses every transition to `0.01ms !important` under reduced motion, so the
     // assertion is "effectively zero" and strictly far shorter than the animated default, not a literal `0s`.
     const normalTransition = await page.evaluate(() => {
-      const anchor = document.querySelector("a.uno-json-action");
+      const anchor = document.querySelector("#listing-actions a.uno-json-action");
       return anchor === null ? "none" : getComputedStyle(anchor).transitionDuration;
     });
     const reducedSeconds = Number.parseFloat(dark.transition);
@@ -1065,6 +1340,9 @@ function fixturePlan() {
     [`${CONTENT}/wo035-broken.en-001.md`, MARKDOWN_DOCUMENTS.brokenAlternative],
     [`${CONTENT}/wo035-draft.en-001.md`, MARKDOWN_DOCUMENTS.draft],
     [`${CONTENT}/wo035-other.en-001.json`, JSON.stringify(JSON_DOCUMENTS.other, null, 2)],
+    [`${CONTENT}/wo037-herobody.en-001.json`, JSON.stringify(JSON_DOCUMENTS.heroBodyMissing, null, 2)],
+    [`${CONTENT}/wo037-statslevel.en-001.json`, JSON.stringify(JSON_DOCUMENTS.statsHeadingSkip, null, 2)],
+    [`${CONTENT}/wo037-quotemarkup.en-001.json`, JSON.stringify(JSON_DOCUMENTS.quoteMarkup, null, 2)],
   ];
   return {
     declarations: [MANIFEST, SELECTION].map((path) => ({ path, digest: PINNED_DECLARATIONS.get(path) })),
@@ -1118,7 +1396,7 @@ if (failures.length > 0 || outcome !== 0) {
   process.exitCode = 1;
 } else {
   process.stdout.write(
-    "verify-u04-json-slice: OK - a validated JSON Page, its two-card article grid, unlisted privacy, strict refusals and a byte-exact restoration are proved over real production HTTP and Chromium.\n",
+    "verify-u04-json-slice: OK - a validated JSON Page with its two-card article grid, hero, statistics and testimonials, unlisted privacy, strict refusals and a byte-exact restoration are proved over real production HTTP and Chromium.\n",
   );
   process.exitCode = 0;
 }

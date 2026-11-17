@@ -1,9 +1,10 @@
 /**
  * Foundation Uno — the validated JSON Page section renderer (`UNO-WO-035 / R01`, U04).
  *
- * WHAT THIS IS. One original **server** React component that renders the five module IDs this execution
- * implements — `layout.stack`, `layout.grid`, `content.heading`, `content.prose`, `content.actions` — from a
- * document that the Page-document contract has already accepted.
+ * WHAT THIS IS. One original **server** React component that renders the eight module IDs this execution
+ * implements — `layout.stack`, `layout.grid`, `content.heading`, `content.prose`, `content.actions`,
+ * `content.hero`, `content.stats`, `content.testimonials` — from a document that the Page-document contract has
+ * already accepted.
  *
  * PREFLIGHT. The component re-validates the document it is handed before emitting a single node. A document that
  * no longer validates renders **nothing at all**: there is no partial output, no "render what we can" path and no
@@ -20,8 +21,9 @@
  * locale, canonical URLs, discovery, analytics or providers.
  *
  * PROVENANCE. Original **Uno-owned** implementation, class **NEW**. The pinned Foundation GEO-03 composer
- * (`fc35a52d6cfc5f114e50470e8286a89916cde801`) was read for comprehension only; no code, markup or class name is
- * copied, and the family composition layer remains a later U04 obligation.
+ * (`fc35a52d6cfc5f114e50470e8286a89916cde801`) and the audited `hero`, `stats` and `quote` section implementations
+ * were read for their semantic structure only (`UNO-WO-037 / R01`). No code, class name, Markdown pipeline, link
+ * resolver or Tailwind token is copied: Uno renders inert text, its own `--uno-*` palette and same-document anchors.
  */
 import {
   readUnoPageDocument,
@@ -105,6 +107,91 @@ function SectionNode({ node }: { readonly node: UnoSectionNode }) {
           ))}
         </ul>
       );
+    case "content.hero": {
+      const { eyebrow, lede, support, align, surface, actions } = node.props;
+      return (
+        <section
+          className="uno-json-hero"
+          data-uno-align={align ?? "start"}
+          data-uno-surface={surface ?? "plain"}
+          id={node.id}
+        >
+          {eyebrow === undefined ? null : <p className="uno-json-eyebrow">{eyebrow}</p>}
+          {lede === undefined ? null : <p className="uno-json-hero-lede">{lede}</p>}
+          {actions === undefined ? null : (
+            <ul className="uno-json-actions uno-json-hero-actions">
+              {actions.map((item, index) => (
+                <li className="uno-json-action-item" key={`${item.targetId}:${index}`}>
+                  <a className="uno-json-action" href={`#${item.targetId}`}>
+                    {item.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {support === undefined ? null : <p className="uno-json-hero-support">{support}</p>}
+        </section>
+      );
+    }
+    case "content.stats": {
+      const { items, heading, level, surface } = node.props;
+      const Tag = level === undefined ? null : HEADING_TAGS[level];
+      const headingId = `${node.id}-title`;
+      return (
+        <section
+          className="uno-json-stats"
+          data-uno-surface={surface ?? "plain"}
+          aria-labelledby={Tag === null ? undefined : headingId}
+          id={node.id}
+        >
+          {Tag === null ? null : (
+            <Tag className="uno-json-stats-heading" id={headingId}>
+              {heading}
+            </Tag>
+          )}
+          <dl className="uno-json-stats-list">
+            {items.map((item, index) => (
+              <div className="uno-json-stat" key={`${item.label}:${index}`}>
+                <dt className="uno-json-stat-label">{item.label}</dt>
+                <dd className="uno-json-stat-value">
+                  {item.value}
+                  {item.detail === undefined ? null : (
+                    <span className="uno-json-stat-detail">{item.detail}</span>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      );
+    }
+    case "content.testimonials": {
+      const { items, align, surface } = node.props;
+      return (
+        <section
+          className="uno-json-testimonials"
+          data-uno-align={align ?? "start"}
+          data-uno-surface={surface ?? "plain"}
+          id={node.id}
+        >
+          {items.map((item, index) => (
+            <figure className="uno-json-testimonial" key={`${item.quote}:${index}`}>
+              <blockquote className="uno-json-testimonial-quote">{item.quote}</blockquote>
+              {item.attribution === undefined && item.role === undefined ? null : (
+                <figcaption className="uno-json-testimonial-caption">
+                  {item.attribution === undefined ? null : (
+                    <span className="uno-json-testimonial-attribution">{item.attribution}</span>
+                  )}
+                  {item.role === undefined ? null : (
+                    <span className="uno-json-testimonial-role">{item.role}</span>
+                  )}
+                </figcaption>
+              )}
+            </figure>
+          ))}
+        </section>
+      );
+    }
     default: {
       // Exhaustive: every renderable literal is handled above, so `node` is `never` here.
       const unreachable: never = node;
