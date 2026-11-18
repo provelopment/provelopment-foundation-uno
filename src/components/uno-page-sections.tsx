@@ -1,10 +1,10 @@
 /**
  * Foundation Uno — the validated JSON Page section renderer (`UNO-WO-035 / R01`, U04).
  *
- * WHAT THIS IS. One original **server** React component that renders the eight module IDs this execution
- * implements — `layout.stack`, `layout.grid`, `content.heading`, `content.prose`, `content.actions`,
- * `content.hero`, `content.stats`, `content.testimonials` — from a document that the Page-document contract has
- * already accepted.
+ * WHAT THIS IS. One original **server** React component that renders the eleven module IDs this execution
+ * implements — `layout.stack`, `layout.grid`, `layout.bento`, `content.heading`, `content.prose`, `content.actions`,
+ * `content.hero`, `content.stats`, `content.testimonials`, `content.pricing`, `content.timeline` — from a document
+ * that the Page-document contract has already accepted.
  *
  * PREFLIGHT. The component re-validates the document it is handed before emitting a single node. A document that
  * no longer validates renders **nothing at all**: there is no partial output, no "render what we can" path and no
@@ -78,6 +78,40 @@ function SectionNode({ node }: { readonly node: UnoSectionNode }) {
               </div>
             ),
           )}
+        </div>
+      );
+    }
+    case "layout.bento": {
+      const semantics = node.props.itemSemantics ?? "plain";
+      // One wrapper per authored child in authored order: DOM order is the reading and keyboard order, so no span
+      // may ever reorder it, and the span is a styling hook only.
+      return (
+        <div
+          className="uno-json-bento"
+          data-uno-columns={node.props.columns}
+          data-uno-item-semantics={semantics}
+          id={node.id}
+        >
+          {node.children.map((child, index) => {
+            const span = node.props.tiles[index]?.span ?? "standard";
+            if (semantics === "article") {
+              return (
+                <article
+                  className="uno-json-tile"
+                  data-uno-tile-id={child.id}
+                  data-uno-tile-span={span}
+                  key={child.id}
+                >
+                  <SectionNode node={child} />
+                </article>
+              );
+            }
+            return (
+              <div className="uno-json-tile" data-uno-tile-id={child.id} data-uno-tile-span={span} key={child.id}>
+                <SectionNode node={child} />
+              </div>
+            );
+          })}
         </div>
       );
     }
@@ -189,6 +223,85 @@ function SectionNode({ node }: { readonly node: UnoSectionNode }) {
               )}
             </figure>
           ))}
+        </section>
+      );
+    }
+    case "content.pricing": {
+      const { items, heading, level, surface } = node.props;
+      const Tag = level === undefined ? null : HEADING_TAGS[level];
+      const headingId = `${node.id}-title`;
+      return (
+        <section
+          className="uno-json-pricing"
+          data-uno-surface={surface ?? "plain"}
+          aria-labelledby={Tag === null ? undefined : headingId}
+          id={node.id}
+        >
+          {Tag === null ? null : (
+            <Tag className="uno-json-pricing-heading" id={headingId}>
+              {heading}
+            </Tag>
+          )}
+          <ul className="uno-json-price-list">
+            {items.map((item, index) => (
+              <li
+                className="uno-json-price"
+                data-uno-featured={item.featured === true ? "true" : undefined}
+                key={`${item.label}:${index}`}
+              >
+                <p className="uno-json-price-label">{item.label}</p>
+                {/* The amount is authored text, printed exactly as written: no currency, total or offer is derived. */}
+                <p className="uno-json-price-amount">
+                  <span className="uno-json-price-value">{item.amount}</span>
+                  {item.unit === undefined ? null : <span className="uno-json-price-unit">{item.unit}</span>}
+                </p>
+                {item.description === undefined ? null : (
+                  <p className="uno-json-price-description">{item.description}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      );
+    }
+    case "content.timeline": {
+      const { items, heading, level, surface } = node.props;
+      const Tag = level === undefined ? null : HEADING_TAGS[level];
+      const headingId = `${node.id}-title`;
+      return (
+        <section
+          className="uno-json-timeline"
+          data-uno-surface={surface ?? "plain"}
+          aria-labelledby={Tag === null ? undefined : headingId}
+          id={node.id}
+        >
+          {Tag === null ? null : (
+            <Tag className="uno-json-timeline-heading" id={headingId}>
+              {heading}
+            </Tag>
+          )}
+          <ol className="uno-json-timeline-list">
+            {items.map((item, index) => (
+              <li
+                className="uno-json-timeline-item"
+                // Only an explicitly authored `current` milestone is announced as the current step. An unauthored or
+                // non-current milestone carries no `aria-current` at all rather than an invented one.
+                aria-current={item.status === "current" ? "step" : undefined}
+                data-uno-status={item.status}
+                key={`${item.title}:${index}`}
+              >
+                {/* Decorative marker: it repeats nothing, and the ordered list already narrates position. */}
+                <span aria-hidden="true" className="uno-json-timeline-marker" />
+                {item.dateLabel === undefined ? null : (
+                  <span className="uno-json-timeline-date">{item.dateLabel}</span>
+                )}
+                <p className="uno-json-timeline-title">{item.title}</p>
+                {item.description === undefined ? null : (
+                  <p className="uno-json-timeline-description">{item.description}</p>
+                )}
+              </li>
+            ))}
+          </ol>
         </section>
       );
     }

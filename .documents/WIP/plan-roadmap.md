@@ -152,6 +152,19 @@ synthetic Page (308 checks, including dark-mode contrast, 320/390/768/1280 overf
 IDs still refuse as `document:renderer-unavailable`. Family composition coverage remains **0 of 17**; this
 increment does not close U04 and does not substitute for the family-composition layer.
 
+**Bounded progress (`UNO-WO-038 / R03`).** Three further renderers land — `layout.bento`, `content.pricing`,
+`content.timeline` — raising live module coverage to **11 of 22**, each with closed typed props, at most one
+featured pricing option, at most one `aria-current="step"` milestone, a unique closed negative refusal and real
+production HTTP plus Chromium proof (464 checks, 0 failed, with the previous 308 preserved and byte-exact fixture
+restoration). The same increment performs the authorised dependency-security migration: `next` moves from
+`16.4.2` to `16.4.6`, the vulnerable `eslint-config-next` resolver chain is removed and its ruleset is
+reconstituted as direct pinned plugins with measured rule-for-rule parity (86→89 `.ts`/`.tsx`, 82→85 `.mjs`;
+zero missing, zero demoted, three added). One advisory — `GHSA-fc5q-39xc-vjpf` on `picomatch`, which has **no
+published fixed release** — is carried as a named, development-only exception expiring **2026-12-18T00:00:00Z**,
+enforced in code and paired with an unfiltered full-graph audit (exactly one high, dev-only) and a strict
+production audit (zero). The eleven remaining registered IDs still refuse as `document:renderer-unavailable`.
+Family composition coverage remains **0 of 17**; U04 stays **OPEN**.
+
 Scope: one owner and **one** presentation shell — assets, responsive navigation and
 accessibility.
 

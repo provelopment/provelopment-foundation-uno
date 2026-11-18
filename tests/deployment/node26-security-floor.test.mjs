@@ -3,6 +3,12 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import {
+  EXPECTED_GHSA_ID,
+  EXPIRES_AT_ISO,
+  parseWorkspaceConfig,
+} from '../../scripts/verify-u04-security-exception.mjs';
+
 /**
  * Foundation Uno — Node 26 and dependency security-floor gate (UNO-WO-014 / R01).
  *
@@ -395,4 +401,77 @@ test('negative fixture: a drifted browser resolution in the lockfile is refused 
     violations.some((line) => line.includes('playwright-core must resolve only 1.65.1')),
     true,
   );
+});
+
+// --- UNO-WO-038 / R03: dependency-security migration and the one bounded exception ------
+
+test('Next is pinned at the patched release, above the 16.4.5 security floor', () => {
+  const manifest = JSON.parse(read('package.json'));
+  assert.equal(manifest.dependencies.next, '16.4.6');
+  assert.ok(compareVersions(manifest.dependencies.next, '16.4.5') >= 0);
+  const resolved = lockVersions(read('pnpm-lock.yaml'), 'next');
+  assert.ok(resolved.includes('16.4.6'), `lock resolves next ${resolved.join(',')}`);
+  assert.equal(resolved.includes('16.4.2'), false, 'the vulnerable Next pin must be gone');
+});
+
+test('negative fixture: the superseded Next 16.4.2 pin is refused by the floor', () => {
+  assert.ok(compareVersions('16.4.2', '16.4.5') < 0);
+});
+
+test('the vulnerable eslint-config-next meta-package is gone from manifest and lock', () => {
+  const manifest = JSON.parse(read('package.json'));
+  const declared = { ...manifest.dependencies, ...manifest.devDependencies };
+  assert.equal('eslint-config-next' in declared, false);
+  const lock = read('pnpm-lock.yaml');
+  assert.equal(/^\s{2}eslint-config-next@/m.test(lock), false, 'meta-package must not resolve');
+  assert.equal(/\beslint-import-resolver-typescript@/.test(lock), false, 'resolver chain must not resolve');
+  // Its direct replacements must be present at the exact reviewed versions.
+  assert.equal(declared['@next/eslint-plugin-next'], '16.4.6');
+  assert.equal(declared['typescript-eslint'], '8.72.2');
+  assert.equal(declared['eslint-plugin-react-hooks'], '7.1.1');
+});
+
+test('the workspace declares exactly the one authorised advisory and its expiry', () => {
+  const parsed = parseWorkspaceConfig(read('pnpm-workspace.yaml'));
+  assert.deepEqual(parsed.packages, ['.']);
+  assert.deepEqual(parsed.ignoreGhsas, [EXPECTED_GHSA_ID]);
+  assert.deepEqual(parsed.forbiddenKeys, []);
+  assert.equal(parsed.declaredExpiryIso, EXPIRES_AT_ISO);
+});
+
+test('negative fixture: a second allowlisted advisory is refused', () => {
+  const parsed = parseWorkspaceConfig(
+    ['packages:', '  - "."', 'auditConfig:', '  ignoreGhsas:', `    - ${EXPECTED_GHSA_ID}`, '    - GHSA-0000-1111-2222', ''].join('\n'),
+  );
+  assert.equal(parsed.ignoreGhsas.length, 2);
+  assert.notDeepEqual(parsed.ignoreGhsas, [EXPECTED_GHSA_ID]);
+});
+
+test('negative fixture: a drifted expiry is detected in the workspace file', () => {
+  const parsed = parseWorkspaceConfig(
+    ['packages:', '  - "."', 'auditConfig:', '  ignoreGhsas:', `    - ${EXPECTED_GHSA_ID}`, '# expires 2027-06-01T00:00:00Z', ''].join('\n'),
+  );
+  assert.equal(parsed.declaredExpiryIso, '2027-06-01T00:00:00Z');
+  assert.notEqual(parsed.declaredExpiryIso, EXPIRES_AT_ISO);
+});
+
+test('no direct dependency or override masks the vulnerable glob graph', () => {
+  const manifest = JSON.parse(read('package.json'));
+  const declared = { ...manifest.dependencies, ...manifest.devDependencies };
+  for (const masked of ['picomatch', 'tinyglobby', 'fdir', 'minimatch']) {
+    assert.equal(masked in declared, false, `${masked} must not be a direct dependency`);
+  }
+  const lock = read('pnpm-lock.yaml');
+  assert.equal(/^\s{2}overrides:/m.test(lock), false, 'no workspace override may mask the graph');
+  assert.equal(manifest.pnpm !== undefined && manifest.pnpm.overrides !== undefined, false);
+});
+
+test('the workflow carries the guard, its tests and the production audit as blocking steps', () => {
+  const text = read('.github/workflows/verify-u01.yml');
+  assert.equal(text.includes('node --test tests/deployment/u04-security-exception.test.mjs'), true);
+  assert.equal(text.includes('node scripts/verify-u04-security-exception.mjs'), true);
+  assert.match(text, /pnpm audit --prod --audit-level high/);
+  assert.match(text, /pnpm audit --audit-level high/);
+  assert.equal(text.includes('continue-on-error'), false);
+  assert.equal(text.includes('|| true'), false);
 });

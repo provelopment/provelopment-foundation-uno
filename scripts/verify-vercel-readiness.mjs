@@ -103,7 +103,7 @@ const LOGO_ACTIVE_CONTENT = /<script|<foreignObject|<image|xlink:href|\son[a-z]+
 /** Exact dependency pins the accepted baseline ships, including the one approved provider. */
 const EXPECTED_DEPENDENCIES = Object.freeze({
   '@vercel/analytics': '2.0.1',
-  next: '16.4.2',
+  next: '16.4.6',
   react: '19.2.9',
   'react-dom': '19.2.9',
 });
@@ -580,6 +580,20 @@ export function analyzeReadiness(snapshot) {
     'workflow:no-security-floor',
   );
   expect(/pnpm audit --audit-level high/.test(workflowText), 'workflow:no-audit-gate');
+  // The full-graph audit can no longer see the one time-bounded exception, so the workflow
+  // must also carry the independent guard, its mutation tests and a strict production audit.
+  expect(
+    workflowText.includes('node scripts/verify-u04-security-exception.mjs'),
+    'workflow:no-security-exception-guard',
+  );
+  expect(
+    workflowText.includes('tests/deployment/u04-security-exception.test.mjs'),
+    'workflow:no-security-exception-tests',
+  );
+  expect(
+    /pnpm audit --prod --audit-level high/.test(workflowText),
+    'workflow:no-production-audit',
+  );
   expect(
     workflowText.includes('tests/deployment/uno-brand-copy.test.mjs'),
     'workflow:no-brand-test',

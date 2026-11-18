@@ -97,8 +97,30 @@ jobs:
         run: node --test tests/deployment/uno-brand-copy.test.mjs
         shell: bash
 
+      # Blocking time-bounded dependency-advisory exception gate (UNO-WO-038 / R03). Exactly one
+      # development-only advisory is excepted, by name, against an expiry this guard enforces in
+      # code. The guard does not trust the filtered audit: it copies the manifest and lockfile into
+      # an isolated, ignore-free workspace, proves the excluded advisory is still present, still HIGH
+      # and still unreachable from production, runs a strict production audit with no exemption at
+      # all, and refuses as soon as a repaired release is published or any detail drifts.
+      - name: Dependency-advisory exception guard tests (expiry, unfiltered, production)
+        run: node --test tests/deployment/u04-security-exception.test.mjs
+        shell: bash
+
+      - name: Dependency-advisory exception guard (unfiltered and production proof)
+        run: node scripts/verify-u04-security-exception.mjs
+        shell: bash
+
+      # Corroborating production-only audit: the shipped runtime graph must carry no high or critical
+      # advisory whatsoever, independently of the development-only exception above.
+      - name: Dependency audit (production graph must be clean)
+        run: pnpm audit --prod --audit-level high
+        shell: bash
+
       # Blocking registry-backed audit gate. A HIGH or CRITICAL advisory fails this job; the
       # command is never suffixed with a success-forcing fallback, and no advisory is suppressed.
+      # The single authorised exception lives in pnpm-workspace.yaml and is proven still real,
+      # still dev-only and still time-bounded by the two steps above.
       - name: Dependency audit (high and critical must be zero)
         run: pnpm audit --audit-level high
         shell: bash

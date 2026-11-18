@@ -81,6 +81,15 @@ const FIXTURE_SOURCES = Object.freeze([
   `${CONTENT}/wo037-herobody.en-001.json`,
   `${CONTENT}/wo037-statslevel.en-001.json`,
   `${CONTENT}/wo037-quotemarkup.en-001.json`,
+  `${CONTENT}/wo038-bentocount.en-001.json`,
+  `${CONTENT}/wo038-bentotile.en-001.json`,
+  `${CONTENT}/wo038-bentoone.en-001.json`,
+  `${CONTENT}/wo038-pricedouble.en-001.json`,
+  `${CONTENT}/wo038-priceamount.en-001.json`,
+  `${CONTENT}/wo038-pricelevel.en-001.json`,
+  `${CONTENT}/wo038-timelinedouble.en-001.json`,
+  `${CONTENT}/wo038-timelinestatus.en-001.json`,
+  `${CONTENT}/wo038-timelinemarkup.en-001.json`,
 ]);
 
 const failures = [];
@@ -159,11 +168,11 @@ function componentSections(locale) {
         surface: "muted",
         items: [
           {
-            value: "8",
+            value: "11",
             label: german ? "Darstellbare Modul-IDs" : "Renderable module IDs",
-            detail: german ? "Fuenf akzeptiert, drei hier ergaenzt." : "Five accepted, three added here.",
+            detail: german ? "Acht akzeptiert, drei hier ergaenzt." : "Eight accepted, three added here.",
           },
-          { value: "14", label: german ? "Weiterhin ohne Renderer" : "Still unrenderable" },
+          { value: "11", label: german ? "Weiterhin ohne Renderer" : "Still unrenderable" },
           { value: "0", label: german ? "Erfundene Werte" : "Fabricated values" },
         ],
       },
@@ -187,6 +196,90 @@ function componentSections(locale) {
               ? "Verfasster Text bleibt vom Dokument bis zum DOM inaktiv."
               : "Authored text stays inert from the document to the DOM.",
           },
+        ],
+      },
+    },
+    {
+      id: "mosaic",
+      module: "layout.bento",
+      props: {
+        columns: 3,
+        itemSemantics: "article",
+        tiles: [
+          { sectionId: "mosaic-lead", span: "feature" },
+          { sectionId: "mosaic-note", span: "wide" },
+          { sectionId: "mosaic-side", span: "standard" },
+        ],
+      },
+      children: [
+        {
+          id: "mosaic-lead",
+          module: "layout.stack",
+          props: { gap: "tight" },
+          children: [
+            {
+              id: "mosaic-lead-title",
+              module: "content.heading",
+              props: { text: german ? "Mosaik" : "Mosaic", level: 2 },
+            },
+            {
+              id: "mosaic-lead-body",
+              module: "content.prose",
+              props: { text: german ? "Ein grosses Feld mit Text." : "A feature tile with body text." },
+            },
+          ],
+        },
+        {
+          id: "mosaic-note",
+          module: "content.prose",
+          props: { text: german ? "Ein breites Feld." : "A wide tile body." },
+        },
+        {
+          id: "mosaic-side",
+          module: "content.prose",
+          props: { text: german ? "Ein normales Feld." : "A standard tile body." },
+        },
+      ],
+    },
+    {
+      id: "tiers",
+      module: "content.pricing",
+      props: {
+        heading: german ? "Stufen" : "Programme tiers",
+        level: 2,
+        surface: "bordered",
+        items: [
+          {
+            label: german ? "Gemeinschaft" : "Community",
+            amount: "Free",
+            description: german ? "Nur verfasster Text, kein Preisalarm." : "Authored text only, no price alert.",
+          },
+          {
+            label: german ? "Team" : "Team",
+            amount: "CHF 40",
+            unit: german ? "pro Monat" : "per month",
+            featured: true,
+          },
+          { label: german ? "Unternehmen" : "Enterprise", amount: german ? "Auf Anfrage" : "On request" },
+        ],
+      },
+    },
+    {
+      id: "road",
+      module: "content.timeline",
+      props: {
+        heading: german ? "Ablauf" : "Programme timeline",
+        level: 2,
+        surface: "muted",
+        items: [
+          {
+            title: german ? "Vertragsbasis" : "Contract baseline",
+            dateLabel: "Phase 1",
+            status: "complete",
+            description: german ? "Angenommen und geprueft." : "Accepted and reviewed.",
+          },
+          { title: german ? "Modulschnitt" : "Module slice", dateLabel: "Phase 2", status: "current" },
+          { title: german ? "Praesentationshuelle" : "Presentation shell", dateLabel: "Phase 3", status: "upcoming" },
         ],
       },
     },
@@ -291,6 +384,119 @@ const JSON_DOCUMENTS = Object.freeze({
         module: "content.testimonials",
         props: { items: [{ quote: "<b>Bold</b> quotation." }] },
       },
+    ],
+  },
+  // The nine unique negatives of the modules added by UNO-WO-038 / R01: three distinct invalid Pages per module.
+  bentoCountMismatch: {
+    version: 1,
+    title: "Bento tile count mismatch",
+    sections: [
+      {
+        id: "mosaic",
+        module: "layout.bento",
+        props: { columns: 2, tiles: [{ sectionId: "mosaic-a", span: "feature" }] },
+        children: [
+          { id: "mosaic-a", module: "content.prose", props: { text: "A." } },
+          { id: "mosaic-b", module: "content.prose", props: { text: "B." } },
+        ],
+      },
+    ],
+  },
+  bentoForeignTile: {
+    version: 1,
+    title: "Bento tile names a stranger",
+    sections: [
+      {
+        id: "mosaic",
+        module: "layout.bento",
+        props: {
+          columns: 2,
+          tiles: [
+            { sectionId: "mosaic-a", span: "feature" },
+            { sectionId: "mosaic-elsewhere", span: "standard" },
+          ],
+        },
+        children: [
+          { id: "mosaic-a", module: "content.prose", props: { text: "A." } },
+          { id: "mosaic-b", module: "content.prose", props: { text: "B." } },
+        ],
+      },
+    ],
+  },
+  bentoSingleChild: {
+    version: 1,
+    title: "Bento with a single tile",
+    sections: [
+      {
+        id: "mosaic",
+        module: "layout.bento",
+        props: { columns: 2, tiles: [{ sectionId: "mosaic-a", span: "feature" }] },
+        children: [{ id: "mosaic-a", module: "content.prose", props: { text: "Alone." } }],
+      },
+    ],
+  },
+  priceDoubleFeatured: {
+    version: 1,
+    title: "Two highlighted prices",
+    sections: [
+      {
+        id: "tiers",
+        module: "content.pricing",
+        props: {
+          items: [
+            { label: "One", amount: "1", featured: true },
+            { label: "Two", amount: "2", featured: true },
+          ],
+        },
+      },
+    ],
+  },
+  priceEmptyAmount: {
+    version: 1,
+    title: "Price without an amount",
+    sections: [
+      { id: "tiers", module: "content.pricing", props: { items: [{ label: "One", amount: "  " }] } },
+    ],
+  },
+  priceHeadingSkip: {
+    version: 1,
+    title: "Pricing heading skip",
+    sections: [
+      {
+        id: "tiers",
+        module: "content.pricing",
+        props: { heading: "Skips a level", level: 4, items: [{ label: "One", amount: "1" }] },
+      },
+    ],
+  },
+  timelineDoubleCurrent: {
+    version: 1,
+    title: "Two current milestones",
+    sections: [
+      {
+        id: "road",
+        module: "content.timeline",
+        props: {
+          items: [
+            { title: "One", status: "current" },
+            { title: "Two", status: "current" },
+          ],
+        },
+      },
+    ],
+  },
+  timelineBadStatus: {
+    version: 1,
+    title: "Malformed milestone status",
+    sections: [
+      { id: "road", module: "content.timeline", props: { items: [{ title: "One", status: "in-progress" }] } },
+    ],
+  },
+  timelineMarkup: {
+    version: 1,
+    title: "Milestone with markup",
+    sections: [
+      { id: "road", module: "content.timeline", props: { items: [{ title: "<b>Bold</b> milestone" }] } },
     ],
   },
   tooDeep: {
@@ -415,6 +621,33 @@ function fixturePages() {
     ]),
     published("quotemarkup", ["quotemarkup"], [
       representation("en-001", [jsonSource(`${CONTENT}/wo037-quotemarkup.en-001.json`)]),
+    ]),
+    published("bentocount", ["bentocount"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo038-bentocount.en-001.json`)]),
+    ]),
+    published("bentotile", ["bentotile"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo038-bentotile.en-001.json`)]),
+    ]),
+    published("bentoone", ["bentoone"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo038-bentoone.en-001.json`)]),
+    ]),
+    published("pricedouble", ["pricedouble"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo038-pricedouble.en-001.json`)]),
+    ]),
+    published("priceamount", ["priceamount"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo038-priceamount.en-001.json`)]),
+    ]),
+    published("pricelevel", ["pricelevel"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo038-pricelevel.en-001.json`)]),
+    ]),
+    published("timelinedouble", ["timelinedouble"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo038-timelinedouble.en-001.json`)]),
+    ]),
+    published("timelinestatus", ["timelinestatus"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo038-timelinestatus.en-001.json`)]),
+    ]),
+    published("timelinemarkup", ["timelinemarkup"], [
+      representation("en-001", [jsonSource(`${CONTENT}/wo038-timelinemarkup.en-001.json`)]),
     ]),
   ];
 }
@@ -666,6 +899,16 @@ const REFUSED_PAGES = Object.freeze([
   { pathname: "/en-001/herobody", reason: "invalid-props" },
   { pathname: "/en-001/statslevel", reason: "heading-order" },
   { pathname: "/en-001/quotemarkup", reason: "unsafe-text" },
+  // The nine unique negatives of the modules added by UNO-WO-038 / R01: three distinct Pages per module.
+  { pathname: "/en-001/bentocount", reason: "invalid-props" },
+  { pathname: "/en-001/bentotile", reason: "invalid-props" },
+  { pathname: "/en-001/bentoone", reason: "invalid-children" },
+  { pathname: "/en-001/pricedouble", reason: "invalid-props" },
+  { pathname: "/en-001/priceamount", reason: "invalid-props" },
+  { pathname: "/en-001/pricelevel", reason: "heading-order" },
+  { pathname: "/en-001/timelinedouble", reason: "invalid-props" },
+  { pathname: "/en-001/timelinestatus", reason: "invalid-props" },
+  { pathname: "/en-001/timelinemarkup", reason: "unsafe-text" },
 ]);
 
 /**
@@ -727,7 +970,14 @@ async function validateFixtureInProcess() {
     components.accepted && components.planned.document.pageDocument !== undefined
       ? components.planned.document.pageDocument.sections.map((node) => node.module)
       : [];
-  for (const moduleId of ["content.hero", "content.stats", "content.testimonials"]) {
+  for (const moduleId of [
+    "content.hero",
+    "content.stats",
+    "content.testimonials",
+    "layout.bento",
+    "content.pricing",
+    "content.timeline",
+  ]) {
     check(`the accepted components Page carries ${moduleId}`, componentModules.includes(moduleId));
   }
   check(
@@ -740,6 +990,15 @@ async function validateFixtureInProcess() {
     ["content.hero", JSON_DOCUMENTS.heroBodyMissing, "document:invalid-props"],
     ["content.stats", JSON_DOCUMENTS.statsHeadingSkip, "document:heading-order"],
     ["content.testimonials", JSON_DOCUMENTS.quoteMarkup, "document:unsafe-text"],
+    ["layout.bento", JSON_DOCUMENTS.bentoCountMismatch, "document:invalid-props"],
+    ["layout.bento", JSON_DOCUMENTS.bentoForeignTile, "document:invalid-props"],
+    ["layout.bento", JSON_DOCUMENTS.bentoSingleChild, "document:invalid-children"],
+    ["content.pricing", JSON_DOCUMENTS.priceDoubleFeatured, "document:invalid-props"],
+    ["content.pricing", JSON_DOCUMENTS.priceEmptyAmount, "document:invalid-props"],
+    ["content.pricing", JSON_DOCUMENTS.priceHeadingSkip, "document:heading-order"],
+    ["content.timeline", JSON_DOCUMENTS.timelineDoubleCurrent, "document:invalid-props"],
+    ["content.timeline", JSON_DOCUMENTS.timelineBadStatus, "document:invalid-props"],
+    ["content.timeline", JSON_DOCUMENTS.timelineMarkup, "document:unsafe-text"],
   ]) {
     const verdict = readUnoPageDocument(negativeDocument);
     check(
@@ -804,16 +1063,24 @@ async function assertPublicPage(base, entry) {
   check(`${entry.pathname} renders no second main landmark`, countOf(body, /<main[\s>]/gu) === 1);
 
   if (entry.pathname.endsWith("/programmes/components")) {
-    check(`${entry.pathname} renders two semantic article cards`, countOf(body, /<article /gu) === 2);
+    const german = entry.locale === "de-DE";
+    check(
+      `${entry.pathname} renders two semantic article cards`,
+      countOf(body, /<article class="uno-json-card"/gu) === 2,
+      `${countOf(body, /<article class="uno-json-card"/gu)}`,
+    );
     check(
       `${entry.pathname} declares a two-column article grid`,
       body.includes('data-uno-columns="2"') && body.includes('data-uno-item-semantics="article"'),
     );
     check(`${entry.pathname} renders a real same-page action link`, body.includes('href="#card-one"'));
-    check(`${entry.pathname} renders both card headings`, countOf(body, /class="uno-json-heading"/gu) === 2);
+    check(
+      `${entry.pathname} renders both card headings`,
+      body.includes(german ? ">Erste Karte</h2>" : ">Card one</h2>") &&
+        body.includes(german ? ">Zweite Karte</h2>" : ">Card two</h2>"),
+    );
 
     // --- The three modules added by UNO-WO-037 / R01, proved in the REAL served markup ----------------
-    const german = entry.locale === "de-DE";
     check(`${entry.pathname} renders the hero section`, body.includes('class="uno-json-hero"'));
     check(
       `${entry.pathname} renders the hero with its closed alignment and surface`,
@@ -850,7 +1117,7 @@ async function assertPublicPage(base, entry) {
     check(`${entry.pathname} renders three statistic values`, countOf(body, /<dd class="uno-json-stat-value">/gu) === 3);
     check(
       `${entry.pathname} renders the authored statistic detail`,
-      body.includes(german ? "Fuenf akzeptiert, drei hier ergaenzt." : "Five accepted, three added here."),
+      body.includes(german ? "Acht akzeptiert, drei hier ergaenzt." : "Eight accepted, three added here."),
     );
     check(
       `${entry.pathname} renders two semantic quotation figures`,
@@ -873,6 +1140,132 @@ async function assertPublicPage(base, entry) {
     check(
       `${entry.pathname} keeps authored markup out of the quotation`,
       !body.includes("<b>Bold</b>") && !body.includes("&lt;b&gt;Bold&lt;/b&gt;"),
+    );
+
+    // --- The three modules added by UNO-WO-038 / R01, proved in the REAL served markup ------------------
+    check(`${entry.pathname} renders the bento container`, body.includes('class="uno-json-bento"'));
+    check(
+      `${entry.pathname} declares the authored three-column bento`,
+      body.includes('data-uno-columns="3"') && body.includes('data-uno-item-semantics="article"'),
+    );
+    check(
+      `${entry.pathname} renders one article tile per bento child`,
+      countOf(body, /<article class="uno-json-tile"/gu) === 3,
+      `${countOf(body, /<article class="uno-json-tile"/gu)}`,
+    );
+    check(
+      `${entry.pathname} keeps the authored tile spans`,
+      body.includes('data-uno-tile-span="feature"') &&
+        body.includes('data-uno-tile-span="wide"') &&
+        body.includes('data-uno-tile-span="standard"'),
+    );
+    check(
+      `${entry.pathname} keeps the tile DOM order identical to the authored order`,
+      body.indexOf('data-uno-tile-id="mosaic-lead"') < body.indexOf('data-uno-tile-id="mosaic-note"') &&
+        body.indexOf('data-uno-tile-id="mosaic-note"') < body.indexOf('data-uno-tile-id="mosaic-side"'),
+    );
+    check(
+      `${entry.pathname} renders the bento child heading and body`,
+      body.includes(german ? "Mosaik" : "Mosaic") &&
+        body.includes(german ? "Ein grosses Feld mit Text." : "A feature tile with body text."),
+    );
+    check(
+      `${entry.pathname} renders the wide and standard tile bodies`,
+      body.includes(german ? "Ein breites Feld." : "A wide tile body.") &&
+        body.includes(german ? "Ein normales Feld." : "A standard tile body."),
+    );
+    check(`${entry.pathname} renders the pricing section`, body.includes('class="uno-json-pricing"'));
+    check(
+      `${entry.pathname} renders the pricing surface and heading reference`,
+      body.includes('data-uno-surface="bordered"') &&
+        body.includes('aria-labelledby="tiers-title"') &&
+        body.includes('id="tiers-title"'),
+    );
+    check(
+      `${entry.pathname} renders the authored pricing heading`,
+      body.includes(german ? ">Stufen</h2>" : ">Programme tiers</h2>"),
+    );
+    check(`${entry.pathname} renders a real price list`, body.includes('<ul class="uno-json-price-list">'));
+    check(
+      `${entry.pathname} renders three priced list items`,
+      countOf(body, /<li class="uno-json-price"/gu) === 3,
+      `${countOf(body, /<li class="uno-json-price"/gu)}`,
+    );
+    check(
+      `${entry.pathname} marks exactly one authored featured price`,
+      countOf(body, /data-uno-featured="true"/gu) === 1,
+      `${countOf(body, /data-uno-featured="true"/gu)}`,
+    );
+    check(`${entry.pathname} prints the authored amount verbatim`, body.includes(">CHF 40</span>"));
+    check(
+      `${entry.pathname} prints the authored unit and the unformatted remaining amount`,
+      body.includes(german ? ">pro Monat</span>" : ">per month</span>") &&
+        body.includes(german ? ">Auf Anfrage</span>" : ">On request</span>"),
+    );
+    check(
+      `${entry.pathname} prints the authored price description`,
+      body.includes(german ? "Nur verfasster Text, kein Preisalarm." : "Authored text only, no price alert."),
+    );
+    check(
+      `${entry.pathname} derives no offer, rating or currency claim`,
+      !body.includes("schema.org/Offer") && !body.includes("itemprop=\"price\"") && !body.includes("Add to cart"),
+    );
+
+    check(`${entry.pathname} renders the timeline section`, body.includes('class="uno-json-timeline"'));
+    check(
+      `${entry.pathname} renders the timeline surface and heading reference`,
+      body.includes('data-uno-surface="muted"') &&
+        body.includes('aria-labelledby="road-title"') &&
+        body.includes('id="road-title"'),
+    );
+    check(
+      `${entry.pathname} renders the authored timeline heading`,
+      body.includes(german ? ">Ablauf</h2>" : ">Programme timeline</h2>"),
+    );
+    check(`${entry.pathname} renders a real ordered milestone list`, body.includes('<ol class="uno-json-timeline-list">'));
+    check(
+      `${entry.pathname} renders three milestone items`,
+      countOf(body, /<li class="uno-json-timeline-item"/gu) === 3,
+      `${countOf(body, /<li class="uno-json-timeline-item"/gu)}`,
+    );
+    check(
+      `${entry.pathname} marks exactly one authored current step`,
+      countOf(body, /aria-current="step"/gu) === 1,
+      `${countOf(body, /aria-current="step"/gu)}`,
+    );
+    check(
+      `${entry.pathname} keeps the three declared statuses distinct`,
+      countOf(body, /data-uno-status="complete"/gu) === 1 &&
+        countOf(body, /data-uno-status="current"/gu) === 1 &&
+        countOf(body, /data-uno-status="upcoming"/gu) === 1,
+    );
+    check(
+      `${entry.pathname} renders the authored milestone titles and date labels`,
+      body.includes(german ? ">Vertragsbasis</p>" : ">Contract baseline</p>") &&
+        body.includes(">Phase 1</span>") &&
+        body.includes(german ? ">Modulschnitt</p>" : ">Module slice</p>"),
+    );
+    check(
+      `${entry.pathname} renders the authored milestone description`,
+      body.includes(german ? "Angenommen und geprueft." : "Accepted and reviewed."),
+    );
+    check(
+      `${entry.pathname} renders a decorative marker per milestone and no ordered-list narration duplication`,
+      countOf(body, /<span aria-hidden="true" class="uno-json-timeline-marker"><\/span>/gu) === 3,
+    );
+    check(
+      `${entry.pathname} keeps the milestone DOM order identical to the authored order`,
+      body.indexOf(german ? "Vertragsbasis" : "Contract baseline") <
+        body.indexOf(german ? "Modulschnitt" : "Module slice") &&
+        body.indexOf(german ? "Modulschnitt" : "Module slice") <
+          body.indexOf(german ? "Praesentationshuelle" : "Presentation shell"),
+    );
+    check(
+      `${entry.pathname} keeps eleven renderable modules and one h1 in the served document`,
+      body.includes('class="uno-json-bento"') &&
+        body.includes('class="uno-json-pricing"') &&
+        body.includes('class="uno-json-timeline"') &&
+        countOf(body, /<h1[\s>]/gu) === 1,
     );
   }
 }
@@ -986,7 +1379,7 @@ async function assertInBrowser(base) {
       h1: document.querySelectorAll("h1").length,
       main: document.querySelectorAll("main").length,
       articles: document.querySelectorAll("article.uno-json-card").length,
-      headings: [...document.querySelectorAll(".uno-json-heading")].map((node) => node.textContent),
+      headings: [...document.querySelectorAll("article.uno-json-card .uno-json-heading")].map((node) => node.textContent),
       gridColumns: document.querySelector(".uno-json-grid")?.getAttribute("data-uno-columns") ?? null,
       actionHref: document.querySelector("#listing-actions a.uno-json-action")?.getAttribute("href") ?? null,
     }));
@@ -1062,6 +1455,82 @@ async function assertInBrowser(base) {
       `${added.h1}/${added.main}/${added.articles}`,
     );
 
+    // The three modules added by UNO-WO-038 / R01, measured in the real rendered DOM.
+    const structure038 = await page.evaluate(() => {
+      const bento = document.querySelector("div.uno-json-bento");
+      const pricing = document.querySelector("section.uno-json-pricing");
+      const timeline = document.querySelector("section.uno-json-timeline");
+      const tiles = [...(bento?.querySelectorAll(".uno-json-tile") ?? [])];
+      const prices = [...(pricing?.querySelectorAll("li.uno-json-price") ?? [])];
+      const milestones = [...(timeline?.querySelectorAll("li.uno-json-timeline-item") ?? [])];
+      return {
+        bentoColumns: bento?.getAttribute("data-uno-columns") ?? null,
+        bentoSemantics: bento?.getAttribute("data-uno-item-semantics") ?? null,
+        tileCount: tiles.length,
+        tileIds: tiles.map((tile) => tile.getAttribute("data-uno-tile-id")),
+        tileSpans: tiles.map((tile) => tile.getAttribute("data-uno-tile-span")),
+        articleTiles: tiles.filter((tile) => tile.tagName === "ARTICLE").length,
+        bentoHeadings: bento?.querySelectorAll("h2").length ?? 0,
+        priceItems: prices.length,
+        priceList: pricing?.querySelector("ul.uno-json-price-list") !== null,
+        featured: prices.filter((item) => item.getAttribute("data-uno-featured") === "true").length,
+        priceLabels: prices.map((item) => item.querySelector(".uno-json-price-label")?.textContent ?? null),
+        priceAmounts: prices.map((item) => item.querySelector(".uno-json-price-value")?.textContent ?? null),
+        priceUnits: prices.map((item) => item.querySelector(".uno-json-price-unit")?.textContent ?? null),
+        pricingLabelledBy: pricing?.getAttribute("aria-labelledby") ?? null,
+        timelineList: timeline?.querySelector("ol.uno-json-timeline-list") !== null,
+        milestones: milestones.length,
+        milestoneTitles: milestones.map((item) => item.querySelector(".uno-json-timeline-title")?.textContent ?? null),
+        currentSteps: milestones.filter((item) => item.getAttribute("aria-current") === "step").length,
+        statuses: milestones.map((item) => item.getAttribute("data-uno-status")),
+        markers: timeline?.querySelectorAll('span[aria-hidden="true"].uno-json-timeline-marker').length ?? 0,
+        timelineLabelledBy: timeline?.getAttribute("aria-labelledby") ?? null,
+        h1: document.querySelectorAll("h1").length,
+        main: document.querySelectorAll("main").length,
+      };
+    });
+    check("the bento declares three columns and article semantics", structure038.bentoColumns === "3" && structure038.bentoSemantics === "article");
+    check("the bento renders one tile per child", structure038.tileCount === 3, `${structure038.tileCount}`);
+    check(
+      "the tiles carry the authored ids and spans in authored order",
+      structure038.tileIds.join(",") === "mosaic-lead,mosaic-note,mosaic-side" &&
+        structure038.tileSpans.join(",") === "feature,wide,standard",
+      `${structure038.tileIds.join(",")}|${structure038.tileSpans.join(",")}`,
+    );
+    check("every bento tile is a real article element", structure038.articleTiles === 3, `${structure038.articleTiles}`);
+    check("the bento child heading is a single h2 inside its tile", structure038.bentoHeadings === 1, `${structure038.bentoHeadings}`);
+    check("the price list is a real unordered list", structure038.priceList === true);
+    check("the price list holds three items", structure038.priceItems === 3, `${structure038.priceItems}`);
+    check("exactly one price is marked featured", structure038.featured === 1, `${structure038.featured}`);
+    check(
+      "the price labels and amounts stay visibly paired and authored",
+      structure038.priceLabels.join(",") === "Community,Team,Enterprise" &&
+        structure038.priceAmounts.join(",") === "Free,CHF 40,On request",
+      `${structure038.priceLabels.join(",")}|${structure038.priceAmounts.join(",")}`,
+    );
+    check("only the featured price carries the authored unit", structure038.priceUnits[1] === "per month" && structure038.priceUnits[0] === null);
+    check("the pricing section is labelled by its own heading", structure038.pricingLabelledBy !== null && structure038.pricingLabelledBy === "tiers-title");
+    check("the timeline is a real ordered list", structure038.timelineList === true);
+    check("the timeline holds three authored milestones", structure038.milestones === 3, `${structure038.milestones}`);
+    check(
+      "the milestones keep the authored order",
+      structure038.milestoneTitles.join(",") === "Contract baseline,Module slice,Presentation shell",
+      structure038.milestoneTitles.join(","),
+    );
+    check("exactly one milestone is the current step", structure038.currentSteps === 1, `${structure038.currentSteps}`);
+    check(
+      "the three declared statuses are distinct and authored",
+      structure038.statuses.join(",") === "complete,current,upcoming",
+      structure038.statuses.join(","),
+    );
+    check("every milestone carries one decorative marker", structure038.markers === 3, `${structure038.markers}`);
+    check("the timeline section is labelled by its own heading", structure038.timelineLabelledBy === "road-title");
+    check(
+      "the new modules keep one h1 and one main landmark",
+      structure038.h1 === 1 && structure038.main === 1,
+      `${structure038.h1}/${structure038.main}`,
+    );
+
     const heroFocused = await page.evaluate(() => {
       const anchor = document.querySelector("section.uno-json-hero a.uno-json-action");
       if (anchor === null) return null;
@@ -1083,11 +1552,30 @@ async function assertInBrowser(base) {
       await page.setViewportSize({ width, height: 900 });
       const metrics = await page.evaluate(() => {
         const root = document.documentElement;
-        const cards = [...document.querySelectorAll("article.uno-json-card")].map((node) => {
+        const box = (node) => {
           const rect = node.getBoundingClientRect();
-          return { x: Math.round(rect.x), y: Math.round(rect.y) };
-        });
-        return { scrollWidth: root.scrollWidth, clientWidth: root.clientWidth, cards };
+          return {
+            x: Math.round(rect.x),
+            y: Math.round(rect.y),
+            right: Math.round(rect.right),
+            width: Math.round(rect.width),
+          };
+        };
+        const cards = [...document.querySelectorAll("article.uno-json-card")].map(box);
+        const tiles = [...document.querySelectorAll(".uno-json-tile")].map(box);
+        const prices = [...document.querySelectorAll("li.uno-json-price")].map(box);
+        const milestones = [...document.querySelectorAll("li.uno-json-timeline-item")].map(box);
+        const bento = document.querySelector(".uno-json-bento");
+        const tracks = bento === null ? "" : getComputedStyle(bento).gridTemplateColumns;
+        return {
+          scrollWidth: root.scrollWidth,
+          clientWidth: root.clientWidth,
+          cards,
+          tiles,
+          prices,
+          milestones,
+          columns: tracks.trim().split(/\s+/u).filter((part) => part.length > 0).length,
+        };
       });
       check(
         `${width}px has no horizontal overflow`,
@@ -1102,6 +1590,60 @@ async function assertInBrowser(base) {
       } else {
         check(`${width}px stacks the two cards`, metrics.cards.length === 2 && metrics.cards[0].y !== metrics.cards[1].y);
       }
+
+      // The bento: the authored column count is honoured only where it fits, and a span never overflows.
+      const expectedColumns = width >= 1280 ? 3 : width >= 768 ? 2 : 1;
+      check(
+        `${width}px resolves the bento to ${expectedColumns} column(s)`,
+        metrics.columns === expectedColumns,
+        `${metrics.columns}`,
+      );
+      check(
+        `${width}px keeps every bento tile inside the viewport`,
+        metrics.tiles.length === 3 && metrics.tiles.every((tile) => tile.right <= metrics.clientWidth + 1),
+        metrics.tiles.map((tile) => `${tile.x}+${tile.width}`).join(" "),
+      );
+      if (width >= 768) {
+        check(
+          `${width}px applies the named spans, so the feature tile is wider than the standard tile`,
+          metrics.tiles[0].width > metrics.tiles[2].width,
+          `${metrics.tiles[0].width}/${metrics.tiles[2].width}`,
+        );
+      } else {
+        check(
+          `${width}px collapses every bento span to one column in authored order`,
+          metrics.tiles.every((tile) => tile.x === metrics.tiles[0].x) &&
+            metrics.tiles[1].y > metrics.tiles[0].y &&
+            metrics.tiles[2].y > metrics.tiles[1].y,
+          metrics.tiles.map((tile) => `${tile.x},${tile.y}`).join(" "),
+        );
+      }
+
+      // Pricing: stacked on the narrow widths, at least two side by side where there is room.
+      if (width >= 768) {
+        check(
+          `${width}px places at least two priced offers side by side`,
+          metrics.prices.length === 3 && metrics.prices[0].y === metrics.prices[1].y && metrics.prices[0].x !== metrics.prices[1].x,
+          metrics.prices.map((price) => `${price.x},${price.y}`).join(" "),
+        );
+      } else {
+        check(
+          `${width}px stacks the priced offers in authored order`,
+          metrics.prices.length === 3 && metrics.prices[0].x === metrics.prices[1].x && metrics.prices[0].y < metrics.prices[1].y,
+          metrics.prices.map((price) => `${price.x},${price.y}`).join(" "),
+        );
+      }
+
+      // The timeline stays one truthful vertical column at every width, in authored order.
+      check(
+        `${width}px keeps the milestones in one vertical column in authored order`,
+        metrics.milestones.length === 3 &&
+          metrics.milestones.every((milestone, index) => {
+            if (milestone.x !== metrics.milestones[0].x) return false;
+            return index === 0 || milestone.y > metrics.milestones[index - 1].y;
+          }),
+        metrics.milestones.map((milestone) => `${milestone.x},${milestone.y}`).join(" "),
+      );
     }
 
     // Dark mode legibility and reduced motion, measured in a fresh context created in that mode: a context-level
@@ -1138,6 +1680,19 @@ async function assertInBrowser(base) {
       const statContrast =
         Number(((Math.max(luminance(statBackground), luminance(statForeground)) + 0.05) /
           (Math.min(luminance(statBackground), luminance(statForeground)) + 0.05)).toFixed(2));
+      // The authored price amount and the milestone title carry their own contrast proofs in dark mode.
+      const priceItem = document.querySelector("li.uno-json-price[data-uno-featured=\"true\"]");
+      const priceValue = priceItem?.querySelector(".uno-json-price-value") ?? null;
+      const priceBackground = parse(priceItem === null ? "" : getComputedStyle(priceItem).backgroundColor);
+      const priceForeground = parse(priceValue === null ? "" : getComputedStyle(priceValue).color);
+      const priceContrast =
+        Number(((Math.max(luminance(priceBackground), luminance(priceForeground)) + 0.05) /
+          (Math.min(luminance(priceBackground), luminance(priceForeground)) + 0.05)).toFixed(2));
+      const milestoneTitle = document.querySelector(".uno-json-timeline-title");
+      const milestoneForeground = parse(milestoneTitle === null ? "" : getComputedStyle(milestoneTitle).color);
+      const milestoneContrast =
+        Number(((Math.max(luminance(background), luminance(milestoneForeground)) + 0.05) /
+          (Math.min(luminance(background), luminance(milestoneForeground)) + 0.05)).toFixed(2));
       return {
         prefersDark: matchMedia("(prefers-color-scheme: dark)").matches,
         prefersReduced: matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -1145,6 +1700,8 @@ async function assertInBrowser(base) {
         background,
         contrast: Number(((lighter + 0.05) / (darker + 0.05)).toFixed(2)),
         statContrast,
+        priceContrast,
+        milestoneContrast,
         transition: action === null ? "none" : getComputedStyle(action).transitionDuration,
       };
     });
@@ -1159,6 +1716,16 @@ async function assertInBrowser(base) {
       "dark mode keeps the statistic value above a 4.5:1 contrast ratio",
       dark.statContrast >= 4.5,
       `${dark.statContrast}`,
+    );
+    check(
+      "dark mode keeps the featured price amount above a 4.5:1 contrast ratio",
+      dark.priceContrast >= 4.5,
+      `${dark.priceContrast}`,
+    );
+    check(
+      "dark mode keeps a milestone title above a 4.5:1 contrast ratio",
+      dark.milestoneContrast >= 4.5,
+      `${dark.milestoneContrast}`,
     );
     // The accepted demo already collapses every transition to `0.01ms !important` under reduced motion, so the
     // assertion is "effectively zero" and strictly far shorter than the animated default, not a literal `0s`.
@@ -1343,6 +1910,15 @@ function fixturePlan() {
     [`${CONTENT}/wo037-herobody.en-001.json`, JSON.stringify(JSON_DOCUMENTS.heroBodyMissing, null, 2)],
     [`${CONTENT}/wo037-statslevel.en-001.json`, JSON.stringify(JSON_DOCUMENTS.statsHeadingSkip, null, 2)],
     [`${CONTENT}/wo037-quotemarkup.en-001.json`, JSON.stringify(JSON_DOCUMENTS.quoteMarkup, null, 2)],
+    [`${CONTENT}/wo038-bentocount.en-001.json`, JSON.stringify(JSON_DOCUMENTS.bentoCountMismatch, null, 2)],
+    [`${CONTENT}/wo038-bentotile.en-001.json`, JSON.stringify(JSON_DOCUMENTS.bentoForeignTile, null, 2)],
+    [`${CONTENT}/wo038-bentoone.en-001.json`, JSON.stringify(JSON_DOCUMENTS.bentoSingleChild, null, 2)],
+    [`${CONTENT}/wo038-pricedouble.en-001.json`, JSON.stringify(JSON_DOCUMENTS.priceDoubleFeatured, null, 2)],
+    [`${CONTENT}/wo038-priceamount.en-001.json`, JSON.stringify(JSON_DOCUMENTS.priceEmptyAmount, null, 2)],
+    [`${CONTENT}/wo038-pricelevel.en-001.json`, JSON.stringify(JSON_DOCUMENTS.priceHeadingSkip, null, 2)],
+    [`${CONTENT}/wo038-timelinedouble.en-001.json`, JSON.stringify(JSON_DOCUMENTS.timelineDoubleCurrent, null, 2)],
+    [`${CONTENT}/wo038-timelinestatus.en-001.json`, JSON.stringify(JSON_DOCUMENTS.timelineBadStatus, null, 2)],
+    [`${CONTENT}/wo038-timelinemarkup.en-001.json`, JSON.stringify(JSON_DOCUMENTS.timelineMarkup, null, 2)],
   ];
   return {
     declarations: [MANIFEST, SELECTION].map((path) => ({ path, digest: PINNED_DECLARATIONS.get(path) })),

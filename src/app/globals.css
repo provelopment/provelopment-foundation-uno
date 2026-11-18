@@ -771,3 +771,253 @@ main {
     transition: none;
   }
 }
+
+/*
+ * Bento, pricing and timeline (`UNO-WO-038 / R01`, U04). Same discipline as the blocks above: scoped to `.uno-json`,
+ * built only from existing `--uno-*` tokens, with no new palette entry, font, image, gradient, animation or external
+ * resource, and the Owner-accepted demonstration rules above are untouched.
+ *
+ * The named span is the whole sizing contract. Nothing here sets `grid-auto-flow: dense`, `order` or a negative
+ * order, so the DOM order the renderer emits stays the reading order, the tab order and the screen-reader order at
+ * every width. Every cell is bounded and every text node wraps rather than pushing a horizontal scrollbar at 320px.
+ */
+.uno-json-bento {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+/* Mobile first: every span collapses to one cell, so a wide tile can never overflow a 320px viewport. */
+.uno-json-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-surface);
+  overflow-wrap: anywhere;
+}
+
+.uno-json-bento[data-uno-item-semantics="article"] > .uno-json-tile {
+  background-color: var(--uno-surface-strong);
+}
+
+@media (min-width: 48rem) {
+  .uno-json-bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* A wide or feature tile spans both columns; a tall or feature tile spans two rows. */
+  .uno-json-bento > .uno-json-tile[data-uno-tile-span="wide"],
+  .uno-json-bento > .uno-json-tile[data-uno-tile-span="feature"] {
+    grid-column: span 2;
+  }
+
+  .uno-json-bento > .uno-json-tile[data-uno-tile-span="tall"],
+  .uno-json-bento > .uno-json-tile[data-uno-tile-span="feature"] {
+    grid-row: span 2;
+  }
+}
+
+@media (min-width: 80rem) {
+  /* The authored column count is honoured only where there is room for it, and a span never exceeds the track count. */
+  .uno-json-bento[data-uno-columns="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .uno-json-bento[data-uno-columns="4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+
+/* Pricing: a real unordered list of explicitly authored offers, one card per list item. */
+.uno-json-pricing,
+.uno-json-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 1.5rem;
+  border-radius: var(--uno-radius-lg);
+  overflow-wrap: anywhere;
+}
+
+.uno-json-pricing[data-uno-surface="muted"],
+.uno-json-timeline[data-uno-surface="muted"] {
+  background-color: var(--uno-surface);
+}
+
+.uno-json-pricing[data-uno-surface="bordered"],
+.uno-json-timeline[data-uno-surface="bordered"] {
+  border: 1px solid var(--uno-border);
+  background-color: var(--uno-surface-strong);
+}
+
+.uno-json-pricing-heading,
+.uno-json-timeline-heading {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.uno-json-price-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 48rem) {
+  .uno-json-price-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 80rem) {
+  .uno-json-price-list {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  }
+}
+
+.uno-json-price {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-background);
+}
+
+/* The single authored featured offer carries an accent border and accent label: no star, rating or "best value". */
+.uno-json-price[data-uno-featured="true"] {
+  border-color: var(--uno-accent);
+  background-color: var(--uno-accent-soft);
+}
+
+.uno-json-price-label {
+  margin: 0;
+  color: var(--uno-foreground);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.uno-json-price[data-uno-featured="true"] .uno-json-price-label {
+  color: var(--uno-accent);
+}
+
+.uno-json-price-amount {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: baseline;
+  margin: 0;
+}
+
+.uno-json-price-value {
+  color: var(--uno-foreground);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.uno-json-price-unit {
+  color: var(--uno-muted);
+  font-size: 0.875rem;
+}
+
+.uno-json-price-description {
+  margin: 0;
+  color: var(--uno-muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+
+/* Timeline: an ordered list whose markers are decorative, drawn from the border and accent tokens only. */
+.uno-json-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0 0 0 1.5rem;
+  list-style: none;
+  border-left: 1px solid var(--uno-border);
+}
+
+.uno-json-timeline-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0 0 1.25rem 0.25rem;
+}
+
+.uno-json-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.uno-json-timeline-marker {
+  position: absolute;
+  top: 0.45rem;
+  left: -1.9375rem;
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 1px solid var(--uno-border);
+  border-radius: 50%;
+  background-color: var(--uno-surface-strong);
+}
+
+.uno-json-timeline-item[data-uno-status="complete"] .uno-json-timeline-marker {
+  border-color: var(--uno-accent);
+  background-color: var(--uno-accent);
+}
+
+.uno-json-timeline-item[data-uno-status="current"] .uno-json-timeline-marker {
+  border-color: var(--uno-accent);
+  background-color: var(--uno-accent-contrast);
+  box-shadow: 0 0 0 2px var(--uno-accent);
+}
+
+.uno-json-timeline-date {
+  color: var(--uno-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.uno-json-timeline-title {
+  margin: 0;
+  color: var(--uno-foreground);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.uno-json-timeline-description {
+  margin: 0;
+  color: var(--uno-muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+/* These three modules carry no transition at all, so reduced motion cannot hide, move or reorder their content. */
+@media (prefers-reduced-motion: reduce) {
+  .uno-json-bento,
+  .uno-json-tile,
+  .uno-json-pricing,
+  .uno-json-timeline {
+    transition: none;
+    animation: none;
+  }
+}

@@ -288,3 +288,229 @@ describe("UnoPageSections — hero, statistics and testimonials", () => {
     expect(markup).not.toContain("cite");
   });
 });
+
+describe("UnoPageSections — bento, pricing and timeline", () => {
+  it("renders a bento as one wrapper per child, in authored order, with the declared spans", () => {
+    const document = accept({
+      version: 1,
+      title: "Bento fixture",
+      sections: [
+        {
+          id: "mosaic",
+          module: "layout.bento",
+          props: {
+            columns: 3,
+            itemSemantics: "article",
+            tiles: [
+              { sectionId: "tile-one", span: "feature" },
+              { sectionId: "tile-two", span: "wide" },
+              { sectionId: "tile-three", span: "standard" },
+            ],
+          },
+          children: [
+            {
+              id: "tile-one",
+              module: "layout.stack",
+              props: { gap: "tight" },
+              children: [
+                { id: "tile-one-title", module: "content.heading", props: { text: "Feature tile", level: 2 } },
+                { id: "tile-one-body", module: "content.prose", props: { text: "Feature body & notes." } },
+              ],
+            },
+            { id: "tile-two", module: "content.prose", props: { text: "Wide tile body." } },
+            { id: "tile-three", module: "content.prose", props: { text: "Standard tile body." } },
+          ],
+        },
+      ],
+    });
+    const markup = render(document);
+    expect(markup).toContain('<div class="uno-json-bento"');
+    expect(markup).toContain('data-uno-columns="3"');
+    expect(markup).toContain('data-uno-item-semantics="article"');
+    // Article semantics produce real `article` wrappers, never a hidden module or a second landmark.
+    expect((markup.match(/<article class="uno-json-tile"/gu) ?? []).length).toBe(3);
+    expect(markup).toContain('data-uno-tile-id="tile-one"');
+    expect(markup).toContain('data-uno-tile-span="feature"');
+    expect(markup).toContain('data-uno-tile-id="tile-two"');
+    expect(markup).toContain('data-uno-tile-span="wide"');
+    expect(markup).toContain('data-uno-tile-id="tile-three"');
+    expect(markup).toContain('data-uno-tile-span="standard"');
+    // Authored order is the DOM order: feature, wide, standard.
+    expect(markup.indexOf('data-uno-tile-id="tile-one"')).toBeLessThan(markup.indexOf('data-uno-tile-id="tile-two"'));
+    expect(markup.indexOf('data-uno-tile-id="tile-two"')).toBeLessThan(markup.indexOf('data-uno-tile-id="tile-three"'));
+    expect(markup).toContain("Feature body &amp; notes.");
+    expect(markup).not.toContain("<main");
+    expect((markup.match(/<h1[\s>]/gu) ?? []).length).toBe(0);
+  });
+
+  it("renders a plain bento with inert div wrappers and no article landmark", () => {
+    const document = accept({
+      version: 1,
+      title: "Plain bento",
+      sections: [
+        {
+          id: "plain-mosaic",
+          module: "layout.bento",
+          props: {
+            columns: 2,
+            tiles: [
+              { sectionId: "left", span: "tall" },
+              { sectionId: "right", span: "standard" },
+            ],
+          },
+          children: [
+            { id: "left", module: "content.prose", props: { text: "Left." } },
+            { id: "right", module: "content.prose", props: { text: "Right." } },
+          ],
+        },
+      ],
+    });
+    const markup = render(document);
+    expect(markup).toContain('data-uno-item-semantics="plain"');
+    expect(markup).not.toContain("<article");
+    expect((markup.match(/<div class="uno-json-tile"/gu) ?? []).length).toBe(2);
+    expect(markup).toContain('data-uno-tile-span="tall"');
+  });
+
+
+  it("renders prices as a real list of authored offers with exactly one featured marker", () => {
+    const document = accept({
+      version: 1,
+      title: "Pricing fixture",
+      sections: [
+        {
+          id: "tiers",
+          module: "content.pricing",
+          props: {
+            heading: "Programme tiers",
+            level: 2,
+            surface: "bordered",
+            items: [
+              { label: "Community", amount: "Free", description: "Authored description & note." },
+              { label: "Team", amount: "CHF 40", unit: "per month", featured: true },
+              { label: "Enterprise", amount: "On request" },
+            ],
+          },
+        },
+      ],
+    });
+    const markup = render(document);
+    expect(markup).toContain('<section class="uno-json-pricing"');
+    expect(markup).toContain('data-uno-surface="bordered"');
+    expect(markup).toContain('aria-labelledby="tiers-title"');
+    expect(markup).toContain('<h2 class="uno-json-pricing-heading" id="tiers-title">Programme tiers</h2>');
+    expect(markup).toContain('<ul class="uno-json-price-list">');
+    expect((markup.match(/<li class="uno-json-price"/gu) ?? []).length).toBe(3);
+    // The label and the amount are visibly paired inside the same list item, in authored text.
+    expect(markup).toContain('<p class="uno-json-price-label">Team</p>');
+    expect(markup).toContain('<span class="uno-json-price-value">CHF 40</span>');
+    expect(markup).toContain('<span class="uno-json-price-unit">per month</span>');
+    expect(markup).toContain("Authored description &amp; note.");
+    // Exactly one featured marker, driven only by `featured: true`.
+    expect((markup.match(/data-uno-featured="true"/gu) ?? []).length).toBe(1);
+    expect(markup).not.toContain("<main");
+    expect((markup.match(/<h1[\s>]/gu) ?? []).length).toBe(0);
+  });
+
+  it("renders prices without a heading and never invents a currency or a call to action", () => {
+    const document = accept({
+      version: 1,
+      title: "Bare pricing",
+      sections: [
+        {
+          id: "offers",
+          module: "content.pricing",
+          props: { items: [{ label: "Support", amount: "Free" }] },
+        },
+      ],
+    });
+    const markup = render(document);
+    expect(markup).toContain('data-uno-surface="plain"');
+    expect(markup).not.toContain("aria-labelledby");
+    expect(markup).not.toContain("uno-json-pricing-heading");
+    expect(markup).not.toContain("data-uno-featured");
+    expect(markup).not.toContain("uno-json-action");
+  });
+
+
+  it("renders a timeline as an ordered list with one authored current step", () => {
+    const document = accept({
+      version: 1,
+      title: "Timeline fixture",
+      sections: [
+        {
+          id: "road",
+          module: "content.timeline",
+          props: {
+            heading: "Programme timeline",
+            level: 2,
+            items: [
+              { title: "Contract baseline", dateLabel: "Phase 1", status: "complete", description: "Accepted." },
+              { title: "Module slice", dateLabel: "Phase 2", status: "current" },
+              { title: "Presentation shell", dateLabel: "Phase 3", status: "upcoming" },
+            ],
+          },
+        },
+      ],
+    });
+    const markup = render(document);
+    expect(markup).toContain('<section class="uno-json-timeline"');
+    expect(markup).toContain('aria-labelledby="road-title"');
+    expect(markup).toContain('<h2 class="uno-json-timeline-heading" id="road-title">Programme timeline</h2>');
+    expect(markup).toContain('<ol class="uno-json-timeline-list">');
+    expect((markup.match(/<li class="uno-json-timeline-item"/gu) ?? []).length).toBe(3);
+    // Exactly one `aria-current="step"`, on the single authored current milestone.
+    expect((markup.match(/aria-current="step"/gu) ?? []).length).toBe(1);
+    expect((markup.match(/data-uno-status="complete"/gu) ?? []).length).toBe(1);
+    expect((markup.match(/data-uno-status="upcoming"/gu) ?? []).length).toBe(1);
+    expect(markup).toContain('<span class="uno-json-timeline-date">Phase 1</span>');
+    expect(markup).toContain('<p class="uno-json-timeline-title">Module slice</p>');
+    // The visual marker is decorative and announces nothing of its own.
+    expect((markup.match(/<span aria-hidden="true" class="uno-json-timeline-marker"><\/span>/gu) ?? []).length).toBe(3);
+    // Authored order is preserved, never sorted.
+    expect(markup.indexOf("Contract baseline")).toBeLessThan(markup.indexOf("Module slice"));
+    expect(markup.indexOf("Module slice")).toBeLessThan(markup.indexOf("Presentation shell"));
+    expect(markup).not.toContain("<main");
+  });
+
+  it("renders a timeline with no status at all without inventing aria-current or a status token", () => {
+    const document = accept({
+      version: 1,
+      title: "Status-free timeline",
+      sections: [
+        {
+          id: "history",
+          module: "content.timeline",
+          props: { items: [{ title: "One" }, { title: "Two" }] },
+        },
+      ],
+    });
+    const markup = render(document);
+    expect(markup).not.toContain("aria-current");
+    expect(markup).not.toContain("data-uno-status");
+    expect((markup.match(/<li class="uno-json-timeline-item"/gu) ?? []).length).toBe(2);
+  });
+
+  it("renders nothing at all for a document whose new module props no longer validate", () => {
+    const broken = {
+      version: 1,
+      title: "Broken",
+      sections: [
+        {
+          id: "mosaic",
+          module: "layout.bento",
+          props: { columns: 2, tiles: [{ sectionId: "one", span: "feature" }] },
+          children: [
+            { id: "one", module: "content.prose", props: { text: "One." } },
+            { id: "two", module: "content.prose", props: { text: "Two." } },
+          ],
+        },
+      ],
+    };
+    // The document type is only reached through validation, so this is a deliberate lie to the component.
+    const markup = renderToStaticMarkup(
+      createElement(UnoPageSections, { document: broken as unknown as UnoPageDocument }),
+    );
+    expect(markup).toBe("");
+  });
+});

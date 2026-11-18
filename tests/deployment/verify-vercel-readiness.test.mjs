@@ -38,7 +38,7 @@ function validSnapshot() {
       },
       dependencies: {
         '@vercel/analytics': '2.0.1',
-        next: '16.4.2',
+        next: '16.4.6',
         react: '19.2.9',
         'react-dom': '19.2.9',
       },
@@ -164,6 +164,12 @@ function validSnapshot() {
     '        run: node --test tests/deployment/node26-security-floor.test.mjs',
     '      - name: Brand and copy contract',
     '        run: node --test tests/deployment/uno-brand-copy.test.mjs',
+    '      - name: Dependency-advisory exception guard tests (expiry, unfiltered, production)',
+    '        run: node --test tests/deployment/u04-security-exception.test.mjs',
+    '      - name: Dependency-advisory exception guard (unfiltered and production proof)',
+    '        run: node scripts/verify-u04-security-exception.mjs',
+    '      - name: Dependency audit (production graph must be clean)',
+    '        run: pnpm audit --prod --audit-level high',
     '      - name: Dependency audit (high and critical must be zero)',
     '        run: pnpm audit --audit-level high',
     '      - name: Bootstrap governance gate',
@@ -313,8 +319,30 @@ test('refuses a package manager other than the pinned pnpm', () => {
 });
 
 test('refuses a drifted Next.js pin', () => {
-  const snapshot = withChange('packageJson', (text) => text.replace('"next": "16.4.2"', '"next": "16.3.0"'));
+  const snapshot = withChange('packageJson', (text) => text.replace('"next": "16.4.6"', '"next": "16.3.0"'));
   assertRefused(analyzeReadiness(snapshot), 'package:next-version');
+});
+
+test('refuses the superseded Next.js 16.4.2 pin', () => {
+  const snapshot = withChange('packageJson', (text) => text.replace('"next": "16.4.6"', '"next": "16.4.2"'));
+  assertRefused(analyzeReadiness(snapshot), 'package:next-version');
+});
+
+test('refuses a workflow that drops the exception guard or the production audit', () => {
+  const noGuard = withChange('u01Workflow', (text) =>
+    text.replace('node scripts/verify-u04-security-exception.mjs', 'echo guard-skipped'),
+  );
+  assertRefused(analyzeReadiness(noGuard), 'workflow:no-security-exception-guard');
+
+  const noGuardTests = withChange('u01Workflow', (text) =>
+    text.replace('tests/deployment/u04-security-exception.test.mjs', 'echo tests-skipped'),
+  );
+  assertRefused(analyzeReadiness(noGuardTests), 'workflow:no-security-exception-tests');
+
+  const noProdAudit = withChange('u01Workflow', (text) =>
+    text.replace('pnpm audit --prod --audit-level high', 'echo prod-audit-skipped'),
+  );
+  assertRefused(analyzeReadiness(noProdAudit), 'workflow:no-production-audit');
 });
 
 test('refuses an unpinned direct dependency', () => {

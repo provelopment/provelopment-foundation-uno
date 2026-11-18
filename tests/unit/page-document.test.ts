@@ -136,16 +136,19 @@ describe("readUnoPageDocument — accepted documents", () => {
     expect(JSON.parse(JSON.stringify(first.document))).toEqual(first.document);
   });
 
-  it("accepts all eight renderable module IDs and nothing else as renderable", () => {
+  it("accepts all eleven renderable module IDs and nothing else as renderable", () => {
     expect([...UNO_RENDERABLE_MODULES]).toEqual([
       "layout.stack",
       "layout.grid",
+      "layout.bento",
       "content.heading",
       "content.prose",
       "content.actions",
       "content.hero",
       "content.stats",
       "content.testimonials",
+      "content.pricing",
+      "content.timeline",
     ]);
     expect(readUnoPageDocument(full()).accepted).toBe(true);
   });
@@ -594,4 +597,512 @@ describe("readUnoPageDocument — content.hero, content.stats and content.testim
 });
 
 
+
+
+/**
+ * The three modules this increment adds (`UNO-WO-038 / R01`): `layout.bento`, `content.pricing` and
+ * `content.timeline`. Each has its accepted shapes and its own closed negative cases, so a regression in one module
+ * can never be mistaken for a regression in another.
+ */
+describe("readUnoPageDocument — layout.bento, content.pricing and content.timeline", () => {
+  /** One accepted document whose single section is the module under test. */
+  function single(module: string, props: Record<string, unknown>): Record<string, unknown> {
+    return { ...minimal(), sections: [section("probe", module, props)] };
+  }
+
+  /** One bento with three children, so a tile list can be proved positional against real sibling ids. */
+  function bento(tiles: unknown, props: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      ...minimal(),
+      sections: [
+        {
+          id: "mosaic",
+          module: "layout.bento",
+          props: { columns: 3, ...props, tiles },
+          children: [
+            { id: "tile-one", module: "content.prose", props: { text: "One." } },
+            { id: "tile-two", module: "content.prose", props: { text: "Two." } },
+            { id: "tile-three", module: "content.prose", props: { text: "Three." } },
+          ],
+        },
+      ],
+    };
+  }
+
+  /** The accepted tile list: one feature, one wide and one standard span in authored order. */
+  const TILES = [
+    { sectionId: "tile-one", span: "feature" },
+    { sectionId: "tile-two", span: "wide" },
+    { sectionId: "tile-three", span: "standard" },
+  ];
+
+  it("layout.bento: accepts an asymmetric composition with and without article semantics", () => {
+    const plain = readUnoPageDocument(bento(TILES));
+    expect(plain.accepted).toBe(true);
+    if (!plain.accepted) return;
+    const node = plain.document.sections[0];
+    expect(node?.module).toBe("layout.bento");
+    if (node?.module !== "layout.bento") return;
+    expect(node.props.columns).toBe(3);
+    expect(node.props.itemSemantics).toBeUndefined();
+    expect(node.props.tiles.map((tile) => tile.span)).toEqual(["feature", "wide", "standard"]);
+    expect(node.props.tiles.map((tile) => tile.sectionId)).toEqual(["tile-one", "tile-two", "tile-three"]);
+    expect(node.children).toHaveLength(3);
+    expect(Object.isFrozen(node.props.tiles)).toBe(true);
+    expect(Object.isFrozen(node.props.tiles[0])).toBe(true);
+
+    const articles = readUnoPageDocument(bento(TILES, { itemSemantics: "article", columns: 4 }));
+    expect(articles.accepted).toBe(true);
+    if (!articles.accepted) return;
+    const articleNode = articles.document.sections[0];
+    expect(articleNode?.module).toBe("layout.bento");
+    if (articleNode?.module !== "layout.bento") return;
+    expect(articleNode.props.itemSemantics).toBe("article");
+    expect(articleNode.props.columns).toBe(4);
+  });
+
+  it("layout.bento: accepts every documented column count and span", () => {
+    for (const columns of [2, 3, 4] as const) {
+      for (const span of ["standard", "wide", "tall", "feature"] as const) {
+        const document = bento(
+          [
+            { sectionId: "tile-one", span },
+            { sectionId: "tile-two", span: "standard" },
+            { sectionId: "tile-three", span: "standard" },
+          ],
+          { columns },
+        );
+        if (span === "standard") {
+          // Four standard tiles would be an even grid, not a bento, so this one shape is refused by design.
+          expectRefusal(document, "document:invalid-props");
+          continue;
+        }
+        expect(readUnoPageDocument(document).accepted).toBe(true);
+      }
+    }
+  });
+
+
+  it("layout.bento: refuses every malformed tile list and every impossible composition", () => {
+    // Missing, empty, non-array and sparse tile lists.
+    expectRefusal(bento(undefined), "document:invalid-props");
+    expectRefusal(bento([]), "document:invalid-props");
+    expectRefusal(bento("tiles"), "document:invalid-props");
+    // Length mismatch in both directions: one tile short, and one tile too many.
+    expectRefusal(bento(TILES.slice(0, 2)), "document:invalid-props");
+    expectRefusal(bento([...TILES, { sectionId: "tile-three", span: "wide" }]), "document:invalid-props");
+    // A tile that names a sibling it does not correspond to, and a tile that names a non-sibling.
+    expectRefusal(
+      bento([
+        { sectionId: "tile-two", span: "feature" },
+        { sectionId: "tile-one", span: "wide" },
+        { sectionId: "tile-three", span: "standard" },
+      ]),
+      "document:invalid-props",
+    );
+    expectRefusal(
+      bento([{ sectionId: "ghost", span: "feature" }, TILES[1], TILES[2]]),
+      "document:invalid-props",
+    );
+    // A duplicate tile id, an unrecognised span, an extra key and a non-plain tile.
+    expectRefusal(
+      bento([{ sectionId: "tile-one", span: "feature" }, { sectionId: "tile-one", span: "wide" }, TILES[2]]),
+      "document:invalid-props",
+    );
+    expectRefusal(
+      bento([{ sectionId: "tile-one", span: "huge" }, TILES[1], TILES[2]]),
+      "document:invalid-props",
+    );
+    expectRefusal(
+      bento([{ sectionId: "tile-one", span: "feature", css: "grid-column: 9" }, TILES[1], TILES[2]]),
+      "document:invalid-props",
+    );
+    expectRefusal(bento([null, TILES[1], TILES[2]]), "document:invalid-props");
+    // An even grid wearing a bento name, an undeclared column count and a level-1 column count.
+    expectRefusal(
+      bento([
+        { sectionId: "tile-one", span: "standard" },
+        { sectionId: "tile-two", span: "standard" },
+        { sectionId: "tile-three", span: "standard" },
+      ]),
+      "document:invalid-props",
+    );
+    expectRefusal(bento(TILES, { columns: 5 }), "document:invalid-props");
+    expectRefusal(bento(TILES, { columns: 1 }), "document:invalid-props");
+    expectRefusal(bento(TILES, { itemSemantics: "figure" }), "document:invalid-props");
+  });
+
+  it("layout.bento: refuses one child, a ninth child and children on a content module", () => {
+    const oneChild = {
+      ...minimal(),
+      sections: [
+        {
+          id: "mosaic",
+          module: "layout.bento",
+          props: { columns: 2, tiles: [{ sectionId: "only", span: "feature" }] },
+          children: [{ id: "only", module: "content.prose", props: { text: "Alone." } }],
+        },
+      ],
+    };
+    expectRefusal(oneChild, "document:invalid-children");
+
+    const nine = {
+      ...minimal(),
+      sections: [
+        {
+          id: "mosaic",
+          module: "layout.bento",
+          props: {
+            columns: 3,
+            tiles: Array.from({ length: 9 }, (_value, index) => ({
+              sectionId: `tile-${index}`,
+              span: index === 0 ? "feature" : "standard",
+            })),
+          },
+          children: Array.from({ length: 9 }, (_value, index) => ({
+            id: `tile-${index}`,
+            module: "content.prose",
+            props: { text: "Tile." },
+          })),
+        },
+      ],
+    };
+    expectRefusal(nine, "document:invalid-children");
+
+    // `content.pricing` is not a layout, so authored children are refused rather than silently dropped.
+    expectRefusal(
+      {
+        ...minimal(),
+        sections: [
+          {
+            id: "prices",
+            module: "content.pricing",
+            props: { items: [{ label: "One", amount: "1" }] },
+            children: [{ id: "extra", module: "content.prose", props: { text: "Extra." } }],
+          },
+        ],
+      },
+      "document:invalid-section",
+    );
+  });
+
+
+  it("content.pricing: accepts one to six authored prices, with and without a linked heading", () => {
+    const bare = readUnoPageDocument(
+      single("content.pricing", { items: [{ label: "Support", amount: "Free" }] }),
+    );
+    expect(bare.accepted).toBe(true);
+    if (!bare.accepted) return;
+    const bareNode = bare.document.sections[0];
+    expect(bareNode?.module).toBe("content.pricing");
+    if (bareNode?.module !== "content.pricing") return;
+    expect(bareNode.props.items).toEqual([{ label: "Support", amount: "Free" }]);
+    expect(bareNode.props.heading).toBeUndefined();
+    expect(bareNode.props.level).toBeUndefined();
+
+    const full = readUnoPageDocument(
+      single("content.pricing", {
+        heading: "Programme tiers",
+        level: 2,
+        surface: "bordered",
+        items: [
+          { label: "Community", amount: "Free", description: "Authored text only." },
+          { label: "Team", amount: "CHF 40", unit: "per month", featured: true },
+          { label: "Enterprise", amount: "On request", unit: "per engagement", description: "Direct agreement." },
+        ],
+      }),
+    );
+    expect(full.accepted).toBe(true);
+    if (!full.accepted) return;
+    const fullNode = full.document.sections[0];
+    expect(fullNode?.module).toBe("content.pricing");
+    if (fullNode?.module !== "content.pricing") return;
+    expect(fullNode.props.heading).toBe("Programme tiers");
+    expect(fullNode.props.level).toBe(2);
+    expect(fullNode.props.surface).toBe("bordered");
+    expect(fullNode.props.items).toHaveLength(3);
+    expect(fullNode.props.items[1]).toEqual({ label: "Team", amount: "CHF 40", unit: "per month", featured: true });
+    expect(fullNode.props.items[2]?.description).toBe("Direct agreement.");
+    expect(Object.isFrozen(fullNode.props.items)).toBe(true);
+
+    // Six is the documented cap and seven is refused, so the bound is exact rather than approximate.
+    const six = { items: Array.from({ length: 6 }, (_value, index) => ({ label: `Tier ${index}`, amount: `${index}` })) };
+    expect(readUnoPageDocument(single("content.pricing", six)).accepted).toBe(true);
+    const seven = { items: Array.from({ length: 7 }, (_value, index) => ({ label: `Tier ${index}`, amount: `${index}` })) };
+    expectRefusal(single("content.pricing", seven), "document:invalid-props");
+  });
+
+  it("content.pricing: refuses empty, oversized, double-featured and malformed prices", () => {
+    expectRefusal(single("content.pricing", { items: [] }), "document:invalid-props");
+    expectRefusal(single("content.pricing", { items: "none" }), "document:invalid-props");
+    expectRefusal(single("content.pricing", { items: [{ label: "Only a label" }] }), "document:invalid-props");
+    expectRefusal(single("content.pricing", { items: [{ amount: "1" }] }), "document:invalid-props");
+    expectRefusal(single("content.pricing", { items: [{ label: "   ", amount: "1" }] }), "document:invalid-props");
+    expectRefusal(single("content.pricing", { items: [{ label: "Empty amount", amount: "" }] }), "document:invalid-props");
+    // A price that exceeds its own bound, and one that carries an undeclared key.
+    expectRefusal(
+      single("content.pricing", { items: [{ label: "Long", amount: "9".repeat(65) }] }),
+      "document:invalid-props",
+    );
+    expectRefusal(
+      single("content.pricing", { items: [{ label: "Taxed", amount: "1", currency: "CHF" }] }),
+      "document:invalid-props",
+    );
+    // Two highlighted offers would state two priorities at once.
+    expectRefusal(
+      single("content.pricing", {
+        items: [
+          { label: "One", amount: "1", featured: true },
+          { label: "Two", amount: "2", featured: true },
+        ],
+      }),
+      "document:invalid-props",
+    );
+    // A non-boolean feature flag, and executable markup inside an authored price string.
+    expectRefusal(
+      single("content.pricing", { items: [{ label: "One", amount: "1", featured: "yes" }] }),
+      "document:invalid-props",
+    );
+    expectRefusal(
+      single("content.pricing", { items: [{ label: "One", amount: "<script>alert(1)</script>" }] }),
+      "document:unsafe-text",
+    );
+    // Heading rules: level without a heading, heading without a level, and a skipped level.
+    expectRefusal(single("content.pricing", { items: [{ label: "One", amount: "1" }], level: 2 }), "document:invalid-props");
+    expectRefusal(single("content.pricing", { items: [{ label: "One", amount: "1" }], heading: "Tiers" }), "document:invalid-props");
+    expectRefusal(
+      single("content.pricing", { items: [{ label: "One", amount: "1" }], heading: "Tiers", level: 4 }),
+      "document:heading-order",
+    );
+    expectRefusal(
+      single("content.pricing", { items: [{ label: "One", amount: "1" }], heading: "Tiers", level: 2, align: "center" }),
+      "document:invalid-props",
+    );
+  });
+
+
+  it("content.timeline: accepts one to twelve authored milestones and declares at most one current", () => {
+    const bare = readUnoPageDocument(single("content.timeline", { items: [{ title: "Kickoff" }] }));
+    expect(bare.accepted).toBe(true);
+    if (!bare.accepted) return;
+    const bareNode = bare.document.sections[0];
+    expect(bareNode?.module).toBe("content.timeline");
+    if (bareNode?.module !== "content.timeline") return;
+    expect(bareNode.props.items).toEqual([{ title: "Kickoff" }]);
+
+    const full = readUnoPageDocument(
+      single("content.timeline", {
+        heading: "Programme timeline",
+        level: 2,
+        surface: "muted",
+        items: [
+          { title: "Contract baseline", dateLabel: "Phase 1", status: "complete", description: "Accepted." },
+          { title: "Module slice", dateLabel: "Phase 2", status: "current" },
+          { title: "Presentation shell", dateLabel: "Phase 3", status: "upcoming" },
+        ],
+      }),
+    );
+    expect(full.accepted).toBe(true);
+    if (!full.accepted) return;
+    const fullNode = full.document.sections[0];
+    expect(fullNode?.module).toBe("content.timeline");
+    if (fullNode?.module !== "content.timeline") return;
+    // Authored order is preserved exactly: the contract never sorts a timeline.
+    expect(fullNode.props.items.map((item) => item.title)).toEqual([
+      "Contract baseline",
+      "Module slice",
+      "Presentation shell",
+    ]);
+    expect(fullNode.props.items[1]?.status).toBe("current");
+    expect(fullNode.props.items[1]?.description).toBeUndefined();
+    expect(fullNode.props.items[0]?.dateLabel).toBe("Phase 1");
+    expect(Object.isFrozen(fullNode.props.items)).toBe(true);
+
+    // Twelve is the documented cap and thirteen is refused, so the bound is exact.
+    const twelve = {
+      items: Array.from({ length: 12 }, (_value, index) => ({ title: `Milestone ${index}` })),
+    };
+    expect(readUnoPageDocument(single("content.timeline", twelve)).accepted).toBe(true);
+    const thirteen = {
+      items: Array.from({ length: 13 }, (_value, index) => ({ title: `Milestone ${index}` })),
+    };
+    expectRefusal(single("content.timeline", thirteen), "document:invalid-props");
+  });
+
+  it("content.timeline: refuses empty, malformed, double-current and oversized milestones", () => {
+    expectRefusal(single("content.timeline", { items: [] }), "document:invalid-props");
+    expectRefusal(single("content.timeline", { items: "later" }), "document:invalid-props");
+    expectRefusal(single("content.timeline", { items: [{ title: "" }] }), "document:invalid-props");
+    expectRefusal(single("content.timeline", { items: [{ title: "   " }] }), "document:invalid-props");
+    expectRefusal(single("content.timeline", { items: [{ description: "No title." }] }), "document:invalid-props");
+    // A status outside the closed three, and two simultaneous current milestones.
+    expectRefusal(
+      single("content.timeline", { items: [{ title: "One", status: "in-progress" }] }),
+      "document:invalid-props",
+    );
+    expectRefusal(
+      single("content.timeline", {
+        items: [
+          { title: "One", status: "current" },
+          { title: "Two", status: "current" },
+        ],
+      }),
+      "document:invalid-props",
+    );
+    // An undeclared key, an overlong title and an overlong date label.
+    expectRefusal(
+      single("content.timeline", { items: [{ title: "One", duration: "3 weeks" }] }),
+      "document:invalid-props",
+    );
+    expectRefusal(
+      single("content.timeline", { items: [{ title: "9".repeat(161) }] }),
+      "document:invalid-props",
+    );
+    expectRefusal(
+      single("content.timeline", { items: [{ title: "One", dateLabel: "9".repeat(121) }] }),
+      "document:invalid-props",
+    );
+    // Executable markup in either authored text field.
+    expectRefusal(
+      single("content.timeline", { items: [{ title: "<img src=x onerror=alert(1)>" }] }),
+      "document:unsafe-text",
+    );
+    expectRefusal(
+      single("content.timeline", { items: [{ title: "One", description: "javascript: alert(1)" }] }),
+      "document:unsafe-text",
+    );
+    // Heading rules and the closed surface vocabulary.
+    expectRefusal(single("content.timeline", { items: [{ title: "One" }], level: 3 }), "document:invalid-props");
+    expectRefusal(single("content.timeline", { items: [{ title: "One" }], heading: "Timeline" }), "document:invalid-props");
+    expectRefusal(
+      single("content.timeline", { items: [{ title: "One" }], heading: "Timeline", level: 5 }),
+      "document:heading-order",
+    );
+    expectRefusal(
+      single("content.timeline", { items: [{ title: "One" }], surface: "shadowed" }),
+      "document:invalid-props",
+    );
+  });
+
+  it("refuses hostile structure inside the three new prop lists", () => {
+    const sparseTiles: unknown[] = new Array(3);
+    expectRefusal(bento(sparseTiles), "document:invalid-props");
+
+    const sparsePrices: unknown[] = new Array(2);
+    expectRefusal(single("content.pricing", { items: sparsePrices }), "document:invalid-props");
+
+    const accessorPrice: Record<string, unknown> = { label: "One", amount: "1" };
+    Object.defineProperty(accessorPrice, "featured", { get: () => true, enumerable: true });
+    expectRefusal(single("content.pricing", { items: [accessorPrice] }), "document:input-not-plain");
+
+    // A `__proto__` own key can only arrive as JSON text, so the reader is proved on its real threat surface.
+    const hostileTimeline =
+      '{"version":1,"title":"Hostile","sections":[{"id":"road","module":"content.timeline","props":{"items":[{"title":"T","__proto__ {"polluted":true}}]}}]}';
+    expectRefusal(hostileTimeline, "document:json-parse");
+    const hostileTimelineKey =
+      '{"version":1,"title":"Hostile","sections":[{"id":"road","module":"content.timeline","props":{"items":[{"title":"T","__proto__":{"polluted":true}}]}}]}';
+    expectRefusal(hostileTimelineKey, "document:json-unsafe");
+  });
+});
+
+/**
+ * The inherited lint notice (`UNO-WO-038 / R01`, §6D). `codePointLength` used to walk the string with an unused
+ * binding, which the lint job reported. It is now an explicit Unicode scalar walk, so these cases pin the exact
+ * counting semantics that replacement must keep: code points, never UTF-16 code units, and never grapheme clusters.
+ */
+describe("readUnoPageDocument — codepoint counting after the lint repair", () => {
+  /** One prose text of exactly `count` code points, built from the given unit repeated. */
+  function repeated(unit: string, count: number): string {
+    return unit.repeat(count);
+  }
+
+  /** One document whose single section is the module under test, so a bound is proved without any other noise. */
+  function probe(module: string, props: Record<string, unknown>): Record<string, unknown> {
+    return { ...minimal(), sections: [section("probe", module, props)] };
+  }
+
+  it("counts an astral character once, so a 160-code-point title bound is not doubled", () => {
+    // U+1F600 is one code point and two code units. 160 of them are exactly the 160-code-point title bound but 320
+    // UTF-16 code units, so a naive code-unit count would have refused a title that is inside the documented bound.
+    const astral = repeated("\u{1F600}", 160);
+    expect(astral.length).toBe(320);
+    expect(readUnoPageDocument({ ...minimal(), title: astral }).accepted).toBe(true);
+
+    // 161 astral characters exceed the 160-code-point title bound.
+    const overTitle = repeated("\u{1F600}", 161);
+    expectRefusal({ ...minimal(), title: overTitle }, "document:invalid-title");
+
+    // Exactly 4000 code points of astral text is accepted as a section body, and 4001 is refused.
+    const bodyCap = repeated("\u{1F600}", 4000);
+    expect(
+      readUnoPageDocument(probe("content.prose", { text: bodyCap })).accepted,
+    ).toBe(true);
+    expectRefusal(probe("content.prose", { text: repeated("\u{1F600}", 4001) }), "document:invalid-props");
+  });
+
+  it("counts a combining mark separately, because a code point is not a grapheme cluster", () => {
+    // "e" + combining acute is two code points; 4000 of each pair is 8000 and must be refused.
+    const pairs = repeated("e\u0301", 2000);
+    expect(pairs.length).toBe(4000);
+    expect(readUnoPageDocument(probe("content.prose", { text: pairs })).accepted).toBe(true);
+    expectRefusal(probe("content.prose", { text: repeated("e\u0301", 2001) }), "document:invalid-props");
+  });
+
+  it("counts a lone surrogate once and never repairs it", () => {
+    const lone = "a\uD800b";
+    // Three code points, and the reader must neither throw nor merge the surrogate into a pair.
+    expect(readUnoPageDocument(probe("content.prose", { text: lone })).accepted).toBe(true);
+    const manyLone = repeated("\uD800", 4000);
+    expect(readUnoPageDocument(probe("content.prose", { text: manyLone })).accepted).toBe(true);
+    expectRefusal(probe("content.prose", { text: repeated("\uD800", 4001) }), "document:invalid-props");
+  });
+
+  it("keeps the bounded-string caps exact for the three new modules", () => {
+    // amount <= 64, unit <= 64, description <= 320, pricing heading <= 160.
+    const amount64 = "9".repeat(64);
+    expect(readUnoPageDocument(probe("content.pricing", { items: [{ label: "L", amount: amount64 }] })).accepted).toBe(
+      true,
+    );
+    expectRefusal(
+      probe("content.pricing", { items: [{ label: "L", amount: "9".repeat(65) }] }),
+      "document:invalid-props",
+    );
+    expect(
+      readUnoPageDocument(
+        probe("content.pricing", { items: [{ label: "L", amount: "1", unit: "u".repeat(64) }] }),
+      ).accepted,
+    ).toBe(true);
+    expectRefusal(
+      probe("content.pricing", { items: [{ label: "L", amount: "1", unit: "u".repeat(65) }] }),
+      "document:invalid-props",
+    );
+    expect(
+      readUnoPageDocument(
+        probe("content.pricing", { items: [{ label: "L", amount: "1", description: "d".repeat(320) }] }),
+      ).accepted,
+    ).toBe(true);
+    expectRefusal(
+      probe("content.pricing", { items: [{ label: "L", amount: "1", description: "d".repeat(321) }] }),
+      "document:invalid-props",
+    );
+    expect(
+      readUnoPageDocument(probe("content.pricing", { heading: "h".repeat(160), level: 2, items: [{ label: "L", amount: "1" }] }))
+        .accepted,
+    ).toBe(true);
+
+    // timeline title <= 160, description <= 320, dateLabel <= 120.
+    expect(
+      readUnoPageDocument(probe("content.timeline", { items: [{ title: "t".repeat(160) }] })).accepted,
+    ).toBe(true);
+    expect(
+      readUnoPageDocument(
+        probe("content.timeline", { items: [{ title: "T", description: "d".repeat(320), dateLabel: "l".repeat(120) }] }),
+      ).accepted,
+    ).toBe(true);
+    expectRefusal(
+      probe("content.timeline", { items: [{ title: "T", dateLabel: "l".repeat(121) }] }),
+      "document:invalid-props",
+    );
+  });
+});
 

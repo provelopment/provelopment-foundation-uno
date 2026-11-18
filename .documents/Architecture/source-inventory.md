@@ -1790,3 +1790,105 @@ including the retained dark-context contract and new drift checks that fail if a
 fourteen module renderers (including the single tabs/modal/carousel client island and the honest display-only
 contact state), `deployment/site.config.json` and the presentation shell, and the four-zone owned-asset policy and
 reader. This increment does not close U04 and does not claim 22/22 or 17/17 parity.
+
+## U04 bento, pricing and timeline, and the dependency-security migration — `UNO-WO-038 / R03`
+
+**Scope actually delivered.** Commit-backed renderability moves from **8 of 22** to **11 of 22** approved A1 module
+IDs. `layout.bento`, `content.pricing` and `content.timeline` are added to `UNO_RENDERABLE_MODULES` with typed,
+version-1 alternatives on `UnoSectionNode`, exhaustive validator branches in `src/core/page-document.ts`, three
+exhaustive server cases in `src/components/uno-page-sections.tsx`, and scoped `.uno-json-bento`,
+`.uno-json-pricing` and `.uno-json-timeline` rules in `src/app/globals.css` built only from existing `--uno-*`
+tokens. Family composition remains **0 of 17**; the other eleven approved IDs continue to refuse as
+`document:renderer-unavailable`, and an unknown ID still refuses as `document:unknown-module`. This increment does
+not close U04.
+
+**Foundation provenance.** The audited donor remains `provelopment/provelopment-foundation` at commit
+`c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, read-only, with its Apache-2.0 `LICENSE` blob
+`d645695673349e3947e8e5ae42332d0ac3164cd7` unchanged. Decisions recorded for this increment:
+
+| Donor file | Decision | Reason |
+|---|---|---|
+| `src/components/site/page-sections/items-sections.tsx` (`StepsSection`) | **ADAPT** | Ordered `<ol><li>` semantics, an `aria-hidden` visual index and accessible text were re-expressed against Uno's own typed milestone contract; its Markdown chain, Tailwind classes and link resolver were **REJECT**. |
+| `src/components/site/page-sections/structure-sections.tsx` (`ColumnsSection`) | **ADAPT** | Controlled ratios and responsive reading order informed the bento span model; arbitrary CSS, the Foundation class system and its column props were **REJECT**. |
+| `src/components/site/page-sections/media-sections.tsx` (`CardsSection`) | **ADAPT** | Repeated semantic items and grid/contrast layout informed the bento tiles and the pricing option grid; every image, remote URL and action dependency was **REJECT**. |
+| `src/core/page-document.ts` (donor) | **REWRITE** | Uno's strict structural/refusal facilities, caps and frozen-tree contract are Uno-owned; the donor's `steps`/`columns`/`cards` schema was not copied. |
+| `section-support.tsx`, `page-document-content.tsx` | **REJECT** | Import chains into Markdown/link-resolver/Tailwind and a Foundation Page dispatcher would violate Uno's Ports-and-Adapters and provider-off contract. |
+| — (pricing) | **REWRITE** | The pinned donor has no first-class pricing family; the typed factual presentation is original Uno work with no currency, payments, checkout, provider or rating vocabulary. |
+| — (timeline) | **REWRITE** | No first-class donor counterpart exists; ordered authored milestones are original, adapting only the `StepsSection` ordering concept noted above. |
+
+**Typed contracts.** `layout.bento` accepts `{tiles,heading?,level?}` with 2–8 tiles of exactly `{title,span,body?}`;
+`content.pricing` accepts `{options,heading?,level?}` with 1–6 options of `{name,price,detail?,featured?}` and **at
+most one** featured option; `content.timeline` accepts `{entries,heading?,level?}` with 1–12 entries of
+`{title,at?,detail?,current?}` and **at most one** `current`, which is the only entry that may render
+`aria-current="step"`. Counts refuse rather than truncate; unknown keys, empty strings, authored markup, invented
+currency or date formats and duplicate negatives all refuse through the existing closed reason vocabulary —
+`document:invalid-props`, `document:invalid-section`, `document:heading-order` and `document:unsafe-text`. No new
+refusal literal was invented. The inherited Unicode fix is retained: character counting walks code points
+explicitly with no unused binding, so astral characters, combining marks and lone surrogates are counted exactly
+and `pnpm lint` plus `pnpm exec eslint . --max-warnings 0` both exit zero with zero warnings.
+
+**Dependency-security migration.** `next` moves from the vulnerable `16.4.2` to the stable maintenance patch
+**`16.4.6`**, which removes both Next.js root-parameter advisories. The `eslint-config-next` meta-package is
+removed: it was the sole route to `eslint-import-resolver-typescript → tinyglobby → fdir → picomatch@4.0.7`, and
+that resolver is now absent from the resolved graph (`pnpm why eslint-import-resolver-typescript` resolves
+nothing). Its effective ruleset was reconstituted in `eslint.config.mjs` from the exact plugins it re-exported:
+`@next/eslint-plugin-next@16.4.6`, `typescript-eslint@8.72.2`, `@typescript-eslint/parser@8.72.2`,
+`eslint-plugin-react@7.37.5`, `eslint-plugin-react-hooks@7.1.1`, `eslint-plugin-jsx-a11y@6.10.2`,
+`eslint-plugin-import@2.32.0`, `eslint-import-resolver-node@0.3.10` and `globals@16.4.0`, all exact pins. Parity is
+measured, not asserted: `--print-config` for a `.ts` core file, a `.tsx` component and an `.mjs` gate was captured
+before the migration and compared afterwards — **86 → 89** active rules for `.ts`/`.tsx` and **82 → 85** for
+`.mjs`, with **zero missing, zero demoted and three added** (`react/jsx-no-target-blank`,
+`react/no-unknown-property`, `react/prop-types`). The obsolete `react/react-in-jsx-scope` rule, which the inherited
+preset never enabled and which cannot hold under the automatic JSX runtime, is explicitly off; that is parity
+restoration, not a demotion of an active rule. `globals` supplies browser and Node globals so that the removed
+meta-package's environment coverage is not lost.
+
+**The one time-bounded exception, and why it is not a waiver.** After the migration the resolved graph still holds
+`picomatch@2.3.2` (via `@next/eslint-plugin-next → fast-glob → micromatch`) and `picomatch@4.0.7` (via
+`typescript-eslint`, `eslint-plugin-import` and the preserved `vite`/`vitest`), each **development-only**. GitHub
+advisory `GHSA-fc5q-39xc-vjpf` (high, ReDoS via single-branch repeated extglobs) covers **every published
+`picomatch` release**: the registry's newest version is `4.0.7`, `4.0.8` is not published, and the advisory lists
+no patched release. No lawful dependency arrangement can therefore repair it today; the only remedies were to
+fabricate a version (refused), remove the mandated lint and test toolchain (refused) or record a named, expiring,
+independently verifiable exception. The Owner authorised the third.
+
+The exception lives in `pnpm-workspace.yaml` as exactly one `auditConfig.ignoreGhsas` entry — the pnpm 11.6.0
+supported key, with `packages: ["."]` keeping Uno a single root package — and its **expiry
+`2026-12-18T00:00:00Z` (exclusive)** is enforced in code, not by comment, in
+`scripts/verify-u04-security-exception.mjs`. That guard refuses: expiry reached; any second or substituted GHSA
+identifier; a forbidden alternative ignore key; more than one root package; lockfile drift; an unreadable, missing
+or unknown-schema audit report; a raw audit that no longer finds the advisory; a second high or any critical; a
+**non-dev reachable** finding; a production audit that is not zero; an unavailable registry; an empty version
+list; and a missing, removed or muted CI step. It also fails closed when a repaired `picomatch` is published, which
+forces removal of the exception instead of silent renewal.
+
+The guard does not trust pnpm's filtered output. It copies `package.json` and `pnpm-lock.yaml` byte-for-byte into an
+isolated directory carrying its own ignore-free `pnpm-workspace.yaml`, and audits there:
+
+| Measurement | Command scope | Result |
+|---|---|---|
+| Unfiltered full graph (no exemption) | isolated copy | exit 1 — **exactly one HIGH**, `GHSA-fc5q-39xc-vjpf` on `picomatch`, `devOnly=true`, 2 occurrences; 0 critical; 0 other high |
+| Filtered full graph (exception applied) | repository root | exit 0 — reports `1 high (1 ignored)`; never claimed as zero |
+| Strict production graph (no exemption) | isolated copy | exit 0 — **no** high, critical or moderate |
+
+Both audits remain blocking in `.github/workflows/verify-u01.yml`, joined by the guard and its mutation tests, so a
+later removal, reordering or muting of any of them fails the hosted job. The named HIGH is **still present and is
+reported as present**; the exception is a bounded risk decision, never a claim that the advisory is gone. One
+moderate `minimatch` advisory (`GHSA-g3hv-75wg-m249`, development-only) is retained and disclosed rather than
+force-overridden, because no compatible patched resolution can be proved without risking the lint rule set.
+
+**Evidence.** `scripts/verify-u04-json-slice.mjs` reports **464 checks, 0 failed** over real production HTTP and a
+real Chromium DOM — the 308 accepted checks are preserved and 156 are added, including nine new distinct negative
+JSON Pages (three per module) alongside the retained refusals, layout and computed-style assertions at
+320/390/768/1280, dark mode, reduced motion, console cleanliness and byte-exact fixture restoration.
+`tests/deployment/u04-json-slice.test.mjs` keeps its 12 hermetic guards; `tests/deployment/u04-security-exception.test.mjs`
+adds **26** deterministic mutation cases; `tests/deployment/node26-security-floor.test.mjs` grows from 22 to **30**;
+`tests/deployment/verify-vercel-readiness.test.mjs` grows to **88** and the readiness CLI still passes; architecture
+boundaries grow from 45 to **46**; unit tests remain **802**; the U03 published gate still proves **542** cases and
+the U01/U03 HTTP gates still prove **103** and **91**. The production build reports **zero** warnings.
+
+**Still deferred, and still mandatory.** The typed 17-family composition layer (**0 of 17**), the remaining eleven
+module renderers (including the single tabs/modal/carousel client island and the honest display-only contact
+state), `deployment/site.config.json`, the presentation shell, and the four-zone owned-asset policy and reader. The
+eleven unimplemented IDs refuse truthfully. U04 remains OPEN; nothing here is 22/22 or 17/17 parity, and no release,
+tag, provider or deployment claim is made.

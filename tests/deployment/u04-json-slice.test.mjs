@@ -85,6 +85,70 @@ function holdsAddedModuleEvidence(source) {
   return ADDED_MODULE_EVIDENCE.every((marker) => source.includes(marker));
 }
 
+/**
+ * The real evidence the gate must keep for the three modules added by `UNO-WO-038 / R01`.
+ *
+ * Each marker is a literal from the runner: the fixture nodes, the served-markup assertions, the Chromium DOM and
+ * geometry measurements, the nine bound negative Pages and their refusal reasons. Deleting a module, an assertion or
+ * a refusal fixture therefore falsifies this predicate, so a green total can never hide a removed module.
+ */
+const ADDED_MODULE_EVIDENCE_038 = Object.freeze([
+  'module: "layout.bento"',
+  'module: "content.pricing"',
+  'module: "content.timeline"',
+  "Programme tiers",
+  "Programme timeline",
+  "Contract baseline",
+  'class="uno-json-bento"',
+  "data-uno-tile-span",
+  '<article class="uno-json-tile"',
+  "ul.uno-json-price-list",
+  "li.uno-json-price",
+  'data-uno-featured="true"',
+  "ol.uno-json-timeline-list",
+  'aria-current="step"',
+  "uno-json-timeline-marker",
+  "the tiles carry the authored ids and spans in authored order",
+  "exactly one price is marked featured",
+  "exactly one milestone is the current step",
+  "the new modules keep one h1 and one main landmark",
+  "resolves the bento to",
+  "keeps the milestones in one vertical column in authored order",
+  "dark mode keeps the featured price amount above a 4.5:1 contrast ratio",
+  '["layout.bento", JSON_DOCUMENTS.bentoCountMismatch, "document:invalid-props"]',
+  '["layout.bento", JSON_DOCUMENTS.bentoForeignTile, "document:invalid-props"]',
+  '["layout.bento", JSON_DOCUMENTS.bentoSingleChild, "document:invalid-children"]',
+  '["content.pricing", JSON_DOCUMENTS.priceDoubleFeatured, "document:invalid-props"]',
+  '["content.pricing", JSON_DOCUMENTS.priceEmptyAmount, "document:invalid-props"]',
+  '["content.pricing", JSON_DOCUMENTS.priceHeadingSkip, "document:heading-order"]',
+  '["content.timeline", JSON_DOCUMENTS.timelineDoubleCurrent, "document:invalid-props"]',
+  '["content.timeline", JSON_DOCUMENTS.timelineBadStatus, "document:invalid-props"]',
+  '["content.timeline", JSON_DOCUMENTS.timelineMarkup, "document:unsafe-text"]',
+  'pathname: "/en-001/bentocount"',
+  'pathname: "/en-001/bentotile"',
+  'pathname: "/en-001/bentoone"',
+  'pathname: "/en-001/pricedouble"',
+  'pathname: "/en-001/priceamount"',
+  'pathname: "/en-001/pricelevel"',
+  'pathname: "/en-001/timelinedouble"',
+  'pathname: "/en-001/timelinestatus"',
+  'pathname: "/en-001/timelinemarkup"',
+  "wo038-bentocount.en-001.json",
+  "wo038-bentotile.en-001.json",
+  "wo038-bentoone.en-001.json",
+  "wo038-pricedouble.en-001.json",
+  "wo038-priceamount.en-001.json",
+  "wo038-pricelevel.en-001.json",
+  "wo038-timelinedouble.en-001.json",
+  "wo038-timelinestatus.en-001.json",
+  "wo038-timelinemarkup.en-001.json",
+]);
+
+/** True only while every `UNO-WO-038 / R01` marker is still present in the gate. */
+function holdsAddedModuleEvidence038(source) {
+  return ADDED_MODULE_EVIDENCE_038.every((marker) => source.includes(marker));
+}
+
 /** One fresh scratch directory that is not the Uno checkout. */
 function scratchDirectory() {
   const directory = mkdtempSync(join(tmpdir(), "uno-u04-gate-"));
@@ -269,6 +333,117 @@ describe("the accepted U03 transaction fault suite is reused, not re-implemented
     assert.equal(result.status, 0, result.stderr);
     const passed = Number(/^# pass (\d+)$/mu.exec(result.stdout)?.[1] ?? "0");
     assert.ok(passed >= 27, `expected at least 27 passing cases, saw ${passed}`);
+  });
+});
+
+
+describe("the U04 JSON-slice gate — the three modules added by UNO-WO-038 / R01", () => {
+  it("pins the real HTTP and Chromium evidence for bento, pricing and timeline", () => {
+    // Baseline: the real runner carries every marker.
+    assert.equal(holdsAddedModuleEvidence038(SOURCE), true);
+
+    // Removing a module from the fixture must fail, one module at a time, with every occurrence replaced.
+    for (const marker of ['module: "layout.bento"', 'module: "content.pricing"', 'module: "content.timeline"']) {
+      const removed = SOURCE.replaceAll(marker, 'module: "content.prose"');
+      assert.notEqual(removed, SOURCE, `the gate must actually contain ${marker}`);
+      assert.equal(holdsAddedModuleEvidence038(removed), false, `removing ${marker} must fail this gate`);
+    }
+
+    // Deleting a served-markup assertion, a DOM measurement, a geometry check, a contrast proof, a bound negative
+    // fixture or a refusal binding must each fail on its own.
+    for (const marker of [
+      'class="uno-json-bento"',
+      '<article class="uno-json-tile"',
+      "ul.uno-json-price-list",
+      "li.uno-json-price",
+      "ol.uno-json-timeline-list",
+      'aria-current="step"',
+      "the tiles carry the authored ids and spans in authored order",
+      "exactly one price is marked featured",
+      "exactly one milestone is the current step",
+      "resolves the bento to",
+      "keeps the milestones in one vertical column in authored order",
+      "dark mode keeps the featured price amount above a 4.5:1 contrast ratio",
+      '["layout.bento", JSON_DOCUMENTS.bentoCountMismatch, "document:invalid-props"]',
+      '["content.pricing", JSON_DOCUMENTS.priceHeadingSkip, "document:heading-order"]',
+      '["content.timeline", JSON_DOCUMENTS.timelineMarkup, "document:unsafe-text"]',
+      'pathname: "/en-001/bentoone"',
+      'pathname: "/en-001/priceamount"',
+      'pathname: "/en-001/timelinestatus"',
+      "wo038-bentotile.en-001.json",
+      "wo038-pricedouble.en-001.json",
+      "wo038-timelinestatus.en-001.json",
+    ]) {
+      const removed = SOURCE.replaceAll(marker, "REMOVED");
+      assert.notEqual(removed, SOURCE, `the gate must actually contain ${marker}`);
+      assert.equal(holdsAddedModuleEvidence038(removed), false, `removing ${marker} must fail this gate`);
+    }
+  });
+
+  it("binds each new module to its own three negative Pages, its own reasons and the shared restoration", () => {
+    const negatives = [
+      {
+        module: "layout.bento",
+        bodies: [
+          ["bentoCountMismatch", "invalid-props", "bentocount"],
+          ["bentoForeignTile", "invalid-props", "bentotile"],
+          ["bentoSingleChild", "invalid-children", "bentoone"],
+        ],
+      },
+      {
+        module: "content.pricing",
+        bodies: [
+          ["priceDoubleFeatured", "invalid-props", "pricedouble"],
+          ["priceEmptyAmount", "invalid-props", "priceamount"],
+          ["priceHeadingSkip", "heading-order", "pricelevel"],
+        ],
+      },
+      {
+        module: "content.timeline",
+        bodies: [
+          ["timelineDoubleCurrent", "invalid-props", "timelinedouble"],
+          ["timelineBadStatus", "invalid-props", "timelinestatus"],
+          ["timelineMarkup", "unsafe-text", "timelinemarkup"],
+        ],
+      },
+    ];
+
+    // Nine distinct task-owned invalid Pages, three per module, each with its own route and fixture source.
+    const pages = new Set();
+    for (const negative of negatives) {
+      assert.equal(negative.bodies.length, 3, `${negative.module} must carry exactly three negatives`);
+      for (const [body, reason, page] of negative.bodies) {
+        assert.ok(
+          SOURCE.includes(`["${negative.module}", JSON_DOCUMENTS.${body}, "document:${reason}"]`),
+          `${negative.module} must bind ${body} to document:${reason}`,
+        );
+        assert.ok(SOURCE.includes(`pathname: "/en-001/${page}"`), `missing refused Page ${page}`);
+        assert.ok(SOURCE.includes(`wo038-${page}.en-001.json`), `missing fixture source ${page}`);
+        pages.add(page);
+      }
+    }
+    assert.equal(pages.size, 9, "the nine negatives must be nine distinct Pages");
+
+    // The declared refusal reasons must be genuine members of the closed vocabulary, not free text.
+    for (const reason of ["invalid-props", "invalid-children", "heading-order", "unsafe-text"]) {
+      assert.ok(SOURCE.includes(`reason: "${reason}"`), `missing refusal case: ${reason}`);
+    }
+
+    // The added sources are claimed and restored by the accepted transaction, exactly like the original ones.
+    assert.match(SOURCE, /fixtureSources: sources\.map/u);
+    assert.match(SOURCE, /await transaction\.restore\(\)/u);
+  });
+
+  it("keeps the earlier 308 assertions intact beside the new ones", () => {
+    // The predecessor's own evidence predicate must still hold, so this increment cannot have displaced it.
+    assert.equal(holdsAddedModuleEvidence(SOURCE), true);
+    assert.ok(SOURCE.includes("[1280, 768, 390, 320]"), "the four responsive widths must survive");
+    assert.ok(SOURCE.includes("noindex,nofollow"), "the unlisted Page contract must survive");
+    assert.ok(SOURCE.includes("chromium.launch()"), "the real browser proof must survive");
+    // The original three negatives and their pages are untouched.
+    for (const page of ["herobody", "statslevel", "quotemarkup"]) {
+      assert.ok(SOURCE.includes(`pathname: "/en-001/${page}"`), `missing predecessor refused Page ${page}`);
+    }
   });
 });
 

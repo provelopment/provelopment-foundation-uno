@@ -606,11 +606,38 @@ test('the real package.json is exact, boundary clean and pinned', () => {
   assert.equal(parsed.packageManager, 'pnpm@11.6.0');
   assert.equal(parsed.engines.node, '26.x');
   assert.equal(nodeEngineIssue(parsed), null);
-  assert.equal(parsed.dependencies.next, '16.4.2');
+  assert.equal(parsed.dependencies.next, '16.4.6');
   assert.equal(parsed.dependencies.react, '19.2.9');
   assert.equal(parsed.dependencies['react-dom'], '19.2.9');
   assert.equal(parsed.dependencies[APPROVED_ANALYTICS.packageName], APPROVED_ANALYTICS.version);
   assert.match(parsed.devDependencies['@types/node'], /^26\.\d+\.\d+$/);
+});
+
+test('the lint toolchain is direct, pinned and free of the vulnerable resolver chain', () => {
+  const parsed = JSON.parse(packageJson());
+  const declared = { ...parsed.dependencies, ...parsed.devDependencies };
+
+  // The meta-package that pulled `eslint-import-resolver-typescript → tinyglobby → fdir →
+  // picomatch@4.0.7` must never come back, and nothing may mask the graph directly.
+  assert.equal('eslint-config-next' in declared, false);
+  for (const masked of ['picomatch', 'tinyglobby', 'fdir']) {
+    assert.equal(masked in declared, false, `${masked} must not be a direct dependency`);
+  }
+
+  // Every replacement is an exact pin, not a range.
+  for (const name of [
+    '@next/eslint-plugin-next',
+    'typescript-eslint',
+    '@typescript-eslint/parser',
+    'eslint-plugin-react',
+    'eslint-plugin-react-hooks',
+    'eslint-plugin-jsx-a11y',
+    'eslint-plugin-import',
+    'eslint-import-resolver-node',
+    'globals',
+  ]) {
+    assert.match(declared[name] ?? '', /^\d+\.\d+\.\d+$/, `${name} must be an exact pin`);
+  }
 });
 
 test('a Node 24 or unpinned engine is refused even when everything else is exact', () => {
@@ -1513,11 +1540,11 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
   }
 });
 
-// --- U04 JSON Page slice (UNO-WO-035 / R01, extended by UNO-WO-037 / R01) ---------------------------------
-// The slice must stay exactly what the orders authorised: eight renderable IDs from the immutable 22, one pure
+// --- U04 JSON Page slice (UNO-WO-035 / R01, extended by UNO-WO-037 / R01 and UNO-WO-038 / R01) -----------------
+// The slice must stay exactly what the orders authorised: eleven renderable IDs from the immutable 22, one pure
 // contract, one server renderer, no new client island and no framework or filesystem reach inside `src/core`.
 
-test("the U04 slice declares exactly the eight renderable IDs and implements each one", () => {
+test("the U04 slice declares exactly the eleven renderable IDs and implements each one", () => {
   const contract = stripComments(doc("src/core/page-document.ts"));
   const renderer = stripComments(doc("src/components/uno-page-sections.tsx"));
 
@@ -1527,27 +1554,30 @@ test("the U04 slice declares exactly the eight renderable IDs and implements eac
   assert.deepEqual(ids, [
     "layout.stack",
     "layout.grid",
+    "layout.bento",
     "content.heading",
     "content.prose",
     "content.actions",
     "content.hero",
     "content.stats",
     "content.testimonials",
+    "content.pricing",
+    "content.timeline",
   ]);
 
   for (const id of ids) {
     assert.ok(renderer.includes(`case "${id}":`), `${id} has no renderer case`);
   }
-  assert.equal((renderer.match(/case "[a-z]+\.[a-z]+":/gu) ?? []).length, 8, "the renderer must cover exactly eight IDs");
+  assert.equal((renderer.match(/case "[a-z]+\.[a-z]+":/gu) ?? []).length, 11, "the renderer must cover exactly eleven IDs");
 
-  // Every one of the 22 registry IDs stays immutable and the fourteen unimplemented ones stay unrenderable.
+  // Every one of the 22 registry IDs stays immutable and the eleven unimplemented ones stay unrenderable.
   const registry = stripComments(doc("src/core/modules/capability-registry.ts"));
   const registryIds = [...registry.matchAll(/_CAPABILITY_IDS = Object\.freeze\(\[([\s\S]*?)\] as const\)/gu)].flatMap(
     (blockMatch) => [...blockMatch[1].matchAll(/"([a-z]+\.[a-z]+)"/gu)].map((match) => match[1]),
   );
   assert.equal(registryIds.length, 22, "the immutable registry must still hold exactly 22 IDs");
   const unrenderable = registryIds.filter((id) => !ids.includes(id));
-  assert.equal(unrenderable.length, 14, "exactly fourteen registered IDs must remain unrenderable");
+  assert.equal(unrenderable.length, 11, "exactly eleven registered IDs must remain unrenderable");
   // The retained `renderer-unavailable` negative fixture must still name a registered but unimplemented ID.
   assert.ok(unrenderable.includes("media.image"), "media.image must stay registered and unrenderable");
   for (const id of ids) {

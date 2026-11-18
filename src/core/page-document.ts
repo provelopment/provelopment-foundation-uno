@@ -14,12 +14,13 @@
  * Publication remains the manifest Page's `publication: "published"` declaration; visibility is the selected
  * source's own `public`/`unlisted` intent; presentation is `deployment/site.config.json`.
  *
- * RENDERABILITY. This run implements exactly eight module renderers: the five accepted layout/heading/prose/action
- * modules plus `content.hero`, `content.stats` and `content.testimonials` (`UNO-WO-037 / R01`). A `module` literal
- * that is not one of the immutable 22 IDs is `document:unknown-module`; one that *is* registered but has no
- * renderer yet in this slice is `document:renderer-unavailable`. Both refuse the entire Page, so no partially
- * supported document can ever reach a renderer or a discovery plan. The fourteen remaining registered IDs stay
- * unrenderable, and this tuple remains a local availability discriminator — never a second registry.
+ * RENDERABILITY. This run implements exactly eleven module renderers: the five accepted layout/heading/prose/action
+ * modules, `content.hero`, `content.stats`, `content.testimonials` (`UNO-WO-037 / R01`) and `layout.bento`,
+ * `content.pricing`, `content.timeline` (`UNO-WO-038 / R01`). A `module` literal that is not one of the immutable
+ * 22 IDs is `document:unknown-module`; one that *is* registered but has no renderer yet in this slice is
+ * `document:renderer-unavailable`. Both refuse the entire Page, so no partially supported document can ever reach a
+ * renderer or a discovery plan. The eleven remaining registered IDs stay unrenderable, and this tuple remains a
+ * local availability discriminator — never a second registry.
  *
  * TRUST BOUNDARY. `input` is untrusted `unknown` (plain own data, or raw JSON text). It is classified before any
  * field is read, so a getter, a symbol key, an exotic prototype, a sparse array, a cyclic graph or a throwing
@@ -48,12 +49,15 @@ export const UNO_PAGE_DOCUMENT_VERSION = 1;
 export const UNO_RENDERABLE_MODULES = Object.freeze([
   "layout.stack",
   "layout.grid",
+  "layout.bento",
   "content.heading",
   "content.prose",
   "content.actions",
   "content.hero",
   "content.stats",
   "content.testimonials",
+  "content.pricing",
+  "content.timeline",
 ] as const);
 
 /** One renderable module ID of this slice. */
@@ -81,6 +85,14 @@ export const UNO_PAGE_DOCUMENT_LIMITS = Object.freeze({
   testimonialItems: 6,
   statValueCodePoints: 48,
   statDetailCodePoints: 320,
+  pricingItems: 6,
+  priceAmountCodePoints: 64,
+  priceUnitCodePoints: 64,
+  pricingDescriptionCodePoints: 320,
+  timelineItems: 12,
+  timelineTitleCodePoints: 160,
+  timelineDescriptionCodePoints: 320,
+  timelineDateLabelCodePoints: 120,
   sectionIdLength: 48,
   jsonDepth: 16,
   jsonNodes: 2048,
@@ -179,7 +191,72 @@ export interface UnoContentTestimonialsProps {
   readonly surface?: UnoSectionSurface;
 }
 
-/** One validated module node. Layouts own typed children; the six content modules own none. */
+/**
+ * The four closed bento tile spans. A span is a *named* sizing intent — `standard` 1×1, `wide` two columns,
+ * `tall` two rows, `feature` two columns and two rows — never an authored pixel width, grid line or CSS string.
+ */
+export type UnoBentoTileSpan = "standard" | "wide" | "tall" | "feature";
+
+/** One bento tile: the exact child it sizes and the one closed span applied to that child. */
+export interface UnoBentoTile {
+  readonly sectionId: string;
+  readonly span: UnoBentoTileSpan;
+}
+
+/**
+ * `layout.bento` props: a closed column count, an optional item semantic variant and one tile for every child.
+ *
+ * `tiles` is positional: it is the same length as `children` and its `sectionId` must equal the id of the child at
+ * the same index, so a tile can never size a section that is not its own sibling. At least one span must be
+ * non-`standard`, which is what distinguishes a genuine bento from `layout.grid`.
+ */
+export interface UnoLayoutBentoProps {
+  readonly columns: 2 | 3 | 4;
+  readonly itemSemantics?: UnoGridItemSemantics;
+  readonly tiles: readonly UnoBentoTile[];
+}
+
+/**
+ * One authored price: the label that names what is offered, the amount exactly as the author wrote it, and optional
+ * unit and description. `amount` is inert authored text — this contract never parses, computes, converts or formats
+ * a number, and therefore cannot invent a currency, a tax, a discount, a total or an offer.
+ */
+export interface UnoPricingItem {
+  readonly label: string;
+  readonly amount: string;
+  readonly unit?: string;
+  readonly description?: string;
+  readonly featured?: boolean;
+}
+
+/** `content.pricing` props: 1–6 explicitly authored prices and an optional section heading. */
+export interface UnoContentPricingProps {
+  readonly items: readonly UnoPricingItem[];
+  readonly heading?: string;
+  readonly level?: 2 | 3 | 4 | 5 | 6;
+  readonly surface?: UnoSectionSurface;
+}
+
+/** The three closed author-declared milestone states. Uno never infers, schedules or advances one of them. */
+export type UnoTimelineStatus = "complete" | "current" | "upcoming";
+
+/** One authored milestone: a required title and optional bounded date label, description and declared status. */
+export interface UnoTimelineItem {
+  readonly title: string;
+  readonly description?: string;
+  readonly dateLabel?: string;
+  readonly status?: UnoTimelineStatus;
+}
+
+/** `content.timeline` props: 1–12 ordered authored milestones and an optional section heading. */
+export interface UnoContentTimelineProps {
+  readonly items: readonly UnoTimelineItem[];
+  readonly heading?: string;
+  readonly level?: 2 | 3 | 4 | 5 | 6;
+  readonly surface?: UnoSectionSurface;
+}
+
+/** One validated module node. Layouts own typed children; the eight content modules own none. */
 export type UnoSectionNode =
   | {
       readonly id: string;
@@ -193,6 +270,12 @@ export type UnoSectionNode =
       readonly props: UnoLayoutGridProps;
       readonly children: readonly UnoSectionNode[];
     }
+  | {
+      readonly id: string;
+      readonly module: "layout.bento";
+      readonly props: UnoLayoutBentoProps;
+      readonly children: readonly UnoSectionNode[];
+    }
   | { readonly id: string; readonly module: "content.heading"; readonly props: UnoContentHeadingProps }
   | { readonly id: string; readonly module: "content.prose"; readonly props: UnoContentProseProps }
   | { readonly id: string; readonly module: "content.actions"; readonly props: UnoContentActionsProps }
@@ -202,7 +285,9 @@ export type UnoSectionNode =
       readonly id: string;
       readonly module: "content.testimonials";
       readonly props: UnoContentTestimonialsProps;
-    };
+    }
+  | { readonly id: string; readonly module: "content.pricing"; readonly props: UnoContentPricingProps }
+  | { readonly id: string; readonly module: "content.timeline"; readonly props: UnoContentTimelineProps };
 
 /** The accepted, deeply frozen version-1 Page document. */
 export interface UnoPageDocument {
@@ -316,8 +401,8 @@ const DOCUMENT_REQUIRED_KEYS: readonly string[] = Object.freeze(["version", "tit
 /** The two optional top-level keys of the v1 envelope. */
 const DOCUMENT_OPTIONAL_KEYS: readonly string[] = Object.freeze(["description", "visibility"]);
 
-/** The two layout modules own typed children; every other module owns none. */
-const LAYOUT_MODULES: readonly string[] = Object.freeze(["layout.stack", "layout.grid"]);
+/** The three layout modules own typed children; every other module owns none. */
+const LAYOUT_MODULES: readonly string[] = Object.freeze(["layout.stack", "layout.grid", "layout.bento"]);
 
 /** The three prototype-pollution keys a JSON object may never carry. */
 const FORBIDDEN_KEYS: readonly string[] = Object.freeze(["__proto__", "constructor", "prototype"]);
@@ -330,10 +415,21 @@ function refuseDocument(reason: UnoPageDocumentRefusal): UnoPageDocumentResult {
   return Object.freeze({ accepted: false, reason });
 }
 
-/** Count Unicode code points without allocating an array. */
+/**
+ * Count Unicode code points — not UTF-16 code units and not grapheme clusters.
+ *
+ * A `for…of` iteration over a string yields one full code point per step, but the loop binding is unused here, so the
+ * walk is written explicitly: an astral character occupies two code units and is counted once by skipping its low
+ * surrogate, while a lone surrogate is counted once and never repaired. No array is allocated and no regular
+ * expression is compiled, so a bounded 4000-code-point text costs one linear pass.
+ */
 function codePointLength(value: string): number {
   let count = 0;
-  for (const _character of value) count += 1;
+  for (let index = 0; index < value.length; index += 1) {
+    const point = value.codePointAt(index) ?? 0;
+    count += 1;
+    if (point > 0xffff) index += 1;
+  }
   return count;
 }
 
@@ -754,6 +850,182 @@ function readTestimonialItems(value: unknown): UnoTestimonialItem[] {
 }
 
 /**
+ * One authored price list, each entry exactly `{label, amount, unit?, description?, featured?}`.
+ *
+ * `amount` is authored text, so this contract cannot compute, convert, discount or format it; at most one entry may
+ * declare `featured: true`, because a price list with two highlighted offers states two priorities at once.
+ */
+function readPricingItems(value: unknown): UnoPricingItem[] {
+  if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
+  if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.pricingItems) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const items: UnoPricingItem[] = [];
+  let featuredCount = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) throw new RefusedDocument("document:invalid-props");
+    const item = readPlainData(value[index]);
+    if (item === null) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(item, ["label", "amount"], ["unit", "description", "featured"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const label = readBoundedText(
+      item["label"],
+      UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const amount = readBoundedText(
+      item["amount"],
+      UNO_PAGE_DOCUMENT_LIMITS.priceAmountCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const unit = optionalBoundedText(item["unit"], UNO_PAGE_DOCUMENT_LIMITS.priceUnitCodePoints, false);
+    const itemDescription = optionalBoundedText(
+      item["description"],
+      UNO_PAGE_DOCUMENT_LIMITS.pricingDescriptionCodePoints,
+      false,
+    );
+    const rawFeatured = item["featured"];
+    if (rawFeatured !== undefined && typeof rawFeatured !== "boolean") {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    if (rawFeatured === true) {
+      featuredCount += 1;
+      if (featuredCount > 1) throw new RefusedDocument("document:invalid-props");
+    }
+    items.push({
+      label,
+      amount,
+      ...(unit === undefined ? {} : { unit }),
+      ...(itemDescription === undefined ? {} : { description: itemDescription }),
+      ...(rawFeatured === undefined ? {} : { featured: rawFeatured }),
+    });
+  }
+  return items;
+}
+
+/** The three closed milestone statuses, read as one literal so a misspelling can never reach the renderer. */
+function optionalTimelineStatus(value: unknown): UnoTimelineStatus | undefined {
+  if (value === undefined) return undefined;
+  if (value === "complete" || value === "current" || value === "upcoming") return value;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/**
+ * One authored ordered milestone list, each entry exactly `{title, description?, dateLabel?, status?}`.
+ *
+ * Order is the author's own and is never sorted, and at most one entry may be `current`: two simultaneous "current"
+ * milestones would be a contradictory statement about the programme this Page describes.
+ */
+function readTimelineItems(value: unknown): UnoTimelineItem[] {
+  if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
+  if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.timelineItems) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const items: UnoTimelineItem[] = [];
+  let currentCount = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) throw new RefusedDocument("document:invalid-props");
+    const item = readPlainData(value[index]);
+    if (item === null) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(item, ["title"], ["description", "dateLabel", "status"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const title = readBoundedText(
+      item["title"],
+      UNO_PAGE_DOCUMENT_LIMITS.timelineTitleCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const itemDescription = optionalBoundedText(
+      item["description"],
+      UNO_PAGE_DOCUMENT_LIMITS.timelineDescriptionCodePoints,
+      false,
+    );
+    const dateLabel = optionalBoundedText(item["dateLabel"], UNO_PAGE_DOCUMENT_LIMITS.timelineDateLabelCodePoints, false);
+    const status = optionalTimelineStatus(item["status"]);
+    if (status === "current") {
+      currentCount += 1;
+      if (currentCount > 1) throw new RefusedDocument("document:invalid-props");
+    }
+    items.push({
+      title,
+      ...(itemDescription === undefined ? {} : { description: itemDescription }),
+      ...(dateLabel === undefined ? {} : { dateLabel }),
+      ...(status === undefined ? {} : { status }),
+    });
+  }
+  return items;
+}
+
+/**
+ * One positional bento tile list: exactly one tile per child, in child order, naming that same child.
+ *
+ * The tile cannot introduce a section, omit one, repeat one or size a section that is not its own sibling, and at
+ * least one span must be non-`standard` so a "bento" that is really an even grid is refused rather than mislabelled.
+ */
+function readBentoTiles(value: unknown, children: readonly UnoSectionNode[]): UnoBentoTile[] {
+  if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
+  if (value.length !== children.length) throw new RefusedDocument("document:invalid-props");
+  const tiles: UnoBentoTile[] = [];
+  const claimed = new Set<string>();
+  let hasAsymmetricSpan = false;
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) throw new RefusedDocument("document:invalid-props");
+    const tile = readPlainData(value[index]);
+    if (tile === null) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(tile, ["sectionId", "span"], [])) throw new RefusedDocument("document:invalid-props");
+    const child = children[index];
+    if (child === undefined) throw new RefusedDocument("document:invalid-props");
+    const sectionId = tile["sectionId"];
+    if (typeof sectionId !== "string" || !SECTION_ID.test(sectionId)) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    if (sectionId !== child.id) throw new RefusedDocument("document:invalid-props");
+    if (claimed.has(sectionId)) throw new RefusedDocument("document:invalid-props");
+    claimed.add(sectionId);
+    const span = tile["span"];
+    if (span !== "standard" && span !== "wide" && span !== "tall" && span !== "feature") {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    if (span !== "standard") hasAsymmetricSpan = true;
+    tiles.push({ sectionId, span });
+  }
+  if (!hasAsymmetricSpan) throw new RefusedDocument("document:invalid-props");
+  return tiles;
+}
+
+/**
+ * One optional authored section heading and its closed level, obeying the incremental Page heading contract.
+ *
+ * `level` is required exactly when a heading is authored: a level with no heading would imply a heading this module
+ * does not render, and a heading with no level would leave its rank to guesswork. A present heading must also obey
+ * `lastHeadingLevel + 1`, exactly as `content.heading` does, so no module can skip a level in the outline.
+ */
+function readOptionalHeading(
+  props: DataRecord,
+  state: WalkState,
+): { readonly heading: string | undefined; readonly level: 2 | 3 | 4 | 5 | 6 | undefined } {
+  const heading = optionalBoundedText(props["heading"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, true);
+  const rawLevel = props["level"];
+  if (heading === undefined) {
+    if (rawLevel !== undefined) throw new RefusedDocument("document:invalid-props");
+    return { heading, level: undefined };
+  }
+  if (rawLevel !== 2 && rawLevel !== 3 && rawLevel !== 4 && rawLevel !== 5 && rawLevel !== 6) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  if (rawLevel > state.lastHeadingLevel + 1) throw new RefusedDocument("document:heading-order");
+  state.lastHeadingLevel = rawLevel;
+  return { heading, level: rawLevel };
+}
+
+/**
  * Validate one section node, its closed props and — for the two layouts — its typed children.
  *
  * Order matters: the identifier is claimed first so a duplicate is reported as a duplicate rather than as
@@ -814,6 +1086,24 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
       itemSemantics === undefined ? { columns } : { columns, itemSemantics };
     const children = readChildren(record["children"], depth + 1, state, seen);
     return { id, module: "layout.grid", props: gridProps, children };
+  }
+
+  if (moduleName === "layout.bento") {
+    if (!hasExactlyKeys(props, ["columns", "tiles"], ["itemSemantics"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const columns = props["columns"];
+    if (columns !== 2 && columns !== 3 && columns !== 4) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const itemSemantics = optionalGridSemantics(props["itemSemantics"]);
+    const children = readChildren(record["children"], depth + 1, state, seen);
+    // A bento is an asymmetric composition, so a single tile or a single column count it cannot express is refused.
+    if (children.length < 2) throw new RefusedDocument("document:invalid-children");
+    const tiles = readBentoTiles(props["tiles"], children);
+    const bentoProps: UnoLayoutBentoProps =
+      itemSemantics === undefined ? { columns, tiles } : { columns, itemSemantics, tiles };
+    return { id, module: "layout.bento", props: bentoProps, children };
   }
 
   if (moduleName === "content.heading") {
@@ -888,23 +1178,17 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
     }
     const items = readStatItems(props["items"]);
     const surface = optionalSurface(props["surface"]);
-    const heading = optionalBoundedText(props["heading"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, true);
-    const rawLevel = props["level"];
-    if (heading === undefined) {
-      // A level without a heading would imply a heading this module does not render.
-      if (rawLevel !== undefined) throw new RefusedDocument("document:invalid-props");
-      return { id, module: "content.stats", props: { items, ...(surface === undefined ? {} : { surface }) } };
-    }
-    if (rawLevel !== 2 && rawLevel !== 3 && rawLevel !== 4 && rawLevel !== 5 && rawLevel !== 6) {
-      throw new RefusedDocument("document:invalid-props");
-    }
-    // The same incremental heading contract the heading module obeys, so a stats heading cannot skip a level.
-    if (rawLevel > state.lastHeadingLevel + 1) throw new RefusedDocument("document:heading-order");
-    state.lastHeadingLevel = rawLevel;
+    // Items first, then surface, then heading: a stats item refusal always outranks a heading-level refusal.
+    const { heading, level } = readOptionalHeading(props, state);
     return {
       id,
       module: "content.stats",
-      props: { items, heading, level: rawLevel, ...(surface === undefined ? {} : { surface }) },
+      props: {
+        items,
+        ...(heading === undefined ? {} : { heading }),
+        ...(level === undefined ? {} : { level }),
+        ...(surface === undefined ? {} : { surface }),
+      },
     };
   }
 
@@ -919,6 +1203,44 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
       id,
       module: "content.testimonials",
       props: { items, ...(align === undefined ? {} : { align }), ...(surface === undefined ? {} : { surface }) },
+    };
+  }
+
+  if (moduleName === "content.pricing") {
+    if (!hasExactlyKeys(props, ["items"], ["heading", "level", "surface"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const items = readPricingItems(props["items"]);
+    const surface = optionalSurface(props["surface"]);
+    const { heading, level } = readOptionalHeading(props, state);
+    return {
+      id,
+      module: "content.pricing",
+      props: {
+        items,
+        ...(heading === undefined ? {} : { heading }),
+        ...(level === undefined ? {} : { level }),
+        ...(surface === undefined ? {} : { surface }),
+      },
+    };
+  }
+
+  if (moduleName === "content.timeline") {
+    if (!hasExactlyKeys(props, ["items"], ["heading", "level", "surface"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const items = readTimelineItems(props["items"]);
+    const surface = optionalSurface(props["surface"]);
+    const { heading, level } = readOptionalHeading(props, state);
+    return {
+      id,
+      module: "content.timeline",
+      props: {
+        items,
+        ...(heading === undefined ? {} : { heading }),
+        ...(level === undefined ? {} : { level }),
+        ...(surface === undefined ? {} : { surface }),
+      },
     };
   }
 
