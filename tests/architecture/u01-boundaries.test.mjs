@@ -180,6 +180,7 @@ export const LEGACY_ADDRESS_MARKERS = Object.freeze([
  */
 export const ADAPTER_AUTHORED_FILES = Object.freeze([
   'src/adapters/efs/uno-confined-source-reader.ts',
+  'src/adapters/assets/uno-owned-media-reader.ts',
 ]);
 
 /** Modules a concrete Node adapter must never import. */
@@ -221,6 +222,8 @@ export function scanAdapters(files) {
 
 /** The exact authored `src/core` kernel this baseline declares. */
 export const CORE_AUTHORED_FILES = Object.freeze([
+  'src/core/assets/uno-owned-media.ts',
+  'src/core/video/uno-video-embeds.ts',
   'src/core/efs/identity.ts',
   'src/core/efs/manifest-graph.ts',
   'src/core/efs/properties.ts',
@@ -1427,6 +1430,7 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
     .sort();
   assert.deepEqual(importers, [
     'scripts/verify-u03-published-http.mjs',
+    'scripts/verify-u04-22-module-consent.mjs',
     'scripts/verify-u04-json-slice.mjs',
     'tests/deployment/u03-fixture-transaction.test.mjs',
     'tests/deployment/u04-json-slice.test.mjs',
@@ -1524,8 +1528,8 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
   }
   assert.deepEqual(
     [...fsModules].sort(),
-    ['src/adapters/efs/uno-confined-source-reader.ts', 'src/config/uno-serving.ts'],
-    'only the confined reader and the fixed-declaration serving composition may touch the filesystem',
+    ['src/adapters/assets/uno-owned-media-reader.ts', 'src/adapters/efs/uno-confined-source-reader.ts', 'src/config/uno-serving.ts'],
+    'only the confined reader, the owned-media reader and the fixed-declaration serving composition may touch the filesystem',
   );
   for (const [path, content] of Object.entries(appSources)) {
     assert.equal(
@@ -1544,7 +1548,7 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
 // The slice must stay exactly what the orders authorised: eleven renderable IDs from the immutable 22, one pure
 // contract, one server renderer, no new client island and no framework or filesystem reach inside `src/core`.
 
-test("the U04 slice declares exactly the eleven renderable IDs and implements each one", () => {
+test("the U04 slice declares exactly the twenty-two renderable IDs and implements each one", () => {
   const contract = stripComments(doc("src/core/page-document.ts"));
   const renderer = stripComments(doc("src/components/uno-page-sections.tsx"));
 
@@ -1555,6 +1559,7 @@ test("the U04 slice declares exactly the eleven renderable IDs and implements ea
     "layout.stack",
     "layout.grid",
     "layout.bento",
+    "layout.layers",
     "content.heading",
     "content.prose",
     "content.actions",
@@ -1563,12 +1568,22 @@ test("the U04 slice declares exactly the eleven renderable IDs and implements ea
     "content.testimonials",
     "content.pricing",
     "content.timeline",
+    "media.image",
+    "media.video",
+    "media.gallery",
+    "media.carousel",
+    "design.watermark",
+    "design.motion",
+    "interaction.tabs",
+    "interaction.accordion",
+    "interaction.modal",
+    "interaction.contact",
   ]);
 
   for (const id of ids) {
     assert.ok(renderer.includes(`case "${id}":`), `${id} has no renderer case`);
   }
-  assert.equal((renderer.match(/case "[a-z]+\.[a-z]+":/gu) ?? []).length, 11, "the renderer must cover exactly eleven IDs");
+  assert.equal((renderer.match(/case "[a-z]+\.[a-z]+":/gu) ?? []).length, 22, "the renderer must cover exactly twenty-two IDs");
 
   // Every one of the 22 registry IDs stays immutable and the eleven unimplemented ones stay unrenderable.
   const registry = stripComments(doc("src/core/modules/capability-registry.ts"));
@@ -1576,13 +1591,15 @@ test("the U04 slice declares exactly the eleven renderable IDs and implements ea
     (blockMatch) => [...blockMatch[1].matchAll(/"([a-z]+\.[a-z]+)"/gu)].map((match) => match[1]),
   );
   assert.equal(registryIds.length, 22, "the immutable registry must still hold exactly 22 IDs");
+  // From this increment every registered ID has a renderer, and the availability tuple may not invent one.
   const unrenderable = registryIds.filter((id) => !ids.includes(id));
-  assert.equal(unrenderable.length, 11, "exactly eleven registered IDs must remain unrenderable");
-  // The retained `renderer-unavailable` negative fixture must still name a registered but unimplemented ID.
-  assert.ok(unrenderable.includes("media.image"), "media.image must stay registered and unrenderable");
+  assert.deepEqual(unrenderable, [], "no registered ID may remain unrenderable");
   for (const id of ids) {
     assert.ok(registryIds.includes(id), `${id} is not an immutable registry ID`);
   }
+  // The discriminator is retained so a future registry addition still refuses with its own closed reason rather than
+  // silently rendering nothing.
+  assert.ok(contract.includes("document:renderer-unavailable"), "the availability refusal must be retained");
 });
 
 test('the U04 contract stays framework-free and the renderer stays a server component', () => {
@@ -1600,12 +1617,35 @@ test('the U04 contract stays framework-free and the renderer stays a server comp
   assert.equal(/<h1[\s>]/u.test(renderer), false, 'a document may never author the Page h1');
 });
 
-test('no new client island was added with the U04 slice', () => {
+test('exactly one client island exists, and it is the U04 interaction island', () => {
   const components = Object.entries(readTree('src/components', 'src/components'));
   const clientComponents = components
     .filter(([, content]) => stripComments(content).includes('"use client"'))
     .map(([path]) => path.replaceAll('\\', '/'));
-  assert.deepEqual(clientComponents, [], 'the JSON slice must not introduce a client component');
+  assert.deepEqual(
+    clientComponents,
+    ['src/components/uno-interaction-island.tsx'],
+    'the JSON slice must introduce exactly one client island and no second boundary',
+  );
+
+  const island = stripComments(doc('src/components/uno-interaction-island.tsx'));
+  for (const forbidden of [
+    'node:',
+    'next/',
+    '@vercel/',
+    'dangerouslySetInnerHTML',
+    'fetch(',
+    'XMLHttpRequest',
+    'localStorage',
+    'sessionStorage',
+    'document.cookie',
+    'deployment/',
+  ]) {
+    assert.equal(island.includes(forbidden), false, `the client island must not reference ${forbidden}`);
+  }
+  // The only package the island may import is React itself; every other specifier would be a new authority.
+  const packages = specifiersOf(island).filter((specifier) => !specifier.startsWith('.'));
+  assert.deepEqual(packages, ['react'], 'the client island may import React and nothing else');
 });
 
 test('only the localized Page segment imports the JSON section renderer', () => {

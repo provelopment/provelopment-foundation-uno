@@ -29,15 +29,29 @@ const UNO_DEPLOYMENT_INPUTS = [
   './deployment/efs/content/**/*.json',
 ];
 
+/**
+ * The four owned-media zone roots (`UNO-WO-040 / R01`). Each is a *named* root, not a wildcard over `deployment/**` or
+ * `public/**`: the page route needs them to render an accepted JSON Page's media, and the media route needs them to read
+ * one already-authorised occurrence. `scripts/verify-u03-trace.mjs` refuses a build where this list is missing, widened
+ * or ineffective, so the bounded tracing stays provable rather than promised.
+ */
+const UNO_MEDIA_ZONE_INPUTS = [
+  './deployment/efs/capsule/**/*',
+  './deployment/content/assets/**/*',
+  './public/platform/**/*',
+  './public/_uno-generated/**/*',
+];
+
 const nextConfig: NextConfig = {
   devIndicators: false,
   experimental: {
     globalNotFound: true,
   },
   outputFileTracingIncludes: {
-    '/[locale]/[[...segments]]': UNO_DEPLOYMENT_INPUTS,
+    '/[locale]/[[...segments]]': [...UNO_DEPLOYMENT_INPUTS, ...UNO_MEDIA_ZONE_INPUTS],
     '/sitemap.xml': UNO_DEPLOYMENT_INPUTS,
     '/robots.txt': UNO_DEPLOYMENT_INPUTS,
+    '/uno-media/[...segments]': [...UNO_DEPLOYMENT_INPUTS, ...UNO_MEDIA_ZONE_INPUTS],
   },
 };
 

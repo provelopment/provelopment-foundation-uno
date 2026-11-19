@@ -210,7 +210,25 @@ jobs:
         env:
           PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers
 
-      # Offline deployment-readiness gate (UNO-WO-012 / R02). Reads only committed text from
+      # Hermetic guard for the 22-module gate (UNO-WO-047 / R01): proves the runner still installs a bounded
+      # restore-in-finally fixture, still asserts all 22 distinct IDs and all four providers, and still refuses a
+      # weakened or skipped consent boundary. No browser, no network, no build.
+      - name: U04 22-module consent hermetic guard
+        run: node --test tests/deployment/u04-22-module-consent.test.mjs
+        shell: bash
+
+      # Blocking U04 22-module and four-provider consent gate (UNO-WO-047 / R01). It installs the same
+      # restore-in-finally publication fixture, builds and serves the real production output on loopback, then proves
+      # sixteen distinct refusal cases plus the whole-route 22-module Page: one `main`, one `h1`, all 22 registry IDs
+      # parsed and rendered, and YouTube/Vimeo/Rumble/BitChute consent with zero iframe or provider request before an
+      # explicit action, one governed frame afterwards, and unload with focus return. No provider playback is claimed:
+      # frames and requests are locally intercepted.
+      - name: Verify U04 22-module and four-provider consent (real production HTTP and Chromium)
+        run: node scripts/verify-u04-22-module-consent.mjs
+        shell: bash
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers
+
       # this checkout: no network, no provider call, no credential and no deployment. It fails
       # the job if the pinned build inputs, the payload exclusions, the page/robots guards or
       # these CI steps themselves drift or weaken.

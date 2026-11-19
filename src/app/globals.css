@@ -1,4 +1,98 @@
 /*
+ * Foundation Uno — external-video consent (`media.video` external mode), `UNO-WO-042 / R01`.
+ *
+ * Before consent there is no frame at all: this styles a plain, focusable control block. After consent the frame is a
+ * 16:9 box that never overflows its container from 320 px upward. Nothing here animates, and every transition is
+ * removed under reduced motion, so the block is fully readable without motion.
+ */
+.uno-json-video-external {
+  margin-block: 1.5rem;
+  max-width: 100%;
+}
+
+.uno-video-consent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 100%;
+  padding: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.uno-video-consent-note {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.uno-video-consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.uno-video-activate,
+.uno-video-unload {
+  padding: 0.5rem 1rem;
+  color: inherit;
+  font: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.uno-video-link {
+  text-decoration: underline;
+}
+
+.uno-video-frame {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 0.375rem;
+}
+
+.uno-video-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.uno-video-activate:focus-visible,
+.uno-video-unload:focus-visible,
+.uno-video-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .uno-video-consent {
+    padding: 0.75rem;
+  }
+
+  .uno-video-consent-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uno-video-consent,
+  .uno-video-consent * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+
+/*
  * Foundation Uno — English informational demonstration styles.
  *
  * Original, dependency-free CSS: no webfont, no external stylesheet, no CDN, no background image
@@ -1019,5 +1113,438 @@ main {
   .uno-json-timeline {
     transition: none;
     animation: none;
+  }
+}
+
+/*
+ * Layers, owned media, watermark, motion and the four interactions (`UNO-WO-040 / R01`, U04).
+ *
+ * Same discipline as every block above: scoped to `.uno-json`, built only from existing `--uno-*` tokens, no new palette
+ * entry, no webfont, no image, no gradient, no external resource and no `url()`. Nothing here reorders a node, hides
+ * content behind an animation, or introduces a horizontal scrollbar at 320px.
+ */
+
+/* --- Layers ------------------------------------------------------------------ */
+.uno-json-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.uno-json-layer {
+  min-width: 0;
+}
+
+/* Overlap composes the layers in one cell. Opaque layers keep text legible over the layer beneath, and whichever layer
+   currently holds focus is raised, so a control covered visually is never unreachable by keyboard. */
+.uno-json-layers[data-uno-mode="overlap"] {
+  display: grid;
+}
+
+.uno-json-layers[data-uno-mode="overlap"] > .uno-json-layer {
+  grid-area: 1 / 1;
+  padding: 1.25rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-background);
+}
+
+.uno-json-layers[data-uno-mode="overlap"] > .uno-json-layer:focus-within {
+  position: relative;
+  z-index: 3;
+}
+
+.uno-json-layers[data-uno-align="center"] {
+  align-items: center;
+  text-align: center;
+}
+
+/* --- Owned media ------------------------------------------------------------- */
+.uno-json-media,
+.uno-json-media-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.uno-json-media-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-surface);
+}
+
+.uno-json-media-caption {
+  color: var(--uno-muted);
+  font-size: 0.9375rem;
+}
+
+.uno-json-video-player {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-surface);
+}
+
+.uno-json-gallery {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+/* --- Watermark --------------------------------------------------------------- */
+.uno-json-watermark-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.uno-json-watermark {
+  margin: 0;
+  color: var(--uno-muted);
+  font-size: clamp(1.5rem, 6vw, 3rem);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  /* Decorative and inert: it never intercepts a pointer and never takes part in selection. */
+  pointer-events: none;
+  user-select: none;
+}
+
+.uno-json-watermark[data-uno-strength="subtle"] {
+  opacity: 0.22;
+}
+
+.uno-json-watermark[data-uno-strength="regular"] {
+  opacity: 0.4;
+}
+
+.uno-json-watermark[data-uno-align="start"] {
+  text-align: start;
+}
+
+.uno-json-watermark[data-uno-align="center"] {
+  text-align: center;
+}
+
+.uno-json-watermark[data-uno-align="end"] {
+  text-align: end;
+}
+
+/* --- Motion ------------------------------------------------------------------ */
+.uno-json-motion {
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .uno-json-gallery[data-uno-columns="2"],
+  .uno-json-gallery[data-uno-columns="3"],
+  .uno-json-gallery[data-uno-columns="4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .uno-json-gallery[data-uno-columns="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .uno-json-gallery[data-uno-columns="4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+
+/* --- Tabs -------------------------------------------------------------------- */
+.uno-json-tabs {
+  min-width: 0;
+}
+
+.uno-json-tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--uno-border);
+}
+
+.uno-json-tab {
+  padding: 0.6rem 1rem;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-start-start-radius: var(--uno-radius);
+  border-start-end-radius: var(--uno-radius);
+  background-color: transparent;
+  color: var(--uno-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.uno-json-tab[data-uno-active="true"] {
+  border-color: var(--uno-border);
+  background-color: var(--uno-surface);
+  color: var(--uno-foreground);
+  font-weight: 600;
+}
+
+.uno-json-tabpanel {
+  padding-block-start: 1rem;
+  min-width: 0;
+}
+
+.uno-json-tabpanel[hidden] {
+  display: none;
+}
+
+/* --- Accordion --------------------------------------------------------------- */
+.uno-json-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.uno-json-disclosure {
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-surface);
+}
+
+.uno-json-disclosure-summary {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.uno-json-disclosure-body {
+  padding: 0 1rem 1rem;
+  min-width: 0;
+}
+
+/* --- Modal ------------------------------------------------------------------- */
+.uno-json-modal {
+  min-width: 0;
+}
+
+.uno-json-modal-trigger,
+.uno-json-carousel-button,
+.uno-json-modal-close {
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--uno-accent);
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-accent);
+  color: var(--uno-accent-contrast);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.uno-json-modal-close {
+  background-color: transparent;
+  color: var(--uno-foreground);
+  border-color: var(--uno-border);
+}
+
+.uno-json-modal-dialog {
+  max-width: min(38rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-background);
+  color: var(--uno-foreground);
+}
+
+.uno-json-modal-dialog::backdrop {
+  background-color: rgb(9 13 19 / 55%);
+}
+
+.uno-json-modal-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-block-end: 0.75rem;
+}
+
+.uno-json-modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.uno-json-modal-body {
+  min-width: 0;
+}
+
+/* --- Carousel ---------------------------------------------------------------- */
+.uno-json-carousel {
+  min-width: 0;
+}
+
+.uno-json-carousel-stage {
+  min-width: 0;
+}
+
+.uno-json-carousel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-block-start: 0.75rem;
+}
+
+.uno-json-carousel-status {
+  margin: 0;
+  color: var(--uno-muted);
+  font-size: 0.9375rem;
+  text-align: center;
+}
+
+/* --- Contact (delivery OFF) --------------------------------------------------- */
+.uno-json-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-surface);
+}
+
+.uno-json-contact-heading {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.uno-json-contact-description {
+  color: var(--uno-muted);
+}
+
+.uno-json-contact-status {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-inline-start: 3px solid var(--uno-accent);
+  border-radius: 4px;
+  background-color: var(--uno-accent-soft);
+  color: var(--uno-foreground);
+  font-size: 0.9375rem;
+}
+
+.uno-json-contact-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.uno-json-contact-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.uno-json-contact-label {
+  font-weight: 600;
+}
+
+.uno-json-contact-input {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-background);
+  color: var(--uno-foreground);
+  font: inherit;
+}
+
+.uno-json-contact-submit {
+  align-self: flex-start;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-surface-strong);
+  color: var(--uno-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: not-allowed;
+}
+
+/* --- Narrow screens ---------------------------------------------------------- */
+@media (max-width: 639px) {
+  /* Overlap collapses to a plain stack so no layer can cover a control on a small screen. */
+  .uno-json-layers[data-uno-mode="overlap"] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .uno-json-layers[data-uno-mode="overlap"] > .uno-json-layer {
+    grid-area: auto;
+  }
+
+  .uno-json-carousel-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+/* --- Reduced motion ---------------------------------------------------------- */
+/* `design.motion` is a stylesheet effect only, so `reduce` removes it whole and the content is simply present. */
+@media (prefers-reduced-motion: reduce) {
+  .uno-json-motion,
+  .uno-json-motion *,
+  .uno-json-carousel,
+  .uno-json-tab,
+  .uno-json-disclosure {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .uno-json-motion[data-uno-effect="fade"] {
+    animation: uno-json-fade 300ms ease-out both;
+  }
+
+  .uno-json-motion[data-uno-effect="rise"] {
+    animation: uno-json-rise 300ms ease-out both;
+  }
+
+  .uno-json-motion[data-uno-speed="short"] {
+    animation-duration: 160ms;
+  }
+
+  .uno-json-motion[data-uno-speed="normal"] {
+    animation-duration: 300ms;
+  }
+}
+
+@keyframes uno-json-fade {
+  from {
+    opacity: 0.001;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes uno-json-rise {
+  from {
+    opacity: 0.001;
+    transform: translateY(0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
   }
 }

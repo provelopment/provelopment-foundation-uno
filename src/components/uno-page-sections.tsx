@@ -1,35 +1,36 @@
 /**
- * Foundation Uno — the validated JSON Page section renderer (`UNO-WO-035 / R01`, U04).
+ * Foundation Uno — the validated JSON Page section renderer (`UNO-WO-040 / R01`, U04).
  *
- * WHAT THIS IS. One original **server** React component that renders the eleven module IDs this execution
- * implements — `layout.stack`, `layout.grid`, `layout.bento`, `content.heading`, `content.prose`, `content.actions`,
- * `content.hero`, `content.stats`, `content.testimonials`, `content.pricing`, `content.timeline` — from a document
- * that the Page-document contract has already accepted.
+ * WHAT THIS IS. One original **server** React component that renders all twenty-two approved module IDs from a document
+ * the Page-document contract has already accepted: the four layouts, the eight content modules, the four media modules,
+ * the two design treatments and the four interactions. Owned media arrives as an already-resolved, server-built
+ * projection; the component never reads a file, opens a socket or builds a URL of its own.
  *
- * PREFLIGHT. The component re-validates the document it is handed before emitting a single node. A document that
- * no longer validates renders **nothing at all**: there is no partial output, no "render what we can" path and no
- * Markdown rescue here. The page component decides *whether* a JSON Page may be served; this component only
- * decides *how* an already accepted document is displayed.
+ * PREFLIGHT. The component re-validates the document it is handed before emitting a single node. A document that no
+ * longer validates renders **nothing at all**: there is no partial output, no "render what we can" path and no Markdown
+ * rescue here. The page component decides *whether* a JSON Page may be served; this component only decides *how* an
+ * already accepted document is displayed.
  *
- * SAFETY. Authored text is React text, never HTML: there is no `dangerouslySetInnerHTML`, no Markdown
- * interpretation, no inline style, no authored URL and no `use client`. A same-document action is rendered as a
- * real `<a href="#<section-id>">` whose target the contract has already proved exists in this document. Nothing
- * here is interactive state, so this slice adds no client JavaScript and no hydration boundary.
+ * SAFETY. Authored text is React text, never HTML: there is no `dangerouslySetInnerHTML`, no Markdown interpretation, no
+ * inline style, no authored URL and no authored CSS. A same-document action is a real `<a href="#<section-id>">` whose
+ * target the contract has already proved exists. Only three modules cross into client JavaScript, and they do so through
+ * the single island: everything else is inert server markup.
  *
- * WHAT THIS IS NOT. It emits no `<main>` and no `<h1>`: the App Router page owns the single `main` landmark and
- * the single Page title, so a document can never produce a second one. It knows nothing about publication,
- * locale, canonical URLs, discovery, analytics or providers.
+ * WHAT THIS IS NOT. It emits no `<main>` and no `<h1>`: the App Router page owns the single `main` landmark and the single
+ * Page title, so a document can never produce a second one. It knows nothing about publication, locale, canonical URLs,
+ * discovery, analytics or providers.
  *
  * PROVENANCE. Original **Uno-owned** implementation, class **NEW**. The pinned Foundation GEO-03 composer
- * (`fc35a52d6cfc5f114e50470e8286a89916cde801`) and the audited `hero`, `stats` and `quote` section implementations
- * were read for their semantic structure only (`UNO-WO-037 / R01`). No code, class name, Markdown pipeline, link
- * resolver or Tailwind token is copied: Uno renders inert text, its own `--uno-*` palette and same-document anchors.
+ * (`fc35a52d6cfc5f114e50470e8286a89916cde801`) was read for semantic structure only in `UNO-WO-037 / R01`. No code, class
+ * name, Markdown pipeline, link resolver or Tailwind token is copied: Uno renders inert text, its own `--uno-*` palette,
+ * its own same-document anchors and images served by its own bounded media route.
  */
-import {
-  readUnoPageDocument,
-  type UnoPageDocument,
-  type UnoSectionNode,
-} from "../core/page-document";
+import Image from "next/image";
+
+import type { UnoPageMedia, UnoResolvedImage, UnoSectionMedia } from "../core/assets/uno-owned-media";
+import { readUnoPageDocument, isUnoExternalVideoProps, type UnoPageDocument, type UnoSectionNode } from "../core/page-document";
+import { readUnoVideoEmbed } from "../core/video/uno-video-embeds";
+import { UnoCarouselIsland, UnoExternalVideoIsland, UnoModalIsland, UnoTabsIsland } from "./uno-interaction-island";
 
 /** The exact intrinsic heading element for each authored level; `h1` is deliberately absent. */
 const HEADING_TAGS = Object.freeze({
@@ -40,20 +41,85 @@ const HEADING_TAGS = Object.freeze({
   6: "h6",
 } as const);
 
-/** One validated document. The type says "validated"; the component still re-checks at runtime. */
+/** The readable label of each closed contact field. Fixed Uno chrome, never authored copy. */
+const CONTACT_FIELD_LABELS = Object.freeze({
+  name: "Name",
+  email: "Email",
+  message: "Message",
+} as const);
+
+/** One validated document plus the server-resolved media its sections declared. */
 export interface UnoPageSectionsProps {
   readonly document: UnoPageDocument;
+  readonly media?: UnoPageMedia;
+}
+
+/** The resolved media of one section, or an empty record when the Page published none for it. */
+function mediaOf(media: UnoPageMedia | undefined, id: string): UnoSectionMedia {
+  return media?.get(id) ?? {};
+}
+
+/** One resolved figure: a real owned image with its authored alternative and optional caption. */
+function MediaFigure({
+  id,
+  image,
+  alt,
+  caption,
+}: {
+  readonly id: string;
+  readonly image: UnoResolvedImage;
+  readonly alt: string;
+  readonly caption: string | undefined;
+}) {
+  return (
+    <figure className="uno-json-media" id={id}>
+      <Image
+        alt={alt}
+        className="uno-json-media-image"
+        height={image.height}
+        src={image.src}
+        unoptimized
+        width={image.width}
+      />
+      {caption === undefined ? null : <figcaption className="uno-json-media-caption">{caption}</figcaption>}
+    </figure>
+  );
+}
+
+/** One gallery or carousel item, rendered without an `id` so an item never duplicates a section anchor. */
+function MediaItemFigure({
+  image,
+  alt,
+  caption,
+}: {
+  readonly image: UnoResolvedImage;
+  readonly alt: string;
+  readonly caption: string | undefined;
+}) {
+  return (
+    <figure className="uno-json-media-item">
+      <Image
+        alt={alt}
+        className="uno-json-media-image"
+        height={image.height}
+        src={image.src}
+        unoptimized
+        width={image.width}
+      />
+      {caption === undefined ? null : <figcaption className="uno-json-media-caption">{caption}</figcaption>}
+    </figure>
+  );
 }
 
 /** Render one validated section node, or nothing when the node is somehow not renderable. */
-function SectionNode({ node }: { readonly node: UnoSectionNode }) {
+function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly media: UnoPageMedia | undefined }) {
   switch (node.module) {
     case "layout.stack": {
       const gap = node.props.gap ?? "normal";
       return (
         <div className="uno-json-stack" data-uno-gap={gap} id={node.id}>
           {node.children.map((child) => (
-            <SectionNode key={child.id} node={child} />
+            <SectionNode key={child.id} media={media} node={child} />
           ))}
         </div>
       );
@@ -70,11 +136,11 @@ function SectionNode({ node }: { readonly node: UnoSectionNode }) {
           {node.children.map((child) =>
             semantics === "article" ? (
               <article className="uno-json-card" data-uno-card-id={child.id} key={child.id}>
-                <SectionNode node={child} />
+                <SectionNode media={media} node={child} />
               </article>
             ) : (
               <div className="uno-json-cell" data-uno-cell-id={child.id} key={child.id}>
-                <SectionNode node={child} />
+                <SectionNode media={media} node={child} />
               </div>
             ),
           )}
@@ -102,16 +168,35 @@ function SectionNode({ node }: { readonly node: UnoSectionNode }) {
                   data-uno-tile-span={span}
                   key={child.id}
                 >
-                  <SectionNode node={child} />
+                  <SectionNode media={media} node={child} />
                 </article>
               );
             }
             return (
               <div className="uno-json-tile" data-uno-tile-id={child.id} data-uno-tile-span={span} key={child.id}>
-                <SectionNode node={child} />
+                <SectionNode media={media} node={child} />
               </div>
             );
           })}
+        </div>
+      );
+    }
+    case "layout.layers": {
+      const align = node.props.align ?? "start";
+      // Every layer is a real, ordered child in authored DOM order. `overlap` changes stacking, never order, and the
+      // stylesheet raises whichever layer currently holds focus, so a covered control is never unreachable by keyboard.
+      return (
+        <div
+          className="uno-json-layers"
+          data-uno-align={align}
+          data-uno-mode={node.props.mode}
+          id={node.id}
+        >
+          {node.children.map((child) => (
+            <div className="uno-json-layer" data-uno-layer-id={child.id} key={child.id}>
+              <SectionNode media={media} node={child} />
+            </div>
+          ))}
         </div>
       );
     }
@@ -141,6 +226,7 @@ function SectionNode({ node }: { readonly node: UnoSectionNode }) {
           ))}
         </ul>
       );
+
     case "content.hero": {
       const { eyebrow, lede, support, align, surface, actions } = node.props;
       return (
@@ -226,6 +312,7 @@ function SectionNode({ node }: { readonly node: UnoSectionNode }) {
         </section>
       );
     }
+
     case "content.pricing": {
       const { items, heading, level, surface } = node.props;
       const Tag = level === undefined ? null : HEADING_TAGS[level];
@@ -305,6 +392,217 @@ function SectionNode({ node }: { readonly node: UnoSectionNode }) {
         </section>
       );
     }
+
+    case "media.image": {
+      const resolved = mediaOf(media, node.id).image;
+      // Serving already refused the Page when a declared asset was unreadable, so an unresolved image here means the
+      // document changed after acceptance; rendering nothing is the honest outcome.
+      if (resolved === undefined) return null;
+      return <MediaFigure alt={node.props.alt} caption={node.props.caption} id={node.id} image={resolved} />;
+    }
+    case "media.video": {
+      if (isUnoExternalVideoProps(node.props)) {
+        // The destination is constructed only by the pure provider policy. Acceptance already proved it valid, so a
+        // refusal here means the document changed after acceptance — render nothing rather than an unvalidated frame.
+        const embed = readUnoVideoEmbed({
+          provider: node.props.provider,
+          videoId: node.props.videoId,
+          ...(node.props.privacyHash === undefined ? {} : { vimeoHash: node.props.privacyHash }),
+        });
+        if (!embed.ok) return null;
+        return (
+          <figure className="uno-json-media uno-json-video-external" id={node.id}>
+            <UnoExternalVideoIsland
+              description={node.props.description}
+              embedUrl={embed.projection.embedUrl}
+              externalFallbackUrl={embed.projection.externalFallbackUrl}
+              id={node.id}
+              provider={embed.projection.provider}
+              providerLabel={embed.projection.providerLabel}
+              title={node.props.title}
+            />
+          </figure>
+        );
+      }
+      const resolved = mediaOf(media, node.id);
+      if (resolved.video === undefined || resolved.captions === undefined) return null;
+      return (
+        <figure className="uno-json-media uno-json-video" id={node.id}>
+          <video
+            aria-label={node.props.title}
+            className="uno-json-video-player"
+            controls
+            playsInline
+            poster={resolved.poster?.src}
+            preload="metadata"
+          >
+            <source src={resolved.video.src} type={resolved.video.type} />
+            {/* A required, owned caption track: the video is never published without one. */}
+            <track default kind="captions" label="Captions" src={resolved.captions.src} srcLang="en" />
+          </video>
+          {node.props.description === undefined ? null : (
+            <figcaption className="uno-json-media-caption">{node.props.description}</figcaption>
+          )}
+        </figure>
+      );
+    }
+    case "media.gallery": {
+      const resolved = mediaOf(media, node.id).items;
+      if (resolved === undefined || resolved.length !== node.props.items.length) return null;
+      return (
+        <div className="uno-json-gallery" data-uno-columns={node.props.columns} id={node.id}>
+          {node.props.items.map((item, index) => {
+            const image = resolved[index];
+            if (image === undefined) return null;
+            return (
+              <MediaItemFigure alt={item.alt} caption={item.caption} image={image} key={`${item.alt}:${index}`} />
+            );
+          })}
+        </div>
+      );
+    }
+    case "media.carousel": {
+      const resolved = mediaOf(media, node.id).items;
+      if (resolved === undefined || resolved.length !== node.props.items.length) return null;
+      // Every item is server-rendered here; the island only chooses which one is on stage and never sees a URL.
+      const figures = node.props.items.map((item, index) => {
+        const image = resolved[index];
+        if (image === undefined) return null;
+        return <MediaItemFigure alt={item.alt} caption={item.caption} image={image} key={`${item.alt}:${index}`} />;
+      });
+      return (
+        <UnoCarouselIsland
+          count={node.props.items.length}
+          id={node.id}
+          items={figures}
+          label={node.props.label}
+        />
+      );
+    }
+
+    case "design.watermark": {
+      // Decorative by contract: hidden from assistive technology, inert to pointer and focus, and never a replacement
+      // for the content it sits behind.
+      return (
+        <div className="uno-json-watermark-wrap" id={node.id}>
+          <p
+            aria-hidden="true"
+            className="uno-json-watermark"
+            data-uno-align={node.props.align ?? "center"}
+            data-uno-strength={node.props.strength ?? "subtle"}
+          >
+            {node.props.text}
+          </p>
+        </div>
+      );
+    }
+    case "design.motion": {
+      // The wrapped content is always rendered in its final, readable state; the effect is a stylesheet transition that
+      // `prefers-reduced-motion: reduce` removes entirely, so nothing is ever hidden behind an animation.
+      return (
+        <div
+          className="uno-json-motion"
+          data-uno-effect={node.props.effect}
+          data-uno-speed={node.props.speed ?? "normal"}
+          id={node.id}
+        >
+          {node.children.map((child) => (
+            <SectionNode key={child.id} media={media} node={child} />
+          ))}
+        </div>
+      );
+    }
+    case "interaction.tabs": {
+      const panels = node.children.map((child) => <SectionNode key={child.id} media={media} node={child} />);
+      return <UnoTabsIsland id={node.id} label={node.props.label} panels={panels} tabs={node.props.tabs} />;
+    }
+    case "interaction.accordion": {
+      // Native `<details>`/`<summary>`: keyboard behaviour, expanded state and the disclosure roles are the platform's,
+      // and each disclosure opens independently of the others.
+      return (
+        <div className="uno-json-accordion" id={node.id}>
+          {node.children.map((child, index) => (
+            <details className="uno-json-disclosure" key={child.id}>
+              <summary className="uno-json-disclosure-summary">{node.props.items[index]?.label}</summary>
+              <div className="uno-json-disclosure-body">
+                <SectionNode media={media} node={child} />
+              </div>
+            </details>
+          ))}
+        </div>
+      );
+    }
+
+    case "interaction.modal": {
+      const content = node.children.map((child) => <SectionNode key={child.id} media={media} node={child} />);
+      return (
+        <UnoModalIsland
+          closeLabel={node.props.closeLabel}
+          id={node.id}
+          title={node.props.title}
+          triggerLabel={node.props.triggerLabel}
+        >
+          {content}
+        </UnoModalIsland>
+      );
+    }
+    case "interaction.contact": {
+      const { heading, description, fields, submitLabel } = node.props;
+      const headingId = `${node.id}-title`;
+      const selected = fields ?? [];
+      return (
+        <section
+          aria-labelledby={heading === undefined ? undefined : headingId}
+          className="uno-json-contact"
+          id={node.id}
+        >
+          {heading === undefined ? null : (
+            <p className="uno-json-contact-heading" id={headingId}>
+              {heading}
+            </p>
+          )}
+          {description === undefined ? null : (
+            <p className="uno-json-contact-description">{description}</p>
+          )}
+          {/*
+            The honest delivery-OFF state is stated in the Page itself. There is no `<form>`, no action, no handler and
+            no transport anywhere in this module, so "not sent" is a structural fact rather than a promise.
+          */}
+          <p className="uno-json-contact-status">Delivery is switched off. Nothing entered here is sent or stored.</p>
+          {selected.length === 0 ? null : (
+            <div className="uno-json-contact-fields">
+              {selected.map((field) => (
+                <div className="uno-json-contact-field" key={field}>
+                  <label className="uno-json-contact-label" htmlFor={`${node.id}-${field}`}>
+                    {CONTACT_FIELD_LABELS[field]}
+                  </label>
+                  {field === "message" ? (
+                    <textarea
+                      className="uno-json-contact-input"
+                      id={`${node.id}-${field}`}
+                      readOnly
+                      rows={4}
+                    />
+                  ) : (
+                    <input
+                      className="uno-json-contact-input"
+                      id={`${node.id}-${field}`}
+                      readOnly
+                      type={field === "email" ? "email" : "text"}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {submitLabel === undefined ? null : (
+            <button className="uno-json-contact-submit" disabled type="button">
+              {submitLabel}
+            </button>
+          )}
+        </section>
+      );
+    }
     default: {
       // Exhaustive: every renderable literal is handled above, so `node` is `never` here.
       const unreachable: never = node;
@@ -317,18 +615,17 @@ function SectionNode({ node }: { readonly node: UnoSectionNode }) {
 /**
  * Render an accepted JSON Page document.
  *
- * The sections are wrapped in one `div` so the App Router page keeps its own `main` and heading structure. An
- * invalid document — which the serving gate should already have refused — renders nothing rather than a partial
- * Page.
+ * The sections are wrapped in one `div` so the App Router page keeps its own `main` and heading structure. An invalid
+ * document — which the serving gate should already have refused — renders nothing rather than a partial Page.
  */
-export function UnoPageSections({ document }: UnoPageSectionsProps) {
+export function UnoPageSections({ document, media }: UnoPageSectionsProps) {
   const validated = readUnoPageDocument(document);
   if (!validated.accepted) return null;
 
   return (
     <div className="uno-json" data-uno-document-version={validated.document.version}>
       {validated.document.sections.map((section) => (
-        <SectionNode key={section.id} node={section} />
+        <SectionNode key={section.id} media={media} node={section} />
       ))}
     </div>
   );

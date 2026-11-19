@@ -23,6 +23,7 @@ import { cache } from 'react';
 import type { ReactNode } from 'react';
 
 import type { UnoPublishedPageAccepted } from '../../../../application/plan-uno-published-page';
+import type { UnoPageMedia } from '../../../../core/assets/uno-owned-media';
 import { UnoPageSections } from '../../../../components/uno-page-sections';
 import {
   UnoSafeMarkdownPage,
@@ -70,7 +71,7 @@ export const dynamicParams = false;
 
 /** What this segment resolved an address to. */
 type ResolvedRoute =
-  | { readonly kind: 'page'; readonly page: UnoPublishedPageAccepted }
+  | { readonly kind: 'page'; readonly page: UnoPublishedPageAccepted; readonly media?: UnoPageMedia }
   | { readonly kind: 'redirect'; readonly location: string }
   | { readonly kind: 'refused' };
 
@@ -100,7 +101,12 @@ async function _resolveRoute(params: Promise<LocalizedRouteParams>): Promise<Res
 
   const pathname = segments.length === 0 ? `/${locale}` : `/${locale}/${segments.join('/')}`;
   const planned = await planUnoServingPage(pathname);
-  if (planned.status === 'served') return { kind: 'page', page: planned.page };
+  if (planned.status === 'served') {
+    // The media projections are already resolved and verified by the composition; this segment only forwards them.
+    return planned.media === undefined
+      ? { kind: 'page', page: planned.page }
+      : { kind: 'page', page: planned.page, media: planned.media };
+  }
 
   if (segments.length === 0) {
     const alias = await resolveUnoServingAlias(locale);
@@ -177,7 +183,7 @@ export default async function LocalizedPage({ params }: { params: Promise<Locali
   let body: ReactNode;
   if (page.document.kind === 'json') {
     if (page.document.pageDocument === undefined) notFound();
-    body = <UnoPageSections document={page.document.pageDocument} />;
+    body = <UnoPageSections document={page.document.pageDocument} media={resolvedRoute.media} />;
   } else {
     const parsed = parseUnoSafeMarkdown(page.document.markdownBody);
     if (!parsed.ok) notFound();

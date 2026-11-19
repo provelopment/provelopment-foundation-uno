@@ -136,11 +136,12 @@ describe("readUnoPageDocument — accepted documents", () => {
     expect(JSON.parse(JSON.stringify(first.document))).toEqual(first.document);
   });
 
-  it("accepts all eleven renderable module IDs and nothing else as renderable", () => {
+  it("accepts exactly the twenty-two registered module IDs as renderable", () => {
     expect([...UNO_RENDERABLE_MODULES]).toEqual([
       "layout.stack",
       "layout.grid",
       "layout.bento",
+      "layout.layers",
       "content.heading",
       "content.prose",
       "content.actions",
@@ -149,7 +150,18 @@ describe("readUnoPageDocument — accepted documents", () => {
       "content.testimonials",
       "content.pricing",
       "content.timeline",
+      "media.image",
+      "media.video",
+      "media.gallery",
+      "media.carousel",
+      "design.watermark",
+      "design.motion",
+      "interaction.tabs",
+      "interaction.accordion",
+      "interaction.modal",
+      "interaction.contact",
     ]);
+    expect(UNO_RENDERABLE_MODULES).toHaveLength(22);
     expect(readUnoPageDocument(full()).accepted).toBe(true);
   });
 
@@ -230,10 +242,17 @@ function section(
 }
 
 describe("readUnoPageDocument — closed refusals", () => {
-  it("distinguishes an unregistered module from a registered-but-unrenderable one", () => {
+  it("distinguishes an unregistered module from a registered one with invalid props", () => {
+    // A near-miss module literal is never repaired or guessed at.
     expectRefusal({ ...minimal(), sections: [section("x", "layout.marquee", {})] }, "document:unknown-module");
-    expectRefusal({ ...minimal(), sections: [section("x", "media.image", {})] }, "document:renderer-unavailable");
-    expectRefusal({ ...minimal(), sections: [section("x", "interaction.contact", {})] }, "document:renderer-unavailable");
+    // Every registered ID now has a renderer, so `document:renderer-unavailable` is unreachable for one and a
+    // registered module with missing props is a *props* refusal. The two reasons stay distinguishable.
+    expectRefusal({ ...minimal(), sections: [section("x", "media.image", {})] }, "document:invalid-props");
+    // A leaf module with missing required props is a props refusal, not an availability refusal.
+    expectRefusal({ ...minimal(), sections: [section("x", "media.gallery", {})] }, "document:invalid-props");
+    // A child-bearing module without its `children` key is refused as a children problem, before props are read.
+    expectRefusal({ ...minimal(), sections: [section("x", "design.motion", {})] }, "document:invalid-children");
+    expect(UNO_RENDERABLE_MODULES).toHaveLength(22);
   });
 
   it("refuses an unsupported version instead of upgrading or ignoring it", () => {
@@ -1103,6 +1122,415 @@ describe("readUnoPageDocument — codepoint counting after the lint repair", () 
       probe("content.timeline", { items: [{ title: "T", dateLabel: "l".repeat(121) }] }),
       "document:invalid-props",
     );
+  });
+});
+
+
+describe("readUnoPageDocument — the eleven remaining owned modules", () => {
+  /** One document whose single top-level section is the module under test. */
+  function probe(module: string, props: unknown, children?: readonly unknown[]): unknown {
+    const node: Record<string, unknown> = { id: "subject", module, props };
+    if (children !== undefined) node.children = children;
+    return { version: 1, title: "Module probe", sections: [node] };
+  }
+
+  /** A minimal valid leaf child, used wherever a module needs typed children. */
+  function leaf(id: string): unknown {
+    return { id, module: "content.prose", props: { text: `Body ${id}` } };
+  }
+
+  /** One authored asset reference. */
+  function asset(path: string, zone = "page", integrity?: string): Record<string, unknown> {
+    return integrity === undefined ? { zone, path } : { zone, path, integrity };
+  }
+
+  describe("layout.layers", () => {
+    it("accepts two to four layers and refuses anything outside that bound", () => {
+      expect(
+        readUnoPageDocument(
+          probe("layout.layers", { mode: "overlap", align: "center" }, [leaf("l-one"), leaf("l-two")]),
+        ).accepted,
+      ).toBe(true);
+      expect(
+        readUnoPageDocument(
+          probe("layout.layers", { mode: "stack" }, [leaf("l-one"), leaf("l-two"), leaf("l-three"), leaf("l-four")]),
+        ).accepted,
+      ).toBe(true);
+      expectRefusal(probe("layout.layers", { mode: "stack" }, [leaf("l-one")]), "document:invalid-children");
+      expectRefusal(
+        probe("layout.layers", { mode: "stack" }, [
+          leaf("l-one"),
+          leaf("l-two"),
+          leaf("l-three"),
+          leaf("l-four"),
+          leaf("l-five"),
+        ]),
+        "document:invalid-children",
+      );
+      expectRefusal(
+        probe("layout.layers", { mode: "float" }, [leaf("l-one"), leaf("l-two")]),
+        "document:invalid-props",
+      );
+    });
+  });
+
+  describe("media.image", () => {
+    it("accepts an authored alt, and requires exactly an empty alt when decorative", () => {
+      expect(readUnoPageDocument(probe("media.image", { asset: asset("hero.png"), alt: "A hero" })).accepted).toBe(true);
+      expect(
+        readUnoPageDocument(probe("media.image", { asset: asset("hero.png"), alt: "", decorative: true })).accepted,
+      ).toBe(true);
+      // A decorative image that still says something, and a meaningful image that says nothing, both refuse.
+      expectRefusal(
+        probe("media.image", { asset: asset("hero.png"), alt: "Say", decorative: true }),
+        "document:invalid-props",
+      );
+      expectRefusal(probe("media.image", { asset: asset("hero.png"), alt: "" }), "document:invalid-props");
+      expectRefusal(
+        probe("media.image", { asset: asset("hero.png"), alt: "A", decorative: "yes" }),
+        "document:invalid-props",
+      );
+    });
+
+    it("refuses an unsupported type, an unrelated purpose and a hostile path", () => {
+      expectRefusal(probe("media.image", { asset: asset("logo.svg"), alt: "A" }), "document:invalid-props");
+      expectRefusal(probe("media.image", { asset: asset("clip.mp4"), alt: "A" }), "document:invalid-props");
+      for (const hostile of [
+        "../escape.png",
+        "/absolute.png",
+        "a/../../b.png",
+        "C:/win.png",
+        "a\\b.png",
+        "a%2e%2e/b.png",
+        "a/b.png?x=1",
+        "a//b.png",
+        "con.png",
+        "hero.PNG",
+      ]) {
+        expectRefusal(probe("media.image", { asset: asset(hostile), alt: "A" }), "document:invalid-props");
+      }
+    });
+
+    it("requires integrity only for the generated zone", () => {
+      const digest = "a".repeat(64);
+      expect(
+        readUnoPageDocument(probe("media.image", { asset: asset("g.png", "generated", digest), alt: "A" })).accepted,
+      ).toBe(true);
+      expectRefusal(probe("media.image", { asset: asset("g.png", "generated"), alt: "A" }), "document:invalid-props");
+      expectRefusal(
+        probe("media.image", { asset: asset("g.png", "generated", "A".repeat(64)), alt: "A" }),
+        "document:invalid-props",
+      );
+      expectRefusal(
+        probe("media.image", { asset: asset("g.png", "page", digest), alt: "A" }),
+        "document:invalid-props",
+      );
+      expectRefusal(probe("media.image", { asset: asset("g.png", "elsewhere"), alt: "A" }), "document:invalid-props");
+    });
+  });
+
+  describe("media.video", () => {
+    it("accepts a video with its required caption track and refuses the wrong kinds", () => {
+      expect(
+        readUnoPageDocument(
+          probe("media.video", {
+            asset: asset("clip.mp4"),
+            captions: asset("clip.vtt"),
+            title: "A clip",
+            poster: asset("poster.webp"),
+          }),
+        ).accepted,
+      ).toBe(true);
+      // The caption track cannot be the video, and the video cannot be the caption track.
+      expectRefusal(
+        probe("media.video", { asset: asset("clip.mp4"), captions: asset("clip.mp4"), title: "A" }),
+        "document:invalid-props",
+      );
+      expectRefusal(
+        probe("media.video", { asset: asset("clip.vtt"), captions: asset("clip.vtt"), title: "A" }),
+        "document:invalid-props",
+      );
+      expectRefusal(probe("media.video", { asset: asset("clip.mp4"), title: "A" }), "document:invalid-props");
+    });
+  });
+
+  describe("media.gallery and media.carousel", () => {
+    const items = (count: number) =>
+      Array.from({ length: count }, (_unused, index) => ({ asset: asset(`g-${index}.png`), alt: `Image ${index}` }));
+
+    it("bounds a gallery to two through twelve items at one of three column counts", () => {
+      expect(readUnoPageDocument(probe("media.gallery", { columns: 3, items: items(2) })).accepted).toBe(true);
+      expect(readUnoPageDocument(probe("media.gallery", { columns: 4, items: items(12) })).accepted).toBe(true);
+      expectRefusal(probe("media.gallery", { columns: 3, items: items(1) }), "document:invalid-props");
+      expectRefusal(probe("media.gallery", { columns: 3, items: items(13) }), "document:invalid-props");
+      expectRefusal(probe("media.gallery", { columns: 5, items: items(2) }), "document:invalid-props");
+    });
+
+    it("bounds a carousel to two through eight items and requires a label", () => {
+      expect(readUnoPageDocument(probe("media.carousel", { label: "Work", items: items(2) })).accepted).toBe(true);
+      expect(readUnoPageDocument(probe("media.carousel", { label: "Work", items: items(8) })).accepted).toBe(true);
+      expectRefusal(probe("media.carousel", { label: "Work", items: items(1) }), "document:invalid-props");
+      expectRefusal(probe("media.carousel", { label: "Work", items: items(9) }), "document:invalid-props");
+      expectRefusal(probe("media.carousel", { items: items(2) }), "document:invalid-props");
+      // An item without its own alternative is refused rather than inheriting a neighbour's.
+      expectRefusal(
+        probe("media.carousel", { label: "Work", items: [{ asset: asset("a.png"), alt: "" }, ...items(1)] }),
+        "document:invalid-props",
+      );
+    });
+  });
+
+  describe("design.watermark and design.motion", () => {
+    it("accepts bounded watermark text with closed placement and strength", () => {
+      expect(
+        readUnoPageDocument(probe("design.watermark", { text: "Draft", align: "end", strength: "regular" })).accepted,
+      ).toBe(true);
+      expectRefusal(probe("design.watermark", { text: "t".repeat(161) }), "document:invalid-props");
+      expectRefusal(probe("design.watermark", { text: "Draft", align: "middle" }), "document:invalid-props");
+      expectRefusal(probe("design.watermark", { text: "Draft", strength: "loud" }), "document:invalid-props");
+    });
+
+    it("accepts one to four motion children and refuses an unknown effect", () => {
+      expect(readUnoPageDocument(probe("design.motion", { effect: "fade" }, [leaf("m-one")])).accepted).toBe(true);
+      expect(
+        readUnoPageDocument(
+          probe("design.motion", { effect: "rise", speed: "short" }, [
+            leaf("m-one"),
+            leaf("m-two"),
+            leaf("m-three"),
+            leaf("m-four"),
+          ]),
+        ).accepted,
+      ).toBe(true);
+      expectRefusal(probe("design.motion", { effect: "fade" }, []), "document:invalid-children");
+      expectRefusal(
+        probe("design.motion", { effect: "fade" }, [
+          leaf("m-one"),
+          leaf("m-two"),
+          leaf("m-three"),
+          leaf("m-four"),
+          leaf("m-five"),
+        ]),
+        "document:invalid-children",
+      );
+      expectRefusal(probe("design.motion", { effect: "spin" }, [leaf("m-one")]), "document:invalid-props");
+    });
+  });
+
+  describe("interaction.tabs and interaction.accordion", () => {
+    const panels = [leaf("panel-a"), leaf("panel-b")];
+    const tabEntries = [
+      { sectionId: "panel-a", label: "A" },
+      { sectionId: "panel-b", label: "B" },
+    ];
+
+    it("binds positional tab entries to their own children exactly", () => {
+      expect(
+        readUnoPageDocument(probe("interaction.tabs", { label: "Sections", tabs: tabEntries }, panels)).accepted,
+      ).toBe(true);
+      // A tab naming a different child, a short list and a mismatched count all refuse.
+      expectRefusal(
+        probe(
+          "interaction.tabs",
+          {
+            label: "S",
+            tabs: [
+              { sectionId: "panel-b", label: "A" },
+              { sectionId: "panel-b", label: "B" },
+            ],
+          },
+          panels,
+        ),
+        "document:invalid-props",
+      );
+      expectRefusal(
+        probe("interaction.tabs", { label: "S", tabs: [{ sectionId: "panel-a", label: "A" }] }, panels),
+        "document:invalid-props",
+      );
+      // A single panel violates the two-panel minimum before the entry list is even read.
+      expectRefusal(
+        probe("interaction.tabs", { label: "S", tabs: tabEntries }, [leaf("panel-a")]),
+        "document:invalid-children",
+      );
+      // Seven panels exceed the closed six-panel bound.
+      const seven = ["p1", "p2", "p3", "p4", "p5", "p6", "p7"];
+      expectRefusal(
+        probe(
+          "interaction.tabs",
+          { label: "S", tabs: seven.map((id) => ({ sectionId: id, label: id })) },
+          seven.map((id) => leaf(id)),
+        ),
+        "document:invalid-children",
+      );
+    });
+
+    it("binds accordion entries to one through eight children", () => {
+      expect(
+        readUnoPageDocument(
+          probe("interaction.accordion", { items: [{ sectionId: "d-one", label: "One" }] }, [leaf("d-one")]),
+        ).accepted,
+      ).toBe(true);
+      expectRefusal(
+        probe("interaction.accordion", { items: [{ sectionId: "d-two", label: "One" }] }, [leaf("d-one")]),
+        "document:invalid-props",
+      );
+    });
+  });
+
+  describe("interaction.modal and interaction.contact", () => {
+    const labels = { triggerLabel: "Open", title: "Details", closeLabel: "Close" };
+
+    it("accepts exactly one modal content node", () => {
+      expect(readUnoPageDocument(probe("interaction.modal", labels, [leaf("modal-body")])).accepted).toBe(true);
+      expectRefusal(
+        probe("interaction.modal", labels, [leaf("modal-a"), leaf("modal-b")]),
+        "document:invalid-children",
+      );
+      expectRefusal(probe("interaction.modal", labels, []), "document:invalid-children");
+    });
+
+    it("accepts the delivery-OFF contact surface with and without fields", () => {
+      expect(readUnoPageDocument(probe("interaction.contact", {})).accepted).toBe(true);
+      expect(
+        readUnoPageDocument(
+          probe("interaction.contact", {
+            heading: "Contact",
+            fields: ["name", "email", "message"],
+            submitLabel: "Send",
+          }),
+        ).accepted,
+      ).toBe(true);
+      expectRefusal(probe("interaction.contact", { fields: ["name", "name"] }), "document:invalid-props");
+      expectRefusal(probe("interaction.contact", { fields: ["phone"] }), "document:invalid-props");
+      expectRefusal(probe("interaction.contact", { fields: [] }), "document:invalid-props");
+    });
+  });
+
+
+
+});
+
+
+/**
+ * `media.video` is one strict discriminated union: an owned native player, or a consent-gated external embed whose
+ * destination is constructed only by the pure four-provider policy. These cases prove both alternatives and, just as
+ * importantly, that a mixed or hostile form refuses the **whole Page** rather than degrading to a partial render.
+ */
+describe("media.video — native/external discriminated union", () => {
+  const page = (props: Record<string, unknown>) => ({
+    ...minimal(),
+    sections: [section("clip", "media.video", props)],
+  });
+
+  it("accepts the four governed providers with their own identifier grammars", () => {
+    const accepted: readonly Record<string, unknown>[] = [
+      { source: "external", provider: "youtube", videoId: "dQw4w9WgXcQ", title: "A YouTube clip" },
+      { source: "external", provider: "vimeo", videoId: "76979871", title: "A Vimeo clip" },
+      { source: "external", provider: "rumble", videoId: "v17j3tt", title: "A Rumble clip" },
+      { source: "external", provider: "bitchute", videoId: "aB_9-hXyZ", title: "A BitChute clip" },
+    ];
+    for (const props of accepted) {
+      expect(readUnoPageDocument(page(props)).accepted).toBe(true);
+    }
+  });
+
+  it("keeps mixed-case provider video IDs valid where the provider allows them", () => {
+    expect(
+      readUnoPageDocument(page({ source: "external", provider: "youtube", videoId: "AbCdEfGh-_1", title: "Mixed" }))
+        .accepted,
+    ).toBe(true);
+    expect(
+      readUnoPageDocument(page({ source: "external", provider: "bitchute", videoId: "AbCd_-1", title: "Mixed" }))
+        .accepted,
+    ).toBe(true);
+  });
+
+  it("accepts a Vimeo unlisted privacy hash and keeps it only for Vimeo", () => {
+    const withHash = page({
+      source: "external",
+      provider: "vimeo",
+      videoId: "76979871",
+      privacyHash: "abcdef12",
+      title: "Unlisted",
+    });
+    const accepted = readUnoPageDocument(withHash);
+    expect(accepted.accepted).toBe(true);
+    if (accepted.accepted) {
+      const node = accepted.document.sections[0];
+      expect(node?.module).toBe("media.video");
+      expect(node?.props).toMatchObject({ source: "external", privacyHash: "abcdef12" });
+    }
+    // A hash is Vimeo-only: on every other provider it refuses the entire Page.
+    for (const provider of ["youtube", "rumble", "bitchute"]) {
+      expectRefusal(
+        page({
+          source: "external",
+          provider,
+          videoId: provider === "youtube" ? "dQw4w9WgXcQ" : provider === "rumble" ? "v17j3tt" : "abcde",
+          privacyHash: "abcdef12",
+          title: "Hash elsewhere",
+        }),
+        "document:invalid-props",
+      );
+    }
+  });
+
+  it("refuses a mixed native/external form in both directions", () => {
+    const owned = { zone: "page", path: "wo042-clip.mp4" };
+    // External mode carrying native asset fields is not repaired into native mode.
+    expectRefusal(
+      page({ source: "external", provider: "youtube", videoId: "dQw4w9WgXcQ", title: "Mixed", asset: owned }),
+      "document:invalid-props",
+    );
+    expectRefusal(
+      page({
+        source: "external",
+        provider: "youtube",
+        videoId: "dQw4w9WgXcQ",
+        title: "Mixed",
+        captions: owned,
+      }),
+      "document:invalid-props",
+    );
+    // Native mode carrying an external field is likewise refused.
+    expectRefusal(
+      page({ asset: owned, captions: owned, title: "Native", provider: "youtube" }),
+      "document:invalid-props",
+    );
+    // And an unknown value for the discriminator is not a third mode.
+    expectRefusal(
+      page({ source: "embedded", provider: "youtube", videoId: "dQw4w9WgXcQ", title: "Third mode" }),
+      "document:invalid-props",
+    );
+  });
+
+  it("refuses host, URL, markup, scheme and key injection in external mode", () => {
+    const hostile: readonly Record<string, unknown>[] = [
+      { source: "external", provider: "youtube", videoId: "javascript:alert(1)", title: "Scheme" },
+      { source: "external", provider: "youtube", videoId: "data:text/html,x", title: "Data" },
+      { source: "external", provider: "youtube", videoId: "//evil.example/x", title: "Protocol relative" },
+      { source: "external", provider: "youtube", videoId: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", title: "URL" },
+      { source: "external", provider: "youtube", videoId: "<script>x</script>", title: "Markup" },
+      { source: "external", provider: "youtube", videoId: "dQw4w9WgXcQ", title: "Extra", src: "https://evil.example" },
+      { source: "external", provider: "youtube", videoId: "dQw4w9WgXcQ", title: "Extra", allow: "autoplay" },
+      { source: "external", provider: "youtube", videoId: "dQw4w9WgXcQ", title: "Extra", sandbox: "allow-forms" },
+      { source: "external", provider: "YouTube", videoId: "dQw4w9WgXcQ", title: "Case" },
+      { source: "external", provider: "youtube2", videoId: "dQw4w9WgXcQ", title: "Typo" },
+      { source: "external", provider: "dailymotion", videoId: "x8x8x8", title: "Unsupported" },
+      { source: "external", provider: "youtube", videoId: "dQw4w9WgXcQ", title: "" },
+      { source: "external", provider: "youtube", title: "No id" },
+      { source: "external", provider: "vimeo", videoId: "76979871", privacyHash: "ABCDEF12", title: "Hash case" },
+    ];
+    for (const props of hostile) expectRefusal(page(props), "document:invalid-props");
+  });
+
+  it("still refuses an unavailable module and a duplicate id", () => {
+    expectRefusal({ ...minimal(), sections: [section("x", "layout.marquee", {})] }, "document:unknown-module");
+    const twice = [
+      section("clip", "media.video", { source: "external", provider: "youtube", videoId: "dQw4w9WgXcQ", title: "A" }),
+      section("clip", "media.video", { source: "external", provider: "youtube", videoId: "dQw4w9WgXcQ", title: "B" }),
+    ];
+    expectRefusal({ ...minimal(), sections: twice }, "document:duplicate-section-id");
   });
 });
 

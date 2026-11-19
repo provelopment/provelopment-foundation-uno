@@ -1,30 +1,29 @@
 #!/usr/bin/env node
 /**
- * Foundation Uno — time-bounded dependency-advisory exception guard.
+ * Foundation Uno — unwaived dependency-advisory guard.
  *
- * Uno carries exactly one Owner-approved, named, expiring exception for a
- * dependency advisory that has no published repair:
+ * Uno carries no dependency-advisory waiver. The former one-entry exception
+ * (`GHSA-fc5q-39xc-vjpf`, `picomatch`, expiry 2026-12-18T00:00:00Z) was retired
+ * by UNO-WO-046 / R01 after a fresh unfiltered full-graph audit reported zero
+ * HIGH and zero critical findings. Retirement is not a repair claim: the
+ * published advisory still describes every picomatch release through 4.0.7 and
+ * no patched release exists, so the residual development-only code risk stays
+ * disclosed in every report.
  *
- *   GHSA-fc5q-39xc-vjpf — `picomatch` ReDoS via single-branch repeated extglobs.
- *   Affected through 4.0.7; no patched release is published; development-only.
- *   Expiry 2026-12-18T00:00:00Z (exclusive), checked against the system UTC clock.
+ * Because no advisory is suppressed, `pnpm audit --audit-level high` is now the
+ * whole truth; this guard additionally proves the posture cannot quietly decay:
  *
- * `pnpm audit --audit-level high` cannot see the excluded advisory, so trusting
- * its exit code alone would be a false negative. This guard therefore:
- *
- *   1. verifies the allowlist is exactly one identifier, in one root package,
- *      with no forbidden alternative ignore key;
- *   2. enforces expiry in code — a comment enforces nothing;
- *   3. copies `package.json` and `pnpm-lock.yaml` byte-for-byte into an isolated
- *      directory that carries its own ignore-free workspace config, then runs a
- *      raw full-graph `pnpm audit --json` there, proving the excluded advisory is
- *      still real, still HIGH, and still development-only;
- *   4. runs a strict production audit with no exemption at all;
- *   5. consults the registry so that a genuine patched release forces removal of
- *      the exception instead of silently prolonging it.
+ *   1. `pnpm-workspace.yaml` declares exactly one root package, zero waiver
+ *      entries, no forbidden alternative ignore key and no leftover expiry;
+ *   2. the isolated audit copy of the lockfile is byte-identical;
+ *   3. a raw unfiltered full-graph audit has zero HIGH and zero critical
+ *      findings, and any reappearing HIGH/critical is blocking;
+ *   4. a strict production audit exits zero with no HIGH/critical;
+ *   5. the registry is still consulted, so a repaired release is reported
+ *      truthfully instead of being mistaken for a fix that already landed.
  *
  * Every step fails closed. An audit error, unknown schema, registry outage or
- * missing evidence is never reinterpreted as an accepted exception.
+ * missing evidence is never reinterpreted as an accepted posture.
  *
  * Pure Node, no new dependency, no network unless the registry check runs.
  */
@@ -238,22 +237,17 @@ export function evaluateSecurityException(evidence) {
   const failures = [];
   const fail = (reason) => failures.push(reason);
 
-  const now = evidence.now;
-  if (typeof now !== 'number' || !Number.isFinite(now)) {
-    fail('no trustworthy clock value was supplied');
-  } else if (now >= EXPIRES_AT_MS) {
-    fail(`the exception expired at ${EXPIRES_AT_ISO}; remove it and adopt a repaired release`);
-  }
-
   const workspace = evidence.workspace ?? {};
   if (!workspace.exists) {
-    fail('pnpm-workspace.yaml is missing, so no exception is declared or verifiable');
+    fail('pnpm-workspace.yaml is missing, so the unwaived posture is unverifiable');
   } else {
     const ghsas = Array.isArray(workspace.ignoreGhsas) ? workspace.ignoreGhsas : null;
     if (ghsas === null) {
-      fail('the workspace allowlist is unreadable');
-    } else if (ghsas.length !== 1 || ghsas[0] !== EXPECTED_GHSA_ID) {
-      fail(`the workspace allowlist must contain exactly ${EXPECTED_GHSA_ID}; found [${ghsas.join(', ')}]`);
+      fail('the workspace waiver list is unreadable');
+    } else if (ghsas.length !== 0) {
+      fail(
+        `the workspace must declare no advisory waiver — the ${EXPECTED_GHSA_ID} exception was retired; found [${ghsas.join(', ')}]`,
+      );
     }
     const packages = Array.isArray(workspace.packages) ? workspace.packages : null;
     if (packages === null || packages.length !== 1 || packages[0] !== '.') {
@@ -262,9 +256,9 @@ export function evaluateSecurityException(evidence) {
     if (Array.isArray(workspace.forbiddenKeys) && workspace.forbiddenKeys.length > 0) {
       fail(`the workspace config carries a forbidden ignore key: ${workspace.forbiddenKeys.join(', ')}`);
     }
-    if (workspace.declaredExpiryIso && workspace.declaredExpiryIso !== EXPIRES_AT_ISO) {
+    if (workspace.declaredExpiryIso) {
       fail(
-        `the documented expiry ${workspace.declaredExpiryIso} does not match the enforced expiry ${EXPIRES_AT_ISO}`,
+        `a waiver expiry ${workspace.declaredExpiryIso} is still documented although no waiver exists; the ${EXPECTED_GHSA_ID} exception was retired`,
       );
     }
   }
@@ -277,39 +271,24 @@ export function evaluateSecurityException(evidence) {
   const raw = evidence.rawAudit ?? {};
   if (raw.exitCode === null || raw.exitCode === undefined) {
     fail('the unfiltered full-graph audit produced no exit status');
-  } else if (raw.exitCode === 0) {
-    fail(
-      'the unfiltered full-graph audit reports no advisory, so the excluded case no longer exists; remove the exception',
-    );
   }
   if (!raw.parsed || raw.parsed.ok !== true) {
     fail(`the unfiltered full-graph audit is not usable evidence: ${raw.parsed?.reason ?? 'no parsed report'}`);
   } else {
     const { advisories, counts } = raw.parsed;
     if (counts.critical !== 0) {
-      fail(`the unfiltered full-graph audit reports ${counts.critical} critical advisories`);
+      fail(`the unfiltered full-graph audit reports ${counts.critical} critical advisories; any critical is blocking`);
     }
-    if (counts.high !== 1) {
-      fail(`the unfiltered full-graph audit reports ${counts.high} high advisories, expected exactly one`);
+    if (counts.high !== 0) {
+      fail(`the unfiltered full-graph audit reports ${counts.high} high advisories; any high is blocking`);
     }
     const blocking = advisories.filter((advisory) => BLOCKING_SEVERITIES.includes(advisory.severity));
-    if (blocking.length !== 1) {
-      fail(`the unfiltered full-graph audit reports ${blocking.length} high/critical advisories, expected exactly one`);
-    }
-    const excluded = blocking[0];
-    if (excluded) {
-      if (excluded.githubAdvisoryId !== EXPECTED_GHSA_ID) {
-        fail(`the excluded advisory is ${excluded.githubAdvisoryId}, not ${EXPECTED_GHSA_ID}`);
-      }
-      if (excluded.moduleName !== EXPECTED_PACKAGE) {
-        fail(`the excluded advisory applies to ${excluded.moduleName}, not ${EXPECTED_PACKAGE}`);
-      }
-      const reachable = excluded.findings.some(
-        (finding) => finding && (finding.dev !== true || finding.optional === true),
+    if (blocking.length !== 0) {
+      fail(
+        `the unfiltered full-graph audit reports ${blocking.length} high/critical advisories (${blocking
+          .map((advisory) => `${advisory.githubAdvisoryId}/${advisory.moduleName}`)
+          .join(', ')}); no waiver exists, so this is blocking`,
       );
-      if (reachable) {
-        fail('the excluded advisory is reachable from a non-development or optional dependency path');
-      }
     }
   }
 
@@ -338,11 +317,9 @@ export function evaluateSecurityException(evidence) {
     const repaired = versions.filter(
       (version) => compareVersions(version, HIGHEST_KNOWN_AFFECTED_VERSION) > 0,
     );
-    if (repaired.length > 0) {
-      fail(
-        `a repaired ${EXPECTED_PACKAGE} release now exists (${repaired.slice(0, 3).join(', ')}); remove the exception and adopt it`,
-      );
-    }
+    // A repaired release is welcome news, not a failure: no waiver remains that could be prolonged. Its absence is
+    // disclosed in the summary, because zero current audit detection does not prove the advisory is fixed.
+    void repaired;
   }
 
   const workflow = evidence.workflow ?? {};
@@ -369,7 +346,7 @@ export function evaluateSecurityException(evidence) {
   const summary = {
     ghsa: EXPECTED_GHSA_ID,
     package: EXPECTED_PACKAGE,
-    expiresAt: EXPIRES_AT_ISO,
+    waiver: 'retired',
     rawCounts: raw.parsed?.ok === true ? raw.parsed.counts : null,
     productionCounts: production.parsed?.ok === true ? production.parsed.counts : null,
     publishedRepair,
@@ -542,10 +519,10 @@ async function main() {
   const lines = [
     'U04 dependency-advisory exception guard',
     `  pnpm: ${pnpmVersion}`,
-    `  exception: ${EXPECTED_GHSA_ID} (${EXPECTED_PACKAGE}), expires ${EXPIRES_AT_ISO}`,
-    `  allowlist: [${evidence.workspace.ignoreGhsas.join(', ')}]`,
+    `  waiver: none — the ${EXPECTED_GHSA_ID} (${EXPECTED_PACKAGE}) exception was retired by UNO-WO-046 / R01`,
+    `  workspace waivers: [${evidence.workspace.ignoreGhsas.join(', ')}]`,
     `  unfiltered full-graph audit (no exemption): exit ${evidence.rawAudit.exitCode} counts=${JSON.stringify(rawCounts)}`,
-    `  filtered full-graph audit (exception applied): exit ${evidence.filteredAudit.exitCode} counts=${JSON.stringify(filteredCounts)}`,
+    `  isolated-directory full-graph audit: exit ${evidence.filteredAudit.exitCode} counts=${JSON.stringify(filteredCounts)}`,
     `  strict production audit (no exemption): exit ${evidence.productionAudit.exitCode} counts=${JSON.stringify(productionCounts)}`,
     `  registry repair available: ${verdict.summary.publishedRepair === null ? 'UNVERIFIED' : verdict.summary.publishedRepair}`,
   ];
@@ -570,7 +547,7 @@ async function main() {
   }
 
   console.log(lines.join('\n'));
-  console.log('  result: ACCEPTED (one named, dev-only, time-bounded advisory exception)');
+  console.log('  result: ACCEPTED (unwaived posture: no waiver, zero HIGH/critical, clean strict production audit)');
 }
 
 const invokedDirectly =

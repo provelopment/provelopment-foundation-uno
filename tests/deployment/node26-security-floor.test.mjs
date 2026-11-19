@@ -431,12 +431,15 @@ test('the vulnerable eslint-config-next meta-package is gone from manifest and l
   assert.equal(declared['eslint-plugin-react-hooks'], '7.1.1');
 });
 
-test('the workspace declares exactly the one authorised advisory and its expiry', () => {
+test('the workspace declares no advisory waiver and no leftover expiry', () => {
   const parsed = parseWorkspaceConfig(read('pnpm-workspace.yaml'));
   assert.deepEqual(parsed.packages, ['.']);
-  assert.deepEqual(parsed.ignoreGhsas, [EXPECTED_GHSA_ID]);
+  // UNO-WO-046 / R01 retired the former GHSA-fc5q-39xc-vjpf exception after a raw full-graph audit reported zero
+  // HIGH and zero critical findings. The parser must still *detect* a waiver if one were re-added (negative fixtures
+  // below), which is why these assertions require an empty list rather than a different identifier.
+  assert.deepEqual(parsed.ignoreGhsas, []);
   assert.deepEqual(parsed.forbiddenKeys, []);
-  assert.equal(parsed.declaredExpiryIso, EXPIRES_AT_ISO);
+  assert.equal(parsed.declaredExpiryIso, null);
 });
 
 test('negative fixture: a second allowlisted advisory is refused', () => {

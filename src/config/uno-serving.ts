@@ -23,6 +23,20 @@
  */
 import { readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import { readUnoOwnedMedia, type UnoOwnedMediaOwner } from "../adapters/assets/uno-owned-media-reader";
+import {
+  UNO_MEDIA_NOMINAL_SIZE,
+  readUnoOwnedAssetRef,
+  unoOwnedMediaImageSize,
+  type UnoPageMedia,
+  type UnoResolvedImage,
+  type UnoResolvedMedia,
+} from "../core/assets/uno-owned-media";
+import {
+  planUnoPageAssets,
+  readUnoPageAssetOccurrence,
+  type UnoPageAssetPlan,
+} from "../application/plan-uno-page-assets";
 import {
   UNO_MANIFEST_PATH,
   UNO_SELECTION_PATH,
@@ -43,6 +57,7 @@ export type UnoServingRefusal =
   | "serving:authority-unavailable"
   | "serving:publication-refused"
   | "serving:renderer-unavailable"
+  | "serving:media-unavailable"
   | "serving:discovery-unavailable";
 
 /** The same vocabulary as frozen data, so a caller can assert membership without copying literals. */
@@ -51,12 +66,22 @@ export const UNO_SERVING_REFUSAL_REASONS: readonly UnoServingRefusal[] = Object.
   "serving:authority-unavailable",
   "serving:publication-refused",
   "serving:renderer-unavailable",
+  "serving:media-unavailable",
   "serving:discovery-unavailable",
 ] as const);
 
-/** A Page that may be served: an accepted published plan whose body this version can render. */
+/**
+ * A Page that may be served: an accepted published plan whose body this version can render, plus — for a JSON Page —
+ * the resolved owned-media projections its sections declared and the occurrence ledger the media route authorises
+ * against.
+ */
 export type UnoServingPageOutcome =
-  | { readonly status: "served"; readonly page: UnoPublishedPageAccepted }
+  | {
+      readonly status: "served";
+      readonly page: UnoPublishedPageAccepted;
+      readonly media?: UnoPageMedia;
+      readonly assets?: UnoPageAssetPlan;
+    }
   | { readonly status: "not-served"; readonly reason: UnoServingRefusal };
 
 /** A short-alias outcome: one temporary redirect target, or nothing at all. */
@@ -131,6 +156,80 @@ function normalizePathname(pathname: unknown): string | null {
 }
 
 
+/** One mutable section projection while a plan is being resolved into render-ready media. */
+interface MutableSectionMedia {
+  image?: UnoResolvedImage;
+  video?: UnoResolvedMedia;
+  poster?: UnoResolvedImage;
+  captions?: UnoResolvedMedia;
+  items?: UnoResolvedImage[];
+}
+
+/** The accepted Page's own identity: the only thing that may select a `page`-zone capsule directory. */
+function ownerOf(page: UnoPublishedPageAccepted): UnoOwnedMediaOwner {
+  return {
+    entityId: page.identity.entityId,
+    facetId: page.identity.facetId,
+    siteId: page.identity.siteId,
+  };
+}
+
+/**
+ * Resolve and verify every asset one accepted Page declares.
+ *
+ * A Page is served only when **all** of its declared assets resolve: a missing, oversized, wrongly signed, escaping or
+ * integrity-mismatched occurrence refuses the whole Page rather than dropping one module. Images are read in full so the
+ * intrinsic box can be taken from their own header; video is read only far enough to prove its container.
+ */
+function resolvePageMedia(
+  root: string,
+  page: UnoPublishedPageAccepted,
+  plan: UnoPageAssetPlan,
+): { readonly ok: true; readonly media: UnoPageMedia } | { readonly ok: false } {
+  const owner = ownerOf(page);
+  const bySection = new Map<string, MutableSectionMedia>();
+
+  for (const occurrence of plan.occurrences) {
+    const decision = readUnoOwnedAssetRef(occurrence.ref, occurrence.purpose);
+    if (!decision.ok) return { ok: false };
+
+    const read = readUnoOwnedMedia({
+      repoRoot: root,
+      owner,
+      decision: decision.decision,
+      full: occurrence.purpose !== "video",
+    });
+    if (!read.accepted) return { ok: false };
+
+    const current = bySection.get(occurrence.sectionId) ?? {};
+    if (occurrence.purpose === "captions") {
+      current.captions = { src: occurrence.url, type: decision.decision.mime };
+    } else if (occurrence.purpose === "video") {
+      current.video = { src: occurrence.url, type: decision.decision.mime };
+    } else {
+      const size = unoOwnedMediaImageSize(read.bytes, decision.decision.extension);
+      const image: UnoResolvedImage = {
+        src: occurrence.url,
+        type: decision.decision.mime,
+        width: size?.width ?? UNO_MEDIA_NOMINAL_SIZE.width,
+        height: size?.height ?? UNO_MEDIA_NOMINAL_SIZE.height,
+      };
+      if (occurrence.slot === "poster") {
+        current.poster = image;
+      } else if (occurrence.itemIndex >= 0) {
+        const items = current.items === undefined ? [] : [...current.items];
+        items[occurrence.itemIndex] = image;
+        current.items = items;
+      } else {
+        current.image = image;
+      }
+    }
+    bySection.set(occurrence.sectionId, current);
+  }
+
+  return { ok: true, media: bySection as UnoPageMedia };
+}
+
 /**
  * Decide whether one absolute address may be served as a published Page of the selected Site.
  *
@@ -164,7 +263,86 @@ export async function planUnoServingPage(pathname: unknown): Promise<UnoServingP
     return { status: "not-served", reason: "serving:renderer-unavailable" };
   }
 
+  if (planned.document.kind === "json") {
+    // A JSON Page is served only when every asset it declares is present, in place and valid. One bad asset refuses the
+    // whole Page with its own closed reason; nothing is silently pruned and no partial Page reaches a renderer.
+    const assets = planUnoPageAssets(planned);
+    if (assets.status !== "planned") return { status: "not-served", reason: "serving:media-unavailable" };
+    const resolved = resolvePageMedia(authority.root, planned, assets.plan);
+    if (!resolved.ok) return { status: "not-served", reason: "serving:media-unavailable" };
+    return { status: "served", page: planned, media: resolved.media, assets: assets.plan };
+  }
+
   return { status: "served", page: planned };
+}
+
+/**
+ * The outcome of one media locator request.
+ *
+ * There is no "partial" and no redirect: a locator either names an occurrence of the one accepted published Page for its
+ * own address, in which case the bytes and their true MIME type are returned, or it does not, in which case the caller
+ * answers a real 404 with no metadata at all.
+ */
+export type UnoServingMediaOutcome =
+  | { readonly status: "resolved"; readonly bytes: Uint8Array; readonly mime: string }
+  | { readonly status: "not-found"; readonly reason: UnoServingRefusal };
+
+/** One integer occurrence segment of a locator. */
+const OCCURRENCE_SEGMENT = /^(?:0|[1-9][0-9]{0,3})$/u;
+
+/** One lowercase public path segment of a Page address. */
+const PATH_SEGMENT = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+
+/**
+ * Serve the bytes behind one media locator.
+ *
+ * The last segment is the occurrence index and everything before it is the Page's own public address, so the route can
+ * never be given a storage path: it re-derives the address, re-runs the full publication and media preflight, and only
+ * then reads the one occurrence that address declares. An unlisted Page is addressable only at its own exact locator,
+ * which is why no sitemap or navigation reference can make it discoverable.
+ */
+export async function readUnoServingMedia(segments: unknown): Promise<UnoServingMediaOutcome> {
+  if (!Array.isArray(segments) || segments.length < 2 || segments.length > 6) {
+    return { status: "not-found", reason: "serving:input-invalid" };
+  }
+  const parts: string[] = [];
+  for (const part of segments) {
+    if (typeof part !== "string" || part.length === 0 || part.length > 64 || !PATH_SEGMENT.test(part)) {
+      return { status: "not-found", reason: "serving:input-invalid" };
+    }
+    parts.push(part);
+  }
+
+  const last = parts[parts.length - 1];
+  if (last === undefined || !OCCURRENCE_SEGMENT.test(last)) {
+    return { status: "not-found", reason: "serving:input-invalid" };
+  }
+  const occurrence = Number(last);
+  const pathname = `/${parts.slice(0, -1).join("/")}`;
+
+  const served = await planUnoServingPage(pathname);
+  if (served.status !== "served" || served.assets === undefined) {
+    return { status: "not-found", reason: "serving:publication-refused" };
+  }
+
+  const declared = readUnoPageAssetOccurrence(served.assets, occurrence);
+  if (declared === undefined) return { status: "not-found", reason: "serving:media-unavailable" };
+
+  const decision: ReturnType<typeof readUnoOwnedAssetRef> = readUnoOwnedAssetRef(declared.ref, declared.purpose);
+  if (!decision.ok) return { status: "not-found", reason: "serving:media-unavailable" };
+
+  const authority = readAuthority();
+  if (authority.status === "refused") return { status: "not-found", reason: authority.reason };
+
+  const read = readUnoOwnedMedia({
+    repoRoot: authority.root,
+    owner: ownerOf(served.page),
+    decision: decision.decision,
+    full: true,
+  });
+  if (!read.accepted) return { status: "not-found", reason: "serving:media-unavailable" };
+
+  return { status: "resolved", bytes: read.bytes, mime: read.mime };
 }
 
 /**

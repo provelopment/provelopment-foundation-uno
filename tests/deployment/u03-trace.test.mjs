@@ -318,6 +318,13 @@ function configuredIncludes() {
   return [...block.matchAll(/'([^']+)'/gu)].map((match) => match[1]).sort();
 }
 
+/** The four owned-media zone roots declared in `next.config.ts`, as project-relative globs. */
+function configuredMediaIncludes() {
+  const text = readFileSync(resolve(ROOT, "next.config.ts"), "utf8");
+  const block = /const UNO_MEDIA_ZONE_INPUTS = \[([\s\S]*?)\];/u.exec(text)?.[1] ?? "";
+  return [...block.matchAll(/'([^']+)'/gu)].map((match) => match[1]).sort();
+}
+
 test('the next config declares exactly the narrow deployment inputs', () => {
   assert.deepEqual(configuredIncludes(), [
     "./deployment/efs/content/**/*.json",
@@ -327,18 +334,39 @@ test('the next config declares exactly the narrow deployment inputs', () => {
   ]);
 });
 
+test('the next config declares exactly the four owned-media zone roots', () => {
+  assert.deepEqual(configuredMediaIncludes(), [
+    "./deployment/content/assets/**/*",
+    "./deployment/efs/capsule/**/*",
+    "./public/_uno-generated/**/*",
+    "./public/platform/**/*",
+  ]);
+});
+
 test('the next config refuses a root-wide or escaping include', () => {
-  for (const include of configuredIncludes()) {
+  for (const include of [...configuredIncludes(), ...configuredMediaIncludes()]) {
     assert.equal(include.startsWith("./"), true, `${include} must be project-relative`);
     assert.equal(/^(\.\/)?\*\*/u.test(include), false, `${include} must not be a root-wide glob`);
     assert.equal(include.includes(".."), false, `${include} must not escape the project`);
+    // A zone wildcard must stay inside its named root: never `./deployment/**` or `./public/**`.
+    assert.equal(include.startsWith("./deployment/**"), false, `${include} must not widen to the deployment root`);
+    assert.equal(include.startsWith("./public/**"), false, `${include} must not widen to the public root`);
   }
 });
 
 test('the next config scopes its includes to the routes that read the declarations', () => {
   const text = readFileSync(resolve(ROOT, "next.config.ts"), "utf8");
-  const keys = [...text.matchAll(/^\s*'(\/[^']*)': UNO_DEPLOYMENT_INPUTS,/gmu)].map((match) => match[1]);
-  assert.deepEqual(keys.sort(), ["/[locale]/[[...segments]]", "/robots.txt", "/sitemap.xml"]);
+  const keys = [
+    ...text.matchAll(
+      /^\s*'(\/[^']*)':\s*(?:UNO_DEPLOYMENT_INPUTS|\[\.\.\.UNO_DEPLOYMENT_INPUTS,\s*\.\.\.UNO_MEDIA_ZONE_INPUTS\]),/gmu,
+    ),
+  ].map((match) => match[1]);
+  assert.deepEqual(keys.sort(), [
+    "/[locale]/[[...segments]]",
+    "/robots.txt",
+    "/sitemap.xml",
+    "/uno-media/[...segments]",
+  ]);
   // `experimental` must not gain an unbounded tracing override, and no webpack escape may appear.
   assert.equal(/outputFileTracingRoot/u.test(text), false);
   assert.equal(/experimental\s*:\s*\{[^}]*outputFileTracing/u.test(text), false);

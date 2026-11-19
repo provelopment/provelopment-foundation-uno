@@ -1,27 +1,27 @@
 # Foundation Uno — single-package workspace declaration.
 #
-# This file exists for exactly one reason: `auditConfig.ignoreGhsas` is the
-# pnpm 11.6.0-supported key for a named, time-bounded dependency-advisory
-# exception. Uno keeps a single root package; `packages` below must stay `"."`.
+# Uno keeps a single root package; `packages` below must stay `"."`, and this
+# file declares no dependency-advisory suppression of any kind.
 #
-# Authorised exception (exactly one identifier, never a blanket allowlist):
+# Waiver retired (UNO-WO-046 / R01). No advisory is suppressed here.
 #
 #   GHSA-fc5q-39xc-vjpf — picomatch ReDoS via single-branch repeated extglobs.
 #   Affected: every published picomatch release up to and including 4.0.7.
 #   No patched release is published, so the advisory cannot be repaired today.
 #   Reachability: development-only lint/test tooling; not reachable from
 #   `dependencies` and absent from the production graph.
-#   Owner-approved bounded risk, expiry 2026-12-18T00:00:00Z (exclusive).
+#   A fresh unfiltered full-graph audit on 2026-11-20 reported zero HIGH and
+#   zero critical findings, so the bounded exception was removed rather than
+#   renewed. Absence from today's audit does NOT prove a patched release: the
+#   advisory still describes 4.0.7 and no fix is published, so the residual
+#   development-only code risk is disclosed, not repaired.
 #
-# The comment above enforces nothing. Expiry, the one-identifier allowlist and
-# the "the advisory is still real and still dev-only" evidence are enforced in
-# code by scripts/verify-u04-security-exception.mjs, which additionally runs an
-# unfiltered full-graph audit and a strict production audit. Adding a second
-# identifier, changing this one, or moving the expiry is refused by that guard
-# and by tests/deployment/u04-security-exception.test.mjs.
+# This comment enforces nothing. scripts/verify-u04-security-exception.mjs
+# enforces the unwaived posture in code — exactly zero waiver entries here or
+# in any alternative ignore field, zero current raw HIGH/critical findings on
+# the unfiltered full graph, a clean strict production audit, one workspace
+# package and lockfile integrity. Re-adding a suppression, or a resurfacing
+# HIGH/critical, is refused by that guard and by
+# tests/deployment/u04-security-exception.test.mjs.
 packages:
   - "."
-
-auditConfig:
-  ignoreGhsas:
-    - GHSA-fc5q-39xc-vjpf

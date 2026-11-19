@@ -35,6 +35,8 @@
  * bounds only*; no code, schema text, fixture or asset is copied, and the family composition layer it implies
  * remains a later U04 obligation.
  */
+import { readUnoOwnedAssetRef, type UnoOwnedAssetRef, type UnoOwnedMediaPurpose } from "./assets/uno-owned-media";
+import { isUnoVideoProvider, readUnoVideoEmbed, type UnoVideoProvider } from "./video/uno-video-embeds";
 import { isCapabilityId } from "./modules/capability-registry";
 
 /** The only document version this build accepts. An unknown version refuses; it is never upgraded. */
@@ -44,12 +46,15 @@ export const UNO_PAGE_DOCUMENT_VERSION = 1;
  * The exact module IDs that have a real renderer in this execution.
  *
  * Every member is an existing ID from the immutable registry; this tuple is a *local availability
- * discriminator* for one bounded slice, not a second registry. The registry itself stays byte-identical.
+ * discriminator*, not a second registry. From `UNO-WO-040 / R01` all **22** registered IDs are renderable, so this
+ * tuple and the registry agree exactly. It is kept as a distinct list so that a future registry addition still
+ * refuses with `document:renderer-unavailable` instead of silently rendering nothing.
  */
 export const UNO_RENDERABLE_MODULES = Object.freeze([
   "layout.stack",
   "layout.grid",
   "layout.bento",
+  "layout.layers",
   "content.heading",
   "content.prose",
   "content.actions",
@@ -58,7 +63,18 @@ export const UNO_RENDERABLE_MODULES = Object.freeze([
   "content.testimonials",
   "content.pricing",
   "content.timeline",
+  "media.image",
+  "media.video",
+  "media.gallery",
+  "media.carousel",
+  "design.watermark",
+  "design.motion",
+  "interaction.tabs",
+  "interaction.accordion",
+  "interaction.modal",
+  "interaction.contact",
 ] as const);
+
 
 /** One renderable module ID of this slice. */
 export type UnoRenderableModule = (typeof UNO_RENDERABLE_MODULES)[number];
@@ -93,6 +109,19 @@ export const UNO_PAGE_DOCUMENT_LIMITS = Object.freeze({
   timelineTitleCodePoints: 160,
   timelineDescriptionCodePoints: 320,
   timelineDateLabelCodePoints: 120,
+  /** `layout.layers` and `design.motion` accept 2–4 and 1–4 children respectively. */
+  layerChildren: 4,
+  motionChildren: 4,
+  /** `interaction.tabs`, `interaction.accordion` and `interaction.modal` child bounds. */
+  tabChildren: 6,
+  accordionChildren: 8,
+  /** `media.gallery` and `media.carousel` item bounds. */
+  galleryItems: 12,
+  carouselItems: 8,
+  mediaAltCodePoints: 320,
+  mediaCaptionCodePoints: 320,
+  watermarkTextCodePoints: 160,
+  contactDescriptionCodePoints: 400,
   sectionIdLength: 48,
   jsonDepth: 16,
   jsonNodes: 2048,
@@ -256,6 +285,149 @@ export interface UnoContentTimelineProps {
   readonly surface?: UnoSectionSurface;
 }
 
+/** The two closed `layout.layers` modes. */
+export type UnoLayerMode = "stack" | "overlap";
+
+/** `layout.layers` props: a closed mode and an optional closed alignment. The children supply the layers. */
+export interface UnoLayoutLayersProps {
+  readonly mode: UnoLayerMode;
+  readonly align?: UnoSectionAlign;
+}
+
+/** One authored media item: the owned asset, its alternative text and an optional caption. */
+export interface UnoMediaItem {
+  readonly asset: UnoOwnedAssetRef;
+  readonly alt: string;
+  readonly caption?: string;
+}
+
+/** `media.image` props: one owned raster, an authored alt (empty only when decorative) and an optional caption. */
+export interface UnoMediaImageProps {
+  readonly asset: UnoOwnedAssetRef;
+  readonly alt: string;
+  readonly decorative?: boolean;
+  readonly caption?: string;
+}
+
+/** `media.video` props: one owned video, its **required** owned caption track and an authored accessible name. */
+export interface UnoMediaVideoProps {
+  readonly asset: UnoOwnedAssetRef;
+  readonly captions: UnoOwnedAssetRef;
+  readonly title: string;
+  readonly poster?: UnoOwnedAssetRef;
+  readonly description?: string;
+}
+
+/**
+ * `media.video` props, external mode — the Owner-approved second alternative of the same module ID.
+ *
+ * It is discriminated by the `source` literal and is deliberately exclusive with native mode: it carries no `asset`,
+ * `captions` or `poster`, because an external embed is **not** an owned asset, is never served from `/uno-media/...`,
+ * owns no zone and grants no publication authority. `provider` is one of four exact lowercase literals and `videoId`
+ * is the provider's own identifier. `privacyHash` exists for Vimeo's unlisted embeds only, and is never a secret or an
+ * access grant. The validated destination is constructed exclusively by `src/core/video/uno-video-embeds.ts`.
+ */
+export interface UnoExternalVideoProps {
+  readonly source: "external";
+  readonly provider: UnoVideoProvider;
+  readonly videoId: string;
+  readonly title: string;
+  readonly privacyHash?: string;
+  readonly description?: string;
+}
+
+/** The closed `media.video` alternative set: an owned native player, or a consent-gated external embed. */
+export type UnoMediaVideoAlternative = UnoMediaVideoProps | UnoExternalVideoProps;
+
+/**
+ * Narrow a validated `media.video` alternative to external mode.
+ *
+ * External mode is identified by the presence of the own `source` key, which native mode never carries and which the
+ * validator accepts only as the literal `"external"`. Callers therefore narrow on structure, never on a value they
+ * would have to trust.
+ */
+export function isUnoExternalVideoProps(props: UnoMediaVideoAlternative): props is UnoExternalVideoProps {
+  return Object.prototype.hasOwnProperty.call(props, "source");
+}
+
+/** `media.gallery` props: 2–12 owned images at one of three closed column intents. */
+export interface UnoMediaGalleryProps {
+  readonly columns: 2 | 3 | 4;
+  readonly items: readonly UnoMediaItem[];
+}
+
+/** `media.carousel` props: 2–8 owned images behind one authored group label. */
+export interface UnoMediaCarouselProps {
+  readonly label: string;
+  readonly items: readonly UnoMediaItem[];
+}
+
+/** The three closed watermark alignments. */
+export type UnoWatermarkAlign = "start" | "center" | "end";
+
+/** The two closed watermark strengths. */
+export type UnoWatermarkStrength = "subtle" | "regular";
+
+/** `design.watermark` props: inert decorative text with closed placement and strength. */
+export interface UnoDesignWatermarkProps {
+  readonly text: string;
+  readonly align?: UnoWatermarkAlign;
+  readonly strength?: UnoWatermarkStrength;
+}
+
+/** The three closed motion effects; `none` is a real authored choice, never the absence of a value. */
+export type UnoMotionEffect = "fade" | "rise" | "none";
+
+/** The two closed motion durations. */
+export type UnoMotionSpeed = "short" | "normal";
+
+/** `design.motion` props: one closed effect wrapping 1–4 validated children. */
+export interface UnoDesignMotionProps {
+  readonly effect: UnoMotionEffect;
+  readonly speed?: UnoMotionSpeed;
+}
+
+/** One tab entry: the panel child it names and the label that names it. */
+export interface UnoTabEntry {
+  readonly sectionId: string;
+  readonly label: string;
+}
+
+/** `interaction.tabs` props: 2–6 positional entries matching the children exactly. */
+export interface UnoInteractionTabsProps {
+  readonly label: string;
+  readonly tabs: readonly UnoTabEntry[];
+}
+
+/** One accordion entry: the disclosure child it names and the summary label. */
+export interface UnoAccordionEntry {
+  readonly sectionId: string;
+  readonly label: string;
+}
+
+/** `interaction.accordion` props: 1–8 positional entries matching the children exactly. */
+export interface UnoInteractionAccordionProps {
+  readonly items: readonly UnoAccordionEntry[];
+}
+
+/** `interaction.modal` props: the trigger, dialog title and close control labels. Its one child is the content. */
+export interface UnoInteractionModalProps {
+  readonly triggerLabel: string;
+  readonly title: string;
+  readonly closeLabel: string;
+}
+
+/** The three closed contact field names. Local-only while delivery is off. */
+export type UnoContactField = "name" | "email" | "message";
+
+/** `interaction.contact` props: a delivery-OFF surface with readable labels and no transport of any kind. */
+export interface UnoInteractionContactProps {
+  readonly heading?: string;
+  readonly description?: string;
+  readonly fields?: readonly UnoContactField[];
+  readonly submitLabel?: string;
+}
+
 /** One validated module node. Layouts own typed children; the eight content modules own none. */
 export type UnoSectionNode =
   | {
@@ -287,7 +459,43 @@ export type UnoSectionNode =
       readonly props: UnoContentTestimonialsProps;
     }
   | { readonly id: string; readonly module: "content.pricing"; readonly props: UnoContentPricingProps }
-  | { readonly id: string; readonly module: "content.timeline"; readonly props: UnoContentTimelineProps };
+  | { readonly id: string; readonly module: "content.timeline"; readonly props: UnoContentTimelineProps }
+  | {
+      readonly id: string;
+      readonly module: "layout.layers";
+      readonly props: UnoLayoutLayersProps;
+      readonly children: readonly UnoSectionNode[];
+    }
+  | { readonly id: string; readonly module: "media.image"; readonly props: UnoMediaImageProps }
+  | { readonly id: string; readonly module: "media.video"; readonly props: UnoMediaVideoAlternative }
+  | { readonly id: string; readonly module: "media.gallery"; readonly props: UnoMediaGalleryProps }
+  | { readonly id: string; readonly module: "media.carousel"; readonly props: UnoMediaCarouselProps }
+  | { readonly id: string; readonly module: "design.watermark"; readonly props: UnoDesignWatermarkProps }
+  | {
+      readonly id: string;
+      readonly module: "design.motion";
+      readonly props: UnoDesignMotionProps;
+      readonly children: readonly UnoSectionNode[];
+    }
+  | {
+      readonly id: string;
+      readonly module: "interaction.tabs";
+      readonly props: UnoInteractionTabsProps;
+      readonly children: readonly UnoSectionNode[];
+    }
+  | {
+      readonly id: string;
+      readonly module: "interaction.accordion";
+      readonly props: UnoInteractionAccordionProps;
+      readonly children: readonly UnoSectionNode[];
+    }
+  | {
+      readonly id: string;
+      readonly module: "interaction.modal";
+      readonly props: UnoInteractionModalProps;
+      readonly children: readonly UnoSectionNode[];
+    }
+  | { readonly id: string; readonly module: "interaction.contact"; readonly props: UnoInteractionContactProps };
 
 /** The accepted, deeply frozen version-1 Page document. */
 export interface UnoPageDocument {
@@ -401,8 +609,21 @@ const DOCUMENT_REQUIRED_KEYS: readonly string[] = Object.freeze(["version", "tit
 /** The two optional top-level keys of the v1 envelope. */
 const DOCUMENT_OPTIONAL_KEYS: readonly string[] = Object.freeze(["description", "visibility"]);
 
-/** The three layout modules own typed children; every other module owns none. */
-const LAYOUT_MODULES: readonly string[] = Object.freeze(["layout.stack", "layout.grid", "layout.bento"]);
+/**
+ * The modules that own typed children: the four layouts, `design.motion`, and the three child-bearing interactions.
+ * Every other module is a leaf. A modal owns exactly one content node, tabs and accordion own labelled panels, and a
+ * watermark, image, video, gallery, carousel or the contact surface owns none.
+ */
+const CHILD_BEARING_MODULES: readonly string[] = Object.freeze([
+  "layout.stack",
+  "layout.grid",
+  "layout.bento",
+  "layout.layers",
+  "design.motion",
+  "interaction.tabs",
+  "interaction.accordion",
+  "interaction.modal",
+]);
 
 /** The three prototype-pollution keys a JSON object may never carry. */
 const FORBIDDEN_KEYS: readonly string[] = Object.freeze(["__proto__", "constructor", "prototype"]);
@@ -688,15 +909,17 @@ interface WalkState {
   lastHeadingLevel: number;
 }
 
-/** One bounded, non-sparse list of layout children. */
+/** One bounded, non-sparse list of typed children. The bounds are the module's own, never a global guess. */
 function readChildren(
   value: unknown,
   depth: number,
   state: WalkState,
   seen: WeakSet<object>,
+  min: number = 1,
+  max: number = UNO_PAGE_DOCUMENT_LIMITS.layoutChildren,
 ): UnoSectionNode[] {
   if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-children");
-  if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.layoutChildren) {
+  if (value.length < min || value.length > max) {
     throw new RefusedDocument("document:invalid-children");
   }
   const children: UnoSectionNode[] = [];
@@ -1025,6 +1248,140 @@ function readOptionalHeading(
   return { heading, level: rawLevel };
 }
 
+/** One authored owned-asset reference for one purpose, or a props refusal. */
+function readOwnedAsset(value: unknown, purpose: UnoOwnedMediaPurpose): UnoOwnedAssetRef {
+  const decision = readUnoOwnedAssetRef(value, purpose);
+  if (!decision.ok) throw new RefusedDocument("document:invalid-props");
+  return decision.decision.ref;
+}
+
+/** One optional media caption; an absent caption stays absent rather than becoming an empty string. */
+function readOptionalCaption(value: unknown): string | undefined {
+  return optionalBoundedText(value, UNO_PAGE_DOCUMENT_LIMITS.mediaCaptionCodePoints, true);
+}
+
+/**
+ * One bounded ordered media item list for `media.gallery` and `media.carousel`.
+ *
+ * Every item carries its own owned asset and its own non-empty authored alternative, so no item can inherit, borrow or
+ * silently reuse a neighbour's description. Captions are optional and never invented.
+ */
+function readMediaItems(value: unknown, min: number, max: number): UnoMediaItem[] {
+  if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
+  if (value.length < min || value.length > max) throw new RefusedDocument("document:invalid-props");
+  const items: UnoMediaItem[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) throw new RefusedDocument("document:invalid-props");
+    const item = readPlainData(value[index]);
+    if (item === null) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(item, ["asset", "alt"], ["caption"])) throw new RefusedDocument("document:invalid-props");
+    const asset = readOwnedAsset(item["asset"], "image");
+    const alt = readBoundedText(
+      item["alt"],
+      UNO_PAGE_DOCUMENT_LIMITS.mediaAltCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const caption = readOptionalCaption(item["caption"]);
+    items.push({ asset, alt, ...(caption === undefined ? {} : { caption }) });
+  }
+  return items;
+}
+
+/**
+ * One positional panel-entry list for `interaction.tabs` and `interaction.accordion`.
+ *
+ * Exactly one entry per child, in child order, naming that same child: a tab list cannot introduce a panel, omit one,
+ * repeat one or point at a sibling that is not its own child. Labels are bounded authored text and never derived from
+ * the child's content, so a tab label cannot silently borrow a heading.
+ */
+function readPanelEntries(
+  value: unknown,
+  children: readonly UnoSectionNode[],
+  min: number,
+  max: number,
+): { readonly sectionId: string; readonly label: string }[] {
+  if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
+  if (value.length !== children.length) throw new RefusedDocument("document:invalid-props");
+  if (value.length < min || value.length > max) throw new RefusedDocument("document:invalid-props");
+  const entries: { readonly sectionId: string; readonly label: string }[] = [];
+  const claimed = new Set<string>();
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) throw new RefusedDocument("document:invalid-props");
+    const entry = readPlainData(value[index]);
+    if (entry === null) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(entry, ["sectionId", "label"], [])) throw new RefusedDocument("document:invalid-props");
+    const child = children[index];
+    if (child === undefined) throw new RefusedDocument("document:invalid-props");
+    const sectionId = entry["sectionId"];
+    if (typeof sectionId !== "string" || !SECTION_ID.test(sectionId)) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    if (sectionId !== child.id) throw new RefusedDocument("document:invalid-props");
+    if (claimed.has(sectionId)) throw new RefusedDocument("document:invalid-props");
+    claimed.add(sectionId);
+    const label = readBoundedText(
+      entry["label"],
+      UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    entries.push({ sectionId, label });
+  }
+  return entries;
+}
+
+/** One bounded, duplicate-free contact field list. Absent means "no fields", never "all fields". */
+function readContactFields(value: unknown): UnoContactField[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length < 1 || value.length > 3) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const fields: UnoContactField[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < value.length; index += 1) {
+    const field = value[index];
+    if (field !== "name" && field !== "email" && field !== "message") {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    if (seen.has(field)) throw new RefusedDocument("document:invalid-props");
+    seen.add(field);
+    fields.push(field);
+  }
+  return fields;
+}
+
+/** The three closed watermark alignments, or `undefined`. */
+function optionalWatermarkAlign(value: unknown): UnoWatermarkAlign | undefined {
+  if (value === undefined) return undefined;
+  if (value === "start" || value === "center" || value === "end") return value;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/** The two closed watermark strengths, or `undefined`. */
+function optionalWatermarkStrength(value: unknown): UnoWatermarkStrength | undefined {
+  if (value === undefined) return undefined;
+  if (value === "subtle" || value === "regular") return value;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/** The three closed motion effects, or `undefined`. */
+function optionalMotionEffect(value: unknown): UnoMotionEffect | undefined {
+  if (value === undefined) return undefined;
+  if (value === "fade" || value === "rise" || value === "none") return value;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/** The two closed motion speeds, or `undefined`. */
+function optionalMotionSpeed(value: unknown): UnoMotionSpeed | undefined {
+  if (value === undefined) return undefined;
+  if (value === "short" || value === "normal") return value;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+
 /**
  * Validate one section node, its closed props and — for the two layouts — its typed children.
  *
@@ -1059,10 +1416,10 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
     throw new RefusedDocument("document:renderer-unavailable");
   }
 
-  const isLayout = LAYOUT_MODULES.includes(moduleName);
-  const requiredKeys = isLayout ? ["id", "module", "props", "children"] : ["id", "module", "props"];
+  const ownsChildren = CHILD_BEARING_MODULES.includes(moduleName);
+  const requiredKeys = ownsChildren ? ["id", "module", "props", "children"] : ["id", "module", "props"];
   if (!hasExactlyKeys(record, requiredKeys, [])) {
-    throw new RefusedDocument(isLayout ? "document:invalid-children" : "document:invalid-section");
+    throw new RefusedDocument(ownsChildren ? "document:invalid-children" : "document:invalid-section");
   }
 
   const props = readPlainData(record["props"]);
@@ -1240,6 +1597,282 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
         ...(heading === undefined ? {} : { heading }),
         ...(level === undefined ? {} : { level }),
         ...(surface === undefined ? {} : { surface }),
+      },
+    };
+  }
+
+  if (moduleName === "layout.layers") {
+    if (!hasExactlyKeys(props, ["mode"], ["align"])) throw new RefusedDocument("document:invalid-props");
+    const mode = props["mode"];
+    if (mode !== "stack" && mode !== "overlap") throw new RefusedDocument("document:invalid-props");
+    const align = optionalAlign(props["align"]);
+    const children = readChildren(
+      record["children"],
+      depth + 1,
+      state,
+      seen,
+      2,
+      UNO_PAGE_DOCUMENT_LIMITS.layerChildren,
+    );
+    const layersProps: UnoLayoutLayersProps = align === undefined ? { mode } : { mode, align };
+    return { id, module: "layout.layers", props: layersProps, children };
+  }
+
+  if (moduleName === "media.image") {
+    if (!hasExactlyKeys(props, ["asset", "alt"], ["decorative", "caption"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const rawDecorative = props["decorative"];
+    if (rawDecorative !== undefined && typeof rawDecorative !== "boolean") {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const decorative = rawDecorative === true;
+    const asset = readOwnedAsset(props["asset"], "image");
+    // A decorative image is announced as nothing, so its `alt` must be exactly empty; a meaningful one must say something.
+    const alt = readBoundedText(
+      props["alt"],
+      UNO_PAGE_DOCUMENT_LIMITS.mediaAltCodePoints,
+      "document:invalid-props",
+      decorative,
+      false,
+    );
+    if (decorative && alt.length !== 0) throw new RefusedDocument("document:invalid-props");
+    const caption = readOptionalCaption(props["caption"]);
+    return {
+      id,
+      module: "media.image",
+      props: {
+        asset,
+        alt,
+        ...(rawDecorative === undefined ? {} : { decorative }),
+        ...(caption === undefined ? {} : { caption }),
+      },
+    };
+  }
+
+  if (moduleName === "media.video") {
+    // One strict discriminated union. `source` selects external mode; native mode is the absence of `source` and keeps
+    // its original shape. A mixed form is not repaired: it fails `hasExactlyKeys` in whichever branch it lands in.
+    if (Object.prototype.hasOwnProperty.call(props, "source")) {
+      if (!hasExactlyKeys(props, ["source", "provider", "videoId", "title"], ["privacyHash", "description"])) {
+        throw new RefusedDocument("document:invalid-props");
+      }
+      if (props["source"] !== "external") throw new RefusedDocument("document:invalid-props");
+      const provider = props["provider"];
+      if (!isUnoVideoProvider(provider)) throw new RefusedDocument("document:invalid-props");
+      const videoId = props["videoId"];
+      if (typeof videoId !== "string") throw new RefusedDocument("document:invalid-props");
+      const rawPrivacyHash = props["privacyHash"];
+      if (rawPrivacyHash !== undefined && typeof rawPrivacyHash !== "string") {
+        throw new RefusedDocument("document:invalid-props");
+      }
+      // The pure policy is the only place a provider destination is constructed. `privacyHash` is the authored name;
+      // the policy's `vimeoHash` is the same value under its own vocabulary.
+      const embed = readUnoVideoEmbed({
+        provider,
+        videoId,
+        ...(rawPrivacyHash === undefined ? {} : { vimeoHash: rawPrivacyHash }),
+      });
+      if (!embed.ok) throw new RefusedDocument("document:invalid-props");
+      const externalTitle = readBoundedText(
+        props["title"],
+        UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+        "document:invalid-props",
+        false,
+        false,
+      );
+      const externalDescription = optionalBoundedText(
+        props["description"],
+        UNO_PAGE_DOCUMENT_LIMITS.textCodePoints,
+        true,
+      );
+      return {
+        id,
+        module: "media.video",
+        props: {
+          source: "external",
+          provider,
+          videoId,
+          title: externalTitle,
+          ...(rawPrivacyHash === undefined ? {} : { privacyHash: rawPrivacyHash }),
+          ...(externalDescription === undefined ? {} : { description: externalDescription }),
+        },
+      };
+    }
+    if (!hasExactlyKeys(props, ["asset", "captions", "title"], ["poster", "description"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    // Video, caption track and poster are three strictly distinguished purposes: a `.vtt` can never become the video.
+    const asset = readOwnedAsset(props["asset"], "video");
+    const captions = readOwnedAsset(props["captions"], "captions");
+    const title = readBoundedText(
+      props["title"],
+      UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const poster = props["poster"] === undefined ? undefined : readOwnedAsset(props["poster"], "poster");
+    const description = optionalBoundedText(props["description"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
+    return {
+      id,
+      module: "media.video",
+      props: {
+        asset,
+        captions,
+        title,
+        ...(poster === undefined ? {} : { poster }),
+        ...(description === undefined ? {} : { description }),
+      },
+    };
+  }
+
+  if (moduleName === "media.gallery") {
+    if (!hasExactlyKeys(props, ["columns", "items"], [])) throw new RefusedDocument("document:invalid-props");
+    const columns = props["columns"];
+    if (columns !== 2 && columns !== 3 && columns !== 4) throw new RefusedDocument("document:invalid-props");
+    const items = readMediaItems(props["items"], 2, UNO_PAGE_DOCUMENT_LIMITS.galleryItems);
+    return { id, module: "media.gallery", props: { columns, items } };
+  }
+
+  if (moduleName === "media.carousel") {
+    if (!hasExactlyKeys(props, ["label", "items"], [])) throw new RefusedDocument("document:invalid-props");
+    const label = readBoundedText(
+      props["label"],
+      UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const items = readMediaItems(props["items"], 2, UNO_PAGE_DOCUMENT_LIMITS.carouselItems);
+    return { id, module: "media.carousel", props: { label, items } };
+  }
+
+  if (moduleName === "design.watermark") {
+    if (!hasExactlyKeys(props, ["text"], ["align", "strength"])) throw new RefusedDocument("document:invalid-props");
+    const text = readBoundedText(
+      props["text"],
+      UNO_PAGE_DOCUMENT_LIMITS.watermarkTextCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const align = optionalWatermarkAlign(props["align"]);
+    const strength = optionalWatermarkStrength(props["strength"]);
+    return {
+      id,
+      module: "design.watermark",
+      props: {
+        text,
+        ...(align === undefined ? {} : { align }),
+        ...(strength === undefined ? {} : { strength }),
+      },
+    };
+  }
+
+  if (moduleName === "design.motion") {
+    if (!hasExactlyKeys(props, ["effect"], ["speed"])) throw new RefusedDocument("document:invalid-props");
+    const effect = optionalMotionEffect(props["effect"]);
+    if (effect === undefined) throw new RefusedDocument("document:invalid-props");
+    const speed = optionalMotionSpeed(props["speed"]);
+    const children = readChildren(
+      record["children"],
+      depth + 1,
+      state,
+      seen,
+      1,
+      UNO_PAGE_DOCUMENT_LIMITS.motionChildren,
+    );
+    const motionProps: UnoDesignMotionProps = speed === undefined ? { effect } : { effect, speed };
+    return { id, module: "design.motion", props: motionProps, children };
+  }
+
+  if (moduleName === "interaction.tabs") {
+    if (!hasExactlyKeys(props, ["label", "tabs"], [])) throw new RefusedDocument("document:invalid-props");
+    const label = readBoundedText(
+      props["label"],
+      UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const children = readChildren(
+      record["children"],
+      depth + 1,
+      state,
+      seen,
+      2,
+      UNO_PAGE_DOCUMENT_LIMITS.tabChildren,
+    );
+    const tabs = readPanelEntries(props["tabs"], children, 2, UNO_PAGE_DOCUMENT_LIMITS.tabChildren);
+    return { id, module: "interaction.tabs", props: { label, tabs }, children };
+  }
+
+  if (moduleName === "interaction.accordion") {
+    if (!hasExactlyKeys(props, ["items"], [])) throw new RefusedDocument("document:invalid-props");
+    const children = readChildren(
+      record["children"],
+      depth + 1,
+      state,
+      seen,
+      1,
+      UNO_PAGE_DOCUMENT_LIMITS.accordionChildren,
+    );
+    const items = readPanelEntries(props["items"], children, 1, UNO_PAGE_DOCUMENT_LIMITS.accordionChildren);
+    return { id, module: "interaction.accordion", props: { items }, children };
+  }
+
+  if (moduleName === "interaction.modal") {
+    if (!hasExactlyKeys(props, ["triggerLabel", "title", "closeLabel"], [])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const triggerLabel = readBoundedText(
+      props["triggerLabel"],
+      UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const title = readBoundedText(
+      props["title"],
+      UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const closeLabel = readBoundedText(
+      props["closeLabel"],
+      UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    // A dialog owns exactly one content node: zero would be an empty dialog and two would need a wrapper this order
+    // does not authorise, so the bound is exact rather than merely bounded.
+    const children = readChildren(record["children"], depth + 1, state, seen, 1, 1);
+    return { id, module: "interaction.modal", props: { triggerLabel, title, closeLabel }, children };
+  }
+
+  if (moduleName === "interaction.contact") {
+    if (!hasExactlyKeys(props, [], ["heading", "description", "fields", "submitLabel"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const heading = optionalBoundedText(props["heading"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, true);
+    const description = optionalBoundedText(
+      props["description"],
+      UNO_PAGE_DOCUMENT_LIMITS.contactDescriptionCodePoints,
+      true,
+    );
+    const fields = readContactFields(props["fields"]);
+    const submitLabel = optionalBoundedText(props["submitLabel"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, false);
+    return {
+      id,
+      module: "interaction.contact",
+      props: {
+        ...(heading === undefined ? {} : { heading }),
+        ...(description === undefined ? {} : { description }),
+        ...(fields === undefined ? {} : { fields }),
+        ...(submitLabel === undefined ? {} : { submitLabel }),
       },
     };
   }

@@ -514,3 +514,327 @@ describe("UnoPageSections — bento, pricing and timeline", () => {
     expect(markup).toBe("");
   });
 });
+
+describe("the eleven remaining module renderers", () => {
+  /** One resolved image projection, as the server composition would hand it over. */
+  const image = (seed: string) => ({
+    src: `/uno-media/en-001/${seed}`,
+    type: "image/png",
+    width: 4,
+    height: 2,
+  });
+
+  /** Render one document together with its resolved media projections. */
+  function renderWithMedia(document: Record<string, unknown>, media: ReadonlyMap<string, unknown>): string {
+    return renderToStaticMarkup(
+      createElement(UnoPageSections, { document: accept(document), media: media as never }),
+    );
+  }
+
+  it("renders overlapping layers as ordered children with a closed mode", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Layers",
+        sections: [
+          {
+            id: "layers",
+            module: "layout.layers",
+            props: { mode: "overlap", align: "center" },
+            children: [
+              { id: "layer-one", module: "content.prose", props: { text: "First layer" } },
+              { id: "layer-two", module: "content.prose", props: { text: "Second layer" } },
+            ],
+          },
+        ],
+      },
+      new Map(),
+    );
+    expect(html).toContain('data-uno-mode="overlap"');
+    expect(html).toContain('data-uno-align="center"');
+    expect(html).toContain('data-uno-layer-id="layer-one"');
+    expect(html).toContain('data-uno-layer-id="layer-two"');
+    // Authored order is preserved in the markup, which is the reading and keyboard order.
+    expect(html.indexOf("layer-one")).toBeLessThan(html.indexOf("layer-two"));
+  });
+
+  it("renders an inert decorative watermark and a closed motion effect", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Treatments",
+        sections: [
+          { id: "mark", module: "design.watermark", props: { text: "Draft", align: "end", strength: "regular" } },
+          {
+            id: "motion",
+            module: "design.motion",
+            props: { effect: "rise", speed: "short" },
+            children: [{ id: "motion-body", module: "content.prose", props: { text: "Readable body" } }],
+          },
+        ],
+      },
+      new Map(),
+    );
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).toContain('data-uno-align="end"');
+    expect(html).toContain('data-uno-strength="regular"');
+    expect(html).toContain('data-uno-effect="rise"');
+    expect(html).toContain('data-uno-speed="short"');
+    // The wrapped content is present in its final state, never hidden awaiting animation.
+    expect(html).toContain("Readable body");
+  });
+
+  it("renders an accordion as native disclosures with ordered labels", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Disclosures",
+        sections: [
+          {
+            id: "faq",
+            module: "interaction.accordion",
+            props: {
+              items: [
+                { sectionId: "d-one", label: "First question" },
+                { sectionId: "d-two", label: "Second question" },
+              ],
+            },
+            children: [
+              { id: "d-one", module: "content.prose", props: { text: "First answer" } },
+              { id: "d-two", module: "content.prose", props: { text: "Second answer" } },
+            ],
+          },
+        ],
+      },
+      new Map(),
+    );
+    expect(html.match(/<details/gu)?.length).toBe(2);
+    expect(html.match(/<summary/gu)?.length).toBe(2);
+    expect(html).toContain("First question");
+    expect(html).toContain("Second answer");
+  });
+
+  it("renders the contact surface as delivery-OFF with no form and a disabled control", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Contact",
+        sections: [
+          {
+            id: "contact",
+            module: "interaction.contact",
+            props: { heading: "Talk to us", fields: ["name", "email", "message"], submitLabel: "Send" },
+          },
+        ],
+      },
+      new Map(),
+    );
+    expect(html).toContain("Delivery is switched off");
+    expect(html).toContain("Talk to us");
+    expect(html).toContain("<label");
+    expect(html).toContain("disabled");
+    // There is no form, no action and no transport anywhere in this module.
+    expect(html.includes("<form")).toBe(false);
+    expect(html.includes("action=")).toBe(false);
+    expect(html.includes("fetch(")).toBe(false);
+  });
+
+  it("renders an owned image with its authored alternative and a served locator", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Image",
+        sections: [
+          { id: "photo", module: "media.image", props: { asset: { zone: "page", path: "hero.png" }, alt: "A hero" } },
+        ],
+      },
+      new Map([["photo", { image: image("0") }]]),
+    );
+    expect(html.includes("<img")).toBe(true);
+    expect(html).toContain('alt="A hero"');
+    expect(html).toContain("/uno-media/en-001/0");
+    // The rendered locator never carries the authored storage path it came from.
+    expect(html.includes("hero.png")).toBe(false);
+  });
+
+  it("renders a gallery at its closed column count with one figure per item", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Gallery",
+        sections: [
+          {
+            id: "gal",
+            module: "media.gallery",
+            props: {
+              columns: 3,
+              items: [
+                { asset: { zone: "page", path: "g-one.png" }, alt: "One" },
+                { asset: { zone: "page", path: "g-two.png" }, alt: "Two" },
+              ],
+            },
+          },
+        ],
+      },
+      new Map([["gal", { items: [image("0"), image("1")] }]]),
+    );
+    expect(html).toContain('data-uno-columns="3"');
+    expect(html.match(/<img/gu)?.length).toBe(2);
+    expect(html).toContain('alt="One"');
+    expect(html).toContain('alt="Two"');
+  });
+
+  it("renders the carousel through the island with one item on stage", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Carousel",
+        sections: [
+          {
+            id: "carousel",
+            module: "media.carousel",
+            props: {
+              label: "Selected work",
+              items: [
+                { asset: { zone: "page", path: "c-one.png" }, alt: "First" },
+                { asset: { zone: "page", path: "c-two.png" }, alt: "Second" },
+              ],
+            },
+          },
+        ],
+      },
+      new Map([["carousel", { items: [image("0"), image("1")] }]]),
+    );
+    expect(html).toContain('aria-roledescription="carousel"');
+    expect(html).toContain("Image 1 of 2");
+    expect(html).toContain('alt="First"');
+    expect(html.includes('alt="Second"')).toBe(false);
+  });
+
+  it("renders tabs and a modal through the single island boundary", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Interactions",
+        sections: [
+          {
+            id: "tabs",
+            module: "interaction.tabs",
+            props: {
+              label: "Sections",
+              tabs: [
+                { sectionId: "tab-one", label: "Alpha" },
+                { sectionId: "tab-two", label: "Beta" },
+              ],
+            },
+            children: [
+              { id: "tab-one", module: "content.prose", props: { text: "Alpha body" } },
+              { id: "tab-two", module: "content.prose", props: { text: "Beta body" } },
+            ],
+          },
+          {
+            id: "modal",
+            module: "interaction.modal",
+            props: { triggerLabel: "Open details", title: "Details", closeLabel: "Close" },
+            children: [{ id: "modal-body", module: "content.prose", props: { text: "Dialog body" } }],
+          },
+        ],
+      },
+      new Map(),
+    );
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain("Alpha");
+    expect(html).toContain("Beta body");
+    expect(html.includes("<dialog")).toBe(true);
+    expect(html).toContain("Open details");
+    // Exactly one `h1`/`main` owner: the renderer still emits neither.
+    expect(html.includes("<main")).toBe(false);
+    expect(/<h1[\s>]/u.test(html)).toBe(false);
+  });
+});
+
+
+
+/**
+ * `media.video` external mode, server side. The server must emit a **consent placeholder** and never a frame: these
+ * assertions are the pre-consent guarantee, so they check for the absence of `iframe`/provider `src` as strictly as for
+ * the presence of the label and disclosure.
+ */
+describe("media.video — external consent placeholder", () => {
+  /** Render one document with an explicit media projection (empty here: external embeds own no served bytes). */
+  function renderWithMedia(document: Record<string, unknown>, media: ReadonlyMap<string, unknown>): string {
+    return renderToStaticMarkup(
+      createElement(UnoPageSections, { document: accept(document), media: media as never }),
+    );
+  }
+
+  const providers = [
+    { provider: "youtube", videoId: "dQw4w9WgXcQ", label: "YouTube", host: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ" },
+    { provider: "vimeo", videoId: "76979871", label: "Vimeo", host: "https://player.vimeo.com/video/76979871?dnt=1" },
+    { provider: "rumble", videoId: "v17j3tt", label: "Rumble", host: "https://rumble.com/embed/v17j3tt/" },
+    { provider: "bitchute", videoId: "aB_9-hXyZ", label: "BitChute", host: "https://www.bitchute.com/embed/aB_9-hXyZ/" },
+  ] as const;
+
+  function externalHtml(provider: string, videoId: string): string {
+    return renderWithMedia(
+      {
+        ...twoCardDocument(),
+        sections: [{ id: "clip", module: "media.video", props: { source: "external", provider, videoId, title: "An external clip" } }],
+      },
+      new Map(),
+    );
+  }
+
+  it("emits no frame, no provider src and no third-party request before consent", () => {
+    for (const entry of providers) {
+      const html = externalHtml(entry.provider, entry.videoId);
+      expect(html.includes("<iframe")).toBe(false);
+      expect(html.includes("srcdoc")).toBe(false);
+      expect(html.includes(`src="${entry.host}"`)).toBe(false);
+      expect(html.includes("preconnect")).toBe(false);
+      expect(html.includes("preload=\"none\"")).toBe(false);
+    }
+  });
+
+  it("emits one accessible activation control and an honest third-party disclosure", () => {
+    for (const entry of providers) {
+      const html = externalHtml(entry.provider, entry.videoId);
+      expect(html.includes(`Load video from ${entry.label}`)).toBe(true);
+      expect(html.includes(`hosted by ${entry.label}`)).toBe(true);
+      expect(html.includes(`type="button"`)).toBe(true);
+      // The outbound link is an ordinary anchor to the validated destination: it fetches nothing on load.
+      expect(html.includes(`href="${entry.host}"`)).toBe(true);
+      expect(html.includes(`rel="noreferrer noopener"`)).toBe(true);
+    }
+  });
+
+  it("carries the provider identity on the block for targeted verification", () => {
+    const html = externalHtml("vimeo", "76979871");
+    expect(html.includes('data-uno-embed-provider="vimeo"')).toBe(true);
+    expect(html.includes('data-uno-embed-id="clip"')).toBe(true);
+  });
+
+  it("keeps a native video as a real player with a required caption track", () => {
+    const html = renderWithMedia(
+      {
+        ...twoCardDocument(),
+        sections: [
+          {
+            id: "clip",
+            module: "media.video",
+            props: {
+              asset: { zone: "page", path: "wo042-clip.mp4" },
+              captions: { zone: "page", path: "wo042-clip.vtt" },
+              title: "An owned clip",
+            },
+          },
+        ],
+      },
+      new Map(),
+    );
+    // With no resolved media the honest outcome is nothing at all — never a bare or remote-sourced player.
+    expect(html.includes("<video")).toBe(false);
+    expect(html.includes("<iframe")).toBe(false);
+  });
+});
+
