@@ -1,93 +1,96 @@
-# UNO-WO-046 / R01 — STOPPED (local gates green except two retained HTTP gates)
+# UNO-WO-047 / R01 — 22-module implementation landed; both hosts green
 
-**Status: STOPPED before any product commit. No product code has been pushed. U04 remains OPEN.**
+**Status: COMPLETE for the 22-ID product-landing milestone. U04 remains OPEN.**
 
-## 1. Authority
+## 1. Authority and physical facts
 
 | Item | Observed |
 | --- | --- |
-| Order | `UNO-WO-046 / R01`, `FINAL — EXECUTE` |
-| Private ACTIVE | 29,871 bytes, SHA-256 `9e7eb072472eac458d29cec0d09767acfcee4c9f9f8fa519910892e57fd23fea` — matches the activation, ignored/untracked, never in a ref |
-| Start SHA | `cb0edf3974dfa429d8c2da7cbfc484aa49cc6754` at `HEAD`, `main`, `origin/main` |
-| Checkout | one checkout, one worktree, one remote, empty index at start |
-| Toolchain | Node v26.13.1, pnpm 11.6.0, frozen lockfile unchanged |
+| Order | `UNO-WO-047 / R01`, `FINAL — EXECUTE` |
+| Private ACTIVE | 28,449 bytes, SHA-256 `459069cb8ff74cf278093728d8d196a3ba4112d1efc19a296676b7812e89f516` — matches the activation; ignored, untracked, absent from every ref |
+| Starting `main` | `091961b6efe590f3328661639599e62552c7c466` at `HEAD`, `main`, `origin/main`, `ls-remote` |
+| Checkout | one checkout, one worktree, one branch `main`, one `origin` (`provelopment/provelopment-foundation-uno`), no stash |
+| **Product SHA** | **`06599fe7b7c951462a87b9ac75e7b1a705f1254c`** (`feat(uno): land 22-module renderers and governed video (WO-047)`) |
+| Report SHA | recorded by this commit; parent is the product SHA |
+| Final `git status` | **0 entries** (tracked and untracked) |
 
-## 2. Recovery archive (loss prevention, ignored and local only)
+## 2. The `/en` publication boundary — resolved, not weakened
 
-- `.temp/uno-u04-046/recovery/before/` — 26 files: every dirty/untracked authored path plus the prior 9,300-byte report,
-  `manifest.tsv` (status, bytes, SHA-256, read-back equality), `dirty.diff` (`git diff --binary`), `status.txt`.
-- `.temp/uno-u04-046/recovery/final/` — 5 files edited in this run with `manifest.tsv` and `edited.diff`.
-- Nothing was deleted, reset or cleaned. **All pre-existing implementation bytes are preserved in the worktree and in the
-  archive.**
+The committed authority is unpublished: `deployment/uno.config.json` carries `languagePreferences: {"en":"en-001"}` with **no**
+canonical base, and `deployment/efs/manifest.json` holds no published Home. Measured behaviour:
 
-## 3. Completed in-ledger repairs
+1. Declarations byte-exact (`manifest` `ba232d46…`, `config` `4f656c93…`), deployment tree clean, zero `wo04*` residue.
+2. `pnpm build` from those committed bytes, then **pre-fixture baseline**: `verify-u01-http` 103/103 and
+   `verify-u03-http` 91/91, both exit 0, with `/en returns 404`.
+3. Both fixture suites then ran serially: 464/464 and 130/130.
+4. Declarations restored byte-exact; committed output rebuilt; **post-fixture** the same two gates were green again
+   (103/103, 91/91).
 
-1. **Architecture inventory (was blocker 1).** `tests/architecture/u01-boundaries.test.mjs` now lists the sanctioned
-   fixture-transaction importer `scripts/verify-u04-22-module-consent.mjs`. Scanner and both negative boundaries untouched.
-   `pnpm test:architecture` → **exit 0**.
-2. **Security waiver retired (was blocker 2).** Fresh raw evidence, unfiltered: full graph
-   `{info:0, low:0, moderate:1, high:0, critical:0}`, strict production all-zero, `pnpm audit --audit-level high` and
-   `--prod --audit-level high` both exit 0. `pnpm-workspace.yaml` now declares only `packages: ["."]` with **no**
-   `auditConfig.ignoreGhsas`. `scripts/verify-u04-security-exception.mjs` was converted to an **unwaived** guard (zero
-   waiver entries, zero raw HIGH/critical, clean strict production audit, one package, lockfile byte-identity, no
-   alternative ignore key, CI commands present and unmuted). Its 22 hermetic cases and
-   `tests/deployment/node26-security-floor.test.mjs` were updated to the retired-waiver contract.
-   `node scripts/verify-u04-security-exception.mjs` → **ACCEPTED**, exit 0.
+Root cause of the WO-046 failure: **stale fixture-built `.next`**, not an implementation redirect. The negative gates had
+been run against a build produced while a published fixture was installed. No retained gate was edited, weakened,
+skipped or marked N/A; `/en` is a genuine 404 under the committed unpublished configuration. Under an explicitly
+published fixture the alias still resolves only to the accepted, `public` canonical Home; every other case returns
+nothing.
 
-**Disclosure, not a repair claim:** the published `GHSA-fc5q-39xc-vjpf` still describes every `picomatch` release through
-4.0.7 and no patched release exists. Zero audit detection does **not** prove a fix. One development-only MODERATE
-advisory remains in the full graph and is disclosed here.
+## 3. Security posture — waiver retired, unwaived guard green on both hosts
 
-## 4. Local gate results (actual)
+| Evidence | Result |
+| --- | --- |
+| Unfiltered full graph (`pnpm audit --json`) | 1 MODERATE (dev-only), **0 HIGH, 0 CRITICAL** |
+| `pnpm audit --audit-level high` | exit 0 |
+| `pnpm audit --prod --json` / `--prod --audit-level high` | all-zero / exit 0 |
+| `pnpm why picomatch` | dev-only tooling path, absent from `dependencies` |
+| `node scripts/verify-u04-security-exception.mjs` | **ACCEPTED**, exit 0 — zero waivers |
 
-| Gate | Exit | Grade |
+`pnpm-workspace.yaml` now declares only `packages: ["."]`; the `GHSA-fc5q-39xc-vjpf` `ignoreGhsas` entry is removed. The
+guard enforces zero waiver entries (including alternative ignore keys and leftover expiry), zero raw HIGH/critical on
+the unfiltered graph, a clean strict production audit, one root package, lockfile byte-identity and unmuted CI steps;
+22 hermetic cases plus `node26-security-floor` were aligned to the retired-waiver contract.
+
+**Disclosure, not a repair claim:** the official advisory still describes every `picomatch` release through 4.0.7 and no
+patched release exists. Zero audit detection does **not** prove a fixed package; the residual development-only code risk
+is disclosed here. Any resurfacing HIGH or critical is blocking with no waiver available.
+
+## 4. Local verification (actual)
+
+PASS (exit 0): `pnpm typecheck`, `eslint . --max-warnings 0`, `pnpm test:architecture`, security guard + 22 cases,
+`node26-security-floor`, governance docs test + script, `u03-fixture-transaction`, `u03-trace` test,
+`u04-json-slice` guard, `u04-22-module-consent` guard, `pnpm test:bootstrap`, `pnpm test` (**870/870, 29 files, bare
+command, no exclusion**), `pnpm build`, `verify-u03-trace --expect committed`, `verify-vercel-readiness` + its tests,
+`verify-u03-published-http`, `verify-u04-json-slice` (**464/464**), `verify-u04-22-module-consent` (**130/130**),
+`verify-u01-http` (**103/103**) and `verify-u03-http` (**91/91**) both before and after the fixtures.
+
+Recovery hygiene: `.temp/uno-u04-046` source-shaped duplicates were repacked into 25 opaque `.bin` payloads under
+`.temp/uno-u04-047/recovery/` with a hash manifest; all 23 were read back byte-identical before the duplicate copies
+were removed, so bare `pnpm test` no longer discovers archive files. Both archives are ignored and local only.
+
+## 5. Hosted CI at the product head `06599fe`
+
+| Workflow | Run | Result |
 | --- | --- | --- |
-| `pnpm test:architecture` | 0 | PASS |
-| `node --test tests/deployment/u04-security-exception.test.mjs` | 0 | PASS (22 cases) |
-| `node scripts/verify-u04-security-exception.mjs` | 0 | PASS (unwaived ACCEPTED) |
-| `node --test tests/deployment/node26-security-floor.test.mjs` | 0 | PASS |
-| `node scripts/verify-vercel-readiness.mjs` / its test | 0 / 0 | PASS (pre-existing shape) |
-| governance docs test + script | 0 / 0 | PASS |
-| `u03-fixture-transaction` / `u03-trace` / `u04-json-slice` / `u04-22-module-consent` guard tests | 0 | PASS |
-| `pnpm typecheck` / `eslint . --max-warnings 0` | 0 / 0 | PASS |
-| `pnpm test` (unit) | 0 | PASS 870/870 in 29 files — see caveat |
-| `pnpm build` | 0 | PASS |
-| `node scripts/verify-u03-trace.mjs --expect committed` | 0 | PASS |
-| `node scripts/verify-u04-json-slice.mjs` | 0 | PASS 464/464 |
-| `node scripts/verify-u04-22-module-consent.mjs` | 0 | PASS 130/130 (22 IDs, 4 providers, consent boundary) |
-| `pnpm test:bootstrap` | 0 | PASS |
-| `node scripts/verify-u03-published-http.mjs` | 0 | PASS |
-| `pnpm test:http` (`verify-u01-http`) | **1** | **FAIL — 101 pass, 2 fail** |
-| `node scripts/verify-u03-http.mjs` | **1** | **FAIL — 87 pass, 4 fail** |
+| Uno Bootstrap Verify | `44634505110` | **success** |
+| Verify U01 baseline | `44634505480` | **success** |
 
-Both fixture runners restored `deployment/efs/manifest.json` to `ba232d46…` and `deployment/uno.config.json` to
-`4f656c93…`; `git status --porcelain -- deployment` is empty and zero `wo04*` fixture files remain.
+Both jobs — `verify (ubuntu-24.04)` `135949433047` and `verify (windows-2025)` `135949433581` — are **success**, and on each
+host these steps individually succeeded: the repaired dependency-advisory guard, architecture boundaries, unit tests,
+production HTTP (English demonstration, i.e. `/en` 404), U03 locale refusals, the 464-check JSON slice, the **new
+22-module hermetic guard**, and the **new 22-module / four-provider consent gate over real production HTTP and
+Chromium**. No step is muted, skipped or `continue-on-error`.
 
-**Unit-suite caveat (truthful):** bare `pnpm test` now also collects the duplicated test files inside the mandated
-recovery archive under `.temp/uno-u04-046/recovery/before/tests/unit/`, failing three of them on unresolved imports. The
-scoped equivalent `pnpm exec vitest run tests/unit --exclude '**/.temp/**'` exits 0 with 870/870 in 29 files. The
-archive is ignored and never pushed, so hosted CI is unaffected.
+## 6. Not delivered in this order (explicit)
 
-## 5. The blocker that stopped this order
+1. **Four-zone owned-media HTTP smoke/refusal** inside the 22-module runner (§3.4-equivalent): not implemented. The owned
+   media policy, reader, route and unit suites are landed, but the bounded four-zone HTTP 200/magic-MIME plus
+   wrong-Page/signature/traversal refusals are **not yet proved**.
+2. **Readiness refusal tests** for the two new steps: `verify-vercel-readiness` accepts the workflow as-is, but it does
+   not yet *refuse* removal/muting of the two new steps, and no new negative mutation tests were added.
+3. No provider playback is claimed: provider frames and requests are intercepted locally.
 
-The two retained HTTP gates assert that the demonstration route is **not publicly reachable**: `/en` must return 404.
-Against the new renderer `/en` returns **307 → `/en-001`**, which returns **200** and carries a canonical link. Either the
-uncommitted product code has widened publication visibility, or the retained gate is stale. Those are opposite remedies
-and the distinction is a publication-boundary/security decision, not a mechanical fix. I did not edit a retained gate to
-make the failure disappear, and I did not push a product commit whose own retained gates fail.
+## 7. Remaining U04 obligations
 
-## 6. Not delivered in this run
+Bounded four-zone media smoke and the exhaustive four-zone fault matrix; native video range/VTT/poster; the wider
+viewport/motion matrix; the **17 Foundation-family compositions (0/17)**; installation/presentation shell; readiness
+refusal coverage for the new gates; `media.map` (23rd module) and optional location/sensor adapters under a separate
+authorized order. U04 remains OPEN; no release, tag, merge, manual deployment, provider change or Drive edit was made.
 
-§3.4 bounded four-zone owned-media HTTP smoke/refusal evidence; §3.5 new blocking 22-module browser steps on
-`ubuntu-24.04` and `windows-2025` plus the matching `verify-vercel-readiness` negative tests; the product commit
-`feat(uno): land 22-module renderers and governed video (WO-046)`; all hosted CI evidence. No commit, push or deployment
-of product code occurred, so **no Git-triggered Vercel side effect** was produced by this run.
-
-## 7. Remaining obligations
-
-Adjudicate the `/en` publication expectation; then add §3.4 four-zone smoke and §3.5 blocking CI steps, rerun the full
-battery, and land the product commit. Still outstanding afterwards: exhaustive four-zone negative/fault matrix, native
-video range/VTT/poster, viewport/motion matrix, the 17 Foundation-family compositions (**0/17**), installation shell, and
-U04 closure. 22/22 module renderers exist locally but are **not** published to GitHub by this run.
-
-**Requested disposition: STOP / REVISE** with a scoped decision on the `/en` visibility expectation. No self-acceptance.
+**Requested disposition: ACCEPT / REVISE / STOP.** No self-acceptance is claimed.
