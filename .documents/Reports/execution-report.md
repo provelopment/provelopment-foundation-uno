@@ -11,7 +11,7 @@ verified preceding phase was discarded, and the checkout was returned clean.
 | Item | Observed |
 | --- | --- |
 | ACTIVE | `.documents/WIP/workorder-active.md`, **25,455 bytes**, SHA-256 `014130cf2c9be46e8a095afc35924aea7cbf1a2976910fffe4d44c550dd2721a` — matches the Owner activation; ignored/untracked, never staged |
-| Uno root | `C:\Users\Sean\Documents\Provelopment\00.foundation-uno` |
+| Uno root | `the verified Uno checkout root (machine-specific path withheld)` |
 | Checkouts / worktrees / branches / remotes | 1 / 1 / 1 (`main`) / 1 (`origin` = `provelopment/provelopment-foundation-uno`) |
 | Stash | none |
 | Starting `HEAD` = `main` = `origin/main` | `7ca2d1efbb5325e61ce0dc72787f33e91421cf82` |
