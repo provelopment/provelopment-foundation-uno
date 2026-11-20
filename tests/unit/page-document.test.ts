@@ -1534,3 +1534,278 @@ describe("media.video — native/external discriminated union", () => {
   });
 });
 
+
+describe("content.prose variants and layout.grid list/ratio — accepted shapes", () => {
+  const prosePage = (props: unknown): Record<string, unknown> => ({
+    ...minimal(),
+    sections: [{ id: "variant-prose", module: "content.prose", props }],
+  });
+  const acceptedProps = (props: Record<string, unknown>): Record<string, unknown> => {
+    const result = readUnoPageDocument(prosePage(props));
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) throw new Error(result.reason);
+    const section = result.document.sections[0];
+    if (section === undefined || section.module !== "content.prose") throw new Error("unexpected section");
+    return section.props as unknown as Record<string, unknown>;
+  };
+
+  it("keeps the legacy prose props byte-compatible and deep-frozen", () => {
+    const props = acceptedProps({ text: "A & B" });
+    expect(Object.keys(props)).toEqual(["text"]);
+    expect(props).toEqual({ text: "A & B" });
+    expect(Object.isFrozen(props)).toBe(true);
+  });
+
+  it("accepts a callout with and without an authored tone", () => {
+    expect(acceptedProps({ variant: "callout", text: "Note body" })).toEqual({ variant: "callout", text: "Note body" });
+    expect(acceptedProps({ variant: "callout", text: "Careful", tone: "warning" })).toEqual({
+      variant: "callout",
+      text: "Careful",
+      tone: "warning",
+    });
+  });
+
+  it("accepts ordered and unordered list variants with optional details", () => {
+    expect(
+      acceptedProps({ variant: "list", items: [{ label: "One" }, { label: "Two", detail: "Second detail" }] }),
+    ).toEqual({ variant: "list", items: [{ label: "One" }, { label: "Two", detail: "Second detail" }] });
+    expect(acceptedProps({ variant: "list", ordered: true, items: [{ label: "Only" }] })).toEqual({
+      variant: "list",
+      ordered: true,
+      items: [{ label: "Only" }],
+    });
+  });
+
+  it("accepts a rectangular table with and without a caption", () => {
+    const table = { variant: "table", columns: ["A", "B"], rows: [["1", "2"], ["3", "4"]] };
+    expect(acceptedProps(table)).toEqual(table);
+    expect(acceptedProps({ ...table, caption: "Bounded caption" })).toEqual({ ...table, caption: "Bounded caption" });
+  });
+
+  it("accepts a content-free divider and round-trips every variant through JSON", () => {
+    expect(acceptedProps({ variant: "divider" })).toEqual({ variant: "divider" });
+    const variants: readonly Record<string, unknown>[] = [
+      { text: "Legacy" },
+      { variant: "callout", text: "Body", tone: "info" },
+      { variant: "list", items: [{ label: "One" }] },
+      { variant: "table", columns: ["A"], rows: [["1"]] },
+      { variant: "divider" },
+    ];
+    for (const variant of variants) {
+      const first = readUnoPageDocument(prosePage(variant));
+      expect(first.accepted).toBe(true);
+      if (!first.accepted) continue;
+      const serialized = JSON.stringify(first.document);
+      const second = readUnoPageDocument(serialized, { reservedHome: false });
+      expect(second.accepted).toBe(true);
+      if (!second.accepted) continue;
+      expect(JSON.stringify(second.document)).toBe(serialized);
+      expect(Object.isFrozen(second.document)).toBe(true);
+    }
+  });
+
+  it("accepts grid list semantics and a ratio only on two columns", () => {
+    const gridPage = (props: Record<string, unknown>): Record<string, unknown> => ({
+      ...minimal(),
+      sections: [
+        {
+          id: "grid",
+          module: "layout.grid",
+          props,
+          children: [{ id: "grid-cell", module: "content.prose", props: { text: "Cell" } }],
+        },
+      ],
+    });
+    for (const props of [
+      { columns: 2, itemSemantics: "list" },
+      { columns: 2, ratio: "equal" },
+      { columns: 2, ratio: "start-wide" },
+      { columns: 2, ratio: "end-wide" },
+      { columns: 2, itemSemantics: "list", ratio: "end-wide" },
+    ]) {
+      expect(readUnoPageDocument(gridPage(props)).accepted).toBe(true);
+    }
+    const listed = readUnoPageDocument(gridPage({ columns: 2, itemSemantics: "list", ratio: "end-wide" }));
+    expect(listed.accepted).toBe(true);
+    if (listed.accepted) {
+      expect(listed.document.sections[0]).toMatchObject({
+        module: "layout.grid",
+        props: { columns: 2, itemSemantics: "list", ratio: "end-wide" },
+      });
+    }
+  });
+});
+
+describe("content.prose variants and layout.grid list/ratio — closed refusals", () => {
+  const prosePage = (props: unknown): Record<string, unknown> => ({
+    ...minimal(),
+    sections: [{ id: "variant-prose", module: "content.prose", props }],
+  });
+  const gridPage = (props: Record<string, unknown>): Record<string, unknown> => ({
+    ...minimal(),
+    sections: [
+      {
+        id: "grid",
+        module: "layout.grid",
+        props,
+        children: [{ id: "grid-cell", module: "content.prose", props: { text: "Cell" } }],
+      },
+    ],
+  });
+  const refusals: readonly { readonly name: string; readonly props: unknown; readonly reason: string }[] = [
+    { name: "an unknown prose variant", props: { variant: "embed" }, reason: "document:invalid-props" },
+    { name: "a declared but undefined variant", props: { variant: undefined, text: "A" }, reason: "document:invalid-props" },
+    { name: "a stray prop on legacy prose", props: { text: "A", href: "/elsewhere" }, reason: "document:invalid-props" },
+    {
+      name: "a crossed table and text shape",
+      props: { variant: "table", text: "A", columns: ["A"], rows: [["1"]] },
+      reason: "document:invalid-props",
+    },
+    { name: "a crossed divider and text shape", props: { variant: "divider", text: "A" }, reason: "document:invalid-props" },
+    { name: "an unknown callout tone", props: { variant: "callout", text: "A", tone: "danger" }, reason: "document:invalid-props" },
+    { name: "an empty callout body", props: { variant: "callout", text: "   " }, reason: "document:invalid-props" },
+    { name: "a callout html prop", props: { variant: "callout", text: "A", html: "x" }, reason: "document:invalid-props" },
+    { name: "a callout style prop", props: { variant: "callout", text: "A", style: "x" }, reason: "document:invalid-props" },
+    { name: "a callout onClick prop", props: { variant: "callout", text: "A", onClick: "x" }, reason: "document:invalid-props" },
+    { name: "an empty list", props: { variant: "list", items: [] }, reason: "document:invalid-props" },
+    {
+      name: "thirteen list entries",
+      props: { variant: "list", items: Array.from({ length: 13 }, (_, index) => ({ label: `Item ${index}` })) },
+      reason: "document:invalid-props",
+    },
+    { name: "an empty list label", props: { variant: "list", items: [{ label: "  " }] }, reason: "document:invalid-props" },
+    { name: "a non-string list label", props: { variant: "list", items: [{ label: 5 }] }, reason: "document:invalid-props" },
+    { name: "a list item href", props: { variant: "list", items: [{ label: "A", href: "/x" }] }, reason: "document:invalid-props" },
+    {
+      name: "a string ordered flag",
+      props: { variant: "list", ordered: "true", items: [{ label: "A" }] },
+      reason: "document:invalid-props",
+    },
+    { name: "non-array list items", props: { variant: "list", items: "A" }, reason: "document:invalid-props" },
+    { name: "empty table columns", props: { variant: "table", columns: [], rows: [["1"]] }, reason: "document:invalid-props" },
+    {
+      name: "seven table columns",
+      props: {
+        variant: "table",
+        columns: ["a", "b", "c", "d", "e", "f", "g"],
+        rows: [["1", "2", "3", "4", "5", "6", "7"]],
+      },
+      reason: "document:invalid-props",
+    },
+    { name: "empty table rows", props: { variant: "table", columns: ["A"], rows: [] }, reason: "document:invalid-props" },
+    {
+      name: "twenty-one table rows",
+      props: { variant: "table", columns: ["A"], rows: Array.from({ length: 21 }, () => ["1"]) },
+      reason: "document:invalid-props",
+    },
+    {
+      name: "a non-array table row",
+      props: { variant: "table", columns: ["A"], rows: ["1"] },
+      reason: "document:invalid-props",
+    },
+    {
+      name: "a ragged table row",
+      props: { variant: "table", columns: ["A", "B"], rows: [["1"]] },
+      reason: "document:invalid-props",
+    },
+    { name: "a blank table cell", props: { variant: "table", columns: ["A"], rows: [[" "]] }, reason: "document:invalid-props" },
+    {
+      name: "an overlong table cell",
+      props: { variant: "table", columns: ["A"], rows: [["x".repeat(321)]] },
+      reason: "document:invalid-props",
+    },
+    {
+      name: "an overlong table caption",
+      props: { variant: "table", columns: ["A"], rows: [["1"]], caption: "x".repeat(321) },
+      reason: "document:invalid-props",
+    },
+    {
+      name: "a nested object table cell",
+      props: { variant: "table", columns: ["A"], rows: [[{ nested: true }]] },
+      reason: "document:invalid-props",
+    },
+    {
+      name: "a table extra prop",
+      props: { variant: "table", columns: ["A"], rows: [["1"]], sort: "asc" },
+      reason: "document:invalid-props",
+    },
+    {
+      name: "script text in a callout",
+      props: { variant: "callout", text: "<script>alert(1)</script>" },
+      reason: "document:unsafe-text",
+    },
+    {
+      name: "a javascript destination in a list label",
+      props: { variant: "list", items: [{ label: "javascript:alert(1)" }] },
+      reason: "document:unsafe-text",
+    },
+  ];
+  for (const { name, props, reason } of refusals) {
+    it(`refuses ${name}`, () => {
+      expectRefusal(prosePage(props), reason);
+    });
+  }
+
+  it("refuses a sparse list entry and never runs an accessor array index", () => {
+    const sparse: unknown[] = [{ label: "Present" }];
+    sparse.length = 2;
+    expectRefusal(prosePage({ variant: "list", items: sparse }), "document:invalid-props");
+
+    let ran = false;
+    const accessed: unknown[] = [];
+    Object.defineProperty(accessed, "0", {
+      enumerable: true,
+      get: () => {
+        ran = true;
+        return { label: "Getter" };
+      },
+    });
+    accessed.length = 1;
+    expectRefusal(prosePage({ variant: "list", items: accessed }), "document:invalid-props");
+    expect(ran).toBe(false);
+  });
+
+  it("refuses a hostile accessor inside a list entry", () => {
+    const hostile = {
+      get label(): string {
+        throw new Error("getter ran");
+      },
+    };
+    expectRefusal(prosePage({ variant: "list", items: [hostile] }), "document:input-not-plain");
+  });
+
+  it("refuses ratio on one, three and four columns, unknown ratios and unknown semantics", () => {
+    for (const columns of [1, 3, 4]) expectRefusal(gridPage({ columns, ratio: "equal" }), "document:invalid-props");
+    expectRefusal(gridPage({ columns: 2, ratio: "wide" }), "document:invalid-props");
+    expectRefusal(gridPage({ columns: 2, itemSemantics: "grid" }), "document:invalid-props");
+    expectRefusal(gridPage({ columns: 2, ratio: "equal", align: "start" }), "document:invalid-props");
+  });
+
+  it("keeps list semantics out of layout.bento", () => {
+    expectRefusal(
+      {
+        ...minimal(),
+        sections: [
+          {
+            id: "bento",
+            module: "layout.bento",
+            props: {
+              columns: 2,
+              itemSemantics: "list",
+              tiles: [
+                { sectionId: "tile-a", span: "wide" },
+                { sectionId: "tile-b", span: "standard" },
+              ],
+            },
+            children: [
+              { id: "tile-a", module: "content.prose", props: { text: "A" } },
+              { id: "tile-b", module: "content.prose", props: { text: "B" } },
+            ],
+          },
+        ],
+      },
+      "document:invalid-props",
+    );
+  });
+});
+

@@ -141,10 +141,17 @@ export interface UnoLayoutStackProps {
   readonly gap?: UnoStackGap;
 }
 
-/** `layout.grid` props: a required column count and an optional item semantic variant. */
+/** The grid-only third item semantic: one native list with one `<li>` per authored child, in source order. */
+export type UnoGridListSemantics = "list";
+
+/** The closed two-column ratio of `layout.grid`; accepted only when `columns` is exactly 2. */
+export type UnoGridRatio = "equal" | "start-wide" | "end-wide";
+
+/** `layout.grid` props: required columns, an optional item semantic (`list` is grid-only) and a two-column ratio. */
 export interface UnoLayoutGridProps {
   readonly columns: 1 | 2 | 3 | 4;
-  readonly itemSemantics?: UnoGridItemSemantics;
+  readonly itemSemantics?: UnoGridItemSemantics | UnoGridListSemantics;
+  readonly ratio?: UnoGridRatio;
 }
 
 /** `content.heading` props: text plus an explicit level that can never be the Page `h1`. */
@@ -153,10 +160,32 @@ export interface UnoContentHeadingProps {
   readonly level: 2 | 3 | 4 | 5 | 6;
 }
 
-/** `content.prose` props: bounded inert plain text, rendered as React text and never interpreted. */
-export interface UnoContentProseProps {
-  readonly text: string;
+/** The three closed callout tones of a `content.prose` callout. */
+export type UnoProseCalloutTone = "note" | "info" | "warning";
+
+/** One bounded entry of a `content.prose` list variant: a required label and optional detail, never a link. */
+export interface UnoProseListItem {
+  readonly label: string;
+  readonly detail?: string;
 }
+
+/**
+ * `content.prose` props: the original inert plain text, or exactly one of four closed presentation variants.
+ *
+ * The legacy shape carries no `variant` key at all. Every variant is disjoint, bounded and rendered as React text;
+ * none of them introduces links, HTML, Markdown or any other authoring authority.
+ */
+export type UnoContentProseProps =
+  | { readonly text: string; readonly variant?: never }
+  | { readonly variant: "callout"; readonly text: string; readonly tone?: UnoProseCalloutTone }
+  | { readonly variant: "list"; readonly items: readonly UnoProseListItem[]; readonly ordered?: boolean }
+  | {
+      readonly variant: "table";
+      readonly columns: readonly string[];
+      readonly rows: readonly (readonly string[])[];
+      readonly caption?: string;
+    }
+  | { readonly variant: "divider" };
 
 /** One same-document action: a label and the exact `#<section-id>` destination it names. */
 export interface UnoActionItem {
@@ -977,6 +1006,174 @@ function optionalGridSemantics(itemSemantics: unknown): UnoGridItemSemantics | u
   throw new RefusedDocument("document:invalid-props");
 }
 
+/** The grid-only item semantics: the two shared ones plus `list`, which `layout.bento` never accepts. */
+function optionalGridItemSemantics(
+  itemSemantics: unknown,
+): UnoGridItemSemantics | UnoGridListSemantics | undefined {
+  if (itemSemantics === undefined) return undefined;
+  if (itemSemantics === "plain" || itemSemantics === "article" || itemSemantics === "list") return itemSemantics;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/** A two-column ratio; any declared ratio on one, three or four columns is refused rather than ignored. */
+function optionalGridRatio(columns: 1 | 2 | 3 | 4, ratio: unknown): UnoGridRatio | undefined {
+  if (ratio === undefined) return undefined;
+  if (columns !== 2) throw new RefusedDocument("document:invalid-props");
+  if (ratio === "equal" || ratio === "start-wide" || ratio === "end-wide") return ratio;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/**
+ * One array index read as an own **data** property.
+ *
+ * A sparse index, a getter, or an inherited value is refused, so parsing never executes authored code.
+ */
+function ownArrayItem(array: readonly unknown[], index: number): unknown {
+  const slot = Object.getOwnPropertyDescriptor(array, String(index));
+  if (slot === undefined || !("value" in slot)) throw new RefusedDocument("document:invalid-props");
+  return slot.value;
+}
+
+/** The closed optional callout tone; absent stays absent so no authored field is ever manufactured. */
+function optionalProseTone(tone: unknown): UnoProseCalloutTone | undefined {
+  if (tone === undefined) return undefined;
+  if (tone === "note" || tone === "info" || tone === "warning") return tone;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/** One optional non-empty bounded text: absent stays absent, a present value must be safe plain text. */
+function optionalProseText(value: unknown, maxCodePoints: number): string | undefined {
+  if (value === undefined) return undefined;
+  return readBoundedText(value, maxCodePoints, "document:invalid-props", false, false);
+}
+
+/**
+ * Read `content.prose` props as the legacy text form or exactly one of the four closed presentation variants.
+ *
+ * The legacy form is the **absence** of an own `variant` key, not a `variant:undefined` key: a declared but undefined
+ * variant is a crossed shape and is refused. Every variant requires exactly its own keys, so a `table` carrying
+ * `text`, a `divider` carrying content, or any extra `href`/`html`/`style` prop refuses the whole document.
+ */
+function readProseProps(props: DataRecord): UnoContentProseProps {
+  if (!Object.prototype.hasOwnProperty.call(props, "variant")) {
+    if (!hasExactlyKeys(props, ["text"], [])) throw new RefusedDocument("document:invalid-props");
+    const text = readBoundedText(
+      props["text"],
+      UNO_PAGE_DOCUMENT_LIMITS.textCodePoints,
+      "document:invalid-props",
+      false,
+      true,
+    );
+    return { text };
+  }
+
+  const variant = props["variant"];
+
+  if (variant === "divider") {
+    if (!hasExactlyKeys(props, ["variant"], [])) throw new RefusedDocument("document:invalid-props");
+    return { variant: "divider" };
+  }
+
+  if (variant === "callout") {
+    if (!hasExactlyKeys(props, ["variant", "text"], ["tone"])) throw new RefusedDocument("document:invalid-props");
+    const text = readBoundedText(
+      props["text"],
+      UNO_PAGE_DOCUMENT_LIMITS.textCodePoints,
+      "document:invalid-props",
+      false,
+      true,
+    );
+    const tone = optionalProseTone(props["tone"]);
+    return tone === undefined ? { variant: "callout", text } : { variant: "callout", text, tone };
+  }
+
+  if (variant === "list") return readProseList(props);
+  if (variant === "table") return readProseTable(props);
+
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/** The bounded `list` variant: 1..12 label/detail entries in authored order, never a link or raw HTML shape. */
+function readProseList(props: DataRecord): UnoContentProseProps {
+  if (!hasExactlyKeys(props, ["variant", "items"], ["ordered"])) throw new RefusedDocument("document:invalid-props");
+  const rawItems = props["items"];
+  if (!Array.isArray(rawItems) || rawItems.length < 1 || rawItems.length > 12) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const items: UnoProseListItem[] = [];
+  for (let index = 0; index < rawItems.length; index += 1) {
+    const entry = readPlainData(ownArrayItem(rawItems, index));
+    if (entry === null || !hasExactlyKeys(entry, ["label"], ["detail"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const label = readBoundedText(
+      entry["label"],
+      UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    const detail = optionalProseText(entry["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints);
+    items.push(detail === undefined ? { label } : { label, detail });
+  }
+  const ordered = props["ordered"];
+  if (ordered !== undefined && typeof ordered !== "boolean") throw new RefusedDocument("document:invalid-props");
+  return ordered === undefined ? { variant: "list", items } : { variant: "list", items, ordered };
+}
+
+/**
+ * The bounded `table` variant: 1..6 plain-text column labels and 1..20 rows of exactly that width.
+ *
+ * A ragged, sparse, empty or non-array row refuses the document; nothing is sorted, padded or reinterpreted.
+ */
+function readProseTable(props: DataRecord): UnoContentProseProps {
+  if (!hasExactlyKeys(props, ["variant", "columns", "rows"], ["caption"])) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const rawColumns = props["columns"];
+  const rawRows = props["rows"];
+  if (!Array.isArray(rawColumns) || rawColumns.length < 1 || rawColumns.length > 6) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  if (!Array.isArray(rawRows) || rawRows.length < 1 || rawRows.length > 20) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const columns: string[] = [];
+  for (let index = 0; index < rawColumns.length; index += 1) {
+    columns.push(
+      readBoundedText(
+        ownArrayItem(rawColumns, index),
+        UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+        "document:invalid-props",
+        false,
+        false,
+      ),
+    );
+  }
+  const rows: string[][] = [];
+  for (let index = 0; index < rawRows.length; index += 1) {
+    const rawRow = ownArrayItem(rawRows, index);
+    if (!Array.isArray(rawRow) || rawRow.length !== columns.length) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const row: string[] = [];
+    for (let column = 0; column < columns.length; column += 1) {
+      row.push(
+        readBoundedText(
+          ownArrayItem(rawRow, column),
+          UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints,
+          "document:invalid-props",
+          false,
+          false,
+        ),
+      );
+    }
+    rows.push(row);
+  }
+  const caption = optionalProseText(props["caption"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints);
+  return caption === undefined ? { variant: "table", columns, rows } : { variant: "table", columns, rows, caption };
+}
+
 /** The closed optional surface of the three new content modules. */
 function optionalSurface(surface: unknown): UnoSectionSurface | undefined {
   if (surface === undefined) return undefined;
@@ -1433,15 +1630,21 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "layout.grid") {
-    if (!hasExactlyKeys(props, ["columns"], ["itemSemantics"])) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(props, ["columns"], ["itemSemantics", "ratio"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
     const columns = props["columns"];
     if (columns !== 1 && columns !== 2 && columns !== 3 && columns !== 4) {
       throw new RefusedDocument("document:invalid-props");
     }
-    const itemSemantics = optionalGridSemantics(props["itemSemantics"]);
-    const gridProps: UnoLayoutGridProps =
-      itemSemantics === undefined ? { columns } : { columns, itemSemantics };
+    const itemSemantics = optionalGridItemSemantics(props["itemSemantics"]);
+    const ratio = optionalGridRatio(columns, props["ratio"]);
     const children = readChildren(record["children"], depth + 1, state, seen);
+    const gridProps: UnoLayoutGridProps = {
+      columns,
+      ...(itemSemantics === undefined ? {} : { itemSemantics }),
+      ...(ratio === undefined ? {} : { ratio }),
+    };
     return { id, module: "layout.grid", props: gridProps, children };
   }
 
@@ -1483,15 +1686,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "content.prose") {
-    if (!hasExactlyKeys(props, ["text"], [])) throw new RefusedDocument("document:invalid-props");
-    const text = readBoundedText(
-      props["text"],
-      UNO_PAGE_DOCUMENT_LIMITS.textCodePoints,
-      "document:invalid-props",
-      false,
-      true,
-    );
-    return { id, module: "content.prose", props: { text } };
+    return { id, module: "content.prose", props: readProseProps(props) };
   }
 
   if (moduleName === "content.actions") {

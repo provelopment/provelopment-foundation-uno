@@ -838,3 +838,137 @@ describe("media.video — external consent placeholder", () => {
   });
 });
 
+
+describe("content.prose variants and grid list — static semantic markup", () => {
+  const variantHtml = (props: Record<string, unknown>): string =>
+    render(
+      accept({
+        version: 1,
+        title: "Variant fixture",
+        sections: [{ id: "variant", module: "content.prose", props }],
+      }),
+    );
+
+  it("renders legacy prose as the original escaped paragraph with no variant attribute", () => {
+    const html = variantHtml({ text: 'A & B "quoted"' });
+    expect(html).toContain('<p class="uno-json-prose" id="variant">A &amp; B &quot;quoted&quot;</p>');
+    expect(html).not.toContain("data-uno-tone");
+  });
+
+  it("renders a callout as a plain section with an explicit tone and no alert role", () => {
+    const html = variantHtml({ variant: "callout", text: "Careful & slow", tone: "warning" });
+    expect(html).toContain('<section class="uno-json-callout" data-uno-tone="warning" id="variant">');
+    expect(html).toContain("<p>Careful &amp; slow</p>");
+    expect(html).not.toContain('role="alert"');
+    expect(variantHtml({ variant: "callout", text: "Default" })).toContain('data-uno-tone="note"');
+  });
+
+  it("renders ordered and unordered lists as real lists in authored order", () => {
+    const ordered = variantHtml({
+      variant: "list",
+      ordered: true,
+      items: [{ label: "First", detail: "First detail" }, { label: "Second" }],
+    });
+    expect(ordered).toContain('<ol class="uno-json-list" id="variant">');
+    expect((ordered.match(/<li>/gu) ?? []).length).toBe(2);
+    expect(ordered.indexOf("First")).toBeLessThan(ordered.indexOf("Second"));
+    expect(ordered).toContain("<span>First</span><p>First detail</p>");
+    expect(ordered).not.toContain("<a ");
+    expect(variantHtml({ variant: "list", items: [{ label: "Only" }] })).toContain(
+      '<ul class="uno-json-list" id="variant">',
+    );
+  });
+
+  it("renders a table with caption, column headers, a focusable scroll wrapper and exact cells", () => {
+    const html = variantHtml({
+      variant: "table",
+      caption: "Caption & more",
+      columns: ["A", "B"],
+      rows: [["1", "2"], ["3", "4"]],
+    });
+    expect(html).toContain('<div class="uno-json-table-scroll" id="variant" tabindex="0">');
+    expect(html).toContain("<caption>Caption &amp; more</caption>");
+    expect((html.match(/<th scope="col">/gu) ?? []).length).toBe(2);
+    expect((html.match(/<td>/gu) ?? []).length).toBe(4);
+    expect((html.match(/<tr>/gu) ?? []).length).toBe(3);
+    expect(variantHtml({ variant: "table", columns: ["A"], rows: [["1"]] })).not.toContain("<caption>");
+  });
+
+  it("renders a divider as exactly one structural hr and no paragraph", () => {
+    const html = variantHtml({ variant: "divider" });
+    expect(html).toBe(
+      '<div class="uno-json" data-uno-document-version="1"><hr class="uno-json-divider" id="variant"/></div>',
+    );
+    expect(html).not.toContain("<p");
+  });
+});
+
+describe("layout.grid list semantics and ratios — static markup", () => {
+  const gridDocument = (props: Record<string, unknown>): UnoPageDocument =>
+    accept({
+      version: 1,
+      title: "Grid fixture",
+      sections: [
+        {
+          id: "feature-list",
+          module: "layout.grid",
+          props,
+          children: [
+            { id: "feature-a", module: "content.prose", props: { text: "Feature A" } },
+            { id: "feature-b", module: "content.prose", props: { text: "Feature B" } },
+          ],
+        },
+      ],
+    });
+
+  it("renders grid list semantics as one native ul with one direct li per child in order", () => {
+    const html = render(gridDocument({ columns: 2, itemSemantics: "list" }));
+    expect(html.startsWith('<div class="uno-json" data-uno-document-version="1"><ul class="uno-json-grid"')).toBe(true);
+    expect(html).toContain('data-uno-columns="2"');
+    expect(html).toContain('data-uno-item-semantics="list"');
+    expect(html).toContain('role="list"');
+    expect((html.match(/<li class="uno-json-cell"/gu) ?? []).length).toBe(2);
+    expect(html).not.toContain('<div class="uno-json-cell"');
+    expect(html.indexOf("Feature A")).toBeLessThan(html.indexOf("Feature B"));
+  });
+
+  it("keeps the old plain and article grid markup and adds a ratio only when authored", () => {
+    const plain = render(gridDocument({ columns: 2 }));
+    expect(plain).toContain('<div class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="plain"');
+    expect(plain).not.toContain("data-uno-ratio");
+    expect(plain).toContain('<div class="uno-json-cell"');
+    const article = render(gridDocument({ columns: 2, itemSemantics: "article" }));
+    expect(article).toContain('data-uno-item-semantics="article"');
+    expect((article.match(/<article class="uno-json-card"/gu) ?? []).length).toBe(2);
+    const wide = render(gridDocument({ columns: 2, ratio: "start-wide" }));
+    expect(wide).toContain('data-uno-ratio="start-wide"');
+    const listed = render(gridDocument({ columns: 2, itemSemantics: "list", ratio: "end-wide" }));
+    expect(listed).toContain('data-uno-ratio="end-wide"');
+  });
+
+  it("serializes no script, main or h1 and escapes authored ampersands across every variant", () => {
+    const html = render(
+      accept({
+        version: 1,
+        title: "Combined fixture",
+        sections: [
+          { id: "combined-callout", module: "content.prose", props: { variant: "callout", text: "A & B" } },
+          { id: "combined-list", module: "content.prose", props: { variant: "list", items: [{ label: "One" }] } },
+          {
+            id: "combined-table",
+            module: "content.prose",
+            props: { variant: "table", columns: ["A"], rows: [["1"]] },
+          },
+          { id: "combined-divider", module: "content.prose", props: { variant: "divider" } },
+          { id: "combined-legacy", module: "content.prose", props: { text: "Legacy & plain" } },
+        ],
+      }),
+    );
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain("<main");
+    expect(html).not.toContain("<h1");
+    expect(html).toContain("A &amp; B");
+    expect(html).toContain("Legacy &amp; plain");
+  });
+});
+

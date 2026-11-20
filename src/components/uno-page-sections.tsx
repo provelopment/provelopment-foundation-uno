@@ -126,11 +126,31 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
     }
     case "layout.grid": {
       const semantics = node.props.itemSemantics ?? "plain";
+      // `list` is a genuine native list: one `<ul>` root and one direct `<li>` per authored child, in source order.
+      if (semantics === "list") {
+        return (
+          <ul
+            className="uno-json-grid"
+            data-uno-columns={node.props.columns}
+            data-uno-item-semantics="list"
+            data-uno-ratio={node.props.ratio}
+            id={node.id}
+            role="list"
+          >
+            {node.children.map((child) => (
+              <li className="uno-json-cell" data-uno-cell-id={child.id} key={child.id}>
+                <SectionNode media={media} node={child} />
+              </li>
+            ))}
+          </ul>
+        );
+      }
       return (
         <div
           className="uno-json-grid"
           data-uno-columns={node.props.columns}
           data-uno-item-semantics={semantics}
+          data-uno-ratio={node.props.ratio}
           id={node.id}
         >
           {node.children.map((child) =>
@@ -208,12 +228,63 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
         </Tag>
       );
     }
-    case "content.prose":
+    case "content.prose": {
+      const prose = node.props;
+      // Exactly four validated presentation variants; the legacy `{text}` form keeps its original `<p>` output.
+      if (prose.variant === "divider") return <hr className="uno-json-divider" id={node.id} />;
+      if (prose.variant === "table") {
+        return (
+          <div className="uno-json-table-scroll" id={node.id} tabIndex={0}>
+            <table className="uno-json-table">
+              {prose.caption === undefined ? null : <caption>{prose.caption}</caption>}
+              <thead>
+                <tr>
+                  {prose.columns.map((column, columnIndex) => (
+                    <th key={columnIndex} scope="col">
+                      {column}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {prose.rows.map((row, rowIndex) => (
+                  <tr key={rowIndex}>
+                    {row.map((cell, cellIndex) => (
+                      <td key={cellIndex}>{cell}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      if (prose.variant === "list") {
+        const ListTag = prose.ordered === true ? "ol" : "ul";
+        return (
+          <ListTag className="uno-json-list" id={node.id}>
+            {prose.items.map((item, itemIndex) => (
+              <li key={itemIndex}>
+                <span>{item.label}</span>
+                {item.detail === undefined ? null : <p>{item.detail}</p>}
+              </li>
+            ))}
+          </ListTag>
+        );
+      }
+      if (prose.variant === "callout") {
+        return (
+          <section className="uno-json-callout" data-uno-tone={prose.tone ?? "note"} id={node.id}>
+            <p>{prose.text}</p>
+          </section>
+        );
+      }
       return (
         <p className="uno-json-prose" id={node.id}>
-          {node.props.text}
+          {prose.text}
         </p>
       );
+    }
     case "content.actions":
       return (
         <ul className="uno-json-actions" id={node.id}>

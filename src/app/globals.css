@@ -648,6 +648,110 @@ main {
   overflow-wrap: anywhere;
 }
 
+.uno-json-divider {
+  margin: 1.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--uno-border);
+}
+
+.uno-json-callout {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--uno-border);
+  border-left: 0.3rem solid var(--uno-accent);
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-surface);
+}
+
+.uno-json-callout[data-uno-tone="info"] {
+  border-left-color: var(--uno-focus);
+}
+
+.uno-json-callout[data-uno-tone="warning"] {
+  border-left-color: var(--uno-foreground);
+  background-color: var(--uno-surface-strong);
+}
+
+.uno-json-callout p {
+  margin: 0;
+  line-height: 1.65;
+  color: var(--uno-foreground);
+  overflow-wrap: anywhere;
+}
+
+.uno-json-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding-left: 1.35rem;
+  line-height: 1.65;
+  color: var(--uno-muted);
+  overflow-wrap: anywhere;
+}
+
+.uno-json-list > li > span {
+  color: var(--uno-foreground);
+}
+
+.uno-json-list > li > p {
+  margin: 0.125rem 0 0;
+}
+
+.uno-json-table-scroll {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.uno-json-table-scroll:focus-visible {
+  outline: 2px solid var(--uno-focus);
+  outline-offset: 2px;
+}
+
+.uno-json-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.uno-json-table caption {
+  padding-bottom: 0.5rem;
+  color: var(--uno-muted);
+  text-align: left;
+}
+
+.uno-json-table th,
+.uno-json-table td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--uno-border);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.uno-json-table th {
+  color: var(--uno-foreground);
+  background-color: var(--uno-surface);
+}
+
+/* A grid list stays a native list: the marker is reset for layout only, and `role="list"` retains the semantics. */
+.uno-json-grid[data-uno-item-semantics="list"] {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .uno-json-grid[data-uno-columns="2"][data-uno-ratio="start-wide"] {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+
+  .uno-json-grid[data-uno-columns="2"][data-uno-ratio="end-wide"] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+}
+
 .uno-json-actions {
   display: flex;
   flex-wrap: wrap;
