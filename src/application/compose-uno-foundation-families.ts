@@ -1,9 +1,9 @@
 /**
  * Foundation Uno — the bounded Foundation→Uno family composition adapter (`UNO-WO-057 / R01`, extended by
- * `UNO-WO-058 / R01`, U04).
+ * `UNO-WO-058 / R01` and `UNO-WO-059 / R01`, U04).
  *
  * WHAT THIS IS. One pure, inward application function that translates a deliberately small **plain-text subset** of
- * seven Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
+ * nine Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
  * donor source shape and Uno's own validated document: the caller supplies untrusted donor data, this module either
  * returns one accepted, deep-frozen `UnoPageDocument` or one closed refusal, and it never returns a partial Page.
  *
@@ -14,9 +14,11 @@
  *
  * WHAT IT IS NOT. It does not read a file, a manifest, a host, an environment variable or a provider; it publishes
  * nothing, routes nothing, renders nothing and owns no locale, Site, visibility or delivery authority. It implements
- * **seven** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
+ * **nine** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
  * media converter, and it is not the seventeen family parity work: no full `FAMILY_PARITY` result may be derived
- * from it.
+ * from it. In particular `steps` reproduces the donor's ordered sequence and optional body as plain text, but Uno's
+ * timeline title is a `<p>` where the donor step title was an `<h3>`, so the donor heading outline is deliberately
+ * not reproduced and `steps` is not full parity.
  *
  * PROVENANCE. Original **Uno-owned** implementation, adaptation class **NEW / COMPOSE (plain-text subset)**. Concepts
  * — never copied source, CSS, components or assets — are adapted from `provelopment/provelopment-foundation` at
@@ -26,12 +28,14 @@
  * table/caption structure (`structure-sections.tsx`, blob `65d254e192a6a8ef4886590026c2ea58e02264be`), the
  * prose/callout/divider semantics (`text-sections.tsx`, blob `caeee57798bdd533867e5bef350422618187612f`), the
  * list/statistics semantics (`items-sections.tsx`, blob `bc729d6a2e6484dc2c26ed997e65ee644bc8a7e6`) and the hero
- * presentation (`media-sections.tsx`, blob `e3f3a12e5e26cb6af9133bef79f5fa2dc0680bb2`). No donor runtime code,
+ * presentation (`media-sections.tsx`, blob `e3f3a12e5e26cb6af9133bef79f5fa2dc0680bb2`). The ordered step sequence
+ * reuses the `items-sections.tsx` ordering semantics and the quotation reuses the `text-sections.tsx`
+ * figure/blockquote/figcaption semantics recorded above. No donor runtime code,
  * package, image or trademark is imported. See `.documents/Architecture/u04-family-parity.md`.
  */
 import { readUnoPageDocument, type UnoPageDocument } from "../core/page-document";
 
-/** The seven donor source families this bounded adapter accepts, in the order the ledger documents them. */
+/** The nine donor source families this bounded adapter accepts, in the order the ledger documents them. */
 export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "prose",
   "callout",
@@ -40,6 +44,8 @@ export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "divider",
   "hero",
   "stats",
+  "steps",
+  "quote",
 ] as const);
 
 /** One accepted donor family name. */
@@ -49,7 +55,7 @@ export type UnoFoundationSubsetFamily = (typeof UNO_FOUNDATION_SUBSET_FAMILIES)[
  * The closed refusal vocabulary.
  *
  * `unsafe-source` — the input is not plain readable data (hostile object, accessor, cycle, sparse array, oversize).
- * `unsupported-family` — a real donor family outside these seven, never silently dropped.
+ * `unsupported-family` — a real donor family outside these nine, never silently dropped.
  * `unsupported-feature` — a supported family carrying an out-of-subset field or Markdown this subset cannot render.
  * `target-refused` — the composed candidate is not an acceptable Uno Page; no partial document is ever returned.
  */
@@ -257,7 +263,12 @@ function refuseMarkdownArray(values: readonly PlainValue[]): void {
 /** One composed Uno section node, still to be validated by the Uno reader. */
 interface CandidateSection {
   readonly id: string;
-  readonly module: "content.prose" | "content.hero" | "content.stats";
+  readonly module:
+    | "content.prose"
+    | "content.hero"
+    | "content.stats"
+    | "content.timeline"
+    | "content.testimonials";
   readonly props: Record<string, unknown>;
 }
 
@@ -266,6 +277,29 @@ function readDonorText(value: PlainValue | undefined, markdownCapable: boolean):
   if (typeof value !== "string") refuseUnsupportedFeature();
   if (markdownCapable) refuseMarkdown(value);
   return value;
+}
+
+/**
+ * Read one donor text field of the two newest families (`steps`, `quote`).
+ *
+ * These two donor fields are Markdown-capable, and the subset renders them as plain authored text. On top of the
+ * constructs `refuseMarkdown` already rejects, unmistakable emphasis, strike, image, blockquote and list forms are
+ * refused here rather than printed as inert punctuation. This is a conservative plain-text refusal list, not a
+ * Markdown parser, and it is deliberately confined to these two families so the earlier seven keep their exact
+ * accepted surface and regression behaviour.
+ */
+function readNewFamilyText(value: PlainValue | undefined): string {
+  const text = readDonorText(value, true);
+  if (
+    /(?:^|[^*])\*[^*\n]+\*/u.test(text) ||
+    /(?:^|[^\w])_[^_\n]+_/u.test(text) ||
+    /~~[^~\n]+~~/u.test(text) ||
+    /!\[[^\]\n]*\]\([^\n)]*\)/u.test(text) ||
+    /(?:^|\n)[ \t]{0,3}(?:>|[-*+]|[0-9]+[.)])[ \t]+/u.test(text)
+  ) {
+    refuseUnsupportedFeature();
+  }
+  return text;
 }
 
 /**
@@ -379,6 +413,41 @@ function composeSection(section: PlainValue, index: number): CandidateSection {
         output.push(item);
       }
       return { id, module: "content.stats", props: { items: output } };
+    }
+    case "steps": {
+      // Donor `steps` may carry `heading`/`lede`; this subset composes the sequence only, never a section heading.
+      requireExactKeys(record, ["type", "items"], ["surface"]);
+      const items = record["items"];
+      if (!Array.isArray(items)) refuseUnsupportedFeature();
+      const output: Record<string, unknown>[] = [];
+      for (const raw of items) {
+        if (raw === null || typeof raw !== "object" || Array.isArray(raw)) refuseUnsupportedFeature();
+        const entry = raw as PlainRecord;
+        // Exactly `{title, body?}`: an href, route, status, dateLabel, icon or any other key is a feature refusal.
+        requireExactKeys(entry, ["title"], ["body"]);
+        const item: Record<string, unknown> = { title: readNewFamilyText(entry["title"]) };
+        // Donor `body` becomes Uno `description`: no date, lifecycle status or completion is ever manufactured.
+        if (ownsKey(entry, "body")) item["description"] = readNewFamilyText(entry["body"]);
+        output.push(item);
+      }
+      const props: Record<string, unknown> = { items: output };
+      if (ownsKey(record, "surface")) props["surface"] = record["surface"];
+      return { id, module: "content.timeline", props };
+    }
+    case "quote": {
+      requireExactKeys(record, ["type", "body"], ["attribution", "role", "align", "surface"]);
+      // The donor suppresses a role-only caption; Uno would render it, so a role without attribution refuses.
+      if (ownsKey(record, "role") && !ownsKey(record, "attribution")) refuseUnsupportedFeature();
+      const item: Record<string, unknown> = { quote: readNewFamilyText(record["body"]) };
+      if (ownsKey(record, "attribution")) item["attribution"] = readNewFamilyText(record["attribution"]);
+      if (ownsKey(record, "role")) item["role"] = readNewFamilyText(record["role"]);
+      const props: Record<string, unknown> = { items: [item] };
+      // `align`/`surface` are copied as authored closed literals; the Uno reader refuses anything outside its own
+      // enumeration, so no permissive coercion happens here and absent optionals stay truly absent.
+      for (const field of ["align", "surface"] as const) {
+        if (ownsKey(record, field)) props[field] = record[field];
+      }
+      return { id, module: "content.testimonials", props };
     }
     default:
       throw new SourceRefusal("family:unsupported-family");

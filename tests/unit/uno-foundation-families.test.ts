@@ -53,8 +53,8 @@ function expectRefusal(input: unknown, reason: string): void {
   expect(Object.prototype.hasOwnProperty.call(outcome, "document")).toBe(false);
 }
 
-describe("composeUnoFoundationSubset — seven bounded source shapes", () => {
-  it("declares exactly the seven bounded families and leaves the 22-module registry untouched", () => {
+describe("composeUnoFoundationSubset — nine bounded source shapes", () => {
+  it("declares exactly the nine bounded families and leaves the 22-module registry untouched", () => {
     expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([
       "prose",
       "callout",
@@ -63,6 +63,8 @@ describe("composeUnoFoundationSubset — seven bounded source shapes", () => {
       "divider",
       "hero",
       "stats",
+      "steps",
+      "quote",
     ]);
     expect(Object.isFrozen(UNO_FOUNDATION_SUBSET_FAMILIES)).toBe(true);
     expect(UNO_RENDERABLE_MODULES.length).toBe(22);
@@ -320,7 +322,7 @@ describe("composeUnoFoundationSubset — envelope, family and feature refusal", 
     expectRefusal(oversized, "family:target-refused");
   });
 
-  it("refuses every donor family outside the seven, never degrading it to prose", () => {
+  it("refuses every donor family outside the nine, never degrading it to prose", () => {
     for (const type of [
       "media",
       "gallery",
@@ -328,13 +330,13 @@ describe("composeUnoFoundationSubset — envelope, family and feature refusal", 
       "cards",
       "features",
       "columns",
-      "steps",
-      "quote",
       "faq",
       "contactForm",
     ]) {
       expectRefusal(envelope({ type }), "family:unsupported-family");
     }
+    // `steps` and `quote` are composed now, so an unsupported-family refusal must never be claimed for them.
+    expectRefusal(envelope({ type: "heading" }), "family:unsupported-family");
     expectRefusal(envelope("prose"), "family:unsafe-source");
     expectRefusal(envelope({ body: "No type." }), "family:unsupported-feature");
   });
@@ -551,6 +553,104 @@ describe("composeUnoFoundationSubset — hero and stats React markup", () => {
   });
 });
 
+/** The seven-section fixture with the two newest bounded families appended, in source order. */
+function nineSectionSource(): Record<string, unknown> {
+  const source = sevenSectionSource();
+  const sections = source["sections"] as readonly unknown[];
+  return {
+    ...source,
+    sections: [
+      ...sections,
+      {
+        type: "steps",
+        surface: "muted",
+        items: [
+          { title: "Prepare", body: "Review the content." },
+          { title: "Publish" },
+        ],
+      },
+      {
+        type: "quote",
+        body: "The exact words.",
+        attribution: "Example speaker",
+        role: "Reviewer",
+        align: "center",
+        surface: "bordered",
+      },
+    ],
+  };
+}
+
+describe("composeUnoFoundationSubset — bounded steps and quote", () => {
+  it("composes nine nodes in source order, leaving the first seven byte-identical", () => {
+    const seven = composed(sevenSectionSource());
+    const nine = composed(nineSectionSource());
+    expect(nine.sections.length).toBe(9);
+    expect(nine.sections.map((section) => section.id)).toEqual([
+      "family-0-prose",
+      "family-1-callout",
+      "family-2-table",
+      "family-3-list",
+      "family-4-divider",
+      "family-5-hero",
+      "family-6-stats",
+      "family-7-steps",
+      "family-8-quote",
+    ]);
+    expect(JSON.stringify(nine.sections.slice(0, 7))).toBe(JSON.stringify(seven.sections));
+    const steps = nine.sections[7];
+    const quote = nine.sections[8];
+    expect(steps?.module).toBe("content.timeline");
+    expect(quote?.module).toBe("content.testimonials");
+    expect(steps?.props).toEqual({
+      items: [{ title: "Prepare", description: "Review the content." }, { title: "Publish" }],
+      surface: "muted",
+    });
+    expect(quote?.props).toEqual({
+      items: [{ quote: "The exact words.", attribution: "Example speaker", role: "Reviewer" }],
+      align: "center",
+      surface: "bordered",
+    });
+  });
+
+  it("freezes the nine-node Page, keeps caller input unchanged and round-trips both forms", () => {
+    const source = nineSectionSource();
+    const before = JSON.stringify(source);
+    const document = composed(source);
+    expect(JSON.stringify(source)).toBe(before);
+    expect(Object.isFrozen(document)).toBe(true);
+    expect(Object.isFrozen(document.sections)).toBe(true);
+    for (const section of document.sections) {
+      expect(Object.isFrozen(section)).toBe(true);
+      expect(Object.isFrozen(section.props)).toBe(true);
+    }
+    const steps = document.sections[7];
+    if (steps?.module === "content.timeline") expect(Object.isFrozen(steps.props.items)).toBe(true);
+    const quote = document.sections[8];
+    if (quote?.module === "content.testimonials") expect(Object.isFrozen(quote.props.items[0])).toBe(true);
+
+    // The Uno reader accepts the composed object itself and the same document as JSON text, unaltered.
+    const reread = readUnoPageDocument(document);
+    expect(reread.accepted).toBe(true);
+    if (reread.accepted) expect(JSON.stringify(reread.document)).toBe(JSON.stringify(document));
+    const serialized = JSON.stringify(document);
+    const roundTrip = readUnoPageDocument(serialized, { reservedHome: false });
+    expect(roundTrip.accepted).toBe(true);
+    if (roundTrip.accepted) expect(JSON.stringify(roundTrip.document)).toBe(serialized);
+  });
+
+  it("manufactures no absent step or quote field", () => {
+    const steps = composed(envelope({ type: "steps", items: [{ title: "A" }] }));
+    const quote = composed(envelope({ type: "quote", body: "Q" }));
+    const attributed = composed(envelope({ type: "quote", body: "Q", attribution: "Only a name" }));
+    const described = composed(envelope({ type: "steps", items: [{ title: "A", body: "B" }] }));
+    expect(steps.sections[0]?.props).toEqual({ items: [{ title: "A" }] });
+    expect(quote.sections[0]?.props).toEqual({ items: [{ quote: "Q" }] });
+    expect(attributed.sections[0]?.props).toEqual({ items: [{ quote: "Q", attribution: "Only a name" }] });
+    expect(described.sections[0]?.props).toEqual({ items: [{ title: "A", description: "B" }] });
+  });
+});
+
 describe("composeUnoFoundationSubset — hero and stats refusal", () => {
   it("refuses hero fields and Markdown outside the bounded subset", () => {
     expectRefusal(
@@ -638,13 +738,131 @@ const DONOR_17 = [
   "divider",
   "contactForm",
 ] as const;
-/** The seven bounded subsets this adapter composes, in adapter order. */
-const MAPPED_7 = ["prose", "callout", "table", "list", "divider", "hero", "stats"] as const;
+/** The nine bounded subsets this adapter composes, in adapter order. */
+const MAPPED_9 = ["prose", "callout", "table", "list", "divider", "hero", "stats", "steps", "quote"] as const;
+
+describe("composeUnoFoundationSubset — steps and quote React markup", () => {
+  const html = render(composed(nineSectionSource()));
+
+  it("renders the steps as one real ordered timeline list in authored order", () => {
+    expect(html).toContain('<section class="uno-json-timeline" data-uno-surface="muted" id="family-7-steps">');
+    expect((html.match(/<ol class="uno-json-timeline-list">/gu) ?? []).length).toBe(1);
+    expect((html.match(/class="uno-json-timeline-item"/gu) ?? []).length).toBe(2);
+    expect(html).toContain('<p class="uno-json-timeline-title">Prepare</p>');
+    expect(html).toContain('<p class="uno-json-timeline-title">Publish</p>');
+    expect((html.match(/class="uno-json-timeline-description"/gu) ?? []).length).toBe(1);
+    expect(html).toContain('<p class="uno-json-timeline-description">Review the content.</p>');
+    expect(html.indexOf("Prepare")).toBeLessThan(html.indexOf("Publish"));
+    expect(html).not.toContain('aria-current="step"');
+    expect(html).not.toContain("data-uno-status");
+    expect(html).not.toContain("uno-json-timeline-date");
+    expect(html).not.toContain("uno-json-timeline-heading");
+  });
+
+  it("renders the quote as a figure with blockquote and an authored caption", () => {
+    expect(html).toContain(
+      '<section class="uno-json-testimonials" data-uno-align="center" data-uno-surface="bordered" id="family-8-quote">',
+    );
+    expect((html.match(/<figure class="uno-json-testimonial">/gu) ?? []).length).toBe(1);
+    expect(html).toContain('<blockquote class="uno-json-testimonial-quote">The exact words.</blockquote>');
+    expect(html).toContain('<figcaption class="uno-json-testimonial-caption">');
+    expect(html).toContain('<span class="uno-json-testimonial-attribution">Example speaker</span>');
+    expect(html).toContain('<span class="uno-json-testimonial-role">Reviewer</span>');
+  });
+
+  it("supplies no second main, h1, script, iframe or handler from these two families", () => {
+    expect((html.match(/<main/gu) ?? []).length).toBe(0);
+    expect((html.match(/<h1/gu) ?? []).length).toBe(0);
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain("<iframe");
+    expect(html).not.toContain("onclick");
+  });
+
+  it("escapes authored quotation text rather than interpreting it", () => {
+    const escaped = render(composed(envelope({ type: "quote", body: 'A & B "quoted"' })));
+    expect(escaped).toContain("A &amp; B &quot;quoted&quot;");
+  });
+});
+
+describe("composeUnoFoundationSubset — quote refusal", () => {
+  it("refuses quote fields, caption semantics and Markdown outside the bounded subset", () => {
+    for (const extra of ["heading", "lede", "href", "onClick"]) {
+      expectRefusal(envelope({ type: "quote", body: "Q", [extra]: "X" }), "family:unsupported-feature");
+    }
+    expectRefusal(envelope({ type: "quote", body: "Q", role: "Reviewer" }), "family:unsupported-feature");
+    for (const body of ["**bold**", "*italic*", "[x](https://example.org)", "a `code` span", "~~strike~~"]) {
+      expectRefusal(envelope({ type: "quote", body }), "family:unsupported-feature");
+    }
+  });
+
+  it("refuses malformed quote values through the Uno target", () => {
+    expectRefusal(envelope({ type: "quote", body: "" }), "family:target-refused");
+    expectRefusal(envelope({ type: "quote", body: "q".repeat(4001) }), "family:target-refused");
+    expectRefusal(envelope({ type: "quote", body: "Q", align: "end" }), "family:target-refused");
+    expectRefusal(envelope({ type: "quote", body: "Q", surface: "loud" }), "family:target-refused");
+    expectRefusal(envelope({ type: "quote", body: "Q", attribution: "" }), "family:target-refused");
+    expectRefusal(envelope({ type: "quote", body: "Q", attribution: "a".repeat(161) }), "family:target-refused");
+  });
+});
+
+describe("composeUnoFoundationSubset — steps refusal", () => {
+  it("refuses steps fields, item states and Markdown outside the bounded subset", () => {
+    expectRefusal(envelope({ type: "steps", items: [{ title: "A" }], heading: "H" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "steps", items: [{ title: "A" }], lede: "L" }), "family:unsupported-feature");
+    for (const extra of ["href", "status", "dateLabel"]) {
+      expectRefusal(
+        envelope({ type: "steps", items: [{ title: "A", [extra]: "X" }] }),
+        "family:unsupported-feature",
+      );
+    }
+    expectRefusal(envelope({ type: "steps", items: "A" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "steps", items: ["A"] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "steps", items: [{ title: "A", body: "*i*" }] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "steps", items: [{ title: "**b**" }] }), "family:unsupported-feature");
+  });
+
+  it("refuses malformed steps values through the Uno target", () => {
+    expectRefusal(envelope({ type: "steps", items: [] }), "family:target-refused");
+    const thirteen = Array.from({ length: 13 }, (_, index) => ({ title: `Step ${index + 1}` }));
+    expectRefusal(envelope({ type: "steps", items: thirteen }), "family:target-refused");
+    expectRefusal(envelope({ type: "steps", items: [{ title: "" }] }), "family:target-refused");
+    expectRefusal(envelope({ type: "steps", items: [{ title: "t".repeat(161) }] }), "family:target-refused");
+    expectRefusal(
+      envelope({ type: "steps", items: [{ title: "A", body: "b".repeat(321) }] }),
+      "family:target-refused",
+    );
+    expectRefusal(envelope({ type: "steps", items: [{ title: "A" }], surface: "loud" }), "family:target-refused");
+  });
+
+  it("refuses the whole Page when a later steps entry is hostile, without running its getter", () => {
+    let ran = 0;
+    const hostileItem: Record<string, unknown> = {};
+    Object.defineProperty(hostileItem, "title", {
+      enumerable: true,
+      get: () => {
+        ran += 1;
+        return "A";
+      },
+    });
+    const outcome = composeUnoFoundationSubset({
+      version: 1,
+      title: "Mixed fixture",
+      sections: [
+        { type: "quote", body: "A valid leading section." },
+        { type: "steps", items: [hostileItem] },
+      ],
+    });
+    expect(outcome.status).toBe("refused");
+    if (outcome.status === "refused") expect(outcome.reason).toBe("family:unsafe-source");
+    expect(Object.prototype.hasOwnProperty.call(outcome, "document")).toBe(false);
+    expect(ran).toBe(0);
+  });
+});
 
 describe("composeUnoFoundationSubset — canonical donor inventory", () => {
-  it("maps exactly seven of the donor's seventeen families and leaves ten unimplemented", () => {
-    const left = DONOR_17.filter((name) => !(MAPPED_7 as readonly string[]).includes(name));
-    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([...MAPPED_7]);
+  it("maps exactly nine of the donor's seventeen families and leaves eight unimplemented", () => {
+    const left = DONOR_17.filter((name) => !(MAPPED_9 as readonly string[]).includes(name));
+    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([...MAPPED_9]);
     expect(left).toEqual([
       "media",
       "gallery",
@@ -652,8 +870,6 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
       "cards",
       "features",
       "columns",
-      "steps",
-      "quote",
       "faq",
       "contactForm",
     ]);
@@ -665,12 +881,15 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
       "utf8",
     );
     const unimplemented =
-      "**UNIMPLEMENTED (10):** `media`, `gallery`, `actions`, `cards`, `features`, `columns`, `steps`, `quote`, `faq`, `contactForm`.";
+      "**UNIMPLEMENTED (8):** `media`, `gallery`, `actions`, `cards`, `features`, `columns`, `faq`, `contactForm`.";
     expect(ledger.split(unimplemented).length - 1).toBe(1);
-    expect(ledger).not.toContain("Twelve other donor families");
+    expect(ledger).not.toContain("UNIMPLEMENTED (10)");
+    expect(ledger).not.toContain("seven bounded");
+    expect(ledger).not.toContain("ten donor families entirely unimplemented");
     expect(ledger).not.toContain("UNIMPLEMENTED**: `heading`");
-    expect(ledger).not.toMatch(/FAMILY_PARITY=(17\/17|7\/17)/u);
-    for (const family of ["hero", "stats"]) expect(ledger).toContain(`| \`${family}\` |`);
+    expect(ledger).not.toMatch(/FAMILY_PARITY=(17\/17|9\/17|7\/17)/u);
+    for (const family of ["hero", "stats", "steps", "quote"]) expect(ledger).toContain(`| \`${family}\` |`);
+    expect(ledger).toContain("nine bounded");
     expect(ledger).toContain("zero of seventeen full semantic parity");
   });
 });
