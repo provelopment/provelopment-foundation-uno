@@ -1,9 +1,9 @@
 /**
  * Foundation Uno — the bounded Foundation→Uno family composition adapter (`UNO-WO-057 / R01`, extended by
- * `UNO-WO-058 / R01`, `UNO-WO-059 / R01`, `UNO-WO-060 / R01` and `UNO-WO-061 / R01`, U04).
+ * `UNO-WO-058 / R01`, `UNO-WO-059 / R01`, `UNO-WO-060 / R01`, `UNO-WO-061 / R01` and `UNO-WO-062 / R01`, U04).
  *
  * WHAT THIS IS. One pure, inward application function that translates a deliberately small **plain-text subset** of
- * thirteen Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
+ * fourteen Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
  * donor source shape and Uno's own validated document: the caller supplies untrusted donor data, this module either
  * returns one accepted, deep-frozen `UnoPageDocument` or one closed refusal, and it never returns a partial Page.
  *
@@ -14,7 +14,7 @@
  *
  * WHAT IT IS NOT. It does not read a file, a manifest, a host, an environment variable or a provider; it publishes
  * nothing, routes nothing, renders nothing and owns no locale, Site, visibility or delivery authority. It implements
- * **thirteen** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
+ * **fourteen** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
  * media converter, and it is not the seventeen family parity work: no full `FAMILY_PARITY` result may be derived
  * from it. In particular `steps` reproduces the donor's ordered sequence and optional body as plain text, but Uno's
  * timeline title is a `<p>` where the donor step title was an `<h3>`, so the donor heading outline is deliberately
@@ -24,7 +24,10 @@
  * concealed. `cards` and `features` keep only the authored title and optional body of each entry: the donor card's
  * border, image, meta line and action, and the donor feature's decorative icon, are not composed, each item title is an
  * `<h2>` here rather than the donor `<h3>`, and the same minimal native list-grid structure can therefore express two
- * different donor concepts without being full parity for either.
+ * different donor concepts without being full parity for either. `actions` composes **only** an authored same-document
+ * fragment that already names a top-level section this composer generated: the donor's `href`/`route`/`link` destination
+ * alternatives, its action `variant`, and the section heading/lede/align/surface options are all outside this subset, so
+ * no external, `mailto:`, `tel:`, site-route or provider destination can be composed, and `actions` is not full parity.
  *
  * PROVENANCE. Original **Uno-owned** implementation, adaptation class **NEW / COMPOSE (plain-text subset)**. Concepts
  * — never copied source, CSS, components or assets — are adapted from `provelopment/provelopment-foundation` at
@@ -40,12 +43,16 @@
  * the native `<details>`/`<summary>` and grouped-column semantics of `structure-sections.tsx`
  * (blob `65d254e192a6a8ef4886590026c2ea58e02264be`), and the card and feature groups reuse only the native `<li>`
  * item-group semantics of `media-sections.tsx` (blob `e3f3a12e5e26cb6af9133bef79f5fa2dc0680bb2`) and
- * `items-sections.tsx` (blob `bc729d6a2e6484dc2c26ed997e65ee644bc8a7e6`). No donor runtime code,
+ * `items-sections.tsx`
+ * (blob `bc729d6a2e6484dc2c26ed997e65ee644bc8a7e6`), and the same-document action list reuses only the genuine
+ * link-list semantics of the donor `ActionsSection` in `text-sections.tsx` (blob
+ * `caeee57798bdd533867e5bef350422618187612f`) and `ActionLinks` in `section-support.tsx` (blob
+ * `19c9bee3b3b200af2455813e5f842c30b062a6ac`). No donor runtime code,
  * package, image or trademark is imported. See `.documents/Architecture/u04-family-parity.md`.
  */
 import { readUnoPageDocument, type UnoPageDocument } from "../core/page-document";
 
-/** The thirteen donor source families this bounded adapter accepts, in the order the ledger documents them. */
+/** The fourteen donor source families this bounded adapter accepts, in the order the ledger documents them. */
 export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "prose",
   "callout",
@@ -60,6 +67,7 @@ export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "columns",
   "cards",
   "features",
+  "actions",
 ] as const);
 
 /** One accepted donor family name. */
@@ -69,7 +77,7 @@ export type UnoFoundationSubsetFamily = (typeof UNO_FOUNDATION_SUBSET_FAMILIES)[
  * The closed refusal vocabulary.
  *
  * `unsafe-source` — the input is not plain readable data (hostile object, accessor, cycle, sparse array, oversize).
- * `unsupported-family` — a real donor family outside these thirteen, never silently dropped.
+ * `unsupported-family` — a real donor family outside these fourteen, never silently dropped.
  * `unsupported-feature` — a supported family carrying an out-of-subset field or Markdown this subset cannot render.
  * `target-refused` — the composed candidate is not an acceptable Uno Page; no partial document is ever returned.
  */
@@ -103,6 +111,16 @@ const SUBSET_LIMITS = Object.freeze({
 
 /** The three donor keys that could rewrite an object's prototype rather than describe data. */
 const FORBIDDEN_SOURCE_KEYS: readonly string[] = Object.freeze(["__proto__", "constructor", "prototype"]);
+
+/**
+ * The only destination spelling `actions` accepts: a literal same-document fragment shaped like a generated top-level
+ * section id — `#family-<canonical decimal source index>-<name>`.
+ *
+ * This is deliberately lexical only. It admits nested-looking names so that the exact top-level equality preflight,
+ * not this pattern, decides resolvability; it never admits a URL, query, whitespace, percent-encoding or alternate
+ * destination form the donor also offers.
+ */
+const ACTIONS_FRAGMENT = /^#family-(?:0|[1-9][0-9]*)-[a-z][a-zA-Z0-9]*(?:-[a-zA-Z0-9]+)*$/u;
 
 /** One closed refusal thrown while composing; never escapes this module. */
 class SourceRefusal extends Error {
@@ -291,7 +309,8 @@ interface CandidateSection {
     | "interaction.accordion"
     | "layout.grid"
     | "layout.stack"
-    | "content.heading";
+    | "content.heading"
+    | "content.actions";
   readonly props: Record<string, unknown>;
   /**
    * Nested children of a child-bearing module (`interaction.accordion`, `layout.grid`, `layout.stack`).
@@ -598,6 +617,31 @@ function composeSection(section: PlainValue, index: number): CandidateSection {
       }
       return { id, module: "layout.grid", props: { columns: cols, itemSemantics: "list" }, children };
     }
+    case "actions": {
+      // The donor also accepts `href`/`route`/`link` destinations, an action `variant` and section heading/lede/align/
+      // surface options. This subset composes only an authored same-document fragment naming a composed section.
+      requireExactKeys(record, ["type", "actions"], []);
+      const sourceActions = record["actions"];
+      if (!Array.isArray(sourceActions)) refuseUnsupportedFeature();
+      if (sourceActions.length < 1 || sourceActions.length > 8) refuseTarget();
+      const items: Record<string, unknown>[] = [];
+      for (const rawAction of sourceActions) {
+        if (rawAction === null || typeof rawAction !== "object" || Array.isArray(rawAction)) {
+          refuseUnsupportedFeature();
+        }
+        const entry = rawAction as PlainRecord;
+        requireExactKeys(entry, ["label", "href"], []);
+        const label = readNewFamilyText(entry["label"]);
+        // The donor label is Markdown-capable and its own title bound is narrower than Uno's heading bound.
+        if (label.trim().length === 0 || codePointLength(label) > 160) refuseTarget();
+        const href = entry["href"];
+        if (typeof href !== "string") refuseUnsupportedFeature();
+        // Canonical position plus donor type only: a literal fragment, never a URL to classify, decode or rewrite.
+        if (!ACTIONS_FRAGMENT.test(href)) refuseUnsupportedFeature();
+        items.push({ label, targetId: href.slice(1) });
+      }
+      return { id, module: "content.actions", props: { items } };
+    }
     default:
       throw new SourceRefusal("family:unsupported-family");
   }
@@ -633,6 +677,20 @@ export function composeUnoFoundationSubset(input: unknown): UnoFoundationSubsetO
       const section = sections[index];
       if (section === undefined) refuseUnsafeSource();
       nodes.push(composeSection(section, index));
+    }
+
+    // `content.actions` may name only a *top-level* section this composer itself just generated. This is an exact
+    // equality check against its own ids — not a URL classifier — so a missing target, a mistyped name or a nested
+    // generated child refuses instead of becoming a live same-document anchor.
+    const topLevelIds = new Set(nodes.map((node) => node.id));
+    for (const node of nodes) {
+      if (node.module !== "content.actions") continue;
+      const authoredItems = node.props["items"];
+      if (!Array.isArray(authoredItems)) refuseTarget(); // the candidate is this module's own plain data
+      for (const item of authoredItems) {
+        const candidateTarget = (item as { targetId?: unknown }).targetId;
+        if (typeof candidateTarget !== "string" || !topLevelIds.has(candidateTarget)) refuseTarget();
+      }
     }
 
     // Exactly the Uno envelope: the same title, `version: 1` and one node per source section. No description,

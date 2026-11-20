@@ -53,8 +53,8 @@ function expectRefusal(input: unknown, reason: string): void {
   expect(Object.prototype.hasOwnProperty.call(outcome, "document")).toBe(false);
 }
 
-describe("composeUnoFoundationSubset — thirteen bounded source shapes", () => {
-  it("declares exactly the thirteen bounded families and leaves the 22-module registry untouched", () => {
+describe("composeUnoFoundationSubset — fourteen bounded source shapes", () => {
+  it("declares exactly the fourteen bounded families and leaves the 22-module registry untouched", () => {
     expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([
       "prose",
       "callout",
@@ -69,6 +69,7 @@ describe("composeUnoFoundationSubset — thirteen bounded source shapes", () => 
       "columns",
       "cards",
       "features",
+      "actions",
     ]);
     expect(Object.isFrozen(UNO_FOUNDATION_SUBSET_FAMILIES)).toBe(true);
     expect(UNO_RENDERABLE_MODULES.length).toBe(22);
@@ -326,11 +327,11 @@ describe("composeUnoFoundationSubset — envelope, family and feature refusal", 
     expectRefusal(oversized, "family:target-refused");
   });
 
-  it("refuses every donor family outside the thirteen, never degrading it to prose", () => {
-    for (const type of ["media", "gallery", "actions", "contactForm"]) {
+  it("refuses every donor family outside the fourteen, never degrading it to prose", () => {
+    for (const type of ["media", "gallery", "contactForm"]) {
       expectRefusal(envelope({ type }), "family:unsupported-family");
     }
-    // `cards` and `features` are composed now, so no unsupported-family refusal may be claimed for them.
+    // `cards`, `features` and `actions` are composed now, so no unsupported-family refusal may be claimed for them.
     expectRefusal(envelope({ type: "heading" }), "family:unsupported-family");
     expectRefusal(envelope("prose"), "family:unsafe-source");
     expectRefusal(envelope({ body: "No type." }), "family:unsupported-feature");
@@ -733,8 +734,8 @@ const DONOR_17 = [
   "divider",
   "contactForm",
 ] as const;
-/** The thirteen bounded subsets this adapter composes, in adapter order. */
-const MAPPED_13 = [
+/** The fourteen bounded subsets this adapter composes, in adapter order. */
+const MAPPED_14 = [
   "prose",
   "callout",
   "table",
@@ -748,6 +749,7 @@ const MAPPED_13 = [
   "columns",
   "cards",
   "features",
+  "actions",
 ] as const;
 
 describe("composeUnoFoundationSubset — steps and quote React markup", () => {
@@ -1538,11 +1540,302 @@ describe("composeUnoFoundationSubset — cards and features refusal", () => {
   });
 });
 
+/** The thirteen-section fixture with the new bounded `actions` family appended at source index 13. */
+function fourteenSectionSource(): Record<string, unknown> {
+  const source = thirteenSectionSource();
+  const sections = source["sections"] as readonly unknown[];
+  return {
+    ...source,
+    sections: [
+      ...sections,
+      {
+        type: "actions",
+        actions: [
+          { label: "Read the introduction", href: "#family-0-prose" },
+          { label: "Explore features", href: "#family-12-features" },
+        ],
+      },
+    ],
+  };
+}
+
+describe("composeUnoFoundationSubset — bounded actions", () => {
+  it("composes fourteen nodes in source order, leaving the first thirteen byte-identical", () => {
+    const thirteen = composed(thirteenSectionSource());
+    const fourteen = composed(fourteenSectionSource());
+    expect(fourteen.sections.length).toBe(14);
+    expect(fourteen.sections.map((section) => section.id)).toEqual([
+      "family-0-prose",
+      "family-1-callout",
+      "family-2-table",
+      "family-3-list",
+      "family-4-divider",
+      "family-5-hero",
+      "family-6-stats",
+      "family-7-steps",
+      "family-8-quote",
+      "family-9-faq",
+      "family-10-columns",
+      "family-11-cards",
+      "family-12-features",
+      "family-13-actions",
+    ]);
+    expect(JSON.stringify(fourteen.sections.slice(0, 13))).toBe(JSON.stringify(thirteen.sections));
+
+    // Exactly one `content.actions` node, with only the authored labels and their literal targets.
+    expect(fourteen.sections[13]).toEqual({
+      id: "family-13-actions",
+      module: "content.actions",
+      props: {
+        items: [
+          { label: "Read the introduction", targetId: "family-0-prose" },
+          { label: "Explore features", targetId: "family-12-features" },
+        ],
+      },
+    });
+    // No synthesized route, href passthrough, variant or second destination was added beside the target id.
+    expect(JSON.stringify(fourteen.sections[13])).not.toContain("variant");
+    expect(JSON.stringify(fourteen.sections[13])).not.toContain("href");
+  });
+
+  it("accepts a forward reference to a later top-level section and the one/eight item bounds", () => {
+    const forward = composed({
+      version: 1,
+      title: "Forward fixture",
+      sections: [
+        { type: "actions", actions: [{ label: "Go on", href: "#family-1-prose" }] },
+        { type: "prose", body: "The destination." },
+      ],
+    });
+    expect(forward.sections.map((section) => section.id)).toEqual(["family-0-actions", "family-1-prose"]);
+    expect(forward.sections[0]?.props).toEqual({ items: [{ label: "Go on", targetId: "family-1-prose" }] });
+
+    const eight = Array.from({ length: 8 }, (_, index) => ({
+      label: `Action ${index}`,
+      href: "#family-0-actions",
+    }));
+    const bounded = composed(envelope({ type: "actions", actions: eight }));
+    expect(bounded.sections).toHaveLength(1);
+    const only = bounded.sections[0];
+    if (only?.module !== "content.actions") return;
+    expect(only.props.items).toHaveLength(8);
+  });
+
+  it("keeps the caller's input unchanged, freezes nested items and re-accepts object and JSON text", () => {
+    const source = fourteenSectionSource();
+    const before = JSON.stringify(source);
+    const document = composed(source);
+    expect(JSON.stringify(source)).toBe(before);
+    expect(Object.isFrozen(document)).toBe(true);
+    const actions = document.sections[13];
+    expect(actions === undefined ? false : Object.isFrozen(actions)).toBe(true);
+    if (actions?.module !== "content.actions") return;
+    expect(Object.isFrozen(actions.props)).toBe(true);
+    expect(Object.isFrozen(actions.props.items)).toBe(true);
+    for (const item of actions.props.items) expect(Object.isFrozen(item)).toBe(true);
+    expect(() => readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown)).not.toThrow();
+    expect(() => readUnoPageDocument(JSON.stringify(document))).not.toThrow();
+  });
+});
+
+describe("composeUnoFoundationSubset — actions React markup", () => {
+  const html = render(composed(fourteenSectionSource()));
+  const idIndex = html.indexOf('id="family-13-actions"');
+  const start = html.lastIndexOf("<ul ", idIndex);
+  const end = html.indexOf("</ul>", idIndex);
+  const markup = start >= 0 && end > start ? html.slice(start, end + "</ul>".length) : "";
+
+  it("renders one native anchor per authored action, in order, to real section ids", () => {
+    expect(idIndex).toBeGreaterThanOrEqual(0);
+    expect(markup.startsWith('<ul class="uno-json-actions" id="family-13-actions">')).toBe(true);
+    expect((markup.match(/<li class="uno-json-action-item">/gu) ?? []).length).toBe(2);
+    expect((markup.match(/<a class="uno-json-action" /gu) ?? []).length).toBe(2);
+    expect(markup).toContain('<a class="uno-json-action" href="#family-0-prose">Read the introduction</a>');
+    expect(markup).toContain('<a class="uno-json-action" href="#family-12-features">Explore features</a>');
+    expect(markup.indexOf("Read the introduction")).toBeLessThan(markup.indexOf("Explore features"));
+    // Every fragment must land on an id that really exists in this document.
+    for (const target of ["family-0-prose", "family-12-features"]) {
+      expect(html).toContain(`id="${target}"`);
+    }
+  });
+
+  it("emits no external, routed, mailed or scripted destination and no invented attribute", () => {
+    expect(markup).not.toContain("http");
+    expect(markup).not.toContain("mailto:");
+    expect(markup).not.toContain("tel:");
+    expect(markup).not.toContain("iframe");
+    expect(markup).not.toContain("target=");
+    expect(markup).not.toContain("rel=");
+    expect(markup).not.toContain("download");
+    expect(markup).not.toContain("onclick");
+    expect(markup).not.toContain("<script");
+    expect((markup.match(/<a /gu) ?? []).length).toBe(2);
+  });
+
+  it("escapes ampersands and quotes in a label and renders an inert angle bracket as text", () => {
+    const escaped = render(
+      composed(
+        envelope({
+          type: "actions",
+          actions: [{ label: 'A & B "quoted" < 3', href: "#family-0-actions" }],
+        }),
+      ),
+    );
+    expect(escaped).toContain('>A &amp; B &quot;quoted&quot; &lt; 3</a>');
+    expect(() =>
+      composed(
+        envelope({
+          type: "actions",
+          actions: [{ label: "<script>alert(1)</script>", href: "#family-0-actions" }],
+        }),
+      ),
+    ).toThrow();
+  });
+});
+
+describe("composeUnoFoundationSubset — actions refusals", () => {
+  const ok = [{ label: "Go", href: "#family-0-actions" }];
+
+  it("refuses donor action fields and destination forms outside the same-document subset", () => {
+    expectRefusal(envelope({ type: "actions" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "actions", actions: "Go" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "actions", actions: ["Go"] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "actions", actions: [{ href: "#family-0-actions" }] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "actions", actions: [{ label: "Go" }] }), "family:unsupported-feature");
+    for (const entryExtra of ["variant", "route", "link", "target", "rel", "download", "onClick", "style"]) {
+      expectRefusal(
+        envelope({ type: "actions", actions: [{ label: "Go", href: "#family-0-actions", [entryExtra]: "X" }] }),
+        "family:unsupported-feature",
+      );
+    }
+    for (const sectionExtra of ["heading", "lede", "align", "surface", "links", "visibility"]) {
+      expectRefusal(envelope({ type: "actions", actions: ok, [sectionExtra]: "X" }), "family:unsupported-feature");
+    }
+    expectRefusal(
+      envelope({ type: "actions", actions: [{ label: 5, href: "#family-0-actions" }] }),
+      "family:unsupported-feature",
+    );
+    expectRefusal(envelope({ type: "actions", actions: [{ label: "Go", href: 5 }] }), "family:unsupported-feature");
+    for (const label of ["**bold**", "*italic*", "[x](https://example.org)", "`code`"]) {
+      expectRefusal(
+        envelope({ type: "actions", actions: [{ label, href: "#family-0-actions" }] }),
+        "family:unsupported-feature",
+      );
+    }
+    // Valid to the donor, but not expressible as a same-document fragment here.
+    for (const href of [
+      "https://example.org",
+      "/contact",
+      "mailto:hello@example.org",
+      "tel:+61123456789",
+      "#link:foo",
+      "#other",
+      "#family-%30-prose",
+      "#family-0-prose ",
+      "#family-0-prose?x=1",
+    ]) {
+      expectRefusal(envelope({ type: "actions", actions: [{ label: "Go", href }] }), "family:unsupported-feature");
+    }
+  });
+
+  it("refuses unresolvable, nested, blank or oversized action targets through the Uno target", () => {
+    expectRefusal(envelope({ type: "actions", actions: [] }), "family:target-refused");
+    const nine = Array.from({ length: 9 }, (_, index) => ({ label: `A${index}`, href: "#family-0-actions" }));
+    expectRefusal(envelope({ type: "actions", actions: nine }), "family:target-refused");
+    for (const label of ["", "   ", "t".repeat(161), "<script>alert(1)</script>"]) {
+      expectRefusal(
+        envelope({ type: "actions", actions: [{ label, href: "#family-0-actions" }] }),
+        "family:target-refused",
+      );
+    }
+    for (const href of ["#family-99-prose", "#family-0-hero", "#family-1-actions"]) {
+      expectRefusal(envelope({ type: "actions", actions: [{ label: "Go", href }] }), "family:target-refused");
+    }
+    // A nested generated child id exists in the output but is NOT a top-level section, so it must refuse.
+    const nestedSource = {
+      version: 1,
+      title: "Nested target fixture",
+      sections: [
+        { type: "columns", items: [{ title: "Left", body: "L" }, { title: "Right", body: "R" }] },
+        { type: "actions", actions: [{ label: "Nested", href: "#family-0-columns-column-0" }] },
+      ],
+    };
+    // The nested id really does exist in a composed columns document, so only the top-level equality guard can refuse.
+    const composedColumns = composed({
+      version: 1,
+      title: "Nested id evidence",
+      sections: [{ type: "columns", items: [{ title: "Left", body: "L" }, { title: "Right", body: "R" }] }],
+    });
+    expect(JSON.stringify(composedColumns)).toContain('"family-0-columns-column-0"');
+    expectRefusal(nestedSource, "family:target-refused");
+  });
+
+  it("refuses a candidate above the Uno 64 KiB text cap rather than truncating it", () => {
+    const bulky = {
+      version: 1,
+      title: "Oversized action fixture",
+      sections: [
+        { type: "cards", columns: 2, items: Array.from({ length: 8 }, () => ({ title: "T", body: "b".repeat(4000) })) },
+        { type: "features", columns: 2, items: Array.from({ length: 8 }, () => ({ title: "T", body: "b".repeat(4000) })) },
+        { type: "actions", actions: [{ label: "Go", href: "#family-0-cards" }] },
+      ],
+    };
+    expectRefusal(bulky, "family:target-refused");
+  });
+
+  it("refuses hostile action source with no getter invoked and no partial Page", () => {
+    let ran = 0;
+    const labelEntry: Record<string, unknown> = { href: "#family-0-actions" };
+    Object.defineProperty(labelEntry, "label", {
+      enumerable: true,
+      get: () => {
+        ran += 1;
+        return "Go";
+      },
+    });
+    const labelOutcome = composeUnoFoundationSubset(envelope({ type: "actions", actions: [labelEntry] }));
+    expect(labelOutcome.status).toBe("refused");
+    if (labelOutcome.status === "refused") expect(labelOutcome.reason).toBe("family:unsafe-source");
+    expect(Object.prototype.hasOwnProperty.call(labelOutcome, "document")).toBe(false);
+    expect(ran).toBe(0);
+
+    const hrefEntry: Record<string, unknown> = { label: "Go" };
+    Object.defineProperty(hrefEntry, "href", {
+      enumerable: true,
+      get: () => {
+        ran += 1;
+        return "#family-0-actions";
+      },
+    });
+    const hrefOutcome = composeUnoFoundationSubset(envelope({ type: "actions", actions: [hrefEntry] }));
+    expect(hrefOutcome.status).toBe("refused");
+    if (hrefOutcome.status === "refused") expect(hrefOutcome.reason).toBe("family:unsafe-source");
+    expect(ran).toBe(0);
+
+    const sparse: unknown[] = [{ label: "A", href: "#family-0-actions" }, , { label: "C", href: "#family-0-actions" }];
+    expectRefusal(envelope({ type: "actions", actions: sparse }), "family:unsafe-source");
+
+    // One valid prose followed by hostile actions refuses the WHOLE Page with no partial content.
+    const mixed = composeUnoFoundationSubset({
+      version: 1,
+      title: "Mixed action fixture",
+      sections: [
+        { type: "prose", body: "Kept?" },
+        { type: "actions", actions: [{ label: "A", href: "#family-0-prose" }, labelEntry] },
+      ],
+    });
+    expect(mixed.status).toBe("refused");
+    if (mixed.status === "refused") expect(mixed.reason).toBe("family:unsafe-source");
+    expect(Object.prototype.hasOwnProperty.call(mixed, "document")).toBe(false);
+    expect(ran).toBe(0);
+  });
+});
+
 describe("composeUnoFoundationSubset — canonical donor inventory", () => {
-  it("maps exactly thirteen of the donor's seventeen families and leaves four unimplemented", () => {
-    const left = DONOR_17.filter((name) => !(MAPPED_13 as readonly string[]).includes(name));
-    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([...MAPPED_13]);
-    expect(left).toEqual(["media", "gallery", "actions", "contactForm"]);
+  it("maps exactly fourteen of the donor's seventeen families and leaves three unimplemented", () => {
+    const left = DONOR_17.filter((name) => !(MAPPED_14 as readonly string[]).includes(name));
+    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([...MAPPED_14]);
+    expect(left).toEqual(["media", "gallery", "contactForm"]);
   });
 
   it("keeps the committed ledger identical to the canonical inventory", () => {
@@ -1550,30 +1843,30 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
       fileURLToPath(new URL("../../.documents/Architecture/u04-family-parity.md", import.meta.url)),
       "utf8",
     );
-    const unimplemented = "**UNIMPLEMENTED (4):** `media`, `gallery`, `actions`, `contactForm`.";
+    const unimplemented = "**UNIMPLEMENTED (3):** `media`, `gallery`, `contactForm`.";
     expect(ledger.split(unimplemented).length - 1).toBe(1);
     expect(ledger).not.toContain("UNIMPLEMENTED (10)");
     expect(ledger).not.toContain("UNIMPLEMENTED (8)");
     expect(ledger).not.toContain("UNIMPLEMENTED (6)");
+    expect(ledger).not.toContain("UNIMPLEMENTED (4)");
     expect(ledger).not.toContain("seven bounded");
     expect(ledger).not.toContain("nine bounded");
     expect(ledger).not.toContain("eleven bounded");
+    expect(ledger).not.toContain("thirteen bounded");
     expect(ledger).not.toContain("six donor families");
+    expect(ledger).not.toContain("four donor families");
     expect(ledger).not.toContain("eight donor families");
-    expect(ledger).not.toContain("ten donor families entirely unimplemented");
     expect(ledger).not.toContain("UNIMPLEMENTED**: `heading`");
-    expect(ledger).not.toMatch(/FAMILY_PARITY=(17\/17|13\/17|11\/17|9\/17|7\/17)/u);
-    for (const family of ["hero", "stats", "steps", "quote", "faq", "columns", "cards", "features"]) {
+    expect(ledger).not.toMatch(/FAMILY_PARITY=(17\/17|14\/17|13\/17|11\/17|9\/17|7\/17)/u);
+    for (const family of ["hero", "stats", "steps", "quote", "faq", "columns", "cards", "features", "actions"]) {
       expect(ledger).toContain(`| \`${family}\` |`);
     }
-    // The two new rows name their donor evidence and stay distinct from each other.
-    expect(ledger).toContain("`COMPOSE (bounded cards)`");
-    expect(ledger).toContain("`COMPOSE (bounded features)`");
-    expect(ledger).toContain("e3f3a12e");
-    expect(ledger).toContain("bc729d6a");
+    // The new row names its donor evidence and stays distinct from the earlier families.
+    expect(ledger).toContain("`COMPOSE (same-document anchor subset)`");
+    expect(ledger).toContain("caeee577");
     expect(ledger).toContain("19c9bee3");
-    expect(ledger).toContain("thirteen bounded");
+    expect(ledger).toContain("fourteen bounded");
     expect(ledger).toContain("zero of seventeen full semantic parity");
-    expect(ledger).toContain("Deliberately absent donor design (cards and features)");
+    expect(ledger).toContain("Deliberately absent donor design (actions)");
   });
 });
