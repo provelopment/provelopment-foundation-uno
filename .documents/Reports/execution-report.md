@@ -1,125 +1,130 @@
-# Execution Report — UNO-WO-057 / R01
+# Execution Report — UNO-WO-058 / R01
 
-**Status: DELIVERED — one bounded five-source-shape adapter checkpoint published. U04 remains OPEN.**
-**No full family parity is claimed: five bounded mappings implemented, 0/17 families fully accepted.**
+**Status: DELIVERED — bounded seven-source-shape adapter checkpoint published. U04 remains OPEN.**
+**Accounting: seven bounded source-shape mappings implemented, 0/17 full Foundation-family parity.**
 
 ## 1. Order, authority and start state
 
 | Item | Observed |
 | --- | --- |
-| Order | `UNO-WO-057 / R01`, EDITION FINAL — EXECUTE |
-| ACTIVE | `.documents/WIP/workorder-active.md`, **22,839 bytes**, SHA-256 `47951990d7728e7ca33c2aae7e5c08a8161df49695cb8cef0b74f8369c588589` — byte- and hash-identical to the activation; ignored, untracked, unstaged |
-| Required start | `539308e982dda3ebf3bae06c75af1042880b5b21` — matched exactly on `HEAD`, `main`, `origin/main` and `ls-remote` |
-| Physical preflight | one checkout, **1** worktree, **1** branch (`main`), **1** remote (Uno `origin`), **0** stashes, empty index and empty status before the first write |
-| Owner approvals used | one exact-ledger product commit, one report-only commit, ordinary non-force pushes, automatic Git-triggered deployments. No corrective product commit was needed |
+| Order | `UNO-WO-058 / R01`, EDITION FINAL — EXECUTE |
+| ACTIVE | `.documents/WIP/workorder-active.md`, **25,304 bytes**, SHA-256 `cbf64090e9d15384b901b4fa7f77fbaae17b5d2873c889a4bded9f1815c40acc` — byte- and hash-identical to the activation; ignored, untracked, unstaged |
+| Required start | `dd3c25fb33f5a258ece27cc663cfb149fe0e75e5` — matched exactly on `HEAD`, `main`, `origin/main` and `ls-remote` |
+| Start blobs | A01 `5b828258517125c9a73657bf5f14b66a5346ebb2`, A02 `f6313719b6438034849d9fbd72899a54a752ceec`, A03 `f755cec8f7b07783b145fa418862a91e89b87d5a` — all matched the pins, so no Owner change was overwritten |
+| Physical state | one checkout, **1** worktree, **1** branch (`main`), **1** remote (Uno `origin`), **0** stashes, empty index and status before the first write |
+| Commits used | one planned product commit, one report-only commit. No corrective product commit was needed |
 
 ## 2. Published product
 
-**Product commit:** `320aad5eaed71de8f6dcff62dd2390d6ebd6120e` — `feat(u04): compose five bounded Foundation family source shapes`.
+**Product commit:** `5fa398859c03326ef816e4dc3ed0e5ff43b60c83` — `feat(u04): add bounded hero and stats donor family mappings`.
 
-Exactly the three authorised new paths, nothing else (no modification, no deletion, no rename):
+Exactly the three authorised modified paths, nothing else:
 
-- `src/application/compose-uno-foundation-families.ts` (A01)
-- `tests/unit/uno-foundation-families.test.ts` (A02)
-- `.documents/Architecture/u04-family-parity.md` (A03)
+- `src/application/compose-uno-foundation-families.ts`
+- `tests/unit/uno-foundation-families.test.ts`
+- `.documents/Architecture/u04-family-parity.md`
 
-Unchanged: the 22-module registry, `page-document.ts`, the renderers, CSS, routes, fixtures, workflows, package and
-lockfile, manifests, EFS/selection/site declarations, governance and deployment authority.
+Unchanged: the 22-module registry, `page-document.ts`, renderers, CSS, routes, fixtures, workflows, package/lockfile,
+manifests, EFS/selection/site declarations, governance and deployment authority. The private ACTIVE was never staged.
 
-## 3. The five accepted source shapes
+## 3. Seven bounded source-shape results
 
-`composeUnoFoundationSubset(input)` is pure and framework-free (one `src/core/page-document` import; no IO, React,
-Next, provider, environment, host or publication authority). It returns one validated, deep-frozen
-`UnoPageDocument` — `version: 1`, the donor title, ids `family-<index>-<type>`, one `content.prose` node per section —
-or one closed refusal with no document.
+The composer stays pure: one inward `src/core/page-document` import, no IO, React, Next, provider, environment, host or
+publication authority. It returns one validated, deep-frozen `UnoPageDocument` or one of the four existing closed
+refusals with no document.
 
-| Donor family | Accepted subset | Composed Uno node | Rendered semantics |
+| Donor family | Accepted subset | Composed Uno node | Proved markup |
 | --- | --- | --- | --- |
-| `prose` `{type,body}` | body text | `{text}` | `<p class="uno-json-prose">` |
-| `callout` `{type,body,tone?}` | closed `note\|info\|warning` | `{variant:"callout",text,tone?}` | `<section class="uno-json-callout" data-uno-tone>` |
-| `table` `{type,columns,rows,caption?}` | 1–6 columns, 1–20 rectangular rows | `{variant:"table",…}` | focusable scroll wrapper, `<caption>`, `<th scope="col">`, `<td>` |
-| `list` `{type,items,ordered?}` | strings or exactly `{label,detail?}`, optional boolean | `{variant:"list",…}` | real `<ol>`/`<ul class="uno-json-list">`, one `<li>` per entry |
-| `divider` `{type}` | no content | `{variant:"divider"}` | one `<hr class="uno-json-divider">` |
+| `prose` | `type`, `body` | `content.prose {text}` | `<p class="uno-json-prose">` |
+| `callout` | `type`, `body`, optional `tone` | `content.prose {variant:"callout"}` | `<section class="uno-json-callout" data-uno-tone="warning">` |
+| `table` | `type`, `columns`, `rows`, optional `caption` | `content.prose {variant:"table"}` | scroll wrapper, `<caption>`, 2 `<th scope="col">`, 3 `<tr>`, 4 `<td>` |
+| `list` | `type`, `items`, optional `ordered` | `content.prose {variant:"list"}` | one `<ol>` with 2 `<li>` in order |
+| `divider` | `type` | `content.prose {variant:"divider"}` | exactly one `<hr class="uno-json-divider">` |
+| `hero` | `type`, **required** `lede`, optional `eyebrow`, `support`, `align`, `surface` | `content.hero {lede,eyebrow?,support?,align?,surface?}` | `<section class="uno-json-hero" data-uno-align="center" data-uno-surface="muted">` + eyebrow/lede/support paragraphs, no action list |
+| `stats` | `type`, `items[1..6]{value,label,detail?}` | `content.stats {items}` | `<section class="uno-json-stats">` + `<dl class="uno-json-stats-list">`, 2 `<dt>`, 2 `<dd>`, detail on the second only |
 
-Absent `tone`, `caption` and `ordered` stay unmanufactured. The source is snapshotted through own property
-descriptors only, so no authored accessor ever runs; numbers are accepted only as finite values (the envelope
-version).
+The original five-section fixture is retained unchanged and proved byte-identical (`JSON.stringify` of the first five
+nodes equals the five-shape result). The seven-section fixture yields ids `family-0-prose` … `family-6-stats` in source
+order, is deeply frozen, leaves caller input unchanged, and re-accepts through `readUnoPageDocument` including a JSON
+text round-trip. Absent `eyebrow`/`support`/`align`/`surface` and absent `detail` remain absent in validated props; no
+default, heading, level, currency or action is manufactured.
 
+## 4. Corrected canonical ledger
 
-## 4. Refusal results (24 test cases, all closed, no partial document)
+A03 now records the donor's exact ordered seventeen families —
+`hero, prose, media, gallery, actions, callout, cards, features, columns, steps, stats, quote, table, faq, list,
+divider, contactForm` — with seven bounded mappings and one stable line:
 
-- **`family:unsafe-source`** — `null`, array, foreign prototype, symbol key, `__proto__` key, accessor at envelope /
-  section / list entry, accessor at a source array index (counter proven **zero**), sparse section array, sparse table
-  row, cycle, function member, `undefined` member, non-finite version, over-deep nesting, over-node-budget source.
-- **`family:unsupported-family`** — `media`, `faq`, `contactForm`, `heading`, `hero`, `pricing`, `timeline`,
-  `gallery`; never degraded to prose.
-- **`family:unsupported-feature`** — missing/extra envelope key, wrong version, non-string title, zero or 33 sections,
-  non-array sections, `heading`/`lede`/`align`/`surface`/`links`/`visibility`, `href`/`route`/`link`/`html`/`style`/
-  `onClick`, list-item destination or any extra key, `**bold**`, `[label](destination)`, backticks, leading Markdown
-  heading, and a legacy Uno Page source misoffered as donor input.
-- **`family:target-refused`** — empty/overlong prose, script-like body, empty callout, unknown tone, 0/7 columns,
-  0/21 rows, ragged row, blank cell, overlong caption, nested object cell, 0/13 items, blank label, non-boolean
-  `ordered`, and a candidate above the 64 KiB Uno source cap (enforced here because the Uno reader applies that cap to
-  JSON text only).
+## 5. Tests — 42 focused cases (29 retained, 13 added)
 
-## 5. Tests — 29 focused cases, plus 141 unchanged baseline cases
+Retained unchanged in intent: the five-shape acceptance, deep-freeze, JSON round-trip, unmanufactured optionals,
+structural markup, hostile-source, envelope/feature, malformed-value, Markdown and determinism suites, including the
+source-array accessor regression whose counter must stay **zero**.
 
-The accepted envelope composes all five shapes; assertions cover `status === "composed"`, five sections, exact ids and
-module ids, unchanged caller input, deep freezing of document/sections/props/rows/cells, re-acceptance by
-`readUnoPageDocument` and a JSON round-trip. Real server-side React markup is asserted structurally: the legacy
-paragraph, the callout section with `data-uno-tone="warning"` and no `role="alert"`, one `<caption>`, exactly two
-`<th scope="col">`, three `<tr>` and four `<td>`, one `<ol>` with two `<li>` in source order, exactly one `<hr>`,
-preserved section order, escaped ampersands/quotes, and no `<script>`, `<main>`, `<h1>`, `<iframe>` or handler.
-The 22-ID registry length is asserted unchanged.
+Added: seven-node composition and order; first-five byte-identity; seven-shape freeze and round-trip; unmanufactured
+hero/stats optionals; hero markup (`data-uno-align="center"`, `data-uno-surface="muted"`, plain eyebrow/lede/support,
+no action list, no `<iframe>`); stats markup (`<dl>`, two `<dt>`, two `<dd>`, authored order, single detail span, no
+invented heading, no currency); no second `<main>`/`<h1>`; and the canonical inventory guard that reads the committed
+ledger and requires the exact UNIMPLEMENTED line once, the drift-prone old strings absent, `hero`/`stats` rows present
+and no `FAMILY_PARITY` claim.
+
+Exact refusals proved for the two new families (each asserts `status:"refused"`, the exact closed reason and **no
+`document` field**):
+
+| Input | Reason |
+| --- | --- |
+| `hero` with donor `actions`; with `href`; with `route` | `family:unsupported-feature` |
+| `hero` with `support` but no `lede` | `family:unsupported-feature` |
+| `hero` `lede:"**bold**"`; `eyebrow:"[x](https://example.org)"` | `family:unsupported-feature` |
+| `hero` `lede:""`; `align:"end"`; `surface:"loud"`; 4001-char lede; 161-char eyebrow | `family:target-refused` |
+| `stats` with donor `heading`; entry `href`; entry detail Markdown; non-array items; string item | `family:unsupported-feature` |
+| `stats` `items:[]`; seven entries; blank label; blank value | `family:target-refused` |
+| a valid prose section followed by a stats entry with a `value` getter | `family:unsafe-source`, getter proven not to run, no partial Page |
+
+The ten unimplemented donor families each refuse as `family:unsupported-family`; `hero` is no longer expected to refuse.
 
 ## 6. Local battery — every step green
 
-`pnpm test`, `pnpm test:architecture` (46/46), `pnpm typecheck`, `eslint . --max-warnings 0`, `pnpm test:bootstrap`,
-governance test and CLI, fixture-transaction, U03 trace unit, U04 JSON slice unit, U04 22-module guard (19/19), U04
-security exception, Node 26 floor, readiness unit and CLI (**132 checks**), U04 security CLI, U03 published HTTP
-(**542**), U04 slice (**464**), U04 22-module runner (**565 passed, 0 failed**; `FOUR_ZONE_HTTP=4/4`,
+`pnpm test` (42 new-suite cases, 141 baseline), architecture 46/46, typecheck, `eslint . --max-warnings 0`, bootstrap,
+governance test and CLI, fixture-transaction, U03 trace unit, U04 slice unit, U04 22-module guard 19/19, U04 security
+exception, Node 26 floor, readiness unit and CLI (**132 checks**), U04 security CLI, U03 published HTTP (**542**), U04
+slice (**464**), U04 22-module runner (**565 passed, 0 failed**; `FOUR_ZONE_HTTP=4/4`,
 `NATIVE_VIDEO_HTTP=MP4+WEBM+VTT+POSTER`, `BROWSER_MATRIX=16/16`), `pnpm build`, U03 trace `--expect committed`,
 `pnpm test:http` (**103**), `verify-u03-http` (**91**). Declarations before and after: `ba232d46…e3f0` and
-`4f656c93…9a0c`. No skipped or weakened step; committed `/en` still 404. Real HTTP/browser proof for *this adapter* is
-**NOT APPLICABLE** (a pure translator publishes nothing), not PASS.
+`4f656c93…9a0c`. Committed `/en` still 404. Adapter-specific HTTP is **NOT APPLICABLE** (a pure translator publishes
+nothing), not PASS.
+
+**Whitespace gate:** after staging only A01–A03, `git diff --check` and `git diff --cached --check` both exit **0**
+with **no output**; the previously disclosed trailing-blank-line defects are removed (one terminal newline per file).
 
 ## 7. Hosted CI at the product head
 
-`320aad5eaed71de8f6dcff62dd2390d6ebd6120e`:
+`5fa398859c03326ef816e4dc3ed0e5ff43b60c83`:
 
-- `Uno Bootstrap Verify` run `44733597840` — ubuntu-24.04 **success**, windows-2025 **success**
-- `Verify U01 baseline` run `44733597938` — ubuntu-24.04 **success**, windows-2025 **success**
+- `Uno Bootstrap Verify` run `44737930028` — ubuntu-24.04 **success**, windows-2025 **success**
+- `Verify U01 baseline` run `44737930096` — ubuntu-24.04 **success**, windows-2025 **success**
 
-## 8. Source and rights findings
+## 8. Source rights and known advisories
 
-Donor evidence was read as committed blobs at `provelopment/provelopment-foundation` commit
-`c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, Apache-2.0 (`LICENSE` blob `d645695673349e3947e8e5ae42332d0ac3164cd7`).
-All five pins were re-verified live against the donor repository:
+Donor evidence remains `provelopment/provelopment-foundation` @ `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`,
+Apache-2.0 (`LICENSE` blob `d645695673349e3947e8e5ae42332d0ac3164cd7`): `page-document.ts` `a12d964c…` (45,106 B),
+`structure-sections.tsx` `65d254e1…`, `text-sections.tsx` `caeee577…`, `items-sections.tsx` `bc729d6a…`,
+`media-sections.tsx` `e3f3a12e…`. Concepts only; no donor source, component, CSS, image, Connect or trademark copied,
+no donor dependency, no new module ID. Zero waivers and no new advisory; the known picomatch GHSA remains
+**unresolved and disclosed**, not claimed repaired.
 
-| Donor path | Verified blob | Size |
-| --- | --- | --- |
-| `src/core/page-document.ts` | `a12d964c43626c6313a621bf628f5cc24b65d444` | 45,106 |
-| `structure-sections.tsx` | `65d254e192a6a8ef4886590026c2ea58e02264be` | 4,634 |
-| `text-sections.tsx` | `caeee57798bdd533867e5bef350422618187612f` | 4,240 |
-| `items-sections.tsx` | `bc729d6a2e6484dc2c26ed997e65ee644bc8a7e6` | 5,639 |
-| `LICENSE` | `d645695673349e3947e8e5ae42332d0ac3164cd7` | 11,358 |
+## 9. Remaining obligations
 
-The adapter is **original Uno-owned** code: concepts and semantics only, no donor source, component, CSS, Tailwind,
-image, Connect or trademark copied, and no donor package, module or build configuration imported. A03 records the
-per-family disposition `COMPOSE (plain-text subset)`, accepted and refused fields, output semantics and the twelve
-unimplemented families.
-
-## 9. Defects, security and remaining obligations
-
-- **Known cosmetic defect (disclosed):** `git diff --cached --check` reported one “new blank line at EOF” in A01 and
-  A02 after staging. It is whitespace only, lint, typecheck and every gate pass, and it was **not** repaired because no
-  corrective commit was authorised beyond a hosted-CI-required repair. No functional effect.
-- **Security:** zero waivers, no raw HIGH/CRITICAL and no new advisory; lockfile, waiver list and checkers untouched.
-  The known picomatch GHSA remains **unresolved and disclosed** — not claimed repaired. Unsafe text policy was not
-  relaxed: script-like bodies and `javascript:` text are still refused.
-- **Remaining for any parity claim:** twelve families are **UNIMPLEMENTED** (`heading`, `hero`, `media`, `gallery`,
-  `carousel`, `stats`, `testimonials`, `pricing`, `timeline`, `tabs`, `accordion`, `contactForm`), plus donor Markdown
-  rendering, link/destination representation, a composition Page and real published HTTP/browser proof. This order
-  closes only the bounded five-source-shape adapter checkpoint.
+Ten donor families are entirely unimplemented (exact line in A03). Donor Markdown, link/route conversion, media and
+contact forms, the remaining hero/stats option surfaces, a composition Page and real published HTTP/browser proof all
+remain future authorised work. **U04 stays OPEN**; no stage closure, merge, release, tag, manual deployment or
+provider-setting change occurred.
 
 The report head SHA and its CI results cannot appear in this file; both are returned in the handback message.
+
+
+**UNIMPLEMENTED (10):** `media`, `gallery`, `actions`, `cards`, `features`, `columns`, `steps`, `quote`, `faq`, `contactForm`.
+
+The previous incorrect inventory (`heading`, `carousel`, `pricing`, `timeline`, `tabs`, `accordion`, `testimonials`)
+is gone, and the ledger states seven bounded mappings, ten entirely unimplemented families, **zero of seventeen full
+semantic parity** and no family production HTTP/browser proof.
