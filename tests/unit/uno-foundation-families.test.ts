@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -50,14 +53,22 @@ function expectRefusal(input: unknown, reason: string): void {
   expect(Object.prototype.hasOwnProperty.call(outcome, "document")).toBe(false);
 }
 
-describe("composeUnoFoundationSubset — five accepted source shapes", () => {
-  it("declares exactly the five supported families and leaves the 22-module registry untouched", () => {
-    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual(["prose", "callout", "table", "list", "divider"]);
+describe("composeUnoFoundationSubset — seven bounded source shapes", () => {
+  it("declares exactly the seven bounded families and leaves the 22-module registry untouched", () => {
+    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([
+      "prose",
+      "callout",
+      "table",
+      "list",
+      "divider",
+      "hero",
+      "stats",
+    ]);
     expect(Object.isFrozen(UNO_FOUNDATION_SUBSET_FAMILIES)).toBe(true);
     expect(UNO_RENDERABLE_MODULES.length).toBe(22);
   });
 
-  it("composes one validated node per section with stable ids and module ids", () => {
+  it("still accepts the original five-section fixture with stable ids and module ids", () => {
     const document = composed(acceptedSource());
     expect(document.version).toBe(1);
     expect(document.title).toBe("Family subset fixture");
@@ -309,8 +320,19 @@ describe("composeUnoFoundationSubset — envelope, family and feature refusal", 
     expectRefusal(oversized, "family:target-refused");
   });
 
-  it("refuses every donor family outside the five, never degrading it to prose", () => {
-    for (const type of ["media", "faq", "contactForm", "heading", "hero", "pricing", "timeline", "gallery"]) {
+  it("refuses every donor family outside the seven, never degrading it to prose", () => {
+    for (const type of [
+      "media",
+      "gallery",
+      "actions",
+      "cards",
+      "features",
+      "columns",
+      "steps",
+      "quote",
+      "faq",
+      "contactForm",
+    ]) {
       expectRefusal(envelope({ type }), "family:unsupported-family");
     }
     expectRefusal(envelope("prose"), "family:unsafe-source");
@@ -414,5 +436,241 @@ describe("composeUnoFoundationSubset — malformed accepted fields and Markdown 
   });
 });
 
+/** The five-section fixture with the two new bounded families appended, in source order. */
+function sevenSectionSource(): Record<string, unknown> {
+  const source = acceptedSource();
+  const sections = source["sections"] as readonly unknown[];
+  return {
+    ...source,
+    sections: [
+      ...sections,
+      {
+        type: "hero",
+        lede: "A genuine introduction.",
+        eyebrow: "Introduction",
+        support: "Further details.",
+        align: "center",
+        surface: "muted",
+      },
+      {
+        type: "stats",
+        items: [
+          { value: "22", label: "Modules" },
+          { value: "4", label: "Asset zones", detail: "Owned delivery." },
+        ],
+      },
+    ],
+  };
+}
 
+describe("composeUnoFoundationSubset — bounded hero and stats", () => {
+  it("composes seven nodes in source order, leaving the first five byte-identical", () => {
+    const five = composed(acceptedSource());
+    const seven = composed(sevenSectionSource());
+    expect(seven.sections.length).toBe(7);
+    expect(seven.sections.map((section) => section.id)).toEqual([
+      "family-0-prose",
+      "family-1-callout",
+      "family-2-table",
+      "family-3-list",
+      "family-4-divider",
+      "family-5-hero",
+      "family-6-stats",
+    ]);
+    expect(JSON.stringify(seven.sections.slice(0, 5))).toBe(JSON.stringify(five.sections));
+    const hero = seven.sections[5];
+    const stats = seven.sections[6];
+    expect(hero?.module).toBe("content.hero");
+    expect(stats?.module).toBe("content.stats");
+    expect(hero?.props).toEqual({
+      lede: "A genuine introduction.",
+      eyebrow: "Introduction",
+      support: "Further details.",
+      align: "center",
+      surface: "muted",
+    });
+    expect(stats?.props).toEqual({
+      items: [
+        { value: "22", label: "Modules" },
+        { value: "4", label: "Asset zones", detail: "Owned delivery." },
+      ],
+    });
+  });
 
+  it("freezes the composed Page, keeps caller input unchanged and round-trips through JSON", () => {
+    const source = sevenSectionSource();
+    const before = JSON.stringify(source);
+    const document = composed(source);
+    expect(JSON.stringify(source)).toBe(before);
+    expect(Object.isFrozen(document)).toBe(true);
+    expect(Object.isFrozen(document.sections)).toBe(true);
+    for (const section of document.sections) expect(Object.isFrozen(section.props)).toBe(true);
+    const serialized = JSON.stringify(document);
+    const reread = readUnoPageDocument(serialized, { reservedHome: false });
+    expect(reread.accepted).toBe(true);
+    if (reread.accepted) expect(JSON.stringify(reread.document)).toBe(serialized);
+  });
+
+  it("does not manufacture absent hero optionals or absent stats detail", () => {
+    const hero = composed(envelope({ type: "hero", lede: "Only a lede." }));
+    const stats = composed(envelope({ type: "stats", items: [{ value: "1", label: "One" }] }));
+    expect(hero.sections[0]?.props).toEqual({ lede: "Only a lede." });
+    expect(stats.sections[0]?.props).toEqual({ items: [{ value: "1", label: "One" }] });
+  });
+});
+
+describe("composeUnoFoundationSubset — hero and stats React markup", () => {
+  const html = render(composed(sevenSectionSource()));
+
+  it("renders the hero section with authored align, surface and no invented action", () => {
+    expect(html).toContain(
+      '<section class="uno-json-hero" data-uno-align="center" data-uno-surface="muted" id="family-5-hero">',
+    );
+    expect(html).toContain('<p class="uno-json-eyebrow">Introduction</p>');
+    expect(html).toContain('<p class="uno-json-hero-lede">A genuine introduction.</p>');
+    expect(html).toContain('<p class="uno-json-hero-support">Further details.</p>');
+    expect(html).not.toContain("uno-json-hero-actions");
+    expect(html).not.toContain("<iframe");
+  });
+
+  it("renders the stats section as a real description list in authored order", () => {
+    expect(html).toContain('<section class="uno-json-stats" data-uno-surface="plain" id="family-6-stats">');
+    expect(html).toContain('<dl class="uno-json-stats-list">');
+    expect((html.match(/<dt class="uno-json-stat-label">/gu) ?? []).length).toBe(2);
+    expect((html.match(/<dd class="uno-json-stat-value">/gu) ?? []).length).toBe(2);
+    expect(html.indexOf("Modules")).toBeLessThan(html.indexOf("Asset zones"));
+    expect((html.match(/<span class="uno-json-stat-detail">/gu) ?? []).length).toBe(1);
+    expect(html).toContain("Owned delivery.");
+    expect(html).not.toContain("uno-json-stats-heading");
+    expect(html).not.toContain("€");
+  });
+
+  it("supplies no second main or h1 from this component", () => {
+    expect((html.match(/<h1/gu) ?? []).length).toBe(0);
+    expect((html.match(/<main/gu) ?? []).length).toBe(0);
+  });
+});
+
+describe("composeUnoFoundationSubset — hero and stats refusal", () => {
+  it("refuses hero fields and Markdown outside the bounded subset", () => {
+    expectRefusal(
+      envelope({ type: "hero", lede: "A", actions: [{ label: "X", href: "/x" }] }),
+      "family:unsupported-feature",
+    );
+    expectRefusal(envelope({ type: "hero", support: "Only support" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "hero", lede: "**bold**" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "hero", lede: "A", eyebrow: "[x](https://example.org)" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "hero", lede: "A", href: "/x" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "hero", lede: "A", route: "/en" }), "family:unsupported-feature");
+  });
+
+  it("refuses malformed hero values through the Uno target", () => {
+    expectRefusal(envelope({ type: "hero", lede: "" }), "family:target-refused");
+    expectRefusal(envelope({ type: "hero", lede: "A", align: "end" }), "family:target-refused");
+    expectRefusal(envelope({ type: "hero", lede: "A", surface: "loud" }), "family:target-refused");
+    expectRefusal(envelope({ type: "hero", lede: "x".repeat(4001) }), "family:target-refused");
+    expectRefusal(envelope({ type: "hero", lede: "A", eyebrow: "x".repeat(161) }), "family:target-refused");
+  });
+
+  it("refuses stats fields, links and Markdown outside the bounded subset", () => {
+    expectRefusal(envelope({ type: "stats", items: [], heading: "H" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "stats", items: [{ value: "1", label: "X", href: "/x" }] }), "family:unsupported-feature");
+    expectRefusal(
+      envelope({ type: "stats", items: [{ value: "1", label: "X", detail: "[x](https://example.org)" }] }),
+      "family:unsupported-feature",
+    );
+    expectRefusal(envelope({ type: "stats", items: "not-an-array" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "stats", items: ["string"] }), "family:unsupported-feature");
+  });
+
+  it("refuses malformed stats values through the Uno target", () => {
+    expectRefusal(envelope({ type: "stats", items: [] }), "family:target-refused");
+    expectRefusal(
+      envelope({ type: "stats", items: Array.from({ length: 7 }, () => ({ value: "1", label: "X" })) }),
+      "family:target-refused",
+    );
+    expectRefusal(envelope({ type: "stats", items: [{ value: "1", label: "" }] }), "family:target-refused");
+    expectRefusal(envelope({ type: "stats", items: [{ value: "", label: "X" }] }), "family:target-refused");
+  });
+
+  it("refuses the whole Page when a later stats entry is hostile, without running its getter", () => {
+    let ran = 0;
+    const hostileItem: Record<string, unknown> = { label: "X" };
+    Object.defineProperty(hostileItem, "value", {
+      enumerable: true,
+      get: () => {
+        ran += 1;
+        return "1";
+      },
+    });
+    const outcome = composeUnoFoundationSubset({
+      version: 1,
+      title: "Mixed fixture",
+      sections: [
+        { type: "prose", body: "A valid leading section." },
+        { type: "stats", items: [hostileItem] },
+      ],
+    });
+    expect(outcome.status).toBe("refused");
+    if (outcome.status === "refused") expect(outcome.reason).toBe("family:unsafe-source");
+    expect(Object.prototype.hasOwnProperty.call(outcome, "document")).toBe(false);
+    expect(ran).toBe(0);
+  });
+});
+
+/** The donor's exact ordered family roster (`PAGE_SECTION_TYPES`), independent of the Uno module registry. */
+const DONOR_17 = [
+  "hero",
+  "prose",
+  "media",
+  "gallery",
+  "actions",
+  "callout",
+  "cards",
+  "features",
+  "columns",
+  "steps",
+  "stats",
+  "quote",
+  "table",
+  "faq",
+  "list",
+  "divider",
+  "contactForm",
+] as const;
+/** The seven bounded subsets this adapter composes, in adapter order. */
+const MAPPED_7 = ["prose", "callout", "table", "list", "divider", "hero", "stats"] as const;
+
+describe("composeUnoFoundationSubset — canonical donor inventory", () => {
+  it("maps exactly seven of the donor's seventeen families and leaves ten unimplemented", () => {
+    const left = DONOR_17.filter((name) => !(MAPPED_7 as readonly string[]).includes(name));
+    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([...MAPPED_7]);
+    expect(left).toEqual([
+      "media",
+      "gallery",
+      "actions",
+      "cards",
+      "features",
+      "columns",
+      "steps",
+      "quote",
+      "faq",
+      "contactForm",
+    ]);
+  });
+
+  it("keeps the committed ledger identical to the canonical inventory", () => {
+    const ledger = readFileSync(
+      fileURLToPath(new URL("../../.documents/Architecture/u04-family-parity.md", import.meta.url)),
+      "utf8",
+    );
+    const unimplemented =
+      "**UNIMPLEMENTED (10):** `media`, `gallery`, `actions`, `cards`, `features`, `columns`, `steps`, `quote`, `faq`, `contactForm`.";
+    expect(ledger.split(unimplemented).length - 1).toBe(1);
+    expect(ledger).not.toContain("Twelve other donor families");
+    expect(ledger).not.toContain("UNIMPLEMENTED**: `heading`");
+    expect(ledger).not.toMatch(/FAMILY_PARITY=(17\/17|7\/17)/u);
+    for (const family of ["hero", "stats"]) expect(ledger).toContain(`| \`${family}\` |`);
+    expect(ledger).toContain("zero of seventeen full semantic parity");
+  });
+});

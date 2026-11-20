@@ -1,8 +1,9 @@
 /**
- * Foundation Uno — the bounded Foundation→Uno family composition adapter (`UNO-WO-057 / R01`, U04).
+ * Foundation Uno — the bounded Foundation→Uno family composition adapter (`UNO-WO-057 / R01`, extended by
+ * `UNO-WO-058 / R01`, U04).
  *
  * WHAT THIS IS. One pure, inward application function that translates a deliberately small **plain-text subset** of
- * five Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
+ * seven Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
  * donor source shape and Uno's own validated document: the caller supplies untrusted donor data, this module either
  * returns one accepted, deep-frozen `UnoPageDocument` or one closed refusal, and it never returns a partial Page.
  *
@@ -13,8 +14,9 @@
  *
  * WHAT IT IS NOT. It does not read a file, a manifest, a host, an environment variable or a provider; it publishes
  * nothing, routes nothing, renders nothing and owns no locale, Site, visibility or delivery authority. It implements
- * **five** subset mappings only. It is not a Markdown parser, a link or media converter, and it is not the seventeen
- * family parity work: no full `FAMILY_PARITY` result may be derived from it.
+ * **seven** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
+ * media converter, and it is not the seventeen family parity work: no full `FAMILY_PARITY` result may be derived
+ * from it.
  *
  * PROVENANCE. Original **Uno-owned** implementation, adaptation class **NEW / COMPOSE (plain-text subset)**. Concepts
  * — never copied source, CSS, components or assets — are adapted from `provelopment/provelopment-foundation` at
@@ -22,19 +24,22 @@
  * `d645695673349e3947e8e5ae42332d0ac3164cd7`): the donor source-family schema
  * (`src/core/page-document.ts`, blob `a12d964c43626c6313a621bf628f5cc24b65d444`), the native
  * table/caption structure (`structure-sections.tsx`, blob `65d254e192a6a8ef4886590026c2ea58e02264be`), the
- * prose/callout/divider semantics (`text-sections.tsx`, blob `caeee57798bdd533867e5bef350422618187612f`) and the
- * list semantics (`items-sections.tsx`, blob `bc729d6a2e6484dc2c26ed997e65ee644bc8a7e6`). No donor runtime code,
+ * prose/callout/divider semantics (`text-sections.tsx`, blob `caeee57798bdd533867e5bef350422618187612f`), the
+ * list/statistics semantics (`items-sections.tsx`, blob `bc729d6a2e6484dc2c26ed997e65ee644bc8a7e6`) and the hero
+ * presentation (`media-sections.tsx`, blob `e3f3a12e5e26cb6af9133bef79f5fa2dc0680bb2`). No donor runtime code,
  * package, image or trademark is imported. See `.documents/Architecture/u04-family-parity.md`.
  */
 import { readUnoPageDocument, type UnoPageDocument } from "../core/page-document";
 
-/** The five donor source families this bounded adapter accepts, in the order the ledger documents them. */
+/** The seven donor source families this bounded adapter accepts, in the order the ledger documents them. */
 export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "prose",
   "callout",
   "table",
   "list",
   "divider",
+  "hero",
+  "stats",
 ] as const);
 
 /** One accepted donor family name. */
@@ -44,7 +49,7 @@ export type UnoFoundationSubsetFamily = (typeof UNO_FOUNDATION_SUBSET_FAMILIES)[
  * The closed refusal vocabulary.
  *
  * `unsafe-source` — the input is not plain readable data (hostile object, accessor, cycle, sparse array, oversize).
- * `unsupported-family` — a real donor family outside these five, never silently dropped.
+ * `unsupported-family` — a real donor family outside these seven, never silently dropped.
  * `unsupported-feature` — a supported family carrying an out-of-subset field or Markdown this subset cannot render.
  * `target-refused` — the composed candidate is not an acceptable Uno Page; no partial document is ever returned.
  */
@@ -252,7 +257,7 @@ function refuseMarkdownArray(values: readonly PlainValue[]): void {
 /** One composed Uno section node, still to be validated by the Uno reader. */
 interface CandidateSection {
   readonly id: string;
-  readonly module: "content.prose";
+  readonly module: "content.prose" | "content.hero" | "content.stats";
   readonly props: Record<string, unknown>;
 }
 
@@ -342,6 +347,39 @@ function composeSection(section: PlainValue, index: number): CandidateSection {
       requireExactKeys(record, ["type"], []);
       return { id, module: "content.prose", props: { variant: "divider" } };
     }
+    case "hero": {
+      // This subset's hero always needs an authored `lede`: a hero-only `support`/`eyebrow` form is not this subset.
+      requireExactKeys(record, ["type", "lede"], ["eyebrow", "support", "align", "surface"]);
+      const props: Record<string, unknown> = { lede: readDonorText(record["lede"], true) };
+      for (const field of ["eyebrow", "support", "align", "surface"] as const) {
+        if (!ownsKey(record, field)) continue;
+        const value = record[field];
+        // Text fields are Markdown-refusing bounded text; `align`/`surface` are copied as authored closed literals and
+        // the Uno reader refuses any value outside its own enumeration. Absent optionals stay truly absent.
+        if (field === "eyebrow" || field === "support") props[field] = readDonorText(value, true);
+        else props[field] = value;
+      }
+      return { id, module: "content.hero", props };
+    }
+    case "stats": {
+      requireExactKeys(record, ["type", "items"], []);
+      const items = record["items"];
+      if (!Array.isArray(items)) refuseUnsupportedFeature();
+      const output: Record<string, unknown>[] = [];
+      for (const raw of items) {
+        if (raw === null || typeof raw !== "object" || Array.isArray(raw)) refuseUnsupportedFeature();
+        const entry = raw as PlainRecord;
+        // Exactly `{value, label, detail?}`: an embedded link, heading or any other key is a feature refusal.
+        requireExactKeys(entry, ["value", "label"], ["detail"]);
+        const item: Record<string, unknown> = {
+          value: readDonorText(entry["value"], true),
+          label: readDonorText(entry["label"], true),
+        };
+        if (ownsKey(entry, "detail")) item["detail"] = readDonorText(entry["detail"], true);
+        output.push(item);
+      }
+      return { id, module: "content.stats", props: { items: output } };
+    }
     default:
       throw new SourceRefusal("family:unsupported-family");
   }
@@ -399,7 +437,3 @@ export function composeUnoFoundationSubset(input: unknown): UnoFoundationSubsetO
     return { status: "refused", reason: "family:unsafe-source" };
   }
 }
-
-
-
-
