@@ -87,6 +87,35 @@ const PHASE_A_REQUIRED = Object.freeze([
   "for (const [relativePath] of createdMedia) {",
 ]);
 
+/** Phase B invariants (`UNO-WO-054 / R01`): the executed sixteen-case browser matrix. */
+const PHASE_B_REQUIRED = Object.freeze([
+  'const MATRIX_WIDTHS = Object.freeze([320, 390, 768, 1280]);',
+  'const MATRIX_SCHEMES = Object.freeze(["light", "dark"]);',
+  'const MATRIX_MOTIONS = Object.freeze(["no-preference", "reduce"]);',
+  "for (const width of MATRIX_WIDTHS)",
+  "for (const colorScheme of MATRIX_SCHEMES)",
+  "for (const reducedMotion of MATRIX_MOTIONS)",
+  "await tab.setViewportSize({ width, height: 900 });",
+  "await tab.emulateMedia({ colorScheme, reducedMotion });",
+  'await tab.goto(MATRIX_URL, { waitUntil: "load" });',
+  "no document horizontal overflow",
+  "reduced-motion CSS",
+  "two native controls and source/track/poster",
+  "ArrowRight selects B and focuses it",
+  "Home restores A and focus",
+  "accordion Enter opens",
+  "accordion Space closes",
+  "Escape closes modal and restores focus",
+  "carousel next changes live status",
+  "carousel previous restores status",
+  "zero iframe/provider requests before consent",
+  "unload removes frame and restores focus",
+  "matrixPassed += 1",
+  "MATRIX_CASE ${caseId}",
+  "BROWSER_MATRIX 16 distinct case IDs",
+  "BROWSER_MATRIX=16/16",
+]);
+
 const PINNED = Object.freeze([
   "ba232d46edcd13e95231f627f67058d383bc4479f076eb2be1ca9c576de6e3f0",
   "4f656c93a45873d85b133aa99adaec1b6821ac9983b9e9818452773952df9a0c",
@@ -95,7 +124,7 @@ const PINNED = Object.freeze([
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
 function audit(text) {
   const missing = [];
-  for (const token of [...REQUIRED, ...PHASE_A_REQUIRED]) if (!text.includes(token)) missing.push(token);
+  for (const token of [...REQUIRED, ...PHASE_A_REQUIRED, ...PHASE_B_REQUIRED]) if (!text.includes(token)) missing.push(token);
   for (const token of FORBIDDEN) if (text.includes(token)) missing.push(`forbidden: ${token}`);
   for (const id of MODULE_IDS) if (!text.includes(`"${id}"`)) missing.push(`module: ${id}`);
   for (const digest of PINNED) if (!text.includes(digest)) missing.push(`digest: ${digest}`);
@@ -189,5 +218,73 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     const mutated = source.replace("for (const [relativePath] of createdMedia) {", "for (const [relativePath] of []) {");
     assert.notEqual(mutated, source);
     assert.ok(audit(mutated).some((entry) => entry.includes("createdMedia")), audit(mutated).join(","));
+  });
+
+  // `UNO-WO-054 / R01` §5: independent Phase B mutations. Each deletes an executed matrix contract.
+  it("the audit genuinely fails when a matrix dimension is removed", () => {
+    const shapes = [
+      [source.replace("320, 390, 768, 1280", "390, 768, 1280"), "MATRIX_WIDTHS"],
+      [source.replace("320, 390, 768, 1280", "320, 390, 768"), "MATRIX_WIDTHS"],
+      [source.replace('["light", "dark"]', '["light"]'), "MATRIX_SCHEMES"],
+      [source.replace('["no-preference", "reduce"]', '["no-preference"]'), "MATRIX_MOTIONS"],
+    ];
+    for (const [mutated, contract] of shapes) {
+      assert.notEqual(mutated, source);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit genuinely fails when the emulation, navigation or a layout/motion check is removed", () => {
+    const shapes = [
+      [source.replace("await tab.emulateMedia({ colorScheme, reducedMotion });", ""), "emulateMedia"],
+      [source.replace('await tab.goto(MATRIX_URL, { waitUntil: "load" });', ""), "MATRIX_URL"],
+      [source.replace("no document horizontal overflow", "overflow tolerated"), "horizontal overflow"],
+      [source.replace("reduced-motion CSS", "motion unverified"), "reduced-motion"],
+    ];
+    for (const [mutated, contract] of shapes) {
+      assert.notEqual(mutated, source);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit genuinely fails when a keyboard or interaction assertion is removed", () => {
+    const shapes = [
+      [source.replace("ArrowRight selects B and focuses it", "tab unverified"), "ArrowRight"],
+      [source.replace("Home restores A and focus", "tab unverified"), "Home restores"],
+      [source.replace("accordion Enter opens", "accordion unverified"), "accordion Enter"],
+      [source.replace("accordion Space closes", "accordion unverified"), "accordion Space"],
+      [source.replace("Escape closes modal and restores focus", "modal unverified"), "Escape closes modal"],
+      [source.replace("carousel next changes live status", "carousel unverified"), "carousel next"],
+      [source.replace("carousel previous restores status", "carousel unverified"), "carousel previous"],
+    ];
+    for (const [mutated, contract] of shapes) {
+      assert.notEqual(mutated, source);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit genuinely fails when consent, unload or native-media coverage is removed", () => {
+    const shapes = [
+      [source.replace("zero iframe/provider requests before consent", "consent unverified"), "zero iframe"],
+      [source.replace("unload removes frame and restores focus", "unload unverified"), "unload removes"],
+      [source.replace("two native controls and source/track/poster", "media unverified"), "native controls"],
+    ];
+    for (const [mutated, contract] of shapes) {
+      assert.notEqual(mutated, source);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit genuinely fails when the matrix gate, its counting or its case emission is weakened", () => {
+    const shapes = [
+      [source.replace("matrixPassed += 1", "matrixPassed += 0"), "matrixPassed"],
+      [source.replace("MATRIX_CASE ${caseId}", "CASE"), "MATRIX_CASE"],
+      [source.replace("BROWSER_MATRIX=16/16", "BROWSER_MATRIX=ok"), "BROWSER_MATRIX=16/16"],
+      [source.replace('BROWSER_MATRIX 16 distinct case IDs', 'BROWSER_MATRIX ids'), "BROWSER_MATRIX 16 distinct case IDs"],
+    ];
+    for (const [mutated, contract] of shapes) {
+      assert.notEqual(mutated, source);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
   });
 });

@@ -887,7 +887,7 @@ async function consentPhase(base) {
     if (url.startsWith(base)) return route.continue();
     const provider = PROVIDER_REQUEST.test(url);
     requests.push({ url, consentArmed, provider, foreign: !provider });
-    if (provider) return route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>stub</title>" });
+    if (provider) return route.fulfill({ status: 200, contentType: "text/html", headers: { "cache-control": "no-store" }, body: "<!doctype html><title>stub</title>" });
     return route.abort();
   });
 
@@ -937,6 +937,153 @@ async function consentPhase(base) {
       check(`${provider} (${mode}) unload restores focus to the consent control`, /load video/iu.test(focused), focused.slice(0, 60));
     }
   }
+  // --- Phase B: the sixteen-case viewport × colour-scheme × motion matrix (`UNO-WO-054 / R01`) ----------------
+  const MATRIX_WIDTHS = Object.freeze([320, 390, 768, 1280]);
+  const MATRIX_SCHEMES = Object.freeze(["light", "dark"]);
+  const MATRIX_MOTIONS = Object.freeze(["no-preference", "reduce"]);
+  const MATRIX_URL = url;
+  const matrixCases = [];
+  let matrixPassed = 0;
+  for (const width of MATRIX_WIDTHS) {
+    for (const colorScheme of MATRIX_SCHEMES) {
+      for (const reducedMotion of MATRIX_MOTIONS) {
+        const caseId = `${width}/${colorScheme}/${reducedMotion}`;
+        matrixCases.push(caseId);
+        const failuresBefore = failures.length;
+        const errorsBefore = consoleErrors.length;
+        try {
+          await tab.setViewportSize({ width, height: 900 });
+          await tab.emulateMedia({ colorScheme, reducedMotion });
+          requests.length = 0;
+          consentArmed = false;
+          await tab.goto(MATRIX_URL, { waitUntil: "load" });
+          await delay(250);
+          const measurements = await tab.evaluate(() => {
+            const root = document.documentElement;
+            const motion = document.querySelector("#wo044-motion");
+            const motionStyle = motion ? getComputedStyle(motion) : null;
+            const prose = document.querySelector("#wo044-prose");
+            const style = prose ? getComputedStyle(prose) : null;
+            return {
+              width: window.innerWidth,
+              clientWidth: root.clientWidth,
+              scrollWidth: Math.max(root.scrollWidth, document.body.scrollWidth),
+              dark: matchMedia("(prefers-color-scheme: dark)").matches,
+              reduce: matchMedia("(prefers-reduced-motion: reduce)").matches,
+              mains: document.querySelectorAll("main").length,
+              h1s: document.querySelectorAll("h1").length,
+              proseText: prose?.textContent?.trim() ?? "",
+              proseVisibility: style?.visibility ?? "",
+              proseColor: style?.color ?? "",
+              proseBackground: getComputedStyle(document.body).backgroundColor,
+              motionAnimation: motionStyle?.animationName ?? "",
+              motionTransition: motionStyle?.transitionDuration ?? "",
+            };
+          });
+          check(`${caseId} actual viewport`, measurements.width === width, JSON.stringify(measurements));
+          check(`${caseId} actual browser media`, measurements.dark === (colorScheme === "dark")
+            && measurements.reduce === (reducedMotion === "reduce"), JSON.stringify(measurements));
+          check(`${caseId} no document horizontal overflow`, measurements.scrollWidth - measurements.clientWidth <= 2,
+            `${measurements.scrollWidth}/${measurements.clientWidth}`);
+          check(`${caseId} one main and one h1`, measurements.mains === 1 && measurements.h1s === 1,
+            `${measurements.mains}/${measurements.h1s}`);
+          check(`${caseId} prose is visible/readable`, measurements.proseText.length > 0
+            && measurements.proseVisibility === "visible" && measurements.proseColor !== ""
+            && measurements.proseBackground !== "", JSON.stringify(measurements));
+          check(`${caseId} reduced-motion CSS`, reducedMotion === "reduce"
+            ? measurements.motionAnimation === "none" : measurements.motionAnimation.includes("uno-json-fade"),
+            measurements.motionAnimation);
+          const native = await tab.locator(".uno-json-video video").evaluateAll((nodes) => nodes.map((v) => ({
+            controls: v.hasAttribute("controls"),
+            autoplay: v.autoplay,
+            source: v.querySelector("source")?.getAttribute("src") ?? "",
+            track: v.querySelector("track")?.getAttribute("src") ?? "",
+            trackKind: v.querySelector("track")?.getAttribute("kind") ?? "",
+            poster: v.getAttribute("poster") ?? "",
+          })));
+          const isOwned = (value) => /^\/uno-media\/en-001\/wo044-all-modules\/[0-9]+$/u.test(value);
+          check(`${caseId} two native controls and source/track/poster`, native.length === 2
+            && native.every((v) => v.controls && !v.autoplay && isOwned(v.source) && isOwned(v.track)
+              && isOwned(v.poster) && v.trackKind === "captions") && native[0].source !== native[1].source,
+          JSON.stringify(native));
+
+          const tabA = tab.getByRole("tab", { name: "A", exact: true });
+          const tabB = tab.getByRole("tab", { name: "B", exact: true });
+          await tabA.focus();
+          await tab.keyboard.press("ArrowRight");
+          check(`${caseId} ArrowRight selects B and focuses it`,
+            (await tabB.getAttribute("aria-selected")) === "true" && await tabB.evaluate((el) => document.activeElement === el));
+          check(`${caseId} selected B panel visible and A hidden`,
+            await tab.locator("#wo044-tabs-panel-wo044-tab-b").isVisible()
+            && !(await tab.locator("#wo044-tabs-panel-wo044-tab-a").isVisible()));
+          await tab.keyboard.press("Home");
+          check(`${caseId} Home restores A and focus`,
+            (await tabA.getAttribute("aria-selected")) === "true" && await tabA.evaluate((el) => document.activeElement === el));
+          const summary = tab.locator("#wo044-accordion summary").first();
+          const details = tab.locator("#wo044-accordion details").first();
+          await summary.focus();
+          await tab.keyboard.press("Enter");
+          check(`${caseId} accordion Enter opens`, await details.evaluate((el) => el.open),
+            String(await details.evaluate((el) => el.open)));
+          await tab.keyboard.press("Space");
+          check(`${caseId} accordion Space closes`, !(await details.evaluate((el) => el.open)),
+            String(await details.evaluate((el) => el.open)));
+
+          const trigger = tab.getByRole("button", { name: "Open details", exact: true });
+          await trigger.click();
+          const dialog = tab.getByRole("dialog", { name: "Details" });
+          await dialog.waitFor({ state: "visible", timeout: 10_000 });
+          check(`${caseId} modal opens`, await dialog.isVisible());
+          await tab.keyboard.press("Escape");
+          await dialog.waitFor({ state: "hidden", timeout: 10_000 });
+          check(`${caseId} Escape closes modal and restores focus`,
+            !(await dialog.isVisible()) && await trigger.evaluate((el) => document.activeElement === el));
+
+          const carousel = tab.locator("#wo044-carousel");
+          const liveStatus = async () => ((await carousel.locator('[aria-live="polite"]').textContent()) ?? "").trim();
+          check(`${caseId} carousel starts at image 1`, (await liveStatus()).includes("Image 1 of 2"), await liveStatus());
+          await carousel.getByRole("button", { name: "Next image" }).click();
+          check(`${caseId} carousel next changes live status`, (await liveStatus()).includes("Image 2 of 2"), await liveStatus());
+          await carousel.getByRole("button", { name: "Previous image" }).click();
+          check(`${caseId} carousel previous restores status`, (await liveStatus()).includes("Image 1 of 2"), await liveStatus());
+
+          check(`${caseId} zero iframe/provider requests before consent`,
+            (await tab.locator("iframe").count()) === 0 && requests.length === 0, String(requests.length));
+          const activate = tab.getByRole("button", { name: /load video from\s+youtube/iu }).first();
+          consentArmed = true;
+          await activate.click();
+          await tab.waitForSelector("iframe", { state: "attached", timeout: 15_000 });
+          for (let waitForProvider = 0; waitForProvider < 60 && !requests.some((entry) => entry.provider); waitForProvider += 1) await delay(100);
+          consentArmed = false;
+          const frameSrc = (await tab.locator("iframe").first().getAttribute("src")) ?? "";
+          let frameOrigin = "";
+          try { frameOrigin = new URL(frameSrc).origin; } catch { frameOrigin = ""; }
+          const providerCalls = requests.filter((entry) => entry.provider);
+          check(`${caseId} YouTube consent creates one governed frame/request`,
+            (await tab.locator("iframe").count()) === 1 && UNO_VIDEO_EMBED_ORIGINS.includes(frameOrigin)
+            && providerCalls.length === 1 && providerCalls[0].consentArmed === true
+            && requests.every((entry) => !entry.foreign), JSON.stringify({ frameOrigin, requests }));
+          await tab.getByRole("button", { name: /unload video/iu }).first().click();
+          await tab.locator("iframe").first().waitFor({ state: "detached", timeout: 15_000 });
+          const focusedAfterUnload = await tab.evaluate(() => document.activeElement?.textContent ?? "");
+          check(`${caseId} unload removes frame and restores focus`,
+            (await tab.locator("iframe").count()) === 0 && /load video from\s+youtube/iu.test(focusedAfterUnload),
+            `${await tab.locator("iframe").count()} frames, focus=${focusedAfterUnload.slice(0, 60)}`);
+        } catch (error) {
+          check(`${caseId} uncaught case failure`, false, String(error?.message ?? error).slice(0, 180));
+        } finally {
+          consentArmed = false;
+        }
+        check(`${caseId} no new console/page errors`, consoleErrors.length === errorsBefore,
+          consoleErrors.slice(errorsBefore).join(" | ").slice(0, 180));
+        if (failures.length === failuresBefore) matrixPassed += 1;
+        process.stdout.write(`MATRIX_CASE ${caseId}: ${failures.length === failuresBefore ? "PASS" : "FAIL"}\n`);
+      }
+    }
+  }
+  check("BROWSER_MATRIX 16 distinct case IDs", new Set(matrixCases).size === 16, String(new Set(matrixCases).size));
+  check("BROWSER_MATRIX=16/16", matrixPassed === 16 && new Set(matrixCases).size === 16, `${matrixPassed}/16`);
+
   check("the Page logged no console error", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
 }
 
