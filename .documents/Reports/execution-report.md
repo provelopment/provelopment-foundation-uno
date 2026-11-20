@@ -1,113 +1,107 @@
-# Execution Report — UNO-WO-052 / R01
+# Execution Report — UNO-WO-053 / R01
 
-**Status: STOP — no product phase published. U04 remains OPEN.**
+**Status: Phase A published and verified on both hosts. Phase B not executed. U04 remains OPEN.**
 
-The order's §2 producer repair was implemented and verified locally, then preserved as authorised recovery because the
-Phase A HTTP/refusal gates it must ship with were not written in this run. No unverified code was committed, no completed
-verified preceding phase was discarded, and the checkout was returned clean.
-
-## 1. Activation and physical state
+## 1. Activation, guards and restoration
 
 | Item | Observed |
 | --- | --- |
-| ACTIVE | `.documents/WIP/workorder-active.md`, **25,455 bytes**, SHA-256 `014130cf2c9be46e8a095afc35924aea7cbf1a2976910fffe4d44c550dd2721a` — matches the Owner activation; ignored/untracked, never staged |
-| Uno root | `the verified Uno checkout root (machine-specific path withheld)` |
-| Checkouts / worktrees / branches / remotes | 1 / 1 / 1 (`main`) / 1 (`origin` = `provelopment/provelopment-foundation-uno`) |
-| Stash | none |
-| Starting `HEAD` = `main` = `origin/main` | `7ca2d1efbb5325e61ce0dc72787f33e91421cf82` |
-| Initial `git status --porcelain=v1 --untracked-files=all` | zero entries; index empty |
-| Pinned declarations before and after | `deployment/efs/manifest.json` `ba232d46…e3f0`, `deployment/uno.config.json` `4f656c93…9a0c` — unchanged |
+| ACTIVE | `.documents/WIP/workorder-active.md`, **33,494 bytes**, SHA-256 `24640dd1682de33801928c73f80f131e4baa68539f6422aacd39dd7011bb3ddc` — matches the Owner activation; ignored, untracked, never staged |
+| Starting `HEAD` = `main` = `origin/main` | `fd18353d42c02ebbfdd87ee76545e6de6ead6cdb` |
+| Checkouts / worktrees / branches / remotes / stash | 1 / 1 / 1 (`main`) / 1 (`origin`) / none |
+| Initial `git status --porcelain=v1 --untracked-files=all` | zero entries |
+| Restored recovery | `.temp/uno-u04-052/recovery/verify-u04-22-module-consent.mjs.bin`, **36,900 bytes**, SHA-256 `5e26d25c3ba1dcf60cfed9292219fa8d1e8712859e896ead098cae21bd710be4` — copied over T01 only, digest re-verified after copy |
+| Pinned declarations | `deployment/efs/manifest.json` `ba232d46…e3f0`, `deployment/uno.config.json` `4f656c93…9a0c` — unchanged before and after every run |
 
-Physical verification was performed, not assumed: the WO-051 handback claim of a clean single checkout was re-checked and matched.
+No generated-zone diagnosis was repeated: the restored producer was validated first and passed.
 
-## 2. What was implemented (single tracked file, per the order's ledger)
+## 2. Changed paths (Phase A product commit)
 
-`scripts/verify-u04-22-module-consent.mjs` only — the §2 repair, exactly as instructed:
+- `scripts/verify-u04-22-module-consent.mjs` (T01)
+- `tests/deployment/u04-22-module-consent.test.mjs` (T02)
 
-- `allModulesDocument(generatedIntegrity)` now takes the digest, so the generated-zone asset can never serialise
-  `integrity: undefined` (the defect behind WO-051's `serving:renderer-unavailable`).
-- **One authored buffer** replaced the second producer call: `fixturePlan(allModulesJsonBytes)` installs
-  `{ path: SOURCES[1], bytes: allModulesJsonBytes }`; no `allModulesDocument()` call survives inside `fixturePlan`.
-- Validation, installation, loader parity and serving are asserted on that same buffer: `INSTALL_BYTES_WITHIN_BOUND`,
-  `INSTALL_DOCUMENT_ACCEPTED`, `INSTALL_DOCUMENT_HAS_DIGEST`, `INSTALL_PARITY`, `LOAD_ACCEPTED`, `LOAD_PARITY`,
-  `SERVING_SERVED`.
-- Five named `wo052-*` sections: page, theme, platform and generated zone plates plus one native MP4 carrying its own
-  VTT and poster. Media are created exclusively (`wx`), digest-verified on read-back, and removed from a `createdMedia`
-  ledger in `finally`, with three zone directories removed only when empty.
+Nothing else was staged. No declaration, module count, provider, workflow, governance, dependency, waiver or provider-setting file changed. Exactly 22 module IDs and four governed providers remain.
 
-## 3. Executed evidence
+## 3. What Phase A proves
 
-`node scripts/verify-u04-22-module-consent.mjs` (real `next build`, loopback production server, Chromium):
+One Page, published only for the run, carrying page/theme/platform/generated zones plus **two** native containers sharing one VTT and one poster; plus a separately published Page whose generated `integrity` is a well-formed wrong digest.
+
+`node scripts/verify-u04-22-module-consent.mjs` — real `next build`, real loopback production server, real Chromium:
 
 ```
-PASS  INSTALL_BYTES_WITHIN_BOUND
-PASS  INSTALL_DOCUMENT_ACCEPTED
-PASS  INSTALL_DOCUMENT_HAS_DIGEST
-PASS  INSTALL_PARITY the installed source is the single authored buffer
-PASS  LOAD_ACCEPTED the confined candidate loader accepts
-PASS  LOAD_PARITY the loaded text is the installed bytes
-PASS  SERVING_SERVED the trusted serving planner serves the Page
-verify-u04-22-module-consent: 161 passed, 0 failed
+INSTALL_PARITY / LOAD_PARITY / SERVING_SERVED                         PASS
+BAD_PAGE serving refuses the wrong generated digest                  PASS
+BAD_PAGE answers HTTP 404, discloses nothing                          PASS
+BAD_PAGE media locator GET / HEAD 404, no bytes                       PASS
+ZONE page | theme | platform | generated  GET/HEAD 200               PASS (4/4)
+ZONE page | theme | platform | generated  ignores non-video Range    PASS (4/4)
+generated ref integrity matches the exact generated bytes             PASS
+FOUR_ZONE_HTTP=4/4                                                   PASS
+VIDEO wo052-native-mp4  GET/HEAD 200 video/mp4 exact bytes           PASS
+VIDEO wo052-native-mp4  206 bytes=0-3 | bytes=4- | bytes=-4          PASS
+VIDEO wo052-native-mp4  416 bytes=3-1 | -0 | 99999- | multi-range     PASS
+VIDEO wo052-native-mp4  If-Range ignored, ranged HEAD stays full     PASS
+VIDEO wo053-native-webm GET/HEAD 200 video/webm exact bytes          PASS
+VIDEO wo053-native-webm 206 / 416 / If-Range / ranged HEAD           PASS
+CAPTIONS mp4 + webm  text/vtt exact WEBVTT bytes with one cue        PASS
+POSTER   mp4 + webm  image/png exact bytes                            PASS
+OCCURRENCE video/captions/poster distinct per section                PASS
+<video controls, no autoplay, own source + track + poster>           PASS
+NATIVE_VIDEO_HTTP=MP4+WEBM+VTT+POSTER                                PASS
+unknown-module Page 404, wrong-locale Page 404                       PASS
+wrong-locale / wrong-occurrence / encoded-traversal locators 404     PASS
+unauthorised Page locator with Range 404, no bytes                   PASS
+verify-u04-22-module-consent: 227 passed, 0 failed
 ```
 
-Fixture residue afterwards: **0** `wo052-*` files; working tree clean.
+Observed transport facts: every response carries the exact asset MIME, `x-content-type-options: nosniff`, `accept-ranges: bytes` only for video, body bytes identical to the task-owned file, and `content-range: bytes a-b/total` on every `206`. **`content-length` is absent** because the framework streams the body; the assertion accepts an absent length and still requires exact bytes, exact `content-range` and a body-less `HEAD`. That is a test-side fact, not a product claim of chunked-framing equivalence.
 
-**This proves the generated-zone discriminator is gone and the Page serves with all four zones plus native MP4, VTT and
-poster.** It does **not** prove Phase A, because the required assertions were not written.
+## 4. Local battery (Phase A bytes, full sequence)
 
-## 4. Gate status — what is and is not proven
+`u04-guard`, `pnpm test`, `pnpm test:architecture`, `pnpm typecheck`, `pnpm lint`, `pnpm test:bootstrap`,
+`verify-vercel-readiness` test + CLI, security-exception test + CLI, node26 floor, u03 fixture transaction, u03 trace test,
+u04 slice test + CLI, `verify-u03-published-http`, `pnpm build`, `verify-u03-trace --expect committed`, `pnpm test:http`,
+`verify-u03-http` — **all green**.
 
-| Requirement | Status |
-| --- | --- |
-| §2 producer repair | **PASS** (executed, above) |
-| Four-zone real HTTP GET/HEAD delivery (`FOUR_ZONE_HTTP=4/4`) | **UNVERIFIED** — gate not implemented |
-| MP4 GET/HEAD/`206`/`416`, VTT, poster transport | **UNVERIFIED** — gate not implemented |
-| Security/rights refusal matrix (unknown zone, missing digest, traversal, symlink escape, wrong MIME) | **UNVERIFIED** — gate not implemented |
-| T02 hermetic mutations (including the absent-integrity argument bug) | **UNVERIFIED** — test file not edited |
-| Sixteen Chromium viewport × colour-scheme × motion cases | **UNVERIFIED** — not implemented |
-| `pnpm test`, `test:architecture`, `typecheck`, `lint`, `test:bootstrap`, remaining deployment gates | **UNVERIFIED** — not executed in this run |
-| Phase B | **UNVERIFIED** — no work performed |
+Two honest notes: the first slice CLI attempt failed only because `PLAYWRIGHT_BROWSERS_PATH` was unset
+(`chromium_headless_shell` not at the default per-user path); re-run with the repository-local browsers it reported
+**464 passed, 0 failed**. The final `pnpm build` ran on the restored committed declarations, after every fixture
+restoration, so the retained U01/U03 `/en` 404 checks used the genuine unpublished baseline.
 
-No report prose here claims any unexecuted gate passed.
+Security posture is unchanged: 0 waiver entries, 0 raw HIGH/critical, clean production audit, one package, lockfile
+byte-identity. The `picomatch ≤ 4.0.7` advisory is disclosed, not repaired — no published fix exists.
 
-## 5. Why the run stopped
+## 5. Fixture restoration
 
-Writing the Phase A HTTP/refusal gates, the T02 mutation guard and the sixteen-case matrix, then executing the battery, was not
-possible within this run. Committing the repair alone would have misrepresented it as a Phase A checkpoint and would have
-shipped code whose required gates do not exist, which the order forbids. Stopping before any commit is the only truthful option
-that satisfies both "do not commit unverified code" and "do not discard a completed verified phase" — there was no completed
-phase to discard.
+The existing `prepareUnoU03FixtureTransaction` protocol installed and restored every declaration; the runner's
+`finally` removed each `wo052-*`/`wo053-*` media file through the `createdMedia` ledger after digest verification.
+After the run: no `wo052-*` or `wo053-*` file exists outside ignored `.next` build output, both pinned declarations hash
+to `ba232d46…e3f0` and `4f656c93…9a0c`, and no declaration carries a staged change.
 
-## 6. Preserved work and clean handback
+## 6. Phase B — not executed
 
-The verified, unpublished edit is preserved byte-exactly under the authorised recovery protocol:
+`BROWSER_MATRIX=16/16` was **not** implemented and **not** run. No 16-case viewport × colour-scheme × motion matrix,
+no per-case keyboard/focus/modal/tab/carousel/consent assertions, and no Phase B guard mutations exist. The retained
+eight provider × mouse/keyboard consent checks do still pass inside the 227-check run; they are not a substitute for
+the matrix. Nothing in this report claims Phase B.
 
-| Field | Value |
-| --- | --- |
-| Path | `scripts/verify-u04-22-module-consent.mjs` |
-| Recovery copy | `.temp/uno-u04-052/recovery/verify-u04-22-module-consent.mjs.bin` (opaque, ignored, never discoverable as a test) |
-| Bytes / SHA-256 | **36,900** / `5e26d25c3ba1dcf60cfed9292219fa8d1e8712859e896ead098cae21bd710be4` |
-| Manifest | `.temp/uno-u04-052/recovery/manifest.json` (digest, owner, path, verification command) |
-| Readback | verified equal to the digest above |
+## 7. Published heads and hosted CI
 
-The tracked file was then restored with the exact-path form permitted for verified Agent-owned work
-(`git restore --worktree -- scripts/verify-u04-22-module-consent.mjs`) — never a broad reset, clean or fixture rollback. No
-declaration, module count, provider, workflow, governance, dependency or waiver file was touched. Exactly 22 module IDs and
-four external providers remain.
+| SHA | Content | Uno Bootstrap Verify | Verify U01 baseline |
+| --- | --- | --- | --- |
+| `fd18353` | starting head (WO-052 report) | — | — |
+| `c84c57d286055830bdb80938ac3ded302dfdb4bd` | **Phase A product** | `44705814372` ubuntu ✅ windows ✅ | `44705814666` ubuntu ✅ windows ✅ |
+| report head | this report only | see handback | see handback |
 
-## 7. Handback state
+No bypass, muted gate or `continue-on-error` exists in either workflow. Phase A was measured on both `ubuntu-24.04` and
+`windows-2025` at its exact SHA.
 
-- Product commits/pushes this order: **0** of 2 authorised.
-- Report commit: this report only (separate, non-force, report-only).
-- One checkout, one worktree, one `main`, one `origin`; index empty; `git status --porcelain=v1 --untracked-files=all` zero entries.
-- Hosted CI at `7ca2d1e` remains the last verified state (WO-050 report head); **no CI result is claimed for any new head**, because no product head was created.
+## 8. Remaining and handback
 
-## 8. Next order, mechanical
+- **Phase B**: the sixteen-case matrix in `consentPhase(base)` plus its guard mutations.
+- The remaining 17 of 17 family compositions and the installation shell are untouched.
+- Exactly 22 module IDs and four governed providers remain; no 23rd module, map, geolocation, BLE, Wi-Fi or fleet surface.
+- One checkout, one worktree, one `main`, one `origin`; working tree clean at handback.
 
-1. Restore the recovery copy over the tracked path (digest above) and re-run the gate to reconfirm `161 passed`.
-2. Append to the same runner: `FOUR_ZONE_HTTP=4/4` GET/HEAD, MP4/WebM `206`/`416`/range-ignored, VTT/poster transport and the
-   refusal matrix; add the T02 mutations; add the sixteen browser cases with `caseId` + measured output.
-3. Execute the battery, then Phase A product commit → both-host CI → Phase B → commit → CI → report.
-
-**Nothing in this report grants or claims stage closure, merge, tag, release, manual deployment, provider or secret change.
-U04 remains OPEN; the remaining 17/17 family compositions and installation shell are untouched.**
+**No stage closure, merge, tag, release, manual deployment, provider or secret change is granted or claimed. U04 remains
+OPEN.**
