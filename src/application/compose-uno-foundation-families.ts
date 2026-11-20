@@ -1,10 +1,10 @@
 /**
  * Foundation Uno — the bounded Foundation→Uno family composition adapter (`UNO-WO-057 / R01`, extended by
- * `UNO-WO-058 / R01`, `UNO-WO-059 / R01`, `UNO-WO-060 / R01`, `UNO-WO-061 / R01`, `UNO-WO-062 / R01` and
- * `UNO-WO-063 / R01`, U04).
+ * `UNO-WO-058 / R01`, `UNO-WO-059 / R01`, `UNO-WO-060 / R01`, `UNO-WO-061 / R01`, `UNO-WO-062 / R01`,
+ * `UNO-WO-063 / R01` and `UNO-WO-064 / R01`, U04).
  *
  * WHAT THIS IS. One pure, inward application function that translates a deliberately small **plain-text subset** of
- * fifteen Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
+ * sixteen Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
  * donor source shape and Uno's own validated document: the caller supplies untrusted donor data, this module either
  * returns one accepted, deep-frozen `UnoPageDocument` or one closed refusal, and it never returns a partial Page.
  *
@@ -15,7 +15,7 @@
  *
  * WHAT IT IS NOT. It does not read a file, a manifest, a host, an environment variable or a provider; it publishes
  * nothing, routes nothing, renders nothing and owns no locale, Site, visibility or delivery authority. It implements
- * **fifteen** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
+ * **sixteen** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
  * media converter, and it is not the seventeen family parity work: no full `FAMILY_PARITY` result may be derived
  * from it. In particular `steps` reproduces the donor's ordered sequence and optional body as plain text, but Uno's
  * timeline title is a `<p>` where the donor step title was an `<h3>`, so the donor heading outline is deliberately
@@ -33,7 +33,11 @@
  * when the caller supplies an explicit donor-source-to-owned-asset binding: the donor `src` stays an opaque migration
  * identity, the composed asset is the separately authored owned ref, the donor decorative form, heading/lede/position/
  * surface options and any remote URL source are outside the subset, and a donor Markdown caption becomes plain text in
- * Uno's `figcaption`, so `media` is not full parity either.
+ * Uno's `figcaption`, so `media` is not full parity either. `gallery` composes **only** an authored grid of two to eight
+ * descriptive images with an explicit authored `columns` of 2, 3 or 4 and the same kind of explicit owned-asset binding:
+ * the donor's native `<ul>`/`<li>` grouping becomes Uno's `<div>` of `<figure>` children, the donor's optional heading,
+ * lede, surface, decorative images and Markdown captions are outside the subset, and the donor's implicit column default
+ * is never borrowed, so `gallery` is not full parity.
  *
  * PROVENANCE. Original **Uno-owned** implementation, adaptation class **NEW / COMPOSE (plain-text subset)**. Concepts
  * — never copied source, CSS, components or assets — are adapted from `provelopment/provelopment-foundation` at
@@ -67,7 +71,7 @@ import {
   type UnoOwnedAssetRef,
 } from "../core/assets/uno-owned-media";
 
-/** The fifteen donor source families this bounded adapter accepts, in the order the ledger documents them. */
+/** The sixteen donor source families this bounded adapter accepts, in the order the ledger documents them. */
 export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "prose",
   "callout",
@@ -84,6 +88,7 @@ export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "features",
   "actions",
   "media",
+  "gallery",
 ] as const);
 
 /** One accepted donor family name. */
@@ -93,7 +98,7 @@ export type UnoFoundationSubsetFamily = (typeof UNO_FOUNDATION_SUBSET_FAMILIES)[
  * The closed refusal vocabulary.
  *
  * `unsafe-source` — the input is not plain readable data (hostile object, accessor, cycle, sparse array, oversize).
- * `unsupported-family` — a real donor family outside these fifteen, never silently dropped.
+ * `unsupported-family` — a real donor family outside these sixteen, never silently dropped.
  * `unsupported-feature` — a supported family carrying an out-of-subset field or Markdown this subset cannot render.
  * `target-refused` — the composed candidate is not an acceptable Uno Page; no partial document is ever returned.
  */
@@ -391,7 +396,8 @@ interface CandidateSection {
     | "layout.stack"
     | "content.heading"
     | "content.actions"
-    | "media.image";
+    | "media.image"
+    | "media.gallery";
   readonly props: Record<string, unknown>;
   /**
    * Nested children of a child-bearing module (`interaction.accordion`, `layout.grid`, `layout.stack`).
@@ -748,6 +754,43 @@ function composeSection(section: PlainValue, index: number, media: MediaBindingC
         module: "media.image",
         props: { asset: owned, alt, ...(caption === undefined ? {} : { caption }) },
       };
+    }
+    case "gallery": {
+      // The donor also accepts optional heading/lede/surface, decorative images, Markdown captions and an implicit
+      // column default. This subset composes an explicitly columned grid of described images only.
+      requireExactKeys(record, ["type", "columns", "items"], []);
+      const columns = record["columns"];
+      if (columns !== 2 && columns !== 3 && columns !== 4) refuseTarget();
+      const rawItems = record["items"];
+      if (!Array.isArray(rawItems)) refuseUnsupportedFeature();
+      // Narrower than Uno's own 2..12 gallery bound: at most the binder's eight unique source identities.
+      if (rawItems.length < 2 || rawItems.length > 8) refuseTarget();
+      const items: Record<string, unknown>[] = [];
+      for (const rawItem of rawItems) {
+        if (rawItem === null || typeof rawItem !== "object" || Array.isArray(rawItem)) {
+          refuseUnsupportedFeature();
+        }
+        const entry = rawItem as PlainRecord;
+        requireExactKeys(entry, ["image"], ["caption"]);
+        const rawImage = entry["image"];
+        if (rawImage === null || typeof rawImage !== "object" || Array.isArray(rawImage)) {
+          refuseUnsupportedFeature();
+        }
+        const image = rawImage as PlainRecord;
+        requireExactKeys(image, ["src", "alt"], []);
+        const source = readMediaSourceIdentity(image["src"]);
+        if (source === null) refuseUnsupportedFeature();
+        const alt = readNewFamilyText(image["alt"]);
+        // A donor decorative image is a different semantic and is not composed as a described grid item.
+        if (alt.trim().length === 0) refuseTarget();
+        const caption = ownsKey(entry, "caption") ? readNewFamilyText(entry["caption"]) : undefined;
+        if (caption !== undefined && caption.trim().length === 0) refuseTarget();
+        const owned = media.lookup.get(source);
+        if (owned === undefined) refuseUnsupportedFeature();
+        media.usedSources.add(source);
+        items.push({ asset: owned, alt, ...(caption === undefined ? {} : { caption }) });
+      }
+      return { id, module: "media.gallery", props: { columns, items } };
     }
     default:
       throw new SourceRefusal("family:unsupported-family");

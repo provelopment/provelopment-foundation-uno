@@ -56,8 +56,8 @@ function expectRefusal(input: unknown, reason: string, bindings?: unknown): void
   expect(Object.prototype.hasOwnProperty.call(outcome, "document")).toBe(false);
 }
 
-describe("composeUnoFoundationSubset — fifteen bounded source shapes", () => {
-  it("declares exactly the fifteen bounded families and leaves the 22-module registry untouched", () => {
+describe("composeUnoFoundationSubset — sixteen bounded source shapes", () => {
+  it("declares exactly the sixteen bounded families and leaves the 22-module registry untouched", () => {
     expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([
       "prose",
       "callout",
@@ -74,6 +74,7 @@ describe("composeUnoFoundationSubset — fifteen bounded source shapes", () => {
       "features",
       "actions",
       "media",
+      "gallery",
     ]);
     expect(Object.isFrozen(UNO_FOUNDATION_SUBSET_FAMILIES)).toBe(true);
     expect(UNO_RENDERABLE_MODULES.length).toBe(22);
@@ -331,11 +332,10 @@ describe("composeUnoFoundationSubset — envelope, family and feature refusal", 
     expectRefusal(oversized, "family:target-refused");
   });
 
-  it("refuses every donor family outside the fifteen, never degrading it to prose", () => {
-    for (const type of ["gallery", "contactForm"]) {
-      expectRefusal(envelope({ type }), "family:unsupported-family");
-    }
-    // `media` is composed now, so no unsupported-family refusal may be claimed for it.
+  it("refuses every donor family outside the sixteen, never degrading it to prose", () => {
+    // `contactForm` is the only donor family left entirely unimplemented.
+    expectRefusal(envelope({ type: "contactForm" }), "family:unsupported-family");
+    // `media` and `gallery` are composed now, so no unsupported-family refusal may be claimed for them.
     expectRefusal(envelope({ type: "heading" }), "family:unsupported-family");
     expectRefusal(envelope("prose"), "family:unsafe-source");
     expectRefusal(envelope({ body: "No type." }), "family:unsupported-feature");
@@ -738,8 +738,8 @@ const DONOR_17 = [
   "divider",
   "contactForm",
 ] as const;
-/** The fifteen bounded subsets this adapter composes, in adapter order. */
-const MAPPED_15 = [
+/** The sixteen bounded subsets this adapter composes, in adapter order. */
+const MAPPED_16 = [
   "prose",
   "callout",
   "table",
@@ -755,6 +755,7 @@ const MAPPED_15 = [
   "features",
   "actions",
   "media",
+  "gallery",
 ] as const;
 
 describe("composeUnoFoundationSubset — steps and quote React markup", () => {
@@ -1855,6 +1856,33 @@ function portraitBinding(): Record<string, unknown> {
   return { images: [{ source: "/assets/portrait.png", owned: { zone: "page", path: "images/portrait.png" } }] };
 }
 
+/** One supported donor gallery section: two ordered described images with an explicit authored column count. */
+const GALLERY_SECTION = {
+  type: "gallery",
+  columns: 3,
+  items: [
+    { image: { src: "/assets/portrait.png", alt: "Portrait by the author" }, caption: "First caption" },
+    { image: { src: "/assets/scene.webp", alt: "Described scene" } },
+  ],
+};
+
+/** The fifteen-section fixture plus the new bound `gallery` family at source index 15. */
+function sixteenSectionSource(): Record<string, unknown> {
+  const source = fifteenSectionSource();
+  const sections = source["sections"] as readonly unknown[];
+  return { ...source, sections: [...sections, GALLERY_SECTION] };
+}
+
+/** One valid migration binding covering every image the sixteen-section fixture consumes. */
+function galleryBinding(): Record<string, unknown> {
+  return {
+    images: [
+      { source: "/assets/portrait.png", owned: { zone: "page", path: "images/portrait.png" } },
+      { source: "/assets/scene.webp", owned: { zone: "theme", path: "gallery/scene.webp" } },
+    ],
+  };
+}
+
 describe("composeUnoFoundationSubset — explicitly bound media", () => {
   it("composes fifteen nodes and keeps the first fourteen byte-identical", () => {
     const fourteen = composed(fourteenSectionSource());
@@ -2224,10 +2252,10 @@ describe("composeUnoFoundationSubset — hostile media source", () => {
 });
 
 describe("composeUnoFoundationSubset — canonical donor inventory", () => {
-  it("maps exactly fifteen of the donor's seventeen families and leaves two unimplemented", () => {
-    const left = DONOR_17.filter((name) => !(MAPPED_15 as readonly string[]).includes(name));
-    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([...MAPPED_15]);
-    expect(left).toEqual(["gallery", "contactForm"]);
+  it("maps exactly sixteen of the donor's seventeen families and leaves one unimplemented", () => {
+    const left = DONOR_17.filter((name) => !(MAPPED_16 as readonly string[]).includes(name));
+    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([...MAPPED_16]);
+    expect(left).toEqual(["contactForm"]);
   });
 
   it("keeps the committed ledger identical to the canonical inventory", () => {
@@ -2235,24 +2263,30 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
       fileURLToPath(new URL("../../.documents/Architecture/u04-family-parity.md", import.meta.url)),
       "utf8",
     );
-    const unimplemented = "**UNIMPLEMENTED (2):** `gallery`, `contactForm`.";
+    const unimplemented = "**UNIMPLEMENTED (1):** `contactForm`.";
     expect(ledger.split(unimplemented).length - 1).toBe(1);
     expect(ledger).not.toContain("UNIMPLEMENTED (10)");
     expect(ledger).not.toContain("UNIMPLEMENTED (8)");
     expect(ledger).not.toContain("UNIMPLEMENTED (6)");
     expect(ledger).not.toContain("UNIMPLEMENTED (4)");
     expect(ledger).not.toContain("UNIMPLEMENTED (3)");
+    expect(ledger).not.toContain("UNIMPLEMENTED (2)");
     expect(ledger).not.toContain("These thirteen mappings");
+    expect(ledger).not.toContain("These fifteen mappings");
     expect(ledger).not.toContain("seven bounded");
     expect(ledger).not.toContain("nine bounded");
     expect(ledger).not.toContain("eleven bounded");
     expect(ledger).not.toContain("thirteen bounded");
     expect(ledger).not.toContain("fourteen bounded");
     expect(ledger).not.toContain("fourteen composed");
+    expect(ledger).not.toContain("fifteen bounded");
+    expect(ledger).not.toContain("fifteen composed");
     expect(ledger).not.toContain("four donor families");
     expect(ledger).not.toContain("three donor families");
+    expect(ledger).not.toContain("two donor families");
+    expect(ledger).not.toContain("Two donor families");
     expect(ledger).not.toContain("UNIMPLEMENTED**: `heading`");
-    expect(ledger).not.toMatch(/FAMILY_PARITY=(17\/17|15\/17|14\/17|13\/17|11\/17|9\/17|7\/17)/u);
+    expect(ledger).not.toMatch(/FAMILY_PARITY=(17\/17|16\/17|15\/17|14\/17|13\/17|11\/17|9\/17|7\/17)/u);
     for (const family of [
       "hero",
       "stats",
@@ -2264,17 +2298,522 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
       "features",
       "actions",
       "media",
+      "gallery",
     ]) {
       expect(ledger).toContain(`| \`${family}\` |`);
     }
-    // The media row names both donor and local Uno evidence and its own disposition.
+    // Each newest row names its own disposition, donor and local Uno evidence.
     expect(ledger).toContain("`COMPOSE (explicit owned-image binding subset)`");
+    expect(ledger).toContain("`COMPOSE (explicit owned-gallery binding subset)`");
     expect(ledger).toContain("f988a0e5");
     expect(ledger).toContain("e3f3a12e");
-    expect(ledger).toContain("These fifteen mappings");
-    expect(ledger).toContain("fifteen bounded");
+    expect(ledger).toContain("2d968300");
+    expect(ledger).toContain("cde15a6b");
+    expect(ledger).toContain("These sixteen mappings");
+    expect(ledger).toContain("sixteen bounded");
     expect(ledger).toContain("zero of seventeen full semantic parity");
     expect(ledger).toContain("Deliberately absent donor design (media and its binding)");
+    expect(ledger).toContain("Deliberately absent donor design (gallery)");
     expect(ledger).toContain("Deliberately absent donor design (actions)");
+  });
+});
+
+describe("composeUnoFoundationSubset — explicitly bound gallery", () => {
+  it("composes sixteen nodes and keeps the first fifteen byte-identical", () => {
+    const fifteen = composed(fifteenSectionSource(), portraitBinding());
+    const sixteen = composed(sixteenSectionSource(), galleryBinding());
+    expect(sixteen.sections.map((section) => section.id)).toEqual([
+      "family-0-prose",
+      "family-1-callout",
+      "family-2-table",
+      "family-3-list",
+      "family-4-divider",
+      "family-5-hero",
+      "family-6-stats",
+      "family-7-steps",
+      "family-8-quote",
+      "family-9-faq",
+      "family-10-columns",
+      "family-11-cards",
+      "family-12-features",
+      "family-13-actions",
+      "family-14-media",
+      "family-15-gallery",
+    ]);
+    expect(JSON.stringify(sixteen.sections.slice(0, 15))).toBe(JSON.stringify(fifteen.sections));
+    expect(sixteen.sections[15]).toEqual({
+      id: "family-15-gallery",
+      module: "media.gallery",
+      props: {
+        columns: 3,
+        items: [
+          {
+            asset: { zone: "page", path: "images/portrait.png" },
+            alt: "Portrait by the author",
+            caption: "First caption",
+          },
+          { asset: { zone: "theme", path: "gallery/scene.webp" }, alt: "Described scene" },
+        ],
+      },
+    });
+    expect(JSON.stringify(sixteen)).not.toContain("/assets/");
+    expect(JSON.stringify(sixteen)).not.toContain("decorative");
+  });
+
+  it("composes a gallery alone at its own index with two exact owned refs and no invented fields", () => {
+    const document = composed(envelope(GALLERY_SECTION), galleryBinding());
+    expect(document.sections[0]).toEqual({
+      id: "family-0-gallery",
+      module: "media.gallery",
+      props: {
+        columns: 3,
+        items: [
+          {
+            asset: { zone: "page", path: "images/portrait.png" },
+            alt: "Portrait by the author",
+            caption: "First caption",
+          },
+          { asset: { zone: "theme", path: "gallery/scene.webp" }, alt: "Described scene" },
+        ],
+      },
+    });
+    // The item without an authored caption carries no own caption key at all.
+    const props = document.sections[0]?.props as { readonly items: readonly Record<string, unknown>[] };
+    expect(Object.prototype.hasOwnProperty.call(props.items[1], "caption")).toBe(false);
+  });
+
+  it("keeps authored item order when the binding order is reversed", () => {
+    const reversed = { images: [...(galleryBinding()["images"] as readonly unknown[])].reverse() };
+    const document = composed(envelope(GALLERY_SECTION), reversed);
+    const props = document.sections[0]?.props as { readonly items: readonly Record<string, unknown>[] };
+    expect(props.items.map((item) => item["alt"])).toEqual(["Portrait by the author", "Described scene"]);
+    expect(props.items.map((item) => item["asset"])).toEqual([
+      { zone: "page", path: "images/portrait.png" },
+      { zone: "theme", path: "gallery/scene.webp" },
+    ]);
+  });
+});
+
+describe("composeUnoFoundationSubset — gallery binding reuse", () => {
+  it("uses one binding for a repeated source while distinct sources still need their own", () => {
+    const repeated = composed(
+      envelope({
+        type: "gallery",
+        columns: 2,
+        items: [
+          { image: { src: "/assets/portrait.png", alt: "First view" } },
+          { image: { src: "/assets/portrait.png", alt: "Second view" } },
+        ],
+      }),
+      portraitBinding(),
+    );
+    const items = (repeated.sections[0]?.props as { readonly items: readonly Record<string, unknown>[] }).items;
+    expect(items.length).toBe(2);
+    expect(items[0]?.["asset"]).toEqual(items[1]?.["asset"]);
+    expectRefusal(
+      envelope({
+        type: "gallery",
+        columns: 2,
+        items: [
+          { image: { src: "/assets/portrait.png", alt: "First view" } },
+          { image: { src: "/assets/scene.webp", alt: "Second view" } },
+        ],
+      }),
+      "family:unsupported-feature",
+      portraitBinding(),
+    );
+  });
+
+  it("reuses one binding across a media section and a gallery item and refuses unused authority", () => {
+    const shared = composed(
+      {
+        version: 1,
+        title: "Shared source",
+        sections: [
+          FIFTEEN_MEDIA_SECTION,
+          {
+            type: "gallery",
+            columns: 2,
+            items: [
+              { image: { src: "/assets/portrait.png", alt: "First view" } },
+              { image: { src: "/assets/scene.webp", alt: "Second view" } },
+            ],
+          },
+        ],
+      },
+      galleryBinding(),
+    );
+    expect(shared.sections.map((section) => section.id)).toEqual(["family-0-media", "family-1-gallery"]);
+    const spare = {
+      images: [
+        ...(galleryBinding()["images"] as readonly unknown[]),
+        { source: "/assets/spare.png", owned: { zone: "page", path: "images/spare.png" } },
+      ],
+    };
+    expectRefusal(envelope(GALLERY_SECTION), "family:unsupported-feature", spare);
+    // A binder for a Page that consumed no image is unused authority too.
+    expectRefusal(envelope({ type: "prose", body: "No images." }), "family:unsupported-feature", galleryBinding());
+  });
+});
+
+describe("composeUnoFoundationSubset — gallery bounds and immutability", () => {
+  it("accepts exactly two through eight items and all three column literals", () => {
+    const item = (index: number): Record<string, unknown> => ({
+      image: { src: "/assets/portrait.png", alt: `View ${index}` },
+    });
+    for (const columns of [2, 3, 4]) {
+      const document = composed(
+        envelope({ type: "gallery", columns, items: [item(0), item(1)] }),
+        portraitBinding(),
+      );
+      expect((document.sections[0]?.props as { readonly columns: number }).columns).toBe(columns);
+    }
+    const eight = composed(
+      envelope({ type: "gallery", columns: 4, items: Array.from({ length: 8 }, (_unused, index) => item(index)) }),
+      portraitBinding(),
+    );
+    expect((eight.sections[0]?.props as { readonly items: readonly unknown[] }).items.length).toBe(8);
+    expectRefusal(
+      envelope({ type: "gallery", columns: 3, items: Array.from({ length: 9 }, (_unused, index) => item(index)) }),
+      "family:target-refused",
+      portraitBinding(),
+    );
+  });
+
+  it("freezes the gallery node and its parts, leaves caller data unchanged and re-accepts JSON", () => {
+    const source = { version: 1, title: "Gallery fixture", sections: [GALLERY_SECTION] };
+    const binder = galleryBinding();
+    const before = JSON.stringify([source, binder]);
+    const document = composed(source, binder);
+    expect(JSON.stringify([source, binder])).toBe(before);
+    expect(Object.isFrozen(document)).toBe(true);
+    const node = document.sections[0];
+    expect(node === undefined ? false : Object.isFrozen(node)).toBe(true);
+    if (node?.module !== "media.gallery") return;
+    expect(Object.isFrozen(node.props)).toBe(true);
+    expect(Object.isFrozen(node.props.items)).toBe(true);
+    expect(Object.isFrozen(node.props.items[0])).toBe(true);
+    expect(Object.isFrozen(node.props.items[0]?.asset)).toBe(true);
+    expect(() => readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown)).not.toThrow();
+    expect(() => readUnoPageDocument(JSON.stringify(document))).not.toThrow();
+  });
+});
+
+describe("composeUnoFoundationSubset — gallery React markup", () => {
+  it("renders one Uno gallery div with exactly two figures, two images and one authored caption", () => {
+    const document = composed(envelope(GALLERY_SECTION), galleryBinding());
+    const media: UnoPageMedia = new Map([
+      [
+        "family-0-gallery",
+        {
+          items: [
+            { src: "/uno-media/en-001/example/0", type: "image/png", width: 2, height: 2 },
+            { src: "/uno-media/en-001/example/1", type: "image/webp", width: 2, height: 2 },
+          ],
+        },
+      ],
+    ]);
+    const html = render(document, media);
+    expect(html).toContain('<div class="uno-json-gallery" data-uno-columns="3" id="family-0-gallery">');
+    const start = html.indexOf('<div class="uno-json-gallery"');
+    const region = html.slice(start);
+    expect((region.match(/<figure class="uno-json-media-item">/gu) ?? []).length).toBe(2);
+    expect((region.match(/<img /gu) ?? []).length).toBe(2);
+    expect(region).toContain('alt="Portrait by the author"');
+    expect(region).toContain('alt="Described scene"');
+    expect(region).toContain("/uno-media/en-001/example/0");
+    expect(region).toContain("/uno-media/en-001/example/1");
+    expect((region.match(/<figcaption class="uno-json-media-caption">/gu) ?? []).length).toBe(1);
+    expect(region).toContain('<figcaption class="uno-json-media-caption">First caption</figcaption>');
+    // Uno renders a div of figures; the donor's native list wrapper is deliberately different.
+    expect(region).not.toContain("<ul");
+    expect(region).not.toContain("<li");
+    expect(region).not.toContain("carousel");
+    expect(html).not.toContain("/assets/portrait.png");
+    expect(html).not.toContain("/assets/scene.webp");
+  });
+
+  it("emits no gallery, figure or image without a matching server projection", () => {
+    const document = composed(envelope(GALLERY_SECTION), galleryBinding());
+    const withoutProjection = render(document);
+    expect(withoutProjection).not.toContain("uno-json-gallery");
+    expect(withoutProjection).not.toContain("<figure");
+    expect(withoutProjection).not.toContain("<img");
+    expect(withoutProjection).not.toContain("/assets/");
+
+    const mismatched: UnoPageMedia = new Map([
+      ["family-0-gallery", { items: [{ src: "/uno-media/en-001/example/0", type: "image/png", width: 2, height: 2 }] }],
+    ]);
+    const html = render(document, mismatched);
+    expect(html).not.toContain("uno-json-gallery");
+    expect(html).not.toContain("<figure");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("First caption");
+  });
+});
+
+
+describe("composeUnoFoundationSubset — gallery donor-shape refusals", () => {
+  const gallery = (overrides: Record<string, unknown>): Record<string, unknown> => ({
+    type: "gallery",
+    columns: 3,
+    items: [
+      { image: { src: "/assets/portrait.png", alt: "First view" } },
+      { image: { src: "/assets/scene.webp", alt: "Second view" } },
+    ],
+    ...overrides,
+  });
+
+  it("refuses donor gallery fields outside the described-grid subset", () => {
+    const cases: unknown[] = [
+      gallery({ heading: "Title" }),
+      gallery({ lede: "Lede" }),
+      gallery({ surface: "raised" }),
+      gallery({ align: "center" }),
+      gallery({ position: "start" }),
+      gallery({ links: [] }),
+      gallery({ visibility: "public" }),
+      gallery({ style: "color:red" }),
+      gallery({ items: "nope" }),
+      { type: "gallery", columns: 3 },
+      {
+        type: "gallery",
+        columns: 3,
+        items: [{ image: { src: "/assets/portrait.png", alt: "A" }, href: "/elsewhere" }, { image: { src: "/assets/portrait.png", alt: "B" } }],
+      },
+      {
+        type: "gallery",
+        columns: 3,
+        items: [{ image: { src: "/assets/portrait.png", alt: "A" }, meta: "Meta" }, { image: { src: "/assets/portrait.png", alt: "B" } }],
+      },
+      {
+        type: "gallery",
+        columns: 3,
+        items: [{ image: { src: "/assets/portrait.png", alt: "A", decorative: true } }, { image: { src: "/assets/portrait.png", alt: "B" } }],
+      },
+      {
+        type: "gallery",
+        columns: 3,
+        items: [{ image: { src: "/assets/portrait.png", alt: "A", width: 2 } }, { image: { src: "/assets/portrait.png", alt: "B" } }],
+      },
+      {
+        type: "gallery",
+        columns: 3,
+        items: [{ image: "portrait" }, { image: { src: "/assets/portrait.png", alt: "B" } }],
+      },
+      {
+        type: "gallery",
+        columns: 3,
+        items: [{ image: { src: "/assets/portrait.png", alt: 5 } }, { image: { src: "/assets/portrait.png", alt: "B" } }],
+      },
+      {
+        type: "gallery",
+        columns: 3,
+        items: [{ image: { src: "/assets/portrait.png", alt: "**bold**" } }, { image: { src: "/assets/portrait.png", alt: "B" } }],
+      },
+      {
+        type: "gallery",
+        columns: 3,
+        items: [{ image: { src: "/assets/portrait.png", alt: "A" }, caption: "`code`" }, { image: { src: "/assets/portrait.png", alt: "B" } }],
+      },
+    ];
+    for (const section of cases) {
+      expectRefusal(envelope(section), "family:unsupported-feature", galleryBinding());
+    }
+  });
+
+  it("refuses gallery source identities outside the literal raster identity", () => {
+    for (const src of [
+      "https://example.org/portrait.png",
+      "//example.org/portrait.png",
+      "/assets/../scene.webp",
+      "/assets/%2e%2e/scene.webp",
+      "/assets/scene.png?x=1",
+      "/assets/scene.png#frag",
+      "/assets/scene.svg",
+      "/assets/scene.PNG",
+      "/assets/images\\scene.png",
+      "/assets/con.png",
+    ]) {
+      const source = {
+        type: "gallery",
+        columns: 2,
+        items: [{ image: { src, alt: "Described" } }, { image: { src, alt: "Second" } }],
+      };
+      expectRefusal(envelope(source), "family:unsupported-feature", {
+        images: [{ source: src, owned: { zone: "page", path: "images/x.png" } }],
+      });
+    }
+  });
+});
+
+
+describe("composeUnoFoundationSubset — gallery target refusals", () => {
+  const item = (src: string, alt: string, caption?: string): Record<string, unknown> => ({
+    image: { src, alt },
+    ...(caption === undefined ? {} : { caption }),
+  });
+  const source = (overrides: Record<string, unknown>): Record<string, unknown> => ({
+    type: "gallery",
+    columns: 3,
+    items: [item("/assets/portrait.png", "First view"), item("/assets/scene.webp", "Second view")],
+    ...overrides,
+  });
+
+  it("refuses authored columns, item counts and text values the Uno target cannot accept", () => {
+    for (const columns of [0, 1, 5, "2", 2.5, null, true]) {
+      expectRefusal(envelope(source({ columns })), "family:target-refused", galleryBinding());
+    }
+    expectRefusal(envelope(source({ items: [] })), "family:target-refused", galleryBinding());
+    expectRefusal(
+      envelope(source({ items: [item("/assets/portrait.png", "Only one")] })),
+      "family:target-refused",
+      galleryBinding(),
+    );
+    expectRefusal(
+      envelope(source({ items: Array.from({ length: 9 }, () => item("/assets/portrait.png", "Repeated")) })),
+      "family:target-refused",
+      portraitBinding(),
+    );
+    for (const alt of ["", "   ", "t".repeat(321), "<script>alert(1)</script>"]) {
+      expectRefusal(
+        envelope({ type: "gallery", columns: 2, items: [item("/assets/portrait.png", alt), item("/assets/portrait.png", "Second")] }),
+        "family:target-refused",
+        portraitBinding(),
+      );
+    }
+    for (const caption of ["", "   ", "c".repeat(321), "<script>alert(1)</script>"]) {
+      expectRefusal(
+        envelope({
+          type: "gallery",
+          columns: 2,
+          items: [item("/assets/portrait.png", "First", caption), item("/assets/portrait.png", "Second")],
+        }),
+        "family:target-refused",
+        portraitBinding(),
+      );
+    }
+  });
+
+  it("refuses invalid owned targets and oversized candidates through the same policy", () => {
+    for (const owned of [
+      { zone: "unknown", path: "images/x.png" },
+      { zone: "page", path: "../x.png" },
+      { zone: "page", path: "images/x.svg" },
+      { zone: "page", path: "images/x.mp4" },
+      { zone: "generated", path: "images/x.png" },
+      { zone: "page", path: "images/x.png", integrity: "a".repeat(64) },
+    ]) {
+      expectRefusal(
+        envelope(source({ items: [item("/assets/portrait.png", "First view"), item("/assets/portrait.png", "Second view")] })),
+        "family:target-refused",
+        { images: [{ source: "/assets/portrait.png", owned }] },
+      );
+    }
+    const bulky = {
+      version: 1,
+      title: "Oversized gallery fixture",
+      sections: [
+        { type: "features", columns: 2, items: Array.from({ length: 8 }, () => ({ title: "T", body: "b".repeat(4000) })) },
+        { type: "features", columns: 2, items: Array.from({ length: 8 }, () => ({ title: "T", body: "b".repeat(4000) })) },
+        source({ items: [item("/assets/portrait.png", "First view"), item("/assets/portrait.png", "Second view")] }),
+      ],
+    };
+    expectRefusal(bulky, "family:target-refused", portraitBinding());
+  });
+});
+
+
+describe("composeUnoFoundationSubset — hostile gallery source", () => {
+  it("refuses hostile gallery or binder accessors with zero getter invocations and no partial Page", () => {
+    let ran = 0;
+    const count = (): number => {
+      ran += 1;
+      return 0;
+    };
+    const hostileSrc: Record<string, unknown> = { alt: "Described" };
+    Object.defineProperty(hostileSrc, "src", {
+      enumerable: true,
+      get: () => {
+        count();
+        return "/assets/portrait.png";
+      },
+    });
+    const imageOutcome = composeUnoFoundationSubset(
+      envelope({
+        type: "gallery",
+        columns: 2,
+        items: [{ image: hostileSrc }, { image: { src: "/assets/portrait.png", alt: "Second" } }],
+      }),
+      portraitBinding(),
+    );
+    expect(imageOutcome.status).toBe("refused");
+    if (imageOutcome.status === "refused") expect(imageOutcome.reason).toBe("family:unsafe-source");
+    expect(Object.prototype.hasOwnProperty.call(imageOutcome, "document")).toBe(false);
+
+    const hostileAlt: Record<string, unknown> = { src: "/assets/portrait.png" };
+    Object.defineProperty(hostileAlt, "alt", {
+      enumerable: true,
+      get: () => {
+        count();
+        return "Described";
+      },
+    });
+    const altOutcome = composeUnoFoundationSubset(
+      envelope({
+        type: "gallery",
+        columns: 2,
+        items: [{ image: hostileAlt }, { image: { src: "/assets/portrait.png", alt: "Second" } }],
+      }),
+      portraitBinding(),
+    );
+    expect(altOutcome.status).toBe("refused");
+    if (altOutcome.status === "refused") expect(altOutcome.reason).toBe("family:unsafe-source");
+
+    const hostileItems: Record<string, unknown> = { type: "gallery", columns: 2 };
+    Object.defineProperty(hostileItems, "items", {
+      enumerable: true,
+      get: () => {
+        count();
+        return [];
+      },
+    });
+    const itemsOutcome = composeUnoFoundationSubset(envelope(hostileItems), portraitBinding());
+    expect(itemsOutcome.status).toBe("refused");
+    if (itemsOutcome.status === "refused") expect(itemsOutcome.reason).toBe("family:unsafe-source");
+
+    const hostileOwnedPath: Record<string, unknown> = { zone: "page" };
+    Object.defineProperty(hostileOwnedPath, "path", {
+      enumerable: true,
+      get: () => {
+        count();
+        return "images/portrait.png";
+      },
+    });
+    const ownedOutcome = composeUnoFoundationSubset(envelope(GALLERY_SECTION), {
+      images: [
+        { source: "/assets/portrait.png", owned: hostileOwnedPath },
+        { source: "/assets/scene.webp", owned: { zone: "theme", path: "gallery/scene.webp" } },
+      ],
+    });
+    expect(ownedOutcome.status).toBe("refused");
+    if (ownedOutcome.status === "refused") expect(ownedOutcome.reason).toBe("family:unsafe-source");
+
+    // A valid prose followed by a hostile gallery refuses the whole Page, never a partial document.
+    const mixed = composeUnoFoundationSubset(
+      {
+        version: 1,
+        title: "Mixed gallery fixture",
+        sections: [
+          { type: "prose", body: "Kept?" },
+          { type: "gallery", columns: 2, items: [{ image: hostileSrc }, { image: hostileAlt }] },
+        ],
+      },
+      portraitBinding(),
+    );
+    expect(mixed.status).toBe("refused");
+    if (mixed.status === "refused") expect(mixed.reason).toBe("family:unsafe-source");
+    expect(Object.prototype.hasOwnProperty.call(mixed, "document")).toBe(false);
+    expect(ran).toBe(0);
   });
 });
