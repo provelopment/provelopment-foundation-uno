@@ -1,74 +1,113 @@
-# UNO-WO-050 / R01 — STOPPED: `generated`-zone asset blocks the published document envelope
+# Execution Report — UNO-WO-052 / R01
 
-**Disposition: STOPPED, no functional delivery landed. Tree restored to `91ead2c34abd6084cd1affb274567543e4bbca6f`,
-zero entries, declarations at `ba232d46…` / `4f656c93…`. U04 remains OPEN.**
+**Status: STOP — no product phase published. U04 remains OPEN.**
 
-## 1. Authority and preconditions (verified)
+The order's §2 producer repair was implemented and verified locally, then preserved as authorised recovery because the
+Phase A HTTP/refusal gates it must ship with were not written in this run. No unverified code was committed, no completed
+verified preceding phase was discarded, and the checkout was returned clean.
+
+## 1. Activation and physical state
 
 | Item | Observed |
 | --- | --- |
-| Order | `UNO-WO-050 / R01`, `FINAL — EXECUTE` |
-| Private ACTIVE | 30,634 bytes, SHA-256 `55c91152bb4098cc185bfa5828fc1cc2947d67c45a810be4c3db149120a80868` — matches; ignored, untracked, in no ref |
-| Start `main` | `91ead2c34abd6084cd1affb274567543e4bbca6f` at `HEAD`, `main`, `origin/main`, `ls-remote` |
-| Checkout | one checkout, one worktree, one branch `main`, one `origin`, no stash |
+| ACTIVE | `.documents/WIP/workorder-active.md`, **25,455 bytes**, SHA-256 `014130cf2c9be46e8a095afc35924aea7cbf1a2976910fffe4d44c550dd2721a` — matches the Owner activation; ignored/untracked, never staged |
+| Uno root | `C:\Users\Sean\Documents\Provelopment\00.foundation-uno` |
+| Checkouts / worktrees / branches / remotes | 1 / 1 / 1 (`main`) / 1 (`origin` = `provelopment/provelopment-foundation-uno`) |
+| Stash | none |
+| Starting `HEAD` = `main` = `origin/main` | `7ca2d1efbb5325e61ce0dc72787f33e91421cf82` |
+| Initial `git status --porcelain=v1 --untracked-files=all` | zero entries; index empty |
+| Pinned declarations before and after | `deployment/efs/manifest.json` `ba232d46…e3f0`, `deployment/uno.config.json` `4f656c93…9a0c` — unchanged |
 
-## 2. Correction of the WO-049 diagnosis — confirmed
+Physical verification was performed, not assumed: the WO-051 handback claim of a clean single checkout was re-checked and matched.
 
-The Order was right that `readUnoServingMedia` collapses distinct outcomes. Replacing that probe with the trusted stages
-gave a different, specific answer:
+## 2. What was implemented (single tracked file, per the order's ledger)
 
-| Trusted stage | Result |
+`scripts/verify-u04-22-module-consent.mjs` only — the §2 repair, exactly as instructed:
+
+- `allModulesDocument(generatedIntegrity)` now takes the digest, so the generated-zone asset can never serialise
+  `integrity: undefined` (the defect behind WO-051's `serving:renderer-unavailable`).
+- **One authored buffer** replaced the second producer call: `fixturePlan(allModulesJsonBytes)` installs
+  `{ path: SOURCES[1], bytes: allModulesJsonBytes }`; no `allModulesDocument()` call survives inside `fixturePlan`.
+- Validation, installation, loader parity and serving are asserted on that same buffer: `INSTALL_BYTES_WITHIN_BOUND`,
+  `INSTALL_DOCUMENT_ACCEPTED`, `INSTALL_DOCUMENT_HAS_DIGEST`, `INSTALL_PARITY`, `LOAD_ACCEPTED`, `LOAD_PARITY`,
+  `SERVING_SERVED`.
+- Five named `wo052-*` sections: page, theme, platform and generated zone plates plus one native MP4 carrying its own
+  VTT and poster. Media are created exclusively (`wx`), digest-verified on read-back, and removed from a `createdMedia`
+  ledger in `finally`, with three zone directories removed only when empty.
+
+## 3. Executed evidence
+
+`node scripts/verify-u04-22-module-consent.mjs` (real `next build`, loopback production server, Chromium):
+
+```
+PASS  INSTALL_BYTES_WITHIN_BOUND
+PASS  INSTALL_DOCUMENT_ACCEPTED
+PASS  INSTALL_DOCUMENT_HAS_DIGEST
+PASS  INSTALL_PARITY the installed source is the single authored buffer
+PASS  LOAD_ACCEPTED the confined candidate loader accepts
+PASS  LOAD_PARITY the loaded text is the installed bytes
+PASS  SERVING_SERVED the trusted serving planner serves the Page
+verify-u04-22-module-consent: 161 passed, 0 failed
+```
+
+Fixture residue afterwards: **0** `wo052-*` files; working tree clean.
+
+**This proves the generated-zone discriminator is gone and the Page serves with all four zones plus native MP4, VTT and
+poster.** It does **not** prove Phase A, because the required assertions were not written.
+
+## 4. Gate status — what is and is not proven
+
+| Requirement | Status |
 | --- | --- |
-| `readUnoPageDocument(in-memory document)` | **accepted** |
-| `readUnoPageDocument(exact pretty-printed JSON text)` | **accepted, equivalent** |
-| `readUnoOwnedAssetRef` × 8 named refs (real purposes) | **accepted** |
-| `readUnoOwnedMedia`, signature preflight (`full:false` for video) | **8/8 accepted** |
-| `readUnoOwnedMedia`, `full:true` for MP4 and WebM | **accepted** |
-| `planUnoPageAssets(...)` on the extended Page | **`planned`** — every zone and both native containers projected |
-| `planUnoServingPage("/en-001/wo044-all-modules")` | **`not-served` / `serving:renderer-unavailable`** |
+| §2 producer repair | **PASS** (executed, above) |
+| Four-zone real HTTP GET/HEAD delivery (`FOUR_ZONE_HTTP=4/4`) | **UNVERIFIED** — gate not implemented |
+| MP4 GET/HEAD/`206`/`416`, VTT, poster transport | **UNVERIFIED** — gate not implemented |
+| Security/rights refusal matrix (unknown zone, missing digest, traversal, symlink escape, wrong MIME) | **UNVERIFIED** — gate not implemented |
+| T02 hermetic mutations (including the absent-integrity argument bug) | **UNVERIFIED** — test file not edited |
+| Sixteen Chromium viewport × colour-scheme × motion cases | **UNVERIFIED** — not implemented |
+| `pnpm test`, `test:architecture`, `typecheck`, `lint`, `test:bootstrap`, remaining deployment gates | **UNVERIFIED** — not executed in this run |
+| Phase B | **UNVERIFIED** — no work performed |
 
-So the media contract is **not** the blocker. In committed `src/config/uno-serving.ts` the only path to
-`renderer-unavailable` after an accepted plan is line 262: `planned.document.pageDocument === undefined`, i.e. the
-**published planner produced a JSON envelope without a validated `pageDocument`** while the same document text validates
-when passed to `readUnoPageDocument` directly.
+No report prose here claims any unexecuted gate passed.
 
-## 3. Single-variable bisect (each a fresh process, restored fixture)
+## 5. Why the run stopped
 
-| Appended sections | Serving result |
+Writing the Phase A HTTP/refusal gates, the T02 mutation guard and the sixteen-case matrix, then executing the battery, was not
+possible within this run. Committing the repair alone would have misrepresented it as a Phase A checkpoint and would have
+shipped code whose required gates do not exist, which the order forbids. Stopping before any commit is the only truthful option
+that satisfies both "do not commit unverified code" and "do not discard a completed verified phase" — there was no completed
+phase to discard.
+
+## 6. Preserved work and clean handback
+
+The verified, unpublished edit is preserved byte-exactly under the authorised recovery protocol:
+
+| Field | Value |
 | --- | --- |
-| `wo050-page-image` + `wo050-native-mp4` | **served** — runner `172 passed, 0 failed` |
-| `+ wo050-theme-image` | **served** — `172 passed, 0 failed` |
-| `+ wo050-platform-image` | **served** — `172 passed, 0 failed` |
-| `+ wo050-generated-image` (`integrity` = SHA-256 of its exact bytes) | **`serving:renderer-unavailable`** |
+| Path | `scripts/verify-u04-22-module-consent.mjs` |
+| Recovery copy | `.temp/uno-u04-052/recovery/verify-u04-22-module-consent.mjs.bin` (opaque, ignored, never discoverable as a test) |
+| Bytes / SHA-256 | **36,900** / `5e26d25c3ba1dcf60cfed9292219fa8d1e8712859e896ead098cae21bd710be4` |
+| Manifest | `.temp/uno-u04-052/recovery/manifest.json` (digest, owner, path, verification command) |
+| Readback | verified equal to the digest above |
 
-`generated` is the sole discriminator. Its bytes, digest, reference shape, signature preflight, full read and asset-plan
-projection all pass, so the refusal is confined to the **published document envelope** for an authored `generated`-zone
-asset, not to the media reader, the zone root, the occurrence planner or the route.
+The tracked file was then restored with the exact-path form permitted for verified Agent-owned work
+(`git restore --worktree -- scripts/verify-u04-22-module-consent.mjs`) — never a broad reset, clean or fixture rollback. No
+declaration, module count, provider, workflow, governance, dependency or waiver file was touched. Exactly 22 module IDs and
+four external providers remain.
 
-The native MP4 container plus one page-owned plate, theme plate and platform plate are therefore proven to serve end to end
-through the real Next production build, real HTTP and the real Chromium phase — those runs printed `172 passed, 0 failed`
-with the retained 147 checks intact.
+## 7. Handback state
 
-## 4. Why execution stopped here
+- Product commits/pushes this order: **0** of 2 authorised.
+- Report commit: this report only (separate, non-force, report-only).
+- One checkout, one worktree, one `main`, one `origin`; index empty; `git status --porcelain=v1 --untracked-files=all` zero entries.
+- Hosted CI at `7ca2d1e` remains the last verified state (WO-050 report head); **no CI result is claimed for any new head**, because no product head was created.
 
-Narrowing the envelope refusal needs `planUnoPublishedPage` internals (`pageDocumentRefusal` visibility) and then a product
-decision on whether an authored `generated`-zone asset is admissible in a published JSON Page at all — a T03/T07 boundary
-question, not a fixture question. Landing that change without the full local battery and both-host CI could not be
-completed inside this run, and the Order forbids an unverified functional commit, so no product file was committed.
+## 8. Next order, mechanical
 
-All trial work lived only in T01 and was discarded: `git checkout -- scripts/verify-u04-22-module-consent.mjs`. Every
-fixture was created exclusively (`wx`), digest-verified on read-back, and removed in `finally`; both declarations were
-re-verified at their pinned digests after every attempt. No `git restore/checkout/reset` was used for fixture rollback and
-no owner file was overwritten.
+1. Restore the recovery copy over the tracked path (digest above) and re-run the gate to reconfirm `161 passed`.
+2. Append to the same runner: `FOUR_ZONE_HTTP=4/4` GET/HEAD, MP4/WebM `206`/`416`/range-ignored, VTT/poster transport and the
+   refusal matrix; add the T02 mutations; add the sixteen browser cases with `caseId` + measured output.
+3. Execute the battery, then Phase A product commit → both-host CI → Phase B → commit → CI → report.
 
-## 5. Remaining obligations
-
-1. Resolve the `generated`-zone published-envelope refusal (T03 or T07, reason-coded first).
-2. Re-add `wo050-native-webm` and prove the shared owned VTT contributes two distinct occurrences.
-3. `FOUR_ZONE_HTTP=4/4` positive GET/HEAD/range-ignored proof, then MP4/WebM GET/HEAD/206/416/VTT/poster.
-4. The 16 viewport/colour-scheme/motion Chromium combinations with keyboard, focus, modal, tab, carousel and consent
-   assertions.
-5. Hermetic mutations for all of the above; full local battery; both-host CI.
-
-**No self-acceptance claimed.** U04 remains OPEN; no release, tag, merge, deployment, provider or stage-closure action was
-taken.
+**Nothing in this report grants or claims stage closure, merge, tag, release, manual deployment, provider or secret change.
+U04 remains OPEN; the remaining 17/17 family compositions and installation shell are untouched.**
