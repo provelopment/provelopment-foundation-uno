@@ -1,9 +1,9 @@
 /**
  * Foundation Uno — the bounded Foundation→Uno family composition adapter (`UNO-WO-057 / R01`, extended by
- * `UNO-WO-058 / R01`, `UNO-WO-059 / R01` and `UNO-WO-060 / R01`, U04).
+ * `UNO-WO-058 / R01`, `UNO-WO-059 / R01`, `UNO-WO-060 / R01` and `UNO-WO-061 / R01`, U04).
  *
  * WHAT THIS IS. One pure, inward application function that translates a deliberately small **plain-text subset** of
- * eleven Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
+ * thirteen Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
  * donor source shape and Uno's own validated document: the caller supplies untrusted donor data, this module either
  * returns one accepted, deep-frozen `UnoPageDocument` or one closed refusal, and it never returns a partial Page.
  *
@@ -14,14 +14,17 @@
  *
  * WHAT IT IS NOT. It does not read a file, a manifest, a host, an environment variable or a provider; it publishes
  * nothing, routes nothing, renders nothing and owns no locale, Site, visibility or delivery authority. It implements
- * **eleven** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
+ * **thirteen** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
  * media converter, and it is not the seventeen family parity work: no full `FAMILY_PARITY` result may be derived
  * from it. In particular `steps` reproduces the donor's ordered sequence and optional body as plain text, but Uno's
  * timeline title is a `<p>` where the donor step title was an `<h3>`, so the donor heading outline is deliberately
  * not reproduced and `steps` is not full parity. `faq` keeps the donor's native `<details>`/`<summary>` disclosure but
  * its summary is plain text where the donor question was an `<h3>`, and `columns` keeps each authored column title as
  * a navigable `content.heading` at **level 2** where the donor used `<h3>`; both outline differences are recorded, not
- * concealed.
+ * concealed. `cards` and `features` keep only the authored title and optional body of each entry: the donor card's
+ * border, image, meta line and action, and the donor feature's decorative icon, are not composed, each item title is an
+ * `<h2>` here rather than the donor `<h3>`, and the same minimal native list-grid structure can therefore express two
+ * different donor concepts without being full parity for either.
  *
  * PROVENANCE. Original **Uno-owned** implementation, adaptation class **NEW / COMPOSE (plain-text subset)**. Concepts
  * — never copied source, CSS, components or assets — are adapted from `provelopment/provelopment-foundation` at
@@ -35,12 +38,14 @@
  * reuses the `items-sections.tsx` ordering semantics and the quotation reuses the `text-sections.tsx`
  * figure/blockquote/figcaption semantics recorded above; the FAQ disclosure group and the two/three-column group reuse
  * the native `<details>`/`<summary>` and grouped-column semantics of `structure-sections.tsx`
- * (blob `65d254e192a6a8ef4886590026c2ea58e02264be`). No donor runtime code,
+ * (blob `65d254e192a6a8ef4886590026c2ea58e02264be`), and the card and feature groups reuse only the native `<li>`
+ * item-group semantics of `media-sections.tsx` (blob `e3f3a12e5e26cb6af9133bef79f5fa2dc0680bb2`) and
+ * `items-sections.tsx` (blob `bc729d6a2e6484dc2c26ed997e65ee644bc8a7e6`). No donor runtime code,
  * package, image or trademark is imported. See `.documents/Architecture/u04-family-parity.md`.
  */
 import { readUnoPageDocument, type UnoPageDocument } from "../core/page-document";
 
-/** The eleven donor source families this bounded adapter accepts, in the order the ledger documents them. */
+/** The thirteen donor source families this bounded adapter accepts, in the order the ledger documents them. */
 export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "prose",
   "callout",
@@ -53,6 +58,8 @@ export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "quote",
   "faq",
   "columns",
+  "cards",
+  "features",
 ] as const);
 
 /** One accepted donor family name. */
@@ -62,7 +69,7 @@ export type UnoFoundationSubsetFamily = (typeof UNO_FOUNDATION_SUBSET_FAMILIES)[
  * The closed refusal vocabulary.
  *
  * `unsafe-source` — the input is not plain readable data (hostile object, accessor, cycle, sparse array, oversize).
- * `unsupported-family` — a real donor family outside these eleven, never silently dropped.
+ * `unsupported-family` — a real donor family outside these thirteen, never silently dropped.
  * `unsupported-feature` — a supported family carrying an out-of-subset field or Markdown this subset cannot render.
  * `target-refused` — the composed candidate is not an acceptable Uno Page; no partial document is ever returned.
  */
@@ -554,6 +561,42 @@ function composeSection(section: PlainValue, index: number): CandidateSection {
       // An absent ratio stays absent; an authored one is copied as a closed literal the Uno reader validates.
       if (ratioAuthored) props["ratio"] = record["ratio"];
       return { id, module: "layout.grid", props, children: columns };
+    }
+    case "cards":
+    case "features": {
+      // The donor card also accepts image/meta/action and the donor feature an icon; this subset composes neither, and
+      // it requires `columns` explicitly instead of manufacturing the donor renderer's default.
+      requireExactKeys(record, ["type", "columns", "items"], []);
+      const cols = record["columns"];
+      if (cols !== 2 && cols !== 3 && cols !== 4) refuseTarget();
+      const rawItems = record["items"];
+      if (!Array.isArray(rawItems)) refuseUnsupportedFeature();
+      // Uno's `itemSemantics: "list"` grid carries one native `<li>` per child, within its own bounded child count.
+      if (rawItems.length < 1 || rawItems.length > 8) refuseTarget();
+      const children: CandidateSection[] = [];
+      for (let itemIndex = 0; itemIndex < rawItems.length; itemIndex += 1) {
+        const rawItem = rawItems[itemIndex];
+        if (rawItem === null || typeof rawItem !== "object" || Array.isArray(rawItem)) refuseUnsupportedFeature();
+        const entry = rawItem as PlainRecord;
+        requireExactKeys(entry, ["title"], ["body"]);
+        const title = readNewFamilyText(entry["title"]);
+        // Uno's heading bound is wider than the donor item-title bound, so this subset's own limit is enforced here.
+        if (codePointLength(title) > 160) refuseTarget();
+        const itemId = `${id}-item-${itemIndex}`;
+        const nested: CandidateSection[] = [
+          { id: `${itemId}-title`, module: "content.heading", props: { text: title, level: 2 } },
+        ];
+        // An absent body stays absent: no manufactured paragraph, meta line, action or icon.
+        if (ownsKey(entry, "body")) {
+          nested.push({
+            id: `${itemId}-body`,
+            module: "content.prose",
+            props: { text: readNewFamilyText(entry["body"]) },
+          });
+        }
+        children.push({ id: itemId, module: "layout.stack", props: { gap: "tight" }, children: nested });
+      }
+      return { id, module: "layout.grid", props: { columns: cols, itemSemantics: "list" }, children };
     }
     default:
       throw new SourceRefusal("family:unsupported-family");

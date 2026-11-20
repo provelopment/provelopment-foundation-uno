@@ -53,8 +53,8 @@ function expectRefusal(input: unknown, reason: string): void {
   expect(Object.prototype.hasOwnProperty.call(outcome, "document")).toBe(false);
 }
 
-describe("composeUnoFoundationSubset — eleven bounded source shapes", () => {
-  it("declares exactly the eleven bounded families and leaves the 22-module registry untouched", () => {
+describe("composeUnoFoundationSubset — thirteen bounded source shapes", () => {
+  it("declares exactly the thirteen bounded families and leaves the 22-module registry untouched", () => {
     expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([
       "prose",
       "callout",
@@ -67,6 +67,8 @@ describe("composeUnoFoundationSubset — eleven bounded source shapes", () => {
       "quote",
       "faq",
       "columns",
+      "cards",
+      "features",
     ]);
     expect(Object.isFrozen(UNO_FOUNDATION_SUBSET_FAMILIES)).toBe(true);
     expect(UNO_RENDERABLE_MODULES.length).toBe(22);
@@ -324,11 +326,11 @@ describe("composeUnoFoundationSubset — envelope, family and feature refusal", 
     expectRefusal(oversized, "family:target-refused");
   });
 
-  it("refuses every donor family outside the eleven, never degrading it to prose", () => {
-    for (const type of ["media", "gallery", "actions", "cards", "features", "contactForm"]) {
+  it("refuses every donor family outside the thirteen, never degrading it to prose", () => {
+    for (const type of ["media", "gallery", "actions", "contactForm"]) {
       expectRefusal(envelope({ type }), "family:unsupported-family");
     }
-    // `faq` and `columns` are composed now, so no unsupported-family refusal may be claimed for them.
+    // `cards` and `features` are composed now, so no unsupported-family refusal may be claimed for them.
     expectRefusal(envelope({ type: "heading" }), "family:unsupported-family");
     expectRefusal(envelope("prose"), "family:unsafe-source");
     expectRefusal(envelope({ body: "No type." }), "family:unsupported-feature");
@@ -731,8 +733,8 @@ const DONOR_17 = [
   "divider",
   "contactForm",
 ] as const;
-/** The eleven bounded subsets this adapter composes, in adapter order. */
-const MAPPED_11 = [
+/** The thirteen bounded subsets this adapter composes, in adapter order. */
+const MAPPED_13 = [
   "prose",
   "callout",
   "table",
@@ -744,6 +746,8 @@ const MAPPED_11 = [
   "quote",
   "faq",
   "columns",
+  "cards",
+  "features",
 ] as const;
 
 describe("composeUnoFoundationSubset — steps and quote React markup", () => {
@@ -1224,11 +1228,321 @@ describe("composeUnoFoundationSubset — columns target bounds and hostile sourc
   });
 });
 
+/** The eleven-section fixture with the two newest bounded families appended, in source order. */
+function thirteenSectionSource(): Record<string, unknown> {
+  const source = elevenSectionSource();
+  const sections = source["sections"] as readonly unknown[];
+  return {
+    ...source,
+    sections: [
+      ...sections,
+      {
+        type: "cards",
+        columns: 2,
+        items: [
+          { title: "First card", body: "Description." },
+          { title: "Second card" },
+        ],
+      },
+      {
+        type: "features",
+        columns: 3,
+        items: [
+          { title: "First feature", body: "Benefit." },
+          { title: "Second feature" },
+        ],
+      },
+    ],
+  };
+}
+
+describe("composeUnoFoundationSubset — bounded cards and features", () => {
+  it("composes thirteen nodes in source order, leaving the first eleven byte-identical", () => {
+    const eleven = composed(elevenSectionSource());
+    const thirteen = composed(thirteenSectionSource());
+    expect(thirteen.sections.length).toBe(13);
+    expect(thirteen.sections.map((section) => section.id)).toEqual([
+      "family-0-prose",
+      "family-1-callout",
+      "family-2-table",
+      "family-3-list",
+      "family-4-divider",
+      "family-5-hero",
+      "family-6-stats",
+      "family-7-steps",
+      "family-8-quote",
+      "family-9-faq",
+      "family-10-columns",
+      "family-11-cards",
+      "family-12-features",
+    ]);
+    expect(JSON.stringify(thirteen.sections.slice(0, 11))).toBe(JSON.stringify(eleven.sections));
+
+    const cards = thirteen.sections[11];
+    const features = thirteen.sections[12];
+    expect(cards?.module).toBe("layout.grid");
+    expect(features?.module).toBe("layout.grid");
+    if (cards?.module !== "layout.grid" || features?.module !== "layout.grid") return;
+
+    // Native list-grid semantics only: no article wrapper, no ratio, no invented card decoration.
+    expect(cards.props).toEqual({ columns: 2, itemSemantics: "list" });
+    expect(features.props).toEqual({ columns: 3, itemSemantics: "list" });
+
+    expect(cards.children.map((child) => child.id)).toEqual([
+      "family-11-cards-item-0",
+      "family-11-cards-item-1",
+    ]);
+    const firstCard = cards.children[0];
+    const secondCard = cards.children[1];
+    if (firstCard?.module !== "layout.stack" || secondCard?.module !== "layout.stack") return;
+    expect(firstCard.props).toEqual({ gap: "tight" });
+    expect(firstCard.children.map((child) => child.id)).toEqual([
+      "family-11-cards-item-0-title",
+      "family-11-cards-item-0-body",
+    ]);
+    expect(firstCard.children[0]?.props).toEqual({ text: "First card", level: 2 });
+    expect(firstCard.children[1]?.props).toEqual({ text: "Description." });
+    // An absent body stays absent: one title child only, no manufactured paragraph.
+    expect(secondCard.children.map((child) => child.id)).toEqual(["family-11-cards-item-1-title"]);
+    expect(secondCard.children[0]?.props).toEqual({ text: "Second card", level: 2 });
+
+    expect(features.children.map((child) => child.id)).toEqual([
+      "family-12-features-item-0",
+      "family-12-features-item-1",
+    ]);
+    const firstFeature = features.children[0];
+    const secondFeature = features.children[1];
+    if (firstFeature?.module !== "layout.stack" || secondFeature?.module !== "layout.stack") return;
+    expect(firstFeature.children.map((child) => child.id)).toEqual([
+      "family-12-features-item-0-title",
+      "family-12-features-item-0-body",
+    ]);
+    expect(firstFeature.children[1]?.props).toEqual({ text: "Benefit." });
+    expect(secondFeature.children.length).toBe(1);
+    expect(secondFeature.children[0]?.props).toEqual({ text: "Second feature", level: 2 });
+  });
+
+  it("freezes every nested grid, item and props object, keeps input unchanged and re-accepts both forms", () => {
+    const source = thirteenSectionSource();
+    const before = JSON.stringify(source);
+    const document = composed(source);
+    expect(JSON.stringify(source)).toBe(before);
+    expect(Object.isFrozen(document)).toBe(true);
+    for (const section of document.sections.slice(11)) {
+      expect(Object.isFrozen(section)).toBe(true);
+      expect(Object.isFrozen(section.props)).toBe(true);
+      if (section.module !== "layout.grid") continue;
+      expect(Object.isFrozen(section.children)).toBe(true);
+      for (const stack of section.children) {
+        expect(Object.isFrozen(stack)).toBe(true);
+        if (stack.module !== "layout.stack") continue;
+        expect(Object.isFrozen(stack.children)).toBe(true);
+        for (const child of stack.children) expect(Object.isFrozen(child.props)).toBe(true);
+      }
+    }
+    expect(() => readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown)).not.toThrow();
+    expect(() => readUnoPageDocument(JSON.stringify(document))).not.toThrow();
+  });
+});
+
+/**
+ * The markup of one grid, sliced from its own `<ul>` by id, so older list, timeline, accordion and columns markup
+ * cannot inflate the counts.
+ */
+function gridMarkup(html: string, id: string): string {
+  const marker = `id="${id}"`;
+  const idIndex = html.indexOf(marker);
+  expect(idIndex).toBeGreaterThanOrEqual(0);
+  const start = html.lastIndexOf("<ul ", idIndex);
+  expect(start).toBeGreaterThanOrEqual(0);
+  const end = html.indexOf("</ul>", idIndex);
+  expect(end).toBeGreaterThan(start);
+  return html.slice(start, end + "</ul>".length);
+}
+
+describe("composeUnoFoundationSubset — cards and features React markup", () => {
+  const html = render(composed(thirteenSectionSource()));
+  const cards = gridMarkup(html, "family-11-cards");
+  const features = gridMarkup(html, "family-12-features");
+
+  it("renders each card as one native list item of a native list-grid", () => {
+    expect(cards).toContain(
+      '<ul class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="list" id="family-11-cards" role="list">',
+    );
+    expect((cards.match(/<li class="uno-json-cell"/gu) ?? []).length).toBe(2);
+    expect((cards.match(/class="uno-json-stack"/gu) ?? []).length).toBe(2);
+    expect((cards.match(/<h2 class="uno-json-heading"/gu) ?? []).length).toBe(2);
+    expect((cards.match(/<p class="uno-json-prose"/gu) ?? []).length).toBe(1);
+    expect(cards).toContain('<h2 class="uno-json-heading" id="family-11-cards-item-0-title">First card</h2>');
+    expect(cards).toContain('<h2 class="uno-json-heading" id="family-11-cards-item-1-title">Second card</h2>');
+    expect(cards).toContain('<p class="uno-json-prose" id="family-11-cards-item-0-body">Description.</p>');
+    // The card authored without a body gains no paragraph of its own.
+    expect(cards).not.toContain("family-11-cards-item-1-body");
+    expect(cards.indexOf("First card")).toBeLessThan(cards.indexOf("Second card"));
+  });
+
+  it("renders each feature the same bounded way with its authored three columns", () => {
+    expect(features).toContain(
+      '<ul class="uno-json-grid" data-uno-columns="3" data-uno-item-semantics="list" id="family-12-features" role="list">',
+    );
+    expect((features.match(/<li class="uno-json-cell"/gu) ?? []).length).toBe(2);
+    expect((features.match(/<h2 class="uno-json-heading"/gu) ?? []).length).toBe(2);
+    expect((features.match(/<p class="uno-json-prose"/gu) ?? []).length).toBe(1);
+    expect(features).toContain('<p class="uno-json-prose" id="family-12-features-item-0-body">Benefit.</p>');
+    expect(features).not.toContain("family-12-features-item-1-body");
+    expect(features.indexOf("First feature")).toBeLessThan(features.indexOf("Second feature"));
+  });
+
+  it("invents no link, image, icon, action, meta text, extra heading or handler", () => {
+    for (const markup of [cards, features]) {
+      expect(markup).not.toContain("<a ");
+      expect(markup).not.toContain("<img");
+      expect(markup).not.toContain("<iframe");
+      expect(markup).not.toContain("<button");
+      expect(markup).not.toContain("onclick");
+      expect(markup).not.toContain("<h3");
+      expect((markup.match(/<h1/gu) ?? []).length).toBe(0);
+    }
+    expect((html.match(/<main/gu) ?? []).length).toBe(0);
+  });
+
+  it("escapes ampersands and quotes and renders an inert angle bracket as text", () => {
+    const escaped = render(
+      composed(
+        envelope({
+          type: "cards",
+          columns: 2,
+          items: [{ title: 'A & B "quoted" < 3', body: "Safe & sound." }],
+        }),
+      ),
+    );
+    expect(escaped).toContain("A &amp; B &quot;quoted&quot; &lt; 3");
+    expect(escaped).toContain("Safe &amp; sound.");
+    expect(() =>
+      composed(
+        envelope({
+          type: "features",
+          columns: 2,
+          items: [{ title: "<script>alert(1)</script>" }],
+        }),
+      ),
+    ).toThrow();
+  });
+});
+
+describe("composeUnoFoundationSubset — cards and features refusal", () => {
+  it.each(["cards", "features"] as const)("refuses %s fields outside the bounded subset", (type) => {
+    const base = { type, items: [{ title: "A", body: "B" }] };
+    // `columns` is required here even though the donor renderer defaults an omitted value.
+    expectRefusal(envelope(base), "family:unsupported-feature");
+    for (const extra of ["heading", "lede", "surface", "align", "ratio", "href", "route", "link", "style", "onClick", "visibility"]) {
+      expectRefusal(
+        envelope({ ...base, columns: 2, [extra]: extra === "align" ? "center" : "X" }),
+        "family:unsupported-feature",
+      );
+    }
+    for (const extra of ["image", "meta", "action", "icon", "href", "route", "link", "style", "onClick"]) {
+      expectRefusal(
+        envelope({ type, columns: 2, items: [{ title: "A", [extra]: "X" }] }),
+        "family:unsupported-feature",
+      );
+    }
+    expectRefusal(envelope({ type, columns: 2, items: ["A"] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type, columns: 2, items: "A" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type, columns: 2, items: [{ title: 5 }] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type, columns: 2, items: [{ title: "A", body: 5 }] }), "family:unsupported-feature");
+    for (const [field, value] of [
+      ["title", "**bold**"],
+      ["title", "*italic*"],
+      ["title", "[x](https://example.org)"],
+      ["title", "`code`"],
+      ["title", "~~strike~~"],
+      ["title", "![alt](https://example.org/i.png)"],
+      ["title", "- item"],
+      ["body", "**bold**"],
+      ["body", "[x](https://example.org)"],
+    ] as const) {
+      expectRefusal(
+        envelope({ type, columns: 2, items: [{ title: "A", body: "B", [field]: value }] }),
+        "family:unsupported-feature",
+      );
+    }
+  });
+
+  it.each(["cards", "features"] as const)("refuses malformed %s values through the Uno target", (type) => {
+    const items = [{ title: "A", body: "B" }];
+    for (const columns of [1, 5, 0]) {
+      expectRefusal(envelope({ type, columns, items }), "family:target-refused");
+    }
+    expectRefusal(envelope({ type, columns: "2", items }), "family:target-refused");
+    expectRefusal(envelope({ type, columns: 2, items: [] }), "family:target-refused");
+    const nine = Array.from({ length: 9 }, (_, index) => ({ title: `T${index}` }));
+    expectRefusal(envelope({ type, columns: 2, items: nine }), "family:target-refused");
+    expectRefusal(envelope({ type, columns: 2, items: [{ title: "" }] }), "family:target-refused");
+    expectRefusal(envelope({ type, columns: 2, items: [{ title: "t".repeat(161) }] }), "family:target-refused");
+    expectRefusal(envelope({ type, columns: 2, items: [{ title: "A", body: "" }] }), "family:target-refused");
+    expectRefusal(
+      envelope({ type, columns: 2, items: [{ title: "A", body: "b".repeat(4001) }] }),
+      "family:target-refused",
+    );
+    expectRefusal(
+      envelope({ type, columns: 2, items: [{ title: "A", body: "<script>alert(1)</script>" }] }),
+      "family:target-refused",
+    );
+  });
+
+  it("refuses a candidate above the Uno 64 KiB text cap rather than truncating it", () => {
+    const bulky = {
+      version: 1,
+      title: "Oversized fixture",
+      sections: [
+        { type: "cards", columns: 2, items: Array.from({ length: 8 }, () => ({ title: "T", body: "b".repeat(4000) })) },
+        { type: "features", columns: 2, items: Array.from({ length: 8 }, () => ({ title: "T", body: "b".repeat(4000) })) },
+      ],
+    };
+    expectRefusal(bulky, "family:target-refused");
+  });
+
+  it("refuses hostile card and feature source with no getter invoked and no partial Page", () => {
+    let ran = 0;
+    const hostileItem: Record<string, unknown> = { body: "B" };
+    Object.defineProperty(hostileItem, "title", {
+      enumerable: true,
+      get: () => {
+        ran += 1;
+        return "A";
+      },
+    });
+    const outcome = composeUnoFoundationSubset(envelope({ type: "cards", columns: 2, items: [hostileItem] }));
+    expect(outcome.status).toBe("refused");
+    if (outcome.status === "refused") expect(outcome.reason).toBe("family:unsafe-source");
+    expect(Object.prototype.hasOwnProperty.call(outcome, "document")).toBe(false);
+    expect(ran).toBe(0);
+
+    const sparse: unknown[] = [{ title: "A" }, , { title: "C" }];
+    expectRefusal(envelope({ type: "features", columns: 2, items: sparse }), "family:unsafe-source");
+
+    // A valid leading `cards` followed by a hostile `features` item refuses the WHOLE Page.
+    const mixed = composeUnoFoundationSubset({
+      version: 1,
+      title: "Mixed fixture",
+      sections: [
+        { type: "cards", columns: 2, items: [{ title: "A", body: "B" }] },
+        { type: "features", columns: 2, items: [{ title: "C" }, hostileItem] },
+      ],
+    });
+    expect(mixed.status).toBe("refused");
+    if (mixed.status === "refused") expect(mixed.reason).toBe("family:unsafe-source");
+    expect(Object.prototype.hasOwnProperty.call(mixed, "document")).toBe(false);
+    expect(ran).toBe(0);
+  });
+});
+
 describe("composeUnoFoundationSubset — canonical donor inventory", () => {
-  it("maps exactly eleven of the donor's seventeen families and leaves six unimplemented", () => {
-    const left = DONOR_17.filter((name) => !(MAPPED_11 as readonly string[]).includes(name));
-    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([...MAPPED_11]);
-    expect(left).toEqual(["media", "gallery", "actions", "cards", "features", "contactForm"]);
+  it("maps exactly thirteen of the donor's seventeen families and leaves four unimplemented", () => {
+    const left = DONOR_17.filter((name) => !(MAPPED_13 as readonly string[]).includes(name));
+    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([...MAPPED_13]);
+    expect(left).toEqual(["media", "gallery", "actions", "contactForm"]);
   });
 
   it("keeps the committed ledger identical to the canonical inventory", () => {
@@ -1236,21 +1550,30 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
       fileURLToPath(new URL("../../.documents/Architecture/u04-family-parity.md", import.meta.url)),
       "utf8",
     );
-    const unimplemented =
-      "**UNIMPLEMENTED (6):** `media`, `gallery`, `actions`, `cards`, `features`, `contactForm`.";
+    const unimplemented = "**UNIMPLEMENTED (4):** `media`, `gallery`, `actions`, `contactForm`.";
     expect(ledger.split(unimplemented).length - 1).toBe(1);
     expect(ledger).not.toContain("UNIMPLEMENTED (10)");
     expect(ledger).not.toContain("UNIMPLEMENTED (8)");
+    expect(ledger).not.toContain("UNIMPLEMENTED (6)");
     expect(ledger).not.toContain("seven bounded");
     expect(ledger).not.toContain("nine bounded");
+    expect(ledger).not.toContain("eleven bounded");
+    expect(ledger).not.toContain("six donor families");
     expect(ledger).not.toContain("eight donor families");
     expect(ledger).not.toContain("ten donor families entirely unimplemented");
     expect(ledger).not.toContain("UNIMPLEMENTED**: `heading`");
-    expect(ledger).not.toMatch(/FAMILY_PARITY=(17\/17|11\/17|9\/17|7\/17)/u);
-    for (const family of ["hero", "stats", "steps", "quote", "faq", "columns"]) {
+    expect(ledger).not.toMatch(/FAMILY_PARITY=(17\/17|13\/17|11\/17|9\/17|7\/17)/u);
+    for (const family of ["hero", "stats", "steps", "quote", "faq", "columns", "cards", "features"]) {
       expect(ledger).toContain(`| \`${family}\` |`);
     }
-    expect(ledger).toContain("eleven bounded");
+    // The two new rows name their donor evidence and stay distinct from each other.
+    expect(ledger).toContain("`COMPOSE (bounded cards)`");
+    expect(ledger).toContain("`COMPOSE (bounded features)`");
+    expect(ledger).toContain("e3f3a12e");
+    expect(ledger).toContain("bc729d6a");
+    expect(ledger).toContain("19c9bee3");
+    expect(ledger).toContain("thirteen bounded");
     expect(ledger).toContain("zero of seventeen full semantic parity");
+    expect(ledger).toContain("Deliberately absent donor design (cards and features)");
   });
 });
