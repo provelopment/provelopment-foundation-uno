@@ -1,73 +1,67 @@
-# UNO-WO-048 / R01 — Native-video transport, fail-closed readiness, honest scope
+# UNO-WO-049 / R01 — STOPPED: four-zone Page refused at publication before any build
 
-**Status: PARTIAL DELIVERY — product landed and green on both hosts; the four-zone and viewport-matrix portions of this
-order are NOT delivered. U04 remains OPEN.**
+**Status: STOPPED, no functional delivery. Working tree restored to `1e547c55c33cab13516252875fce4fa0d4d90dd5`,
+zero entries, declarations at their pinned digests. U04 remains OPEN.**
 
-## 1. Authority and physical facts
+## 1. Authority and starting state (verified)
 
 | Item | Observed |
 | --- | --- |
-| Order | `UNO-WO-048 / R01`, `FINAL — EXECUTE` |
-| Private ACTIVE | 33,815 bytes, SHA-256 `eccf3532175de2c02116b739eba9267b48c5a3f17d73790de142e723f9965e56` — matches the activation; ignored, untracked, in no ref |
-| Starting `main` | `cc00926041b8e4afded4d065b84cf90091ab3547` at `HEAD`, `main`, `origin/main`, `ls-remote` |
+| Order | `UNO-WO-049 / R01`, `FINAL — EXECUTE` |
+| Private ACTIVE | 31,045 bytes, SHA-256 `7f5777cd69e09ff290c600a875d596698f2d35687226dfc277fad637df1ae268` — matches; ignored, untracked, in no ref |
+| Start `main` | `1e547c55c33cab13516252875fce4fa0d4d90dd5` at `HEAD`, `main`, `origin/main`, `ls-remote` |
 | Checkout | one checkout, one worktree, one branch `main`, one `origin`, no stash |
-| **Product SHA** | **`ae2435869b84b53b051e4b924b9721e05cc230be`** |
-| Final `git status` | **0 entries** |
+| Final tree | 0 entries, 0 staged |
 
-## 2. Changed-path ledger (5 tracked edits, all in ledger)
+## 2. What was attempted (single ledger path, never committed)
 
-| # | Path | Change |
-|---|---|---|
-| 01 | `src/app/uno-media/[...segments]/route.ts` | Explicit `HEAD` from the identical authorisation and media preflight (no body); `accept-ranges: bytes` and one bounded RFC single range for authorised `video/mp4`/`video/webm` only; `206` exact slice with `content-range`; `416` metadata-only (`content-range` names only the total) for malformed, reversed, suffix-zero, overflowing or multi-range; `If-Range` ignored because no validator is published; non-video ignores a range; unauthorised locator is a closed `404` decided before any range or size. Existing MIME, `nosniff`, no-referrer, `default-src none; sandbox` and cache policy preserved; no CORS added. |
-| 11 | `scripts/verify-u04-22-module-consent.mjs` | Real production-HTTP owned-media phase: locator read from the served Page, authorised `200` with allowlisted MIME and PNG signature, served bytes byte-identical to the fixture plate, `HEAD` 200 with empty body, non-video does not advertise ranges and ignores a range, unauthorised locator `404` before range inspection with no bytes, out-of-range occurrence `404`. |
-| 12 | `tests/deployment/u04-22-module-consent.test.mjs` | Eight new `REQUIRED` invariants so the media phase cannot be deleted from the runner. |
-| 13 | `scripts/verify-vercel-readiness.mjs` | New reason codes `workflow:no-u04-consent-unit`, `workflow:no-u04-consent-browser`, `workflow:u04-consent-env`; per-step block reading so a comment, passive mention or wrong entry cannot satisfy the gate; per-step browser-path enforcement replacing the old global occurrence count. |
-| 14 | `tests/deployment/verify-vercel-readiness.test.mjs` | Fixture workflow updated to the committed workflow; three unique negative mutations (deleted hermetic step, muted browser step, missing pinned browser path); the browser-path mutation retargeted to the steps that own the path. |
+All work was in authorised path A01, `scripts/verify-u04-22-module-consent.mjs`, and was discarded before handback:
 
-No new file was created, no frozen governance or deployment authority was touched, and the capability registry still holds
-exactly twenty-two IDs.
+- Seven named test-owned inputs created with exclusive/no-overwrite semantics and digest-verified on write: page-zone
+  `wo049-native.mp4` (28-byte `ftyp` box), `wo049-native.webm` (EBML header naming its DocType), `wo049-native.vtt`
+  (`WEBVTT` + one cue), `wo049-native-poster.png`; theme `wo049-theme.png`; platform `wo049-platform.png`; generated
+  `wo049-generated.png` with its exact SHA-256 as `integrity`.
+- Five accepted v1 sections appended to the existing 22-ID Page: `wo049-theme-image`, `wo049-platform-image`,
+  `wo049-generated-image`, `wo049-native-mp4`, `wo049-native-webm` (native mode, no `source` literal).
+- A pre-build probe of the real serving composition and of the real adapter for all seven refs.
 
-## 3. Local verification
+## 3. The blocking finding
 
-PASS (exit 0): `pnpm typecheck`, `eslint . --max-warnings 0`, `pnpm test:architecture`, bare `pnpm test`
-(**870/870, 29 files**), `pnpm test:bootstrap`, governance test and script, security guard plus its mutation suite,
-`node26-security-floor`, `u03-fixture-transaction`, `u03-trace`, the 464 hermetic guard, the 130 hermetic guard,
-readiness CLI (**132 checks**) and its suite, `pnpm build`, `verify-u03-trace --expect committed`,
-`verify-u04-json-slice` (**464/464**), `verify-u03-published-http` (**542/542**),
-`verify-u04-22-module-consent` (**147/147**, up from 130), `verify-u01-http` (**103/103**) and `verify-u03-http`
-(**91/91**) — the last two re-run **after** both fixture suites restored the declarations and the committed build was
-rebuilt, with `/en` a genuine 404 throughout.
+| Evidence | Result |
+| --- | --- |
+| `readUnoPageDocument` on the extended 22-ID document | **accepted** |
+| `readUnoOwnedAssetRef` for all seven authored refs | **accepted** |
+| `readUnoOwnedMedia` for theme, platform, generated, MP4, WebM, VTT, poster | **7/7 read** under their frozen zone roots |
+| `readUnoServingMedia(["en-001","wo044-all-modules","0"])` before any build | **`serving:publication-refused`** |
+| Real production HTTP for the fixture Page | **404** (whole Page refused, not one module) |
 
-Declarations byte-identical before and after every fixture (`ba232d46…`, `4f656c93…`), no `wo04*` residue, nothing
-staged by any runner.
+The document is valid and every declared asset is physically readable, yet the **publication/planning stage** refuses the
+Page. `serving:publication-refused` is returned from two distinct internal sites (document load and plan), so the refusal
+family could not be localised from the served surface, which is deliberately closed.
 
-## 4. Hosted CI at the product head `ae24358`
+Localising it needs repeated fixture install/build cycles in which a refusal is indistinguishable from a defect until the
+Page serves. Two such cycles did leave the fixture installed when the probe threw; both were recovered from the
+transaction's own `.temp/tx-*/…original` recovery copies with the declarations verified back to `ba232d46…` / `4f656c93…`,
+and the enumerated `wo049-*`/`wo044-*` fixtures removed. No `git restore/checkout/reset` was used as a fixture rollback.
+Continuing that loop inside this order would have risked handing back a contaminated declaration set, so execution stopped
+as the order permits.
 
-| Workflow | Run | Result |
-| --- | --- | --- |
-| Uno Bootstrap Verify | `44645421989` | **success** |
-| Verify U01 baseline | `44645422037` | **success** |
+## 4. Not delivered
 
-Jobs `verify (ubuntu-24.04)` `135986635992` and `verify (windows-2025)` `135986636349` are both **success**, each with
-successful architecture, unit, English production HTTP, U03 refusal HTTP, **U04 22-module hermetic guard**, **U04
-22-module real production HTTP and Chromium gate**, readiness fixtures and readiness CLI. Nothing muted or tolerated.
+1. `FOUR_ZONE_HTTP=4/4` — no four-zone positive GET/HEAD proof exists.
+2. `NATIVE_VIDEO_HTTP=MP4+WEBM+VTT+POSTER` — no native GET/HEAD/206/416/VTT/poster proof exists.
+3. The 16-way viewport/theme/motion matrix and its interaction assertions — not attempted, because Phase A never passed.
+4. Strengthened hermetic mutations for the above — not attempted.
 
-## 5. NOT delivered in this run (explicit)
+Nothing was claimed as passing, no check was weakened or skipped, and no product file, test, workflow, declaration or
+provider setting was changed.
 
-1. **Four-zone production media proof** (§3.1/§3.2): only the `page` zone is exercised. `theme`, `platform` and
-   `generated` have no served-occurrence proof in this gate.
-2. **Native-video HTTP transport proof**: the route implements `206`/`416`/`HEAD` for video, but this fixture contains no
-   `video/mp4` or `video/webm` occurrence, so those paths are **implemented and unit-shape-checked only — not proved over
-   HTTP**. No decoded playback is claimed anywhere.
-3. **VTT/poster over HTTP**, and the **320/390/768/1280 × light/dark × normal/reduced 16-combination matrix** with
-   interaction keyboard/mouse coverage (§4 accessibility/matrix): not implemented in the runner this run.
-4. Consequently the order's headline goal — “all FOUR owned-asset zones genuinely serve” — is **not** met.
+## 5. Required next step
 
-## 6. Remaining U04 obligations
+The blocker is a publication/projection refusal of an accepted document that declares theme, platform and generated
+occurrences plus two native video containers (the two containers share one owned VTT, which the order explicitly permits).
+A new Owner order should authorise **A07/A05 diagnosis with a temporary, non-destructive instrumented probe** of
+`planUnoPublishedPage`/`planUnoPageAssets` (reason-code visibility at the two internal sites), or authorise the specific
+product fix once the refusing family is named. Until then the four-zone, native-video and matrix obligations stand.
 
-Four-zone served-occurrence proof and the exhaustive four-zone fault matrix; native video range/HEAD/VTT/poster proof
-(and a decodable transport fixture); the full viewport/theme/motion and interaction matrix; the **17 Foundation-family
-compositions (0/17)**; installation/presentation shell. `media.map`, geolocation, sensors, BLE and Wi-Fi positioning
-remain explicitly out of scope. U04 is OPEN; no release, tag, merge, manual deployment or Drive edit was made.
-
-**Requested disposition: ACCEPT / REVISE / STOP.** No self-acceptance is claimed.
+**Disposition: STOPPED. No self-acceptance claimed.**
