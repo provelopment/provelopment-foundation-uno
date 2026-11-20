@@ -1,14 +1,14 @@
 # U04 — bounded Foundation→Uno family composition (source and rights ledger)
 
-**Scope of this record.** It documents the **nine** donor source shapes Uno currently composes into its own v1 Page
-document — `prose`, `callout`, `table`, `list`, `divider`, `hero`, `stats`, `steps`, `quote` — out of the donor's
-**seventeen** families. It is a narrow provenance and rights ledger, not a parity record: **nine bounded mappings
-implemented; eight donor families entirely unimplemented; zero of seventeen full semantic parity; no family
+**Scope of this record.** It documents the **eleven** donor source shapes Uno currently composes into its own v1 Page
+document — `prose`, `callout`, `table`, `list`, `divider`, `hero`, `stats`, `steps`, `quote`, `faq`, `columns` — out of
+the donor's **seventeen** families. It is a narrow provenance and rights ledger, not a parity record: **eleven bounded
+mappings implemented; six donor families entirely unimplemented; zero of seventeen full semantic parity; no family
 production HTTP/browser proof.** U04 remains OPEN.
 
 ## 1. Provenance and licence
 
-These nine mappings are an **original Uno-owned** implementation
+These eleven mappings are an **original Uno-owned** implementation
 (`src/application/compose-uno-foundation-families.ts`, adaptation class `COMPOSE (plain-text subset)`). Only
 **concepts and semantics** were adapted — never donor source, components, CSS, Tailwind classes, images, Connect code
 or trademarks — from `provelopment/provelopment-foundation` at commit
@@ -28,14 +28,14 @@ Donor evidence blobs: the source schemas and the exact `PAGE_SECTION_TYPES` rost
 `hero`, `prose`, `media`, `gallery`, `actions`, `callout`, `cards`, `features`, `columns`, `steps`, `stats`, `quote`,
 `table`, `faq`, `list`, `divider`, `contactForm`.
 
-Nine of these are composed as bounded subsets (section 3). The other eight are not implemented at all:
+Eleven of these are composed as bounded subsets (section 3). The other six are not implemented at all:
 
-**UNIMPLEMENTED (8):** `media`, `gallery`, `actions`, `cards`, `features`, `columns`, `faq`, `contactForm`.
+**UNIMPLEMENTED (6):** `media`, `gallery`, `actions`, `cards`, `features`, `contactForm`.
 
 Uno module ids such as `content.heading`, `content.testimonials` or `content.pricing` are Uno concepts or renderer
 features; they are **not** additional donor family keys and must never be listed as an eighteenth family.
 
-## 3. Nine composed source shapes
+## 3. Eleven composed source shapes
 
 | Donor family | Donor evidence | Disposition | Accepted donor fields | Deliberately unsupported | Uno output | Unit proof |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -48,37 +48,44 @@ features; they are **not** additional donor family keys and must never be listed
 | `stats` | `page-document.ts` `a12d964c…`; `items-sections.tsx` `bc729d6a…` | `COMPOSE (plain-text subset)` | `type`, `items[1..6]{value,label,detail?}` | donor heading/lede/surface, embedded links, Markdown, extra keys or entries | `content.stats {items}` → `<section class="uno-json-stats">` with `<dl>`/`<dt>`/`<dd>` | composed + count/link refusal + markup |
 | `steps` | `page-document.ts` `a12d964c…`; `items-sections.tsx` `bc729d6a…` | `COMPOSE (ordered plain-text subset)` | `type`, `items[1..12]{title,body?}`, optional `surface` | donor `heading`/`lede`, item `href`/`route`/`link`/`status`/`dateLabel`/`icon`, Markdown, links, states and dates | `content.timeline {items,surface?}` → `<ol class="uno-json-timeline-list">`, one `<li>` per authored step in source order | composed + order/count/state refusal + markup |
 | `quote` | `page-document.ts` `a12d964c…`; `text-sections.tsx` `caeee577…` | `COMPOSE (plain-text figure subset)` | `type`, `body`, optional `attribution`, `role` (only with `attribution`), `align`, `surface` | donor `heading`/`lede`, Markdown, links, and the donor's role-only caption suppression | `content.testimonials {items:[{quote,attribution?,role?}],align?,surface?}` → one `<figure>` with `<blockquote>` and an authored `<figcaption>` | composed + caption/Markdown refusal + markup |
+| `faq` | `page-document.ts` `a12d964c…`; `structure-sections.tsx` `65d254e1…` | `COMPOSE (bounded FAQ)` | `type`, `items[1..8]{question,answer}` | donor `heading`/`lede`/`surface`, Markdown and links, item `href`/`icon`/`open`, any delivery or independent state | one `interaction.accordion {items:[{sectionId,label}]}` with one `content.prose` answer child per entry, `sectionId` equal to that child's own id | one `<details class="uno-json-disclosure">`/`<summary>` per entry in source order, answers as prose paragraphs inside `.uno-json-disclosure-body` | composed + cap/feature/Markdown refusal + markup |
+| `columns` | `page-document.ts` `a12d964c…`; `structure-sections.tsx` `65d254e1…` | `COMPOSE (bounded columns)` | `type`, `items[2..3]` of `{title,body}` **or** `{title,items[1..12]}`, optional `ratio` (`equal`/`start-wide`/`end-wide`, two columns only) | donor `heading`/`lede`/`surface`, Markdown and links, item `href`/`icon`/`style`, one or four columns, a ratio on three columns | one `layout.grid {columns,ratio?}` holding one `layout.stack {gap:"tight"}` per column, each with `content.heading {level:2}` then one `content.prose` body or native list | `data-uno-columns`, `data-uno-ratio` only when authored, `.uno-json-cell`, `<h2>`, paragraph and native `<ul class="uno-json-list">` | composed + count/ratio/Markdown refusal + markup |
 
 Each accepted output is one validated, deep-frozen `UnoPageDocument` with `version: 1`, the donor title and one node
 per input section (`family-<index>-<type>`). Absent optional fields stay absent; the renderer owns visual defaults.
 No donor Markdown, link destination, image or media form is rendered by this subset.
 
-**Known outline limitation (recorded, not concealed).** The donor `steps` item title renders through the donor's item
-heading (`<h3>`) while Uno's existing timeline title is a `<p>`. This bounded mapping reproduces the authored order,
-labels and optional body meaning only; it does not reproduce the donor heading outline, so `steps` is explicitly not
-full parity.
+**Known outline limitations (recorded, not concealed).** The donor `steps` item title renders through the donor's item
+heading (`<h3>`) while Uno's existing timeline title is a `<p>`. The donor `faq` question is an `<h3>` inside its
+`<summary>`, while Uno's disclosure summary is plain text. The donor `columns` column title is an `<h3>`, while the
+composed `content.heading` is **level 2** so that the Page keeps a valid heading order without inventing a donor
+section heading. These bounded mappings reproduce authored order, labels and body meaning only; none of them reproduces
+the donor heading outline, so each is explicitly not full parity.
 
 ## 4. Refusal policy
 
-- **Unsupported family** (`family:unsupported-family`): any of the eight unimplemented donor families, or any unknown
+- **Unsupported family** (`family:unsupported-family`): any of the six unimplemented donor families, or any unknown
   type. Nothing is degraded into a paragraph.
 - **Unsupported feature** (`family:unsupported-feature`): a supported family carrying an out-of-subset field
   (`heading`, `lede`, `align`, `surface`, `links`, `visibility`, `href`, `route`, `link`, `html`, `style`, `onClick`,
-  hero `actions`, a stats entry link, a `steps` item state/date, any extra key), a missing required subset field (hero
-  without `lede`, `quote` `role` without `attribution`), or a Markdown construct (`**bold**`, `[label](destination)`,
-  backticks, leading Markdown headings, and — for the two newest families only — unmistakable emphasis, strike,
-  image, blockquote or list forms).
+  hero `actions`, a stats entry link, a `steps` item state/date, a `faq` item `href`/`icon`/`open`, a `columns` item
+  `href`/`icon`/`style`, a `ratio` authored on three columns, a column declaring both `body` and `items` or neither,
+  any extra key), a missing required subset field (hero without `lede`, `quote` `role` without `attribution`), or a
+  Markdown construct (`**bold**`, `[label](destination)`, backticks, leading Markdown headings, and — for the newest
+  four families only — unmistakable emphasis, strike, image, blockquote or list forms).
 - **Unsafe source** (`family:unsafe-source`): hostile or unreadable input — accessors (never invoked), foreign
   prototypes, symbol keys, prototype-rewriting keys, cycles, sparse or overloaded arrays, functions, `undefined`,
   non-finite numbers, over-deep or over-budget structures.
 - **Target refused** (`family:target-refused`): malformed values inside accepted fields (empty/overlong text, bad
-  `align`/`surface` literal, zero or seven stats items, blank label/value, unsafe script or scheme) and any candidate
-  above the Uno 64 KiB source cap. The whole document refuses; no partial Page is ever returned.
+  `align`/`surface`/`ratio` literal, zero or seven stats items, zero or nine FAQ entries, one/four or more than three
+  columns, empty or thirteen column labels, blank label/value, unsafe script or scheme) and any candidate above the
+  Uno 64 KiB source cap. The whole document refuses; no partial Page is ever returned.
 
 ## 5. Remaining obligations
 
-Eight donor families are entirely unimplemented (the exact line in section 2). Also outstanding for the nine composed
-shapes: donor Markdown rendering, link/destination representation, rich donor forms, the other hero, stats, steps and
-quote options, the donor `steps` heading outline, a composition Page, and real published HTTP/browser proof. Any future
-order must add those explicitly; this ledger authorises no new module ID, no new schema variant and no publication
+Six donor families are entirely unimplemented (the exact line in section 2). Also outstanding for the eleven composed
+shapes: donor Markdown rendering, link/destination representation, rich donor forms, the other hero, stats, steps, quote,
+FAQ and columns options, the donor `steps`, `faq` and `columns` heading outlines, a composition Page, and real published
+HTTP/browser proof. Any future order must add those explicitly; this ledger authorises no new module ID, no new schema
+variant and no publication
 authority.
