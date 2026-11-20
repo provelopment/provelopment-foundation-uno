@@ -1,9 +1,10 @@
 /**
  * Foundation Uno — the bounded Foundation→Uno family composition adapter (`UNO-WO-057 / R01`, extended by
- * `UNO-WO-058 / R01`, `UNO-WO-059 / R01`, `UNO-WO-060 / R01`, `UNO-WO-061 / R01` and `UNO-WO-062 / R01`, U04).
+ * `UNO-WO-058 / R01`, `UNO-WO-059 / R01`, `UNO-WO-060 / R01`, `UNO-WO-061 / R01`, `UNO-WO-062 / R01` and
+ * `UNO-WO-063 / R01`, U04).
  *
  * WHAT THIS IS. One pure, inward application function that translates a deliberately small **plain-text subset** of
- * fourteen Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
+ * fifteen Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
  * donor source shape and Uno's own validated document: the caller supplies untrusted donor data, this module either
  * returns one accepted, deep-frozen `UnoPageDocument` or one closed refusal, and it never returns a partial Page.
  *
@@ -14,7 +15,7 @@
  *
  * WHAT IT IS NOT. It does not read a file, a manifest, a host, an environment variable or a provider; it publishes
  * nothing, routes nothing, renders nothing and owns no locale, Site, visibility or delivery authority. It implements
- * **fourteen** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
+ * **fifteen** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
  * media converter, and it is not the seventeen family parity work: no full `FAMILY_PARITY` result may be derived
  * from it. In particular `steps` reproduces the donor's ordered sequence and optional body as plain text, but Uno's
  * timeline title is a `<p>` where the donor step title was an `<h3>`, so the donor heading outline is deliberately
@@ -28,6 +29,11 @@
  * fragment that already names a top-level section this composer generated: the donor's `href`/`route`/`link` destination
  * alternatives, its action `variant`, and the section heading/lede/align/surface options are all outside this subset, so
  * no external, `mailto:`, `tel:`, site-route or provider destination can be composed, and `actions` is not full parity.
+ * `media` composes **only** one descriptive image described by an authored alt plus an optional plain caption, and only
+ * when the caller supplies an explicit donor-source-to-owned-asset binding: the donor `src` stays an opaque migration
+ * identity, the composed asset is the separately authored owned ref, the donor decorative form, heading/lede/position/
+ * surface options and any remote URL source are outside the subset, and a donor Markdown caption becomes plain text in
+ * Uno's `figcaption`, so `media` is not full parity either.
  *
  * PROVENANCE. Original **Uno-owned** implementation, adaptation class **NEW / COMPOSE (plain-text subset)**. Concepts
  * — never copied source, CSS, components or assets — are adapted from `provelopment/provelopment-foundation` at
@@ -47,12 +53,21 @@
  * (blob `bc729d6a2e6484dc2c26ed997e65ee644bc8a7e6`), and the same-document action list reuses only the genuine
  * link-list semantics of the donor `ActionsSection` in `text-sections.tsx` (blob
  * `caeee57798bdd533867e5bef350422618187612f`) and `ActionLinks` in `section-support.tsx` (blob
- * `19c9bee3b3b200af2455813e5f842c30b062a6ac`). No donor runtime code,
+ * `19c9bee3b3b200af2455813e5f842c30b062a6ac`) and the donor figure/caption image presentation of
+ * `media-sections.tsx` (blob `e3f3a12e5e26cb6af9133bef79f5fa2dc0680bb2`). The binding reuses only the local Uno-owned
+ * asset policy in `src/core/assets/uno-owned-media.ts` (blob `f988a0e5200a29188f5ee9c91ab1ca04755b8e72`). No donor
+ * runtime code,
  * package, image or trademark is imported. See `.documents/Architecture/u04-family-parity.md`.
  */
 import { readUnoPageDocument, type UnoPageDocument } from "../core/page-document";
+import {
+  readUnoOwnedAssetRef,
+  readUnoOwnedMediaPath,
+  unoOwnedMediaExtension,
+  type UnoOwnedAssetRef,
+} from "../core/assets/uno-owned-media";
 
-/** The fourteen donor source families this bounded adapter accepts, in the order the ledger documents them. */
+/** The fifteen donor source families this bounded adapter accepts, in the order the ledger documents them. */
 export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "prose",
   "callout",
@@ -68,6 +83,7 @@ export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "cards",
   "features",
   "actions",
+  "media",
 ] as const);
 
 /** One accepted donor family name. */
@@ -77,7 +93,7 @@ export type UnoFoundationSubsetFamily = (typeof UNO_FOUNDATION_SUBSET_FAMILIES)[
  * The closed refusal vocabulary.
  *
  * `unsafe-source` — the input is not plain readable data (hostile object, accessor, cycle, sparse array, oversize).
- * `unsupported-family` — a real donor family outside these fourteen, never silently dropped.
+ * `unsupported-family` — a real donor family outside these fifteen, never silently dropped.
  * `unsupported-feature` — a supported family carrying an out-of-subset field or Markdown this subset cannot render.
  * `target-refused` — the composed candidate is not an acceptable Uno Page; no partial document is ever returned.
  */
@@ -121,6 +137,70 @@ const FORBIDDEN_SOURCE_KEYS: readonly string[] = Object.freeze(["__proto__", "co
  * destination form the donor also offers.
  */
 const ACTIONS_FRAGMENT = /^#family-(?:0|[1-9][0-9]*)-[a-z][a-zA-Z0-9]*(?:-[a-zA-Z0-9]+)*$/u;
+
+/** The donor media identity prefix. It is an opaque migration key, never an Uno-served path. */
+const MEDIA_SOURCE_PREFIX = "/assets/";
+
+/** The lowercase raster extensions this bounded subset accepts as a donor image identity. */
+const MEDIA_SOURCE_EXTENSIONS: readonly string[] = Object.freeze(["png", "jpg", "jpeg", "webp", "avif"]);
+
+/**
+ * Read one donor `media` source identity, or `null`.
+ *
+ * The value is a donor-side identity only. It must be a literal `/assets/` prefix followed by a relative path the local
+ * owned-media policy accepts, with an allowlisted lowercase raster extension, so no external URL, protocol-relative
+ * form, percent-encoding, traversal, backslash, colon, whitespace, root alias, device name, uppercase extension or SVG
+ * can enter. Nothing is decoded, trimmed, normalised or rewritten into an Uno reference: the returned string is the
+ * authored identity unchanged, and it is used only as a binding lookup key.
+ */
+function readMediaSourceIdentity(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  if (!value.startsWith(MEDIA_SOURCE_PREFIX)) return null;
+  const suffix = readUnoOwnedMediaPath(value.slice(MEDIA_SOURCE_PREFIX.length));
+  if (suffix === null) return null;
+  const extension = unoOwnedMediaExtension(suffix);
+  if (extension === null || !MEDIA_SOURCE_EXTENSIONS.includes(extension)) return null;
+  return value;
+}
+
+/** One validated migration-binding context: the owned-ref lookup plus the donor sources actually consumed. */
+interface MediaBindingContext {
+  readonly lookup: ReadonlyMap<string, UnoOwnedAssetRef>;
+  readonly usedSources: Set<string>;
+}
+
+/**
+ * Read the optional second argument — a migration binding, never source or publication authority.
+ *
+ * The whole value has already been snapshotted, so nothing here can run authored code. A present binder is exactly
+ * `{images:[...]}` with one to eight dense `{source,owned}` entries; sources are unique validated donor identities and
+ * each owned value is validated by the established Uno-owned image policy *before* any candidate exists. An absent
+ * binder yields an empty lookup, which the `media` arm treats as a refusal rather than as permission to invent a path.
+ */
+function readImageBindings(value: PlainValue | undefined): ReadonlyMap<string, UnoOwnedAssetRef> {
+  const lookup = new Map<string, UnoOwnedAssetRef>();
+  if (value === undefined) return lookup;
+  if (value === null || typeof value !== "object" || Array.isArray(value)) refuseUnsupportedFeature();
+  const binder = value as PlainRecord;
+  requireExactKeys(binder, ["images"], []);
+  const images = binder["images"];
+  if (!Array.isArray(images)) refuseUnsupportedFeature();
+  if (images.length < 1 || images.length > 8) refuseTarget();
+  for (const rawImage of images) {
+    if (rawImage === null || typeof rawImage !== "object" || Array.isArray(rawImage)) {
+      refuseUnsupportedFeature();
+    }
+    const entry = rawImage as PlainRecord;
+    requireExactKeys(entry, ["source", "owned"], []);
+    const source = readMediaSourceIdentity(entry["source"]);
+    if (source === null) refuseUnsupportedFeature();
+    if (lookup.has(source)) refuseUnsupportedFeature();
+    const decision = readUnoOwnedAssetRef(entry["owned"], "image");
+    if (!decision.ok) refuseTarget();
+    lookup.set(source, decision.decision.ref);
+  }
+  return lookup;
+}
 
 /** One closed refusal thrown while composing; never escapes this module. */
 class SourceRefusal extends Error {
@@ -310,7 +390,8 @@ interface CandidateSection {
     | "layout.grid"
     | "layout.stack"
     | "content.heading"
-    | "content.actions";
+    | "content.actions"
+    | "media.image";
   readonly props: Record<string, unknown>;
   /**
    * Nested children of a child-bearing module (`interaction.accordion`, `layout.grid`, `layout.stack`).
@@ -358,7 +439,7 @@ function readNewFamilyText(value: PlainValue | undefined): string {
  * never degraded to a paragraph; a supported family carrying any extra field refuses as a feature. Section ids are
  * `family-<index>-<type>`, which stays inside Uno's own closed section-id grammar.
  */
-function composeSection(section: PlainValue, index: number): CandidateSection {
+function composeSection(section: PlainValue, index: number, media: MediaBindingContext): CandidateSection {
   if (section === null || typeof section !== "object" || Array.isArray(section)) refuseUnsafeSource();
   const record = section as PlainRecord;
 
@@ -642,6 +723,32 @@ function composeSection(section: PlainValue, index: number): CandidateSection {
       }
       return { id, module: "content.actions", props: { items } };
     }
+    case "media": {
+      // The donor also accepts decorative images, a remote source, heading/lede, position and surface. This subset
+      // composes one descriptive owned image per section, and only from an explicit caller-supplied binding.
+      requireExactKeys(record, ["type", "image"], ["caption"]);
+      const rawImage = record["image"];
+      if (rawImage === null || typeof rawImage !== "object" || Array.isArray(rawImage)) refuseUnsupportedFeature();
+      const image = rawImage as PlainRecord;
+      requireExactKeys(image, ["src", "alt"], []);
+      const source = readMediaSourceIdentity(image["src"]);
+      if (source === null) refuseUnsupportedFeature();
+      const alt = readNewFamilyText(image["alt"]);
+      // A donor decorative image (empty alt) is a different semantic and is not composed as a described image.
+      if (alt.trim().length === 0) refuseTarget();
+      const hasCaption = ownsKey(record, "caption");
+      const caption = hasCaption ? readNewFamilyText(record["caption"]) : undefined;
+      if (caption !== undefined && caption.trim().length === 0) refuseTarget();
+      // An unbound source has no owned reference: refuse rather than substitute a path or an external URL.
+      const owned = media.lookup.get(source);
+      if (owned === undefined) refuseUnsupportedFeature();
+      media.usedSources.add(source);
+      return {
+        id,
+        module: "media.image",
+        props: { asset: owned, alt, ...(caption === undefined ? {} : { caption }) },
+      };
+    }
     default:
       throw new SourceRefusal("family:unsupported-family");
   }
@@ -655,9 +762,13 @@ function composeSection(section: PlainValue, index: number): CandidateSection {
  * `{status:"refused", reason}` with one closed literal and no document at all, so a caller can never publish a
  * partially translated Page or mistake a refusal for empty content.
  */
-export function composeUnoFoundationSubset(input: unknown): UnoFoundationSubsetOutcome {
+export function composeUnoFoundationSubset(input: unknown, bindings?: unknown): UnoFoundationSubsetOutcome {
   try {
     const source = snapshotPlainSource(input, 1, { nodes: 0 }, new WeakSet<object>());
+    // The optional migration binding is separately untrusted: its own snapshot, budget and cycle set, read before any
+    // donor section so no authored accessor on either side can run.
+    const bindingSource =
+      bindings === undefined ? undefined : snapshotPlainSource(bindings, 1, { nodes: 0 }, new WeakSet<object>());
     if (source === null || typeof source !== "object" || Array.isArray(source)) refuseUnsafeSource();
     const envelope = source as PlainRecord;
 
@@ -673,10 +784,19 @@ export function composeUnoFoundationSubset(input: unknown): UnoFoundationSubsetO
     if (sections.length < 1 || sections.length > SUBSET_LIMITS.sections) refuseUnsupportedFeature();
 
     const nodes: CandidateSection[] = [];
+    const media: MediaBindingContext = { lookup: readImageBindings(bindingSource), usedSources: new Set<string>() };
     for (let index = 0; index < sections.length; index += 1) {
       const section = sections[index];
       if (section === undefined) refuseUnsafeSource();
-      nodes.push(composeSection(section, index));
+      nodes.push(composeSection(section, index, media));
+    }
+
+    // The binding must be exactly the set of donor sources the document consumed: no missing, extra or unused
+    // authority, and no composed media without an owned reference. An absent binder with no media is the one allowed
+    // empty case.
+    if (media.usedSources.size !== media.lookup.size) refuseUnsupportedFeature();
+    for (const usedSource of media.usedSources) {
+      if (!media.lookup.has(usedSource)) refuseUnsupportedFeature();
     }
 
     // `content.actions` may name only a *top-level* section this composer itself just generated. This is an exact

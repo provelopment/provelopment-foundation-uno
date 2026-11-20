@@ -1,13 +1,13 @@
 # U04 — bounded Foundation→Uno family composition (source and rights ledger)
 
-**Scope of this record.** It documents the **fourteen** donor source shapes Uno currently composes into its own v1 Page
+**Scope of this record.** It documents the **fifteen** donor source shapes Uno currently composes into its own v1 Page
 document — `prose`, `callout`, `table`, `list`, `divider`, `hero`, `stats`, `steps`, `quote`, `faq`, `columns`, `cards`,
-`features`, `actions` — out of the donor's **seventeen** families. It is a narrow provenance and rights ledger, not a
-parity record: **fourteen bounded mappings implemented; three donor families entirely unimplemented; zero of seventeen full semantic parity; no family production HTTP/browser proof.** U04 remains OPEN.
+`features`, `actions`, `media` — out of the donor's **seventeen** families. It is a narrow provenance and rights ledger, not
+a parity record: **fifteen bounded mappings implemented; two donor families entirely unimplemented; zero of seventeen full semantic parity; no family production HTTP/browser proof.** U04 remains OPEN.
 
 ## 1. Provenance and licence
 
-These thirteen mappings are an **original Uno-owned** implementation
+These fifteen mappings are an **original Uno-owned** implementation
 (`src/application/compose-uno-foundation-families.ts`, adaptation class `COMPOSE (plain-text subset)`). Only
 **concepts and semantics** were adapted — never donor source, components, CSS, Tailwind classes, images, Connect code
 or trademarks — from `provelopment/provelopment-foundation` at commit
@@ -27,14 +27,14 @@ Donor evidence blobs: the source schemas and the exact `PAGE_SECTION_TYPES` rost
 `hero`, `prose`, `media`, `gallery`, `actions`, `callout`, `cards`, `features`, `columns`, `steps`, `stats`, `quote`,
 `table`, `faq`, `list`, `divider`, `contactForm`.
 
-Fourteen of these are composed as bounded subsets (section 3). The other three are not implemented at all:
+Fifteen of these are composed as bounded subsets (section 3). The other two are not implemented at all:
 
-**UNIMPLEMENTED (3):** `media`, `gallery`, `contactForm`.
+**UNIMPLEMENTED (2):** `gallery`, `contactForm`.
 
 Uno module ids such as `content.heading`, `content.testimonials` or `content.pricing` are Uno concepts or renderer
 features; they are **not** additional donor family keys and must never be listed as an eighteenth family.
 
-## 3. Fourteen composed source shapes
+## 3. Fifteen composed source shapes
 
 | Donor family | Donor evidence | Disposition | Accepted donor fields | Deliberately unsupported | Uno output | Unit proof |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -52,6 +52,7 @@ features; they are **not** additional donor family keys and must never be listed
 | `cards` | `page-document.ts` `a12d964c…` (strict `cardsSectionSchema`, `cardItemSchema`); `media-sections.tsx` `e3f3a12e…` (native `<li>` cards with optional media/meta/action); `section-support.tsx` `19c9bee3…` (`columnsClass` default, `<h3>` item title) | `COMPOSE (bounded cards)` | `type`, required `columns` 2|3|4, `items[1..8]{title,body?}` | donor `heading`/`lede`/`surface`, an omitted `columns`, item `image`/`meta`/`action`/`href`/`icon`/`style`, Markdown and links, donor border styling and `<h3>` item outline | one `layout.grid {columns,itemSemantics:"list"}` with one `layout.stack {gap:"tight"}` per card: `content.heading {level:2}` and, only when authored, one `content.prose` body | `<ul class="uno-json-grid" data-uno-item-semantics="list" role="list">`, one direct `<li class="uno-json-cell">` per card, `<h2 class="uno-json-heading">` and only authored `<p class="uno-json-prose">` | composed + required-columns/count/Markdown refusal + markup |
 | `features` | `page-document.ts` `a12d964c…` (strict `featuresSectionSchema`, `featureItemSchema`); `items-sections.tsx` `bc729d6a…` (native `<li>` features with optional decorative icon); `section-support.tsx` `19c9bee3…` | `COMPOSE (bounded features)` | `type`, required `columns` 2|3|4, `items[1..8]{title,body?}` | donor `heading`/`lede`/`surface`, an omitted `columns`, item `icon`/`image`/`href`/`style`, Markdown and links, donor icon rendering and `<h3>` item outline | the same native list-grid: `layout.grid {columns,itemSemantics:"list"}` of tight stacks, each `content.heading {level:2}` and only an authored body | the same `<ul role="list">`/`<li>` structure with per-feature `<h2>` and only authored paragraphs | composed + required-columns/count/Markdown refusal + markup |
 | `actions` | `page-document.ts` `a12d964c…` (strict `actionsSectionSchema`, `actionSchema`, destination and variant forms); `text-sections.tsx` `caeee577…` (donor `ActionsSection` genuine link list); `section-support.tsx` `19c9bee3…` (donor `ActionLinks` item presentation) | `COMPOSE (same-document anchor subset)` | `type`, required `actions[1..8]{label,href}` where the label is plain text and `href` is a literal `#family-<index>-<name>` fragment naming an existing **top-level** composed section | donor `href`/`route`/`link` destination alternatives, action `variant`, section `heading`/`lede`/`align`/`surface`, Markdown labels, external/`mailto:`/`tel:`/site-route destinations, percent-encoded, suffixed, whitespace or missing/nested targets | `content.actions {items:[{label,targetId}]}`, preserving authored order and each authored anchor one-to-one; the composer's own exact top-level ID equality check runs before the Uno reader | `<ul class="uno-json-actions" id="family-13-actions">` with one direct `<li class="uno-json-action-item">` and one native `<a class="uno-json-action" href="#<targetId>">` per authored action | composed + destination/label refusal + native-anchor markup |
+| `media` | `page-document.ts` `a12d964c…` (strict `imageSchema`, `mediaSectionSchema`, donor `src`, alt/decorative, optional caption, heading/lede/position/surface); `media-sections.tsx` `e3f3a12e…` (donor `<figure>` image and caption, optional `position`); `section-support.tsx` `19c9bee3…` (donor image presentation and alt semantics); local Uno `src/core/assets/uno-owned-media.ts` `f988a0e5…` (`UnoOwnedAssetRef`, `readUnoOwnedAssetRef`, `readUnoOwnedMediaPath`, four zones, per-purpose extension/MIME, generated-SHA policy) | `COMPOSE (explicit owned-image binding subset)` | `type`, required `image{src,alt}` with a literal donor `/assets/…` identity (lowercase raster extension, path accepted by the local owned-media policy) and an authored nonblank descriptive alt, optional plain `caption`; a caller-supplied `{images:[{source,owned}]}` binding maps each consumed donor identity to a separately authored `{zone,path,integrity?}` image ref | donor decorative images (empty alt), donor `heading`/`lede`/`position`/`surface`, remote or protocol-relative sources, SVG, uppercase extensions, percent-encoding, query/fragment, donor Markdown caption and any automatic URL-to-asset migration, unbound/missing/extra/duplicate bindings, Markdown text | `media.image {asset,alt,caption?}` where `asset` is the validated owned ref from the binding; donor `src` never becomes a rendered URL, and the binding is validated before a candidate exists | real `<figure class="uno-json-media" id="family-14-media">` only when the server supplies a resolved image projection; without that projection no figure and no image is emitted, and the donor path never appears as a `src` | composed + explicit-binding refusal + projection-gated markup |
 
 Each accepted output is one validated, deep-frozen `UnoPageDocument` with `version: 1`, the donor title and one node
 per input section (`family-<index>-<type>`). Absent optional fields stay absent; the renderer owns visual defaults.
@@ -72,6 +73,18 @@ requires `columns` explicitly and refuses an omitted one rather than manufacturi
 families reduce to the same native list-grid, two different donor concepts can produce the same minimal structure; that
 is a bounded structural choice, not visual or semantic parity for either family.
 
+**Deliberately absent donor design (media and its binding).** The donor `media` section accepts a remote or local `src`,
+a decorative image with empty alt, a Markdown caption, and heading/lede/position/surface layout options; its figure also
+renders the caption as Markdown. This subset composes none of that richness. A donor `src` such as `/assets/portrait.png`
+remains an **opaque migration identity**: it is never decoded, trimmed, prefix-rewritten or turned into an Uno path, and
+it is used only to look up an explicit caller-supplied binding. The composed asset is the separately authored
+`{zone,path,integrity?}` reference the established `readUnoOwnedAssetRef(…, "image")` policy accepted, and an absent,
+unused, extra or duplicate binding refuses the whole Page instead of inventing one. Captions and alts are plain text in a
+native `figcaption`, so a donor Markdown caption is *not* literal markup parity, and the renderer emits a figure only when
+a server-built `UnoPageMedia` projection exists for the section — a validated document alone can never fabricate an
+image. The binding is a declaration for later independent verification: it grants no filesystem read, source licence,
+stored bytes, availability, rights or publication authority, and no asset HTTP or browser proof is claimed here.
+
 **Deliberately absent donor design (actions).** The donor action accepts `href`, `route` **or** `link` destinations, an
 optional `variant`, and the section accepts `heading`/`lede`/`align`/`surface`. This subset composes none of those: it
 accepts only a literal, unencoded `#family-<index>-<name>` fragment that names a top-level section the composer itself
@@ -82,17 +95,21 @@ and this ledger claims no link engine, route resolver or publication authority.
 
 ## 4. Refusal policy
 
-- **Unsupported family** (`family:unsupported-family`): any of the three unimplemented donor families, or any unknown
+- **Unsupported family** (`family:unsupported-family`): either unimplemented donor family, or any unknown
   type. Nothing is degraded into a paragraph.
 - **Unsupported feature** (`family:unsupported-feature`): a supported family carrying an out-of-subset field
   (`heading`, `lede`, `align`, `surface`, `links`, `visibility`, `href`, `route`, `link`, `html`, `style`, `onClick`,
   hero `actions`, a stats entry link, a `steps` item state/date, a `faq` item `href`/`icon`/`open`, a `columns` item
   `href`/`icon`/`style`, a `cards`/`features` item `image`/`meta`/`action`/`icon`, an `actions` entry `variant`/`route`/
-  `link`/`target`/`rel`/`download`, a section `ratio` on
+  `link`/`target`/`rel`/`download`, a `media` section `heading`/`lede`/`position`/`surface` or image `decorative`/`href`,
+  a section `ratio` on
   `cards`/`features`, a `ratio` authored on three columns, a column declaring both `body` and `items` or neither,
   any extra key), a missing required subset field (hero without `lede`, `quote` `role` without `attribution`, a
-  `cards`/`features` section without its required `columns`), an `actions` destination outside the accepted literal
-  fragment spelling (external URL, site route, `mailto:`, `tel:`, percent-encoded, whitespace/query/suffix), or a
+  `cards`/`features` section without its required `columns`, `media` without `image.src`/`image.alt`), an `actions`
+  destination outside the accepted literal
+  fragment spelling (external URL, site route, `mailto:`, `tel:`, percent-encoded, whitespace/query/suffix), a `media`
+  source that is not a literal lowercase `/assets/…` raster identity, a `media` document with no binding, a binder passed
+  for a document that consumed no media, an unused/extra/duplicate binding source, or a
   Markdown construct (`**bold**`,
   `[label](destination)`, backticks, leading Markdown headings, and — for the newest six families only — unmistakable
   emphasis, strike, image, blockquote or list forms).
@@ -102,15 +119,18 @@ and this ledger claims no link engine, route resolver or publication authority.
 - **Target refused** (`family:target-refused`): malformed values inside accepted fields (empty/overlong text, bad
   `align`/`surface`/`ratio`/`columns` literal, zero or seven stats items, zero or nine FAQ entries, one/four or more
   than three columns, zero or nine card/feature/action items, blank or 160-plus action label, unresolved or nested
-  action target, empty or thirteen column labels, blank label/value, unsafe script or scheme) and any candidate above the Uno 64 KiB source cap. The whole document refuses; no partial Page is
+  action target, an empty/whitespace/321-code-point/safe-text-refused `media` alt or caption, an invalid owned ref
+  (zone/path/extension/purpose/generated digest), a zero or nine-entry binding, empty or thirteen column labels, blank
+  label/value, unsafe script or scheme) and any candidate above the Uno 64 KiB source cap. The whole document refuses; no partial Page is
   ever returned.
 
 ## 5. Remaining obligations
 
-Three donor families are entirely unimplemented (the exact line in section 2). Also outstanding for the fourteen composed
+Two donor families are entirely unimplemented (the exact line in section 2). Also outstanding for the fifteen composed
 shapes: donor Markdown rendering, link/destination representation beyond same-document fragments, rich donor forms, the
 other hero, stats, steps, quote, FAQ, columns, cards, features and actions options, the donor `steps`, `faq`, `columns`,
-`cards` and `features` heading outlines, donor card borders/media/meta/actions and feature icons, a composition Page, and
+`cards` and `features` heading outlines, donor card borders/media/meta/actions and feature icons, the donor decorative
+media form, media headings/lede/position/surface, remote image sources and Markdown captions, a composition Page, and
 real published HTTP/browser proof. Any
 future order must add those explicitly; this ledger authorises no new module ID, no new schema
 variant and no publication
