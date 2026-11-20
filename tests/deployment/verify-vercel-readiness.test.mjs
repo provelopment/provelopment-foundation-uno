@@ -198,6 +198,12 @@ function validSnapshot() {
     '        run: node scripts/verify-u04-json-slice.mjs',
     '        env:',
     '          PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers',
+    '      - name: U04 22-module consent hermetic guard',
+    '        run: node --test tests/deployment/u04-22-module-consent.test.mjs',
+    '      - name: Verify U04 22-module and four-provider consent (real production HTTP and Chromium)',
+    '        run: node scripts/verify-u04-22-module-consent.mjs',
+    '        env:',
+    '          PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers',
     '      - name: Deployment readiness fixtures',
     '        run: node --test tests/deployment/verify-vercel-readiness.test.mjs',
     '      - name: Deployment readiness (offline)',
@@ -875,4 +881,44 @@ test('the demonstration and its document live in the demo route group', () => {
   assert.equal(readiness.includes("layout: 'src/app/(demo)/layout.tsx'"), true);
   assert.equal(readiness.includes("page: 'src/app/page.tsx'"), false);
   assert.equal(readiness.includes("layout: 'src/app/layout.tsx'"), false);
+});
+
+// --- UNO-WO-048 / R01: the two-host U04 22-module gate must stay blocking ----------------
+
+test('refuses a workflow that deletes the U04 22-module hermetic guard', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text.replace(
+      [
+        '      - name: U04 22-module consent hermetic guard',
+        '        run: node --test tests/deployment/u04-22-module-consent.test.mjs',
+        '',
+      ].join('\n'),
+      '',
+    ),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-u04-consent-unit');
+});
+
+test('refuses a workflow that mutes the U04 22-module browser step into a comment', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text.replace(
+      '        run: node scripts/verify-u04-22-module-consent.mjs',
+      '        # run: node scripts/verify-u04-22-module-consent.mjs',
+    ),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:no-u04-consent-browser');
+});
+
+test('refuses a U04 22-module browser step without the pinned repo-local Chromium path', () => {
+  const snapshot = withChange('u01Workflow', (text) =>
+    text.replace(
+      [
+        '        run: node scripts/verify-u04-22-module-consent.mjs',
+        '        env:',
+        '          PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers',
+      ].join('\n'),
+      '        run: node scripts/verify-u04-22-module-consent.mjs',
+    ),
+  );
+  assertRefused(analyzeReadiness(snapshot), 'workflow:u04-consent-env');
 });

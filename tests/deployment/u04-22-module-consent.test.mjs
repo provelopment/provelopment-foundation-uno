@@ -35,6 +35,15 @@ const REQUIRED = Object.freeze([
   "the unregistered-module Page answers HTTP 404",
   "is restored to its committed bytes",
   "nothing was staged by the gate",
+  // `UNO-WO-048 / R01`: the owned-media HTTP proof must survive any future edit.
+  "the served Page advertises an owned-media locator",
+  "the authorised owned occurrence answers HTTP 200",
+  "it forbids MIME sniffing",
+  "HEAD answers HTTP 200 for the same authorised occurrence",
+  "HEAD returns no body at all",
+  "a non-video resource ignores a range and serves the full authorised 200",
+  "an unauthorised locator is refused before any range is inspected",
+  "an out-of-range occurrence is a closed 404",
   "prepareUnoU03FixtureTransaction",
   "finally",
 ]);

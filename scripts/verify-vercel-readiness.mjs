@@ -256,6 +256,9 @@ export const REASONS = Object.freeze([
   'workflow:no-browser-install',
   'workflow:no-browser-path',
   'workflow:no-browser-runner',
+  'workflow:no-u04-consent-unit',
+  'workflow:no-u04-consent-browser',
+  'workflow:u04-consent-env',
   'workflow:no-u04-slice',
   'workflow:no-u04-hermetic-test',
   'workflow:browser-system-deps',
@@ -613,6 +616,26 @@ export function analyzeReadiness(snapshot) {
   expect(!/secrets\.|VERCEL_TOKEN/.test(workflowText), 'workflow:secret-reference');
   expect(!/technical placeholder/i.test(workflowText), 'workflow:stale-http-label');
 
+  // --- 8c. The existing two-host U04 22-module gate must remain a blocking step -------------
+  // `UNO-WO-048 / R01`. The hermetic guard and the real production-HTTP/Chromium runner are already the `run:` of
+  // named steps on both hosts. Readiness must fail closed if either command is deleted, muted into a comment, moved
+  // onto a passive mention or a different entry, given failure tolerance, or stripped of the pinned repo-local
+  // Chromium path. The block is read from the command's own `run:` line to the next step, so a quoted comment, a
+  // stale string elsewhere in the file or a bare mention in prose cannot satisfy it.
+  const consentUnit = stepForCommand('node --test tests/deployment/u04-22-module-consent\\.test\\.mjs');
+  expect(consentUnit !== null, 'workflow:no-u04-consent-unit');
+  expect(consentUnit !== null ? !/\|\|\s*true|continue-on-error|if:\s*false/u.test(consentUnit) : true, 'workflow:bypass');
+  const consentBrowser = stepForCommand('node scripts/verify-u04-22-module-consent\\.mjs');
+  expect(consentBrowser !== null, 'workflow:no-u04-consent-browser');
+  expect(
+    consentBrowser !== null ? !/\|\|\s*true|continue-on-error|if:\s*false/u.test(consentBrowser) : true,
+    'workflow:bypass',
+  );
+  expect(
+    consentBrowser === null || /PLAYWRIGHT_BROWSERS_PATH:\s*\.temp\/uno-u03-browsers/u.test(consentBrowser),
+    'workflow:u04-consent-env',
+  );
+
   // --- 8b. The test-only browser proof must be installed hermetically inside Uno -------------
   // The pinned Playwright browser stays a *dev* dependency with one exact version; it is installed only into the
   // repository's ignored `.temp` path (never a shared user cache, never an OS package), and the publication runner that
@@ -621,7 +644,28 @@ export function analyzeReadiness(snapshot) {
     workflowText.includes('pnpm exec playwright install --only-shell chromium'),
     'workflow:no-browser-install',
   );
-  expect(countOf(workflowText, 'PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers') >= 2, 'workflow:no-browser-path');
+  // The pinned repo-local browser path must be the `env:` of the real steps that need it, not merely a string that
+  // appears somewhere in the file. `UNO-WO-048 / R01` reads each step's own block, so a passive mention cannot pass.
+  function stepForCommand(command) {
+    const lines = workflowText.split(/\r?\n/u);
+    const pattern = new RegExp(`^\\s*run:\\s*${command}\\s*$`, 'u');
+    const index = lines.findIndex((line) => pattern.test(line));
+    if (index < 0) return null;
+    let start = index;
+    while (start > 0 && !/^\s*-\s+(name|uses|run):/u.test(lines[start])) start -= 1;
+    let end = index + 1;
+    while (end < lines.length && !/^\s*-\s+(name|uses|run):/u.test(lines[end])) end += 1;
+    return lines.slice(start, end).join('\n');
+  }
+  const installStep = stepForCommand('pnpm exec playwright install --only-shell chromium');
+  const publishedStep = stepForCommand('node scripts/verify-u03-published-http\\.mjs');
+  const carriesPath = (block) => block !== null && block.includes('PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers');
+  // A step that is absent altogether is refused by its own reason code, so the path check only speaks for the steps
+  // that do exist: each of them must carry the pinned path in its own block.
+  expect(
+    (installStep === null || carriesPath(installStep)) && (publishedStep === null || carriesPath(publishedStep)),
+    'workflow:no-browser-path',
+  );
   expect(workflowText.includes('node scripts/verify-u03-published-http.mjs'), 'workflow:no-browser-runner');
 
   // --- 8b2. The U04 JSON-slice gate must stay installed, blocking and browser-backed (UNO-WO-035 / R01) ------

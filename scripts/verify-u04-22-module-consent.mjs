@@ -499,6 +499,61 @@ async function main() {
   const refusedResponse = await fetch(`${base}/en-001/wo044-invalid`);
   check("the unregistered-module Page answers HTTP 404", refusedResponse.status === 404, String(refusedResponse.status));
   check("the refused Page does not rescue to Markdown", !(await refusedResponse.text()).includes("Unknown module"));
+
+  // --- Owned media over real production HTTP (`UNO-WO-048 / R01`) --------------------------------
+  // The locator is read from the served Page itself, never guessed from an index. This proves the authorised GET,
+  // the explicit HEAD, closed refusal ordering and non-video range behaviour. No native video occurrence exists in
+  // this fixture yet, so the video `206`/`416` paths remain outstanding and are not claimed.
+  const locator = /\/uno-media\/[A-Za-z0-9/_-]+/u.exec(html);
+  if (!check("the served Page advertises an owned-media locator", locator !== null)) return 1;
+  const mediaUrl = `${base}${locator[0]}`;
+  const mediaResponse = await fetch(mediaUrl);
+  const mediaBytes = Buffer.from(await mediaResponse.arrayBuffer());
+  check("the authorised owned occurrence answers HTTP 200", mediaResponse.status === 200, String(mediaResponse.status));
+  check(
+    "it declares the allowlisted image MIME type",
+    mediaResponse.headers.get("content-type") === "image/png",
+    mediaResponse.headers.get("content-type") ?? "",
+  );
+  check("it forbids MIME sniffing", mediaResponse.headers.get("x-content-type-options") === "nosniff");
+  check("it carries a real PNG signature", mediaBytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])));
+  const plateOnDisk = readFileSync(resolve(ROOT, CAPSULE_DIR, CAPSULE_FILES[0]));
+  check(
+    "the served bytes are exactly the fixture plate's bytes",
+    mediaBytes.equals(plateOnDisk),
+    `${mediaBytes.byteLength}/${plateOnDisk.byteLength}`,
+  );
+  const declaredLength = mediaResponse.headers.get("content-length");
+  check(
+    "any declared length agrees with the authorised bytes",
+    declaredLength === null || declaredLength === String(mediaBytes.byteLength),
+    `${declaredLength ?? ""}/${mediaBytes.byteLength}`,
+  );
+  const headMedia = await fetch(mediaUrl, { method: "HEAD" });
+  check("HEAD answers HTTP 200 for the same authorised occurrence", headMedia.status === 200, String(headMedia.status));
+  check("HEAD carries the same MIME type", headMedia.headers.get("content-type") === "image/png");
+  const headLength = headMedia.headers.get("content-length");
+  check(
+    "HEAD declares the authorised length or streams with none",
+    headLength === null || headLength === String(mediaBytes.byteLength),
+    `${headLength ?? ""}/${mediaBytes.byteLength}`,
+  );
+  check("HEAD returns no body at all", (await headMedia.arrayBuffer()).byteLength === 0);
+  check("a non-video resource does not advertise byte ranges", headMedia.headers.get("accept-ranges") === null);
+  const rangedMedia = await fetch(mediaUrl, { headers: { range: "bytes=0-3" } });
+  const rangedBytes = Buffer.from(await rangedMedia.arrayBuffer());
+  check(
+    "a non-video resource ignores a range and serves the full authorised 200",
+    rangedMedia.status === 200 && rangedBytes.byteLength === mediaBytes.byteLength,
+    `${rangedMedia.status}/${rangedBytes.byteLength}`,
+  );
+  const unauthorised = `${base}/uno-media/en-001/wo044-invalid/0`;
+  check("HEAD on an unauthorised locator is a closed 404", (await fetch(unauthorised, { method: "HEAD" })).status === 404);
+  const unauthorisedRange = await fetch(unauthorised, { headers: { range: "bytes=0-1" } });
+  check("an unauthorised locator is refused before any range is inspected", unauthorisedRange.status === 404, String(unauthorisedRange.status));
+  check("a refused locator returns no media bytes", (await unauthorisedRange.arrayBuffer()).byteLength === 0);
+  const wrongOccurrence = `${base}${locator[0].replace(/\/\d+$/u, "/99")}`;
+  check("an out-of-range occurrence is a closed 404", (await fetch(wrongOccurrence, { method: "HEAD" })).status === 404);
   return base;
 }
 
