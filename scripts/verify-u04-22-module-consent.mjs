@@ -17,7 +17,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, rmdirSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { createServer } from "node:net";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { deflateSync } from "node:zlib";
 
@@ -46,6 +46,62 @@ const SELECTION = "deployment/uno.config.json";
 const ENTITY_ID = "e_7a3knkx60eacyhca7a0cr1k6e1";
 const ALL_ROUTE = ["wo044-all-modules"];
 const INVALID_ROUTE = ["wo044-invalid"];
+/** `UNO-WO-053 / R01`: a separately published Page whose generated asset carries a well-formed but wrong digest. */
+const BAD_ROUTE = ["wo053-bad-generated"];
+
+/** `UNO-WO-052 / R01`: the exclusive `wo052-*` ledger of named original synthetic inputs across four owned zones. */
+const THEME_DIR = "deployment/content/assets";
+const PLATFORM_DIR = "public/platform";
+const GENERATED_DIR = "public/_uno-generated";
+const MEDIA = Object.freeze({
+  page: "wo052-page.png",
+  theme: "wo052-theme.png",
+  platform: "wo052-platform.png",
+  generated: "wo052-generated.png",
+  mp4: "wo052-native.mp4",
+  captions: "wo052-native.vtt",
+  webm: "wo053-native.webm",
+  poster: "wo052-native-poster.png",
+});
+
+/** One bounded `ftyp` MP4 transport box: original bytes, transport MIME/signature only, never a decodability claim. */
+function mp4Bytes() {
+  return Buffer.from([
+    0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00,
+    0x69, 0x73, 0x6f, 0x6d, 0x69, 0x73, 0x6f, 0x32, 0x61, 0x76, 0x63, 0x31, 0x6d, 0x70, 0x34, 0x31,
+    0x69, 0x73, 0x6f, 0x35,
+  ]);
+}
+
+/** One original EBML/WebM transport header: correct signature and DocType, never a decodability claim. */
+function webmBytes() {
+  return Buffer.from("1a45dfa39f4282867765626d4287810142858102", "hex");
+}
+
+/** One original UTF-8 WebVTT track with a single sane cue. */
+function vttBytes() {
+  return Buffer.from("WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nSynthetic transport cue.\n", "utf8");
+}
+
+/** Every test-owned media file this run created, with the exact bytes written. */
+const createdMedia = new Map();
+
+/**
+ * Create one test-owned fixture with exclusive semantics, so the gate can never proceed on an overwritten Owner file or a
+ * partially written plate: a pre-existing path or a digest mismatch on read-back refuses immediately.
+ */
+function createMedia(relativePath, bytes) {
+  const absolute = resolve(ROOT, relativePath);
+  if (existsSync(absolute)) throw new Error(`the fixture path ${relativePath} already exists`);
+  mkdirSync(dirname(absolute), { recursive: true });
+  writeFileSync(absolute, bytes, { flag: "wx" });
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  if (createHash("sha256").update(readFileSync(absolute)).digest("hex") !== digest) {
+    throw new Error(`the fixture path ${relativePath} did not keep its bytes`);
+  }
+  createdMedia.set(relativePath, bytes);
+  return bytes;
+}
 
 /** The committed declaration digests this gate requires before it will touch anything. */
 const PINNED_DECLARATIONS = new Map([
@@ -57,6 +113,7 @@ const SOURCES = Object.freeze([
   `${CONTENT}/wo044-home.en-001.json`,
   `${CONTENT}/wo044-all-modules.en-001.json`,
   `${CONTENT}/wo044-invalid.en-001.json`,
+  `${CONTENT}/wo053-bad-generated.en-001.json`,
 ]);
 
 const failures = [];
@@ -146,7 +203,7 @@ function pngBytes(width, height) {
  * The fixture Page: every one of the twenty-two registered module IDs, authored with published props only, plus the
  * three further external video instances needed to reach all four governed providers.
  */
-function allModulesDocument() {
+function allModulesDocument(generatedIntegrity) {
   return {
     version: 1,
     title: "All modules - consent proof",
@@ -251,6 +308,35 @@ function allModulesDocument() {
       section("wo044-video-bitchute", "media.video", {
         source: "external", provider: "bitchute", videoId: "aB_9-hXyZ", title: "A BitChute clip",
       }),
+      // `UNO-WO-052 / R01`: one named occurrence per owned zone plus one native MP4 transport carrying its own VTT and
+      // poster. The generated zone is the discriminator: its `integrity` must reach the installed bytes verbatim.
+      section("wo052-page-image", "media.image", { asset: plate(MEDIA.page), alt: "A synthetic Page plate" }),
+      section("wo052-theme-image", "media.image", {
+        asset: { zone: "theme", path: MEDIA.theme },
+        alt: "A synthetic theme-zone plate",
+      }),
+      section("wo052-platform-image", "media.image", {
+        asset: { zone: "platform", path: MEDIA.platform },
+        alt: "A synthetic platform-zone plate",
+      }),
+      section("wo052-generated-image", "media.image", {
+        asset: { zone: "generated", path: MEDIA.generated, integrity: generatedIntegrity },
+        alt: "A synthetic generated-zone plate",
+      }),
+      section("wo052-native-mp4", "media.video", {
+        asset: { zone: "page", path: MEDIA.mp4 },
+        captions: { zone: "page", path: MEDIA.captions },
+        poster: { zone: "page", path: MEDIA.poster },
+        title: "Synthetic MP4 transport",
+      }),
+      // `UNO-WO-053 / R01`: the second native container on the same Page, sharing the VTT and poster fixtures so their
+      // occurrence numbers must differ per section.
+      section("wo053-native-webm", "media.video", {
+        asset: { zone: "page", path: MEDIA.webm },
+        captions: { zone: "page", path: MEDIA.captions },
+        poster: { zone: "page", path: MEDIA.poster },
+        title: "WebM transport fixture",
+      }),
     ],
   };
 }
@@ -309,6 +395,12 @@ function fixtureManifest() {
                     publication: "published",
                     representations: [representation("en-001", [jsonSource(SOURCES[2])])],
                   },
+                  {
+                    id: "bad-generated",
+                    route: BAD_ROUTE,
+                    publication: "published",
+                    representations: [representation("en-001", [jsonSource(SOURCES[3])])],
+                  },
                 ],
               },
             ],
@@ -329,7 +421,7 @@ function fixtureSelection() {
   };
 }
 
-function fixturePlan() {
+function fixturePlan(allModulesJsonBytes, badJsonBytes) {
   return {
     declarations: [MANIFEST, SELECTION].map((path) => ({ path, digest: PINNED_DECLARATIONS.get(path) })),
     replacements: [
@@ -338,8 +430,9 @@ function fixturePlan() {
     ],
     fixtureSources: [
       { path: SOURCES[0], bytes: Buffer.from(`${JSON.stringify(homeDocument(), null, 2)}\n`, "utf8") },
-      { path: SOURCES[1], bytes: Buffer.from(`${JSON.stringify(allModulesDocument(), null, 2)}\n`, "utf8") },
+      { path: SOURCES[1], bytes: allModulesJsonBytes },
       { path: SOURCES[2], bytes: Buffer.from(`${JSON.stringify(invalidDocument(), null, 2)}\n`, "utf8") },
+      { path: SOURCES[3], bytes: badJsonBytes },
     ],
   };
 }
@@ -377,6 +470,90 @@ function runChild(args, timeoutMs) {
     childProcess.stderr.on("data", (chunk) => { output += chunk.toString(); });
     childProcess.on("close", (code) => { clearTimeout(timer); resolveRun({ code, output }); });
   });
+}
+
+/** `UNO-WO-053 / R01` Phase A: exact-bytes transport helpers, all driven by the served occurrence ledger. */
+const asBytes = async (response) => Buffer.from(await response.arrayBuffer());
+
+function oneOccurrence(assets, sectionId, slot) {
+  const matches = assets.occurrences.filter((item) => item.sectionId === sectionId && item.slot === slot);
+  if (matches.length !== 1) throw new Error(`ambiguous occurrence: ${sectionId}/${slot}`);
+  return matches[0];
+}
+
+async function expectOwnedGetHead(base, item, expected, label, html) {
+  const url = `${base}${item.url}`;
+  const response = await fetch(url);
+  const bytes = await asBytes(response);
+  const head = await fetch(url, { method: "HEAD" });
+  const headBytes = await asBytes(head);
+  const isVideo = expected.mime === "video/mp4" || expected.mime === "video/webm";
+  const facts = {
+    status: `${response.status}/${head.status}`,
+    body: bytes.equals(expected.bytes),
+    headEmpty: headBytes.length === 0,
+    mime: `${response.headers.get("content-type")}/${head.headers.get("content-type")}`,
+    nosniff: `${response.headers.get("x-content-type-options")}/${head.headers.get("x-content-type-options")}`,
+    length: `${response.headers.get("content-length")}/${head.headers.get("content-length")}/${bytes.length}`,    ranges: `${response.headers.get("accept-ranges")}/${head.headers.get("accept-ranges")}`,
+    inHtml: html.includes(item.url),
+    url: item.url,
+  };
+  const ok = response.status === 200 && head.status === 200
+    && facts.body && facts.headEmpty
+    && response.headers.get("content-type") === expected.mime
+    && head.headers.get("content-type") === expected.mime
+    && response.headers.get("x-content-type-options") === "nosniff"
+    && head.headers.get("x-content-type-options") === "nosniff"
+    && (response.headers.get("content-length") === null || response.headers.get("content-length") === String(bytes.length))
+    && (head.headers.get("content-length") === null || head.headers.get("content-length") === String(bytes.length))
+    && response.headers.get("accept-ranges") === (isVideo ? "bytes" : null)
+    && head.headers.get("accept-ranges") === (isVideo ? "bytes" : null)
+    && facts.inHtml;
+  check(`${label} GET/HEAD 200 MIME exact bytes and advertised HTML`, ok, JSON.stringify(facts));
+  return { url, ok, total: bytes.length };
+}
+
+async function expectVideoRanges(url, bytes, label) {
+  const total = bytes.length;
+  const positive = [["bytes=0-3", 0, 3], ["bytes=4-", 4, total - 1], ["bytes=-4", total - 4, total - 1]];
+  for (const [header, start, end] of positive) {
+    const response = await fetch(url, { headers: { range: header } });
+    const got = await asBytes(response);
+    check(`${label} 206 ${header}`,
+      response.status === 206 && got.equals(bytes.subarray(start, end + 1))
+      && response.headers.get("content-range") === `bytes ${start}-${end}/${total}`
+      && (response.headers.get("content-length") === null || response.headers.get("content-length") === String(end - start + 1))
+      && response.headers.get("accept-ranges") === "bytes",
+      `${response.status} ${got.length}/${end - start + 1} body=${got.equals(bytes.subarray(start, end + 1))} cr=${response.headers.get("content-range")} len=${response.headers.get("content-length")} ar=${response.headers.get("accept-ranges")}`);
+  }
+  for (const header of ["bytes=3-1", "bytes=-0", "bytes=99999-", "bytes=0-1,3-4"]) {
+    const response = await fetch(url, { headers: { range: header } });
+    const got = await asBytes(response);
+    check(`${label} 416 ${header}`,
+      response.status === 416 && got.length === 0
+      && response.headers.get("content-range") === `bytes */${total}`
+      && response.headers.get("accept-ranges") === "bytes",
+      `${response.status} ${got.length} bytes`);
+  }
+  const noValidator = await fetch(url, { headers: { range: "bytes=0-3", "if-range": '"no-validator"' } });
+  const full = await asBytes(noValidator);
+  check(`${label} If-Range ignored without published validator`,
+    noValidator.status === 200 && full.equals(bytes), `${noValidator.status}/${full.length}`);
+  const headRange = await fetch(url, { method: "HEAD", headers: { range: "bytes=0-3" } });
+  check(`${label} ranged HEAD remains full HEAD`, headRange.status === 200
+    && (await asBytes(headRange)).length === 0
+    && (headRange.headers.get("content-length") === null || headRange.headers.get("content-length") === String(total)),
+    `${headRange.status} len=${headRange.headers.get("content-length")}/${total} ar=${headRange.headers.get("accept-ranges")}`);
+}
+
+async function expectClosed404(url, label, init = {}) {
+  const response = await fetch(url, init);
+  const body = await asBytes(response);
+  check(`${label} 404 no bytes/no disclosure`,
+    response.status === 404 && body.length === 0
+    && response.headers.get("content-range") === null
+    && response.headers.get("accept-ranges") === null,
+    `${response.status} ${body.length} bytes`);
 }
 
 async function waitForServer(base, childProcess) {
@@ -430,7 +607,27 @@ async function main() {
   check("the generated plate declares 64x64 dimensions", plateBytes.readUInt32BE(16) === 64 && plateBytes.readUInt32BE(20) === 64);
 
   const { readUnoPageDocument, UNO_RENDERABLE_MODULES } = await import("../src/core/page-document.ts");
-  const accepted = readUnoPageDocument(allModulesDocument());
+  // `UNO-WO-052 / R01` §2: the seven named synthetic inputs, created exclusively and digest-verified on read-back, then
+  // ONE authored JSON buffer used for validation, installation, loader parity and serving. No second producer call.
+  const generatedBytes = createMedia(`${GENERATED_DIR}/${MEDIA.generated}`, pngBytes(64, 64));
+  createMedia(`${THEME_DIR}/${MEDIA.theme}`, pngBytes(64, 64));
+  createMedia(`${PLATFORM_DIR}/${MEDIA.platform}`, pngBytes(32, 32));
+  createMedia(`${CAPSULE_DIR}/${MEDIA.page}`, pngBytes(48, 48));
+  createMedia(`${CAPSULE_DIR}/${MEDIA.mp4}`, mp4Bytes());
+  createMedia(`${CAPSULE_DIR}/${MEDIA.webm}`, webmBytes());
+  createMedia(`${CAPSULE_DIR}/${MEDIA.captions}`, vttBytes());
+  createMedia(`${CAPSULE_DIR}/${MEDIA.poster}`, pngBytes(8, 8));
+  const generatedIntegrity = createHash("sha256").update(generatedBytes).digest("hex");
+  const allModulesJsonBytes = Buffer.from(`${JSON.stringify(allModulesDocument(generatedIntegrity), null, 2)}\n`, "utf8");
+  check("INSTALL_BYTES_WITHIN_BOUND", allModulesJsonBytes.length <= 64 * 1024, String(allModulesJsonBytes.length));
+  const parsedExact = readUnoPageDocument(allModulesJsonBytes.toString("utf8"), { reservedHome: false });
+  check("INSTALL_DOCUMENT_ACCEPTED", parsedExact.accepted === true, parsedExact.accepted ? "" : String(parsedExact.reason));
+  check(
+    "INSTALL_DOCUMENT_HAS_DIGEST",
+    allModulesJsonBytes.toString("utf8").includes(`"integrity": "${generatedIntegrity}"`),
+    generatedIntegrity.slice(0, 12),
+  );
+  const accepted = parsedExact;
   check("the authored fixture Page is accepted by the real validator", accepted.accepted === true, accepted.reason ?? "");
   if (accepted.accepted) {
     const present = new Set();
@@ -446,7 +643,20 @@ async function main() {
   const refused = readUnoPageDocument(invalidDocument());
   check("an unregistered module ID refuses the whole Page", refused.accepted === false, "accepted");
 
-  const plan = fixturePlan();
+  // `UNO-WO-053 / R01` §3: the wrong-digest Page is the authored text with only that one integrity replaced, so its
+  // syntax is guaranteed valid and the sole difference is the digest the owned-media reader must refuse.
+  const forgedIntegrity = "0".repeat(64);
+  const badJsonBytes = Buffer.from(
+    allModulesJsonBytes.toString("utf8").replace(`"integrity": "${generatedIntegrity}"`, `"integrity": "${forgedIntegrity}"`),
+    "utf8",
+  );
+  const badParsed = readUnoPageDocument(badJsonBytes.toString("utf8"), { reservedHome: false });
+  check("BAD_DOCUMENT_VALID the wrong-digest Page is syntactically accepted", badParsed.accepted === true, badParsed.accepted ? "" : String(badParsed.reason));
+  check(
+    "BAD_DOCUMENT_DIGEST differs from the real generated digest",
+    badJsonBytes.toString("utf8").includes(`"integrity": "${forgedIntegrity}"`) && forgedIntegrity !== generatedIntegrity,
+  );
+  const plan = fixturePlan(allModulesJsonBytes, badJsonBytes);
   transaction = await prepareUnoU03FixtureTransaction({
     root: ROOT,
     declarations: plan.declarations,
@@ -461,6 +671,25 @@ async function main() {
   check("the fixture transaction is armed before any write", true);
   const installed = await transaction.install();
   if (!check("the fixture installs without a write failure", installed.ok === true, installed.cause ?? "")) return 1;
+
+  // `UNO-WO-052 / R01`: installed bytes, loaded text and serving are one authority, proven before any production build.
+  {
+    const installedSource = readFileSync(resolve(ROOT, SOURCES[1]));
+    check(
+      "INSTALL_PARITY the installed source is the single authored buffer",
+      installedSource.equals(allModulesJsonBytes),
+      `${installedSource.length}/${allModulesJsonBytes.length}`,
+    );
+    const { loadUnoCandidateSource } = await import("../src/adapters/efs/uno-confined-source-reader.ts");
+    const loaded = await loadUnoCandidateSource({ repoRoot: ROOT, pathname: "/en-001/wo044-all-modules" });
+    check("LOAD_ACCEPTED the confined candidate loader accepts", loaded.accepted === true, loaded.accepted ? "" : String(loaded.reason));
+    if (loaded.accepted) {
+      check("LOAD_PARITY the loaded text is the installed bytes", Buffer.from(loaded.text, "utf8").equals(allModulesJsonBytes));
+      const { planUnoServingPage } = await import("../src/config/uno-serving.ts");
+      const serving = await planUnoServingPage("/en-001/wo044-all-modules");
+      check("SERVING_SERVED the trusted serving planner serves the Page", serving.status === "served", serving.status === "served" ? "" : String(serving.reason));
+    }
+  }
 
   rmSync(resolve(ROOT, ".next"), { recursive: true, force: true });
   const build = await runChild([nextBin, "build"], BUILD_TIMEOUT_MS);
@@ -554,6 +783,94 @@ async function main() {
   check("a refused locator returns no media bytes", (await unauthorisedRange.arrayBuffer()).byteLength === 0);
   const wrongOccurrence = `${base}${locator[0].replace(/\/\d+$/u, "/99")}`;
   check("an out-of-range occurrence is a closed 404", (await fetch(wrongOccurrence, { method: "HEAD" })).status === 404);
+
+  // --- Phase A: four-zone, native-video and closed-refusal proof over real production HTTP (`UNO-WO-053 / R01`) ------
+  {
+    const { planUnoServingPage } = await import("../src/config/uno-serving.ts");
+    const badServing = await planUnoServingPage("/en-001/wo053-bad-generated");
+    check(
+      "BAD_PAGE serving refuses the wrong generated digest",
+      badServing.status !== "served" && String(badServing.reason ?? "").includes("media-unavailable"),
+      String(badServing.reason ?? badServing.status),
+    );
+    const badPage = await fetch(`${base}/en-001/wo053-bad-generated`, { redirect: "manual" });
+    const badPageBody = await badPage.text();
+    check("BAD_PAGE answers HTTP 404", badPage.status === 404, String(badPage.status));
+    check(
+      "BAD_PAGE discloses no authored content, path or integrity",
+      !badPageBody.includes("Bad integrity test") && !badPageBody.includes("wo052-generated.png") && !/users[\\/]/iu.test(badPageBody),
+    );
+    await expectClosed404(`${base}/uno-media/en-001/wo053-bad-generated/0`, "BAD_PAGE media locator GET");
+    await expectClosed404(`${base}/uno-media/en-001/wo053-bad-generated/0`, "BAD_PAGE media locator HEAD", { method: "HEAD" });
+
+    const published = await planUnoServingPage("/en-001/wo044-all-modules");
+    if (!check("PHASE_A the served Page carries an asset ledger", published.status === "served" && published.assets.occurrences.length > 0, String(published.reason ?? published.status))) return 1;
+
+    const specs = [
+      ["page", "wo044-image", "image", "image/png", readFileSync(resolve(ROOT, CAPSULE_DIR, CAPSULE_FILES[0]))],
+      ["theme", "wo052-theme-image", "image", "image/png", readFileSync(resolve(ROOT, THEME_DIR, MEDIA.theme))],
+      ["platform", "wo052-platform-image", "image", "image/png", readFileSync(resolve(ROOT, PLATFORM_DIR, MEDIA.platform))],
+      ["generated", "wo052-generated-image", "image", "image/png", readFileSync(resolve(ROOT, GENERATED_DIR, MEDIA.generated))],
+    ];
+    let fourZones = 0;
+    for (const [zone, id, slot, mime, bytes] of specs) {
+      const occurrence = oneOccurrence(published.assets, id, slot);
+      check(`ZONE ${zone} ledger zone`, occurrence.ref.zone === zone, String(occurrence.ref.zone));
+      const fetched = await expectOwnedGetHead(base, occurrence, { mime, bytes }, `ZONE ${zone}`, html);
+      const ranged = await fetch(fetched.url, { headers: { range: "bytes=0-3" } });
+      const rangedBody = await asBytes(ranged);
+      const goodRange = ranged.status === 200 && rangedBody.equals(bytes) && ranged.headers.get("accept-ranges") === null;
+      check(`ZONE ${zone} ignores non-video Range`, goodRange, `${ranged.status}/${rangedBody.length}`);
+      if (fetched.ok && occurrence.ref.zone === zone && goodRange) fourZones += 1;
+    }
+    check(
+      "generated ref integrity matches the exact generated bytes",
+      oneOccurrence(published.assets, "wo052-generated-image", "image").ref.integrity === generatedIntegrity,
+    );
+    check("FOUR_ZONE_HTTP=4/4", fourZones === 4, `${fourZones}/4`);
+    const seen = new Map();
+    let nativeVideo = 0;
+    for (const [id, name, mime] of [["wo052-native-mp4", MEDIA.mp4, "video/mp4"], ["wo053-native-webm", MEDIA.webm, "video/webm"]]) {
+      const bytes = readFileSync(resolve(ROOT, CAPSULE_DIR, name));
+      const video = oneOccurrence(published.assets, id, "video");
+      const fetched = await expectOwnedGetHead(base, video, { mime, bytes }, `VIDEO ${id}`, html);
+      await expectVideoRanges(fetched.url, bytes, `VIDEO ${id}`);
+      const captions = oneOccurrence(published.assets, id, "captions");
+      const captionsBytes = readFileSync(resolve(ROOT, CAPSULE_DIR, MEDIA.captions));
+      const captionsFetched = await expectOwnedGetHead(base, captions, { mime: "text/vtt", bytes: captionsBytes }, `CAPTIONS ${id}`, html);
+      const poster = oneOccurrence(published.assets, id, "poster");
+      const posterBytes = readFileSync(resolve(ROOT, CAPSULE_DIR, MEDIA.poster));
+      const posterFetched = await expectOwnedGetHead(base, poster, { mime: "image/png", bytes: posterBytes }, `POSTER ${id}`, html);
+      check(
+        `CAPTIONS ${id} begin WEBVTT and carry one bounded cue`,
+        captionsBytes.subarray(0, 6).toString("ascii") === "WEBVTT" && captionsBytes.toString("utf8").includes("-->"),
+      );
+      for (const key of ["video", "captions", "poster"]) {
+        const occurrence = oneOccurrence(published.assets, id, key);
+        const previous = seen.get(key);
+        check(`OCCURRENCE ${id} ${key} is distinct`, previous === undefined || previous !== occurrence.occurrence, `${key}=${occurrence.occurrence}`);
+        seen.set(key, occurrence.occurrence);
+      }
+      check(
+        `VIDEO ${id} is controlled, never autoplaying, and advertises its own source, track and poster`,
+        /<video\b[^>]*\bcontrols\b/iu.test(html) && !/<video\b[^>]*\bautoplay\b/iu.test(html)
+        && html.includes(video.url) && html.includes(captions.url) && html.includes(poster.url),
+        `videos=${(html.match(/<video\b/giu) ?? []).length} controls=${/<video\b[^>]*\bcontrols\b/iu.test(html)} src=${html.includes(video.url)} track=${html.includes(captions.url)} poster=${html.includes(poster.url)}`,
+      );
+      if (fetched.ok && captionsFetched.ok && posterFetched.ok) nativeVideo += 1;
+    }
+    check("NATIVE_VIDEO_HTTP=MP4+WEBM+VTT+POSTER", nativeVideo === 2, `${nativeVideo}/2`);
+
+    const unknownPage = await fetch(`${base}/en-001/wo053-unknown-module`, { redirect: "manual" });
+    check("unknown-module Page is a closed 404", unknownPage.status === 404, String(unknownPage.status));
+    const wrongLocale = await fetch(`${base}/en-002/wo044-all-modules`, { redirect: "manual" });
+    check("an unpublished locale Page is a closed 404", wrongLocale.status === 404, String(wrongLocale.status));
+    await expectClosed404(`${base}/uno-media/en-002/wo044-all-modules/0`, "wrong-locale media locator");
+    await expectClosed404(`${base}/uno-media/en-001/wo044-all-modules/999`, "wrong-occurrence media locator");
+    await expectClosed404(`${base}/uno-media/en-001/wo044-all-modules/0%2e%2e%2fwo052-generated.png`, "encoded traversal media locator");
+    await expectClosed404(`${base}/uno-media/en-001/wo044-invalid/0`, "unauthorised Page media locator with Range", { headers: { range: "bytes=0-1" } });
+  }
+
   return base;
 }
 
@@ -653,6 +970,13 @@ try {
     check(`the Page-owned plate ${name} is removed`, !existsSync(resolve(ROOT, CAPSULE_DIR, name)));
   }
   try { rmdirSync(resolve(ROOT, CAPSULE_DIR)); } catch { /* the directory was already absent or not empty */ }
+  for (const [relativePath] of createdMedia) {
+    try { rmSync(resolve(ROOT, relativePath), { force: true }); } catch { /* best effort */ }
+    check(`the owned media fixture ${relativePath} is removed`, !existsSync(resolve(ROOT, relativePath)));
+  }
+  for (const directory of [THEME_DIR, PLATFORM_DIR, GENERATED_DIR]) {
+    try { rmdirSync(resolve(ROOT, directory)); } catch { /* not created by this run, or not empty */ }
+  }
   const stagedAtEnd = spawnSync("git", ["diff", "--cached", "--name-only"], { cwd: ROOT, encoding: "utf8" });
   check("nothing was staged by the gate", (stagedAtEnd.stdout ?? "").trim() === "");
   process.stdout.write(`\nverify-u04-22-module-consent: ${passes.length} passed, ${failures.length} failed\n`);
