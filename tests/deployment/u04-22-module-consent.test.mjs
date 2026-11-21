@@ -121,10 +121,47 @@ const PINNED = Object.freeze([
   "4f656c93a45873d85b133aa99adaec1b6821ac9983b9e9818452773952df9a0c",
 ]);
 
+/**
+ * Phase C invariants (`UNO-WO-066 / R01`): the composed family Page, from the real adapter through installation,
+ * loading, serving, production HTTP, owned-media bytes and Chromium, plus its unconditional cleanup.
+ */
+const PHASE_C_REQUIRED = Object.freeze([
+  'await import("../src/application/compose-uno-foundation-families.ts")',
+  "composeUnoFoundationSubset(familySource(), familyBindings())",
+  "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the nine-section source once",
+  "FAMILY_COMPOSE_ACCEPTED exact source-index ids and no extra section",
+  "FAMILY_COMPOSE_ACCEPTED the accepted document is deeply frozen",
+  "FAMILY_DOCUMENT_REACCEPTED the real reader reaccepts the same bytes with equal values",
+  "FAMILY_SOURCE_NOT_SERIALIZED the donor identity and the acknowledgement never reach the Page",
+  "FAMILY_SOURCE_NOT_SERIALIZED the Page carries the real Uno modules and the owned ref, not a donor path",
+  "FAMILY_BINDING_REFUSED the identical source refuses with every incomplete binding",
+  'const FAMILY_ROUTE = ["wo066-family-composition"];',
+  "wo066-family-composition.en-001.json",
+  "wo066-family-plate.png",
+  "{ path: SOURCES[4], bytes: familyJsonBytes }",
+  "FAMILY_INSTALL_PARITY the installed family source is the one composed buffer",
+  'loadUnoCandidateSource({ repoRoot: ROOT, pathname: "/en-001/wo066-family-composition" })',
+  "FAMILY_LOAD_PARITY the confined loader accepts and returns the installed bytes",
+  "FAMILY_SERVING_SERVED the trusted serving planner serves the composed Page",
+  "FAMILY_SERVING_SERVED one JSON Page and exactly three owned image occurrences in document order",
+  "FAMILY_HTTP=200 the composed Page answers HTTP 200",
+  "FAMILY_HTTP=200 the Page renders the nine authored section ids in document order",
+  "FAMILY_CONTACT_OFF_HTTP the contact subtree carries no form, control, handler or destination",
+  "FAMILY_CONTACT_OFF_HTTP neither the donor identity nor the acknowledgement appears anywhere in the HTML",
+  "FAMILY_MEDIA=3/3 three distinct locators serve the one Page-owned plate with GET and HEAD",
+  "FAMILY_UNPUBLISHED_404 an unlisted path stays a closed 404",
+  "FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px",
+  "family-6-contactform",
+  "FAMILY_BROWSER ${label}",
+  "${width}px the contact action stays in the same document and reaches its target",
+  "${width}px Enter opens the FAQ disclosure",
+  "the fixture source ${path} is removed",
+]);
+
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
 function audit(text) {
   const missing = [];
-  for (const token of [...REQUIRED, ...PHASE_A_REQUIRED, ...PHASE_B_REQUIRED]) if (!text.includes(token)) missing.push(token);
+  for (const token of [...REQUIRED, ...PHASE_A_REQUIRED, ...PHASE_B_REQUIRED, ...PHASE_C_REQUIRED]) if (!text.includes(token)) missing.push(token);
   for (const token of FORBIDDEN) if (text.includes(token)) missing.push(`forbidden: ${token}`);
   for (const id of MODULE_IDS) if (!text.includes(`"${id}"`)) missing.push(`module: ${id}`);
   for (const digest of PINNED) if (!text.includes(digest)) missing.push(`digest: ${digest}`);
@@ -286,5 +323,73 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       assert.notEqual(mutated, source);
       assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
     }
+  });
+
+  // `UNO-WO-066 / R01` §5: independent Phase C mutations. Each one deletes a real executed family-Page check, and the
+  // audit must name the invariant that disappeared.
+  it("the audit genuinely fails when the real adapter is replaced by a hand-authored Page", () => {
+    const mutated = source
+      .replace('await import("../src/application/compose-uno-foundation-families.ts")', "await import(\"../src/core/page-document.ts\")")
+      .replace("composeUnoFoundationSubset(familySource(), familyBindings())", "({ status: \"composed\", document: familySource() })");
+    assert.notEqual(mutated, source);
+    const missing = audit(mutated);
+    assert.ok(missing.some((entry) => entry.includes("compose-uno-foundation-families.ts")), missing.join(","));
+    assert.ok(missing.some((entry) => entry.includes("composeUnoFoundationSubset(familySource(), familyBindings())")), missing.join(","));
+  });
+
+  it("the audit genuinely fails when the fifth fixture source is not installed from the composed buffer", () => {
+    const mutated = source.replace("{ path: SOURCES[4], bytes: familyJsonBytes }", "{ path: SOURCES[4], bytes: allModulesJsonBytes }");
+    assert.notEqual(mutated, source);
+    assert.ok(audit(mutated).some((entry) => entry.includes("SOURCES[4], bytes: familyJsonBytes")), audit(mutated).join(","));
+  });
+
+  it("the audit genuinely fails when the composed-install or composed-load parity check is deleted", () => {
+    for (const token of [
+      "FAMILY_INSTALL_PARITY the installed family source is the one composed buffer",
+      "FAMILY_LOAD_PARITY the confined loader accepts and returns the installed bytes",
+      "FAMILY_SERVING_SERVED one JSON Page and exactly three owned image occurrences in document order",
+    ]) {
+      const mutated = source.replace(`"${token}"`, '"removed"');
+      assert.notEqual(mutated, source);
+      assert.ok(audit(mutated).some((entry) => entry.includes(token)), token);
+    }
+  });
+
+  it("the audit genuinely fails when the family HTTP, media-byte or contact-OFF check is weakened", () => {
+    const shapes = [
+      ['check("FAMILY_HTTP=200 the composed Page answers HTTP 200"', 'check("FAMILY_HTTP=ok"', "FAMILY_HTTP=200"],
+      ["FAMILY_MEDIA=3/3 three distinct locators serve the one Page-owned plate with GET and HEAD", "FAMILY_MEDIA=served", "FAMILY_MEDIA=3/3"],
+      ["FAMILY_CONTACT_OFF_HTTP the contact subtree carries no form, control, handler or destination", "contact unchecked", "FAMILY_CONTACT_OFF_HTTP"],
+      ["FAMILY_UNPUBLISHED_404 an unlisted path stays a closed 404", "unlisted unchecked", "FAMILY_UNPUBLISHED_404"],
+    ];
+    for (const [from, to, contract] of shapes) {
+      const mutated = source.replace(from, to);
+      assert.notEqual(mutated, source);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit genuinely fails when the family browser, keyboard or cleanup token is removed", () => {
+    const shapes = [
+      ["FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px", "family browser unverified", "FAMILY_BROWSER=PASS"],
+      ["${width}px Enter opens the FAQ disclosure", "faq unverified", "Enter opens the FAQ"],
+      ["${width}px the contact action stays in the same document and reaches its target", "anchor unverified", "reaches its target"],
+      ["the fixture source ${path} is removed", "cleanup skipped", "the fixture source ${path} is removed"],
+    ];
+    for (const [from, to, contract] of shapes) {
+      const mutated = source.replace(from, to);
+      assert.notEqual(mutated, source);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {
+    assert.deepEqual(audit(source), []);
+    // The runner verifies the adapter's contractual top-level ids but never invents a child id or authors a Page node.
+    assert.ok(source.includes("const FAMILY_IDS = Object.freeze(["));
+    assert.ok(!/family-3-faq-/u.test(source));
+    assert.ok(!/id: "family-0-prose", module: "/u.test(source));
+    assert.ok(source.includes('"contactForm"'));
+    assert.ok(source.includes('mode: "delivery-off"'));
   });
 });

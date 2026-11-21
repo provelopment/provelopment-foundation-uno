@@ -2349,7 +2349,11 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).toContain("seventeen bounded");
     expect(ledger).toContain("zero of seventeen full semantic parity");
     expect(ledger).toContain("zero entirely unimplemented");
-    expect(ledger).toContain("zero published family Page acceptance evidence");
+    // `UNO-WO-066 / R01`: one temporary fixture Page is now proven over production HTTP and Chromium, so the older
+    // blanket claim of no family-Page evidence must be gone and replaced by the exact, bounded positive words.
+    expect(ledger).toContain("temporary family-composition fixture verified over production HTTP and Chromium");
+    expect(ledger).toContain("no durable published family Page");
+    expect(ledger).not.toContain("zero published family Page acceptance evidence");
     expect(ledger).toContain("family-<index>-contactform");
     expect(ledger).toContain("Deliberately absent donor design (media and its binding)");
     expect(ledger).toContain("Deliberately absent donor design (gallery)");

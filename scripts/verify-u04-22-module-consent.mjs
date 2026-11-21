@@ -11,6 +11,11 @@
  *
  * FAIL-CLOSED. A refused fixture, an unclean build, a missing browser, a pre-consent provider request, a failed
  * assertion or an unproven restoration fails this gate. Nothing here can pass on a stale build.
+ *
+ * `UNO-WO-066 / R01` adds one further ephemeral proof inside this same lifecycle: a nine-family donor subset is composed
+ * by the real, unmodified `composeUnoFoundationSubset`, installed as a fifth temporary fixture source, and then accepted
+ * by the confined loader, the serving planner, real production HTTP and Chromium. It is a test fixture at a loopback
+ * server — not a durable Page, not a deployment and not publication authority — and it is removed in the same `finally`.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -48,6 +53,12 @@ const ALL_ROUTE = ["wo044-all-modules"];
 const INVALID_ROUTE = ["wo044-invalid"];
 /** `UNO-WO-053 / R01`: a separately published Page whose generated asset carries a well-formed but wrong digest. */
 const BAD_ROUTE = ["wo053-bad-generated"];
+/** `UNO-WO-066 / R01`: one temporary Page whose document is produced by the real family adapter, never authored here. */
+const FAMILY_ROUTE = ["wo066-family-composition"];
+/** The one Page-owned plate the composed Page references; generated, published and deleted only inside this gate. */
+const FAMILY_PLATE = "wo066-family-plate.png";
+/** The donor migration identity the composed source names. It is a binding key, never an emitted or served URL. */
+const FAMILY_DONOR_SOURCE = "/assets/wo066-donor-plate.png";
 
 /** `UNO-WO-052 / R01`: the exclusive `wo052-*` ledger of named original synthetic inputs across four owned zones. */
 const THEME_DIR = "deployment/content/assets";
@@ -114,6 +125,7 @@ const SOURCES = Object.freeze([
   `${CONTENT}/wo044-all-modules.en-001.json`,
   `${CONTENT}/wo044-invalid.en-001.json`,
   `${CONTENT}/wo053-bad-generated.en-001.json`,
+  `${CONTENT}/wo066-family-composition.en-001.json`,
 ]);
 
 const failures = [];
@@ -152,6 +164,7 @@ const CAPSULE_FILES = Object.freeze([
   "wo044-gallery-b.png",
   "wo044-carousel-a.png",
   "wo044-carousel-b.png",
+  FAMILY_PLATE,
 ]);
 
 function crc32(buffer) {
@@ -341,6 +354,76 @@ function allModulesDocument(generatedIntegrity) {
   };
 }
 
+/**
+ * `UNO-WO-066 / R01`: one deterministic donor-shaped source, in the exact order this proof depends on. Every string is
+ * original synthetic test copy; no donor text, asset or code is reproduced. The adapter — not this file — decides the
+ * resulting Uno ids, modules and props.
+ */
+function familySource() {
+  return {
+    version: 1,
+    title: "Bounded family composition proof",
+    sections: [
+      { type: "prose", body: "This Page came from a bounded donor subset." },
+      { type: "callout", body: "A synthetic warning for the publication proof.", tone: "warning" },
+      { type: "list", ordered: true, items: ["Prepare", "Publish"] },
+      {
+        type: "faq",
+        items: [{ question: "Can this contact notice send anything?", answer: "No. Delivery is off." }],
+      },
+      { type: "media", image: { src: FAMILY_DONOR_SOURCE, alt: "Synthetic blue image plate" } },
+      {
+        type: "gallery",
+        columns: 2,
+        items: [
+          { image: { src: FAMILY_DONOR_SOURCE, alt: "Synthetic first gallery image" }, caption: "First fixture image" },
+          { image: { src: FAMILY_DONOR_SOURCE, alt: "Synthetic second gallery image" } },
+        ],
+      },
+      { type: "contactForm", formRef: "wo066-contact" },
+      {
+        type: "actions",
+        actions: [
+          { label: "See the image", href: "#family-4-media" },
+          { label: "Contact notice", href: "#family-6-contactform" },
+        ],
+      },
+      { type: "divider" },
+    ],
+  };
+}
+
+/**
+ * The separate migration binding for that source: one owned Page plate for the single donor image identity, and one
+ * exact `delivery-off` acknowledgement. Neither key is publication, asset-servability or delivery authority.
+ */
+function familyBindings() {
+  return {
+    images: [{ source: FAMILY_DONOR_SOURCE, owned: plate(FAMILY_PLATE) }],
+    contactForms: [{ formRef: "wo066-contact", mode: "delivery-off" }],
+  };
+}
+
+/** The exact top-level ids the unchanged adapter must produce for the fixture above, in document order. */
+const FAMILY_IDS = Object.freeze([
+  "family-0-prose",
+  "family-1-callout",
+  "family-2-list",
+  "family-3-faq",
+  "family-4-media",
+  "family-5-gallery",
+  "family-6-contactform",
+  "family-7-actions",
+  "family-8-divider",
+]);
+
+/** Recursively frozen: an accepted Page must not be rewritten after composition. */
+function deepFrozen(value) {
+  if (value === null || typeof value !== "object") return true;
+  if (!Object.isFrozen(value)) return false;
+  return Object.values(value).every((entry) => deepFrozen(entry));
+}
+
 /** The selected Site's Home Page: a minimal published JSON representation, so the Site has its required anchor. */
 function homeDocument() {
   return {
@@ -401,6 +484,12 @@ function fixtureManifest() {
                     publication: "published",
                     representations: [representation("en-001", [jsonSource(SOURCES[3])])],
                   },
+                  {
+                    id: "family-composition",
+                    route: FAMILY_ROUTE,
+                    publication: "published",
+                    representations: [representation("en-001", [jsonSource(SOURCES[4])])],
+                  },
                 ],
               },
             ],
@@ -421,7 +510,7 @@ function fixtureSelection() {
   };
 }
 
-function fixturePlan(allModulesJsonBytes, badJsonBytes) {
+function fixturePlan(allModulesJsonBytes, badJsonBytes, familyJsonBytes) {
   return {
     declarations: [MANIFEST, SELECTION].map((path) => ({ path, digest: PINNED_DECLARATIONS.get(path) })),
     replacements: [
@@ -433,6 +522,7 @@ function fixturePlan(allModulesJsonBytes, badJsonBytes) {
       { path: SOURCES[1], bytes: allModulesJsonBytes },
       { path: SOURCES[2], bytes: Buffer.from(`${JSON.stringify(invalidDocument(), null, 2)}\n`, "utf8") },
       { path: SOURCES[3], bytes: badJsonBytes },
+      { path: SOURCES[4], bytes: familyJsonBytes },
     ],
   };
 }
@@ -656,7 +746,66 @@ async function main() {
     "BAD_DOCUMENT_DIGEST differs from the real generated digest",
     badJsonBytes.toString("utf8").includes(`"integrity": "${forgedIntegrity}"`) && forgedIntegrity !== generatedIntegrity,
   );
-  const plan = fixturePlan(allModulesJsonBytes, badJsonBytes);
+  // --- `UNO-WO-066 / R01`: one adapter-produced family Page, composed ONCE before any transaction ----------------
+  // The adapter is imported unchanged and invoked exactly once. Its one accepted, frozen document is serialized to a
+  // single UTF-8 buffer that is then the only authority for installation, loading, serving and HTTP.
+  const { composeUnoFoundationSubset } = await import("../src/application/compose-uno-foundation-families.ts");
+  const familyComposed = composeUnoFoundationSubset(familySource(), familyBindings());
+  const familyAccepted = familyComposed.status === "composed" ? familyComposed.document : null;
+  check(
+    "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the nine-section source once",
+    familyAccepted !== null,
+    familyComposed.status === "composed" ? "" : String(familyComposed.reason),
+  );
+  if (familyAccepted === null) return 1;
+  const familyIds = familyAccepted.sections.map((node) => node.id);
+  check(
+    "FAMILY_COMPOSE_ACCEPTED exact source-index ids and no extra section",
+    familyIds.length === 9 && familyIds.every((id, index) => id === FAMILY_IDS[index]),
+    familyIds.join(","),
+  );
+  check(
+    "FAMILY_COMPOSE_ACCEPTED the accepted document is deeply frozen",
+    deepFrozen(familyAccepted) && Object.isFrozen(familyAccepted.sections),
+  );
+  const familyJsonBytes = Buffer.from(`${JSON.stringify(familyAccepted, null, 2)}\n`, "utf8");
+  check("FAMILY_COMPOSE_ACCEPTED the serialized buffer stays inside the 64 KiB Page bound", familyJsonBytes.length <= 64 * 1024, String(familyJsonBytes.length));
+  const familyReparsed = readUnoPageDocument(familyJsonBytes.toString("utf8"), { reservedHome: false });
+  check(
+    "FAMILY_DOCUMENT_REACCEPTED the real reader reaccepts the same bytes with equal values",
+    familyReparsed.accepted === true && JSON.stringify(familyReparsed.document) === JSON.stringify(familyAccepted),
+    familyReparsed.accepted ? "" : String(familyReparsed.reason),
+  );
+  {
+    const serialized = familyJsonBytes.toString("utf8");
+    const leaked = ["contactForms", "wo066-contact", "delivery-off", "formRef", "recipient", "webhook", "provider", FAMILY_DONOR_SOURCE]
+      .filter((token) => serialized.includes(token));
+    check("FAMILY_SOURCE_NOT_SERIALIZED the donor identity and the acknowledgement never reach the Page", leaked.length === 0, leaked.join(","));
+    check(
+      "FAMILY_SOURCE_NOT_SERIALIZED the Page carries the real Uno modules and the owned ref, not a donor path",
+      serialized.includes('"interaction.contact"') && serialized.includes('"media.gallery"')
+        && serialized.includes(`"path": "${FAMILY_PLATE}"`) && !/https?:/u.test(serialized),
+    );
+    const refusals = [
+      ["without bindings", undefined],
+      ["with image-only bindings", { images: familyBindings().images }],
+      ["with contact-only bindings", { contactForms: familyBindings().contactForms }],
+    ].map(([label, bindings]) => {
+      const outcome = composeUnoFoundationSubset(familySource(), bindings);
+      return {
+        label,
+        refused: outcome.status === "refused" && outcome.reason === "family:unsupported-feature",
+        partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+      };
+    });
+    check(
+      "FAMILY_BINDING_REFUSED the identical source refuses with every incomplete binding",
+      refusals.every((entry) => entry.refused && entry.partial === false),
+      JSON.stringify(refusals),
+    );
+  }
+
+  const plan = fixturePlan(allModulesJsonBytes, badJsonBytes, familyJsonBytes);
   transaction = await prepareUnoU03FixtureTransaction({
     root: ROOT,
     declarations: plan.declarations,
@@ -688,6 +837,48 @@ async function main() {
       const { planUnoServingPage } = await import("../src/config/uno-serving.ts");
       const serving = await planUnoServingPage("/en-001/wo044-all-modules");
       check("SERVING_SERVED the trusted serving planner serves the Page", serving.status === "served", serving.status === "served" ? "" : String(serving.reason));
+    }
+
+    // `UNO-WO-066 / R01`: the same three authorities, applied to the adapter-produced family Page.
+    const installedFamily = readFileSync(resolve(ROOT, SOURCES[4]));
+    check(
+      "FAMILY_INSTALL_PARITY the installed family source is the one composed buffer",
+      installedFamily.equals(familyJsonBytes),
+      `${installedFamily.length}/${familyJsonBytes.length}`,
+    );
+    const loadedFamily = await loadUnoCandidateSource({ repoRoot: ROOT, pathname: "/en-001/wo066-family-composition" });
+    check(
+      "FAMILY_LOAD_PARITY the confined loader accepts and returns the installed bytes",
+      loadedFamily.accepted === true && Buffer.from(loadedFamily.text ?? "", "utf8").equals(familyJsonBytes),
+      loadedFamily.accepted ? "" : String(loadedFamily.reason),
+    );
+    const { planUnoServingPage: planFamily } = await import("../src/config/uno-serving.ts");
+    const familyServing = await planFamily("/en-001/wo066-family-composition");
+    if (
+      !check(
+        "FAMILY_SERVING_SERVED the trusted serving planner serves the composed Page",
+        familyServing.status === "served",
+        familyServing.status === "served" ? "" : String(familyServing.reason),
+      )
+    ) {
+      return 1;
+    }
+    if (familyServing.status === "served") {
+      const occurrences = familyServing.assets.occurrences;
+      const labelled = occurrences.map((entry) => `${entry.sectionId}#${entry.itemIndex === -1 ? 0 : entry.itemIndex}`);
+      check(
+        "FAMILY_SERVING_SERVED one JSON Page and exactly three owned image occurrences in document order",
+        occurrences.length === 3
+          && JSON.stringify(labelled) === JSON.stringify(["family-4-media#0", "family-5-gallery#0", "family-5-gallery#1"])
+          && occurrences.every((entry) => entry.slot === "image"),
+        labelled.join(","),
+      );
+      check(
+        "FAMILY_SERVING_SERVED every occurrence is the one Page-owned plate at a distinct locator",
+        new Set(occurrences.map((entry) => entry.url)).size === 3
+          && occurrences.every((entry) => entry.url.startsWith("/uno-media/en-001/wo066-family-composition/")),
+        occurrences.map((entry) => entry.url).join(","),
+      );
     }
   }
 
@@ -783,6 +974,122 @@ async function main() {
   check("a refused locator returns no media bytes", (await unauthorisedRange.arrayBuffer()).byteLength === 0);
   const wrongOccurrence = `${base}${locator[0].replace(/\/\d+$/u, "/99")}`;
   check("an out-of-range occurrence is a closed 404", (await fetch(wrongOccurrence, { method: "HEAD" })).status === 404);
+
+  // --- `UNO-WO-066 / R01`: the adapter-produced family Page over real production HTTP ----------------------------
+  {
+    const { planUnoServingPage: planFamily } = await import("../src/config/uno-serving.ts");
+    const familyPlan = await planFamily("/en-001/wo066-family-composition");
+    const familyHtmlResponse = await fetch(`${base}/en-001/wo066-family-composition`);
+    const familyHtml = await familyHtmlResponse.text();
+    check("FAMILY_HTTP=200 the composed Page answers HTTP 200", familyHtmlResponse.status === 200, String(familyHtmlResponse.status));
+    const positions = FAMILY_IDS.map((id) => familyHtml.indexOf(`id="${id}"`));
+    check(
+      "FAMILY_HTTP=200 the Page renders the nine authored section ids in document order",
+      positions.every((position) => position >= 0) && positions.every((position, index) => index === 0 || position > positions[index - 1]),
+      positions.join(","),
+    );
+    check(
+      "FAMILY_HTTP=200 the composed Page is the declared document, not a Home fallback or a placeholder",
+      familyHtml.includes("Bounded family composition proof") && !familyHtml.includes("The fixture home representation.")
+        && !/unknown module|unsupported module/iu.test(familyHtml),
+    );
+    check(
+      "FAMILY_HTTP=200 exactly one main landmark and one h1",
+      (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1 && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1,
+      `${(familyHtml.match(/<main[\s>]/giu) ?? []).length}/${(familyHtml.match(/<h1[\s>]/giu) ?? []).length}`,
+    );
+    check(
+      "FAMILY_HTTP=200 prose and warning callout are rendered",
+      familyHtml.includes('<p class="uno-json-prose" id="family-0-prose">This Page came from a bounded donor subset.</p>')
+        && familyHtml.includes('<section class="uno-json-callout" data-uno-tone="warning" id="family-1-callout">')
+        && familyHtml.includes("A synthetic warning for the publication proof."),
+    );
+    const listStart = familyHtml.indexOf('<ol class="uno-json-list" id="family-2-list">');
+    const listMarkup = listStart < 0 ? "" : familyHtml.slice(listStart, familyHtml.indexOf("</ol>", listStart));
+    check(
+      "FAMILY_HTTP=200 the ordered list carries exactly the two authored entries",
+      listStart >= 0 && (listMarkup.match(/<li>/gu) ?? []).length === 2
+        && listMarkup.includes("<span>Prepare</span>") && listMarkup.includes("<span>Publish</span>"),
+    );
+    check(
+      "FAMILY_HTTP=200 the FAQ renders as a native disclosure with the authored question",
+      familyHtml.includes('<div class="uno-json-accordion" id="family-3-faq">')
+        && familyHtml.includes("<details") && familyHtml.includes("<summary")
+        && familyHtml.includes("Can this contact notice send anything?"),
+    );
+    const galleryStart = familyHtml.indexOf('<div class="uno-json-gallery" data-uno-columns="2" id="family-5-gallery">');
+    const galleryMarkup = galleryStart < 0 ? "" : familyHtml.slice(galleryStart, familyHtml.indexOf("</div>", galleryStart));
+    check(
+      "FAMILY_HTTP=200 the gallery renders two figures and exactly one caption",
+      galleryStart >= 0 && (galleryMarkup.match(/<figure class="uno-json-media-item">/gu) ?? []).length === 2
+        && (galleryMarkup.match(/<figcaption class="uno-json-media-caption">/gu) ?? []).length === 1
+        && galleryMarkup.includes("First fixture image"),
+    );
+    check(
+      "FAMILY_HTTP=200 the composed actions point at real same-document targets",
+      familyHtml.includes('<a class="uno-json-action" href="#family-4-media">See the image</a>')
+        && familyHtml.includes('<a class="uno-json-action" href="#family-6-contactform">Contact notice</a>'),
+    );
+    const contactStart = familyHtml.indexOf('<section class="uno-json-contact" id="family-6-contactform">');
+    const contactMarkup = contactStart < 0 ? "" : familyHtml.slice(contactStart, familyHtml.indexOf("</section>", contactStart));
+    check(
+      "FAMILY_HTTP=200 the contact section is present with the fixed delivery-OFF status",
+      contactStart >= 0
+        && contactMarkup.includes('<p class="uno-json-contact-status">Delivery is switched off. Nothing entered here is sent or stored.</p>'),
+    );
+    check("FAMILY_HTTP=200 the divider is rendered", familyHtml.includes('id="family-8-divider"') && /<hr\b/u.test(familyHtml));
+    check(
+      "FAMILY_CONTACT_OFF_HTTP the contact subtree carries no form, control, handler or destination",
+      ["<form", "<input", "<textarea", "<button", "action=", "method=", "href=", "onSubmit", "wo066-contact", "contactForms"]
+        .every((token) => !contactMarkup.includes(token)),
+      ["<form", "<input", "<textarea", "<button", "action=", "method=", "href=", "onSubmit", "wo066-contact", "contactForms"]
+        .filter((token) => contactMarkup.includes(token)).join(","),
+    );
+    check(
+      "FAMILY_CONTACT_OFF_HTTP neither the donor identity nor the acknowledgement appears anywhere in the HTML",
+      !familyHtml.includes(FAMILY_DONOR_SOURCE) && !familyHtml.includes("wo066-contact") && !familyHtml.includes("contactForms"),
+    );
+
+    if (familyPlan.status !== "served") {
+      check("FAMILY_MEDIA=3/3 the composed Page plans three owned image occurrences", false, String(familyPlan.reason));
+    } else {
+      const familyPlate = readFileSync(resolve(ROOT, CAPSULE_DIR, FAMILY_PLATE));
+      const occurrences = familyPlan.assets.occurrences;
+      let familyServed = 0;
+      for (const occurrence of occurrences) {
+        const occurrenceUrl = `${base}${occurrence.url}`;
+        const response = await fetch(occurrenceUrl);
+        const bytes = Buffer.from(await response.arrayBuffer());
+        const head = await fetch(occurrenceUrl, { method: "HEAD" });
+        const headLength = head.headers.get("content-length");
+        const label = `${occurrence.sectionId}#${occurrence.itemIndex === -1 ? 0 : occurrence.itemIndex}`;
+        const ok = response.status === 200 && head.status === 200
+          && response.headers.get("content-type") === "image/png"
+          && head.headers.get("content-type") === "image/png"
+          && bytes.equals(familyPlate)
+          && (await head.arrayBuffer()).byteLength === 0
+          && (headLength === null || headLength === String(familyPlate.length))
+          && familyHtml.includes(occurrence.url);
+        check(
+          `FAMILY_MEDIA=3/3 occurrence ${label} serves exactly the generated plate`,
+          ok,
+          `${response.status}/${head.status} ${bytes.length}/${familyPlate.length}`,
+        );
+        if (ok) familyServed += 1;
+      }
+      check(
+        "FAMILY_MEDIA=3/3 three distinct locators serve the one Page-owned plate with GET and HEAD",
+        familyServed === 3 && occurrences.length === 3 && new Set(occurrences.map((entry) => entry.url)).size === 3,
+        `${familyServed}/${occurrences.length}`,
+      );
+      await expectClosed404(`${base}/uno-media/en-001/wo066-family-composition/99`, "FAMILY_UNPUBLISHED_404 wrong-occurrence media locator");
+      await expectClosed404(`${base}/uno-media/en-002/wo066-family-composition/0`, "FAMILY_UNPUBLISHED_404 wrong-locale media locator");
+    }
+    const familyUnbound = await fetch(`${base}/en-001/wo066-unbound`, { redirect: "manual" });
+    check("FAMILY_UNPUBLISHED_404 an unlisted path stays a closed 404", familyUnbound.status === 404, String(familyUnbound.status));
+    const familyWrongLocale = await fetch(`${base}/en-002/wo066-family-composition`, { redirect: "manual" });
+    check("FAMILY_UNPUBLISHED_404 a wrong-locale path stays a closed 404", familyWrongLocale.status === 404, String(familyWrongLocale.status));
+  }
 
   // --- Phase A: four-zone, native-video and closed-refusal proof over real production HTTP (`UNO-WO-053 / R01`) ------
   {
@@ -1083,6 +1390,119 @@ async function consentPhase(base) {
   }
   check("BROWSER_MATRIX 16 distinct case IDs", new Set(matrixCases).size === 16, String(new Set(matrixCases).size));
   check("BROWSER_MATRIX=16/16", matrixPassed === 16 && new Set(matrixCases).size === 16, `${matrixPassed}/16`);
+
+  // --- `UNO-WO-066 / R01`: the composed family Page in real Chromium at a compact and a desktop viewport ----------
+  const FAMILY_URL = `${base}/en-001/wo066-family-composition`;
+  {
+    const errorsBefore = consoleErrors.length;
+    let familyOk = true;
+    const familyCheck = (label, ok, detail = "") => {
+      if (!ok) familyOk = false;
+      return check(`FAMILY_BROWSER ${label}`, ok, detail);
+    };
+    for (const width of [390, 1280]) {
+      requests.length = 0;
+      await tab.setViewportSize({ width, height: 900 });
+      await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
+      await tab.goto(FAMILY_URL, { waitUntil: "load" });
+      await delay(400);
+      const seen = await tab.evaluate(() => {
+        const tops = [...document.querySelectorAll('[id^="family-"]')]
+          .filter((element) => element.parentElement?.closest('[id^="family-"]') === null)
+          .map((element) => element.id);
+        const prose = document.querySelector("#family-0-prose");
+        const callout = document.querySelector("#family-1-callout");
+        const galleryImages = [...document.querySelectorAll("#family-5-gallery img")];
+        const contact = document.querySelector(".uno-json-contact");
+        return {
+          tops,
+          mains: document.querySelectorAll("main").length,
+          h1s: document.querySelectorAll("h1").length,
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          proseText: (prose?.textContent ?? "").trim(),
+          proseVisible: prose === null ? "" : getComputedStyle(prose).visibility,
+          calloutText: (callout?.textContent ?? "").trim(),
+          calloutTone: callout?.getAttribute("data-uno-tone") ?? "",
+          listItems: [...document.querySelectorAll("#family-2-list li")].map((item) => item.textContent?.trim() ?? ""),
+          gallerySources: galleryImages.map((image) => image.getAttribute("src") ?? ""),
+          galleryAlts: galleryImages.map((image) => image.getAttribute("alt") ?? ""),
+          galleryDecoded: galleryImages.map((image) => image.naturalWidth),
+          mediaSource: document.querySelector("#family-4-media img")?.getAttribute("src") ?? "",
+          mediaAlt: document.querySelector("#family-4-media img")?.getAttribute("alt") ?? "",
+          captions: [...document.querySelectorAll("#family-5-gallery figcaption")].map((node) => node.textContent?.trim() ?? ""),
+          contactStatus: contact?.querySelector(".uno-json-contact-status")?.textContent ?? "",
+          contactControls: contact?.querySelectorAll("form, input, textarea, button").length ?? -1,
+          contactHandlers: contact === null ? true : [...contact.querySelectorAll("*")]
+            .some((element) => ["action", "method", "href", "onsubmit", "onclick"].some((name) => element.hasAttribute(name))),
+          contactHtml: contact?.outerHTML ?? "",
+          actionCount: document.querySelectorAll("#family-7-actions a").length,
+          html: document.documentElement.outerHTML,
+        };
+      });
+      familyCheck(`${width}px nine top-level section ids in order`,
+        JSON.stringify(seen.tops) === JSON.stringify(FAMILY_IDS), seen.tops.join(","));
+      familyCheck(`${width}px one main and one h1`, seen.mains === 1 && seen.h1s === 1, `${seen.mains}/${seen.h1s}`);
+      familyCheck(`${width}px no horizontal document overflow`, seen.overflow <= 2, String(seen.overflow));
+      familyCheck(`${width}px prose and warning callout are visible`,
+        seen.proseText.length > 0 && seen.proseVisible === "visible" && seen.calloutTone === "warning"
+          && seen.calloutText.includes("A synthetic warning"),
+        JSON.stringify({ proseText: seen.proseText, proseVisible: seen.proseVisible, calloutTone: seen.calloutTone }));
+      familyCheck(`${width}px the ordered list shows both authored entries`,
+        seen.listItems.length === 2 && seen.listItems[0] === "Prepare" && seen.listItems[1] === "Publish", seen.listItems.join(","));
+      const ownedLocator = /^\/uno-media\/en-001\/wo066-family-composition\/\d+$/u;
+      familyCheck(`${width}px two gallery images use server-owned locators with alt text`,
+        seen.gallerySources.length === 2 && seen.gallerySources.every((source) => ownedLocator.test(source))
+          && seen.galleryAlts.every((alt) => alt.trim().length > 0)
+          && !seen.html.includes("/assets/wo066-donor-plate.png"),
+        JSON.stringify({ gallerySources: seen.gallerySources, galleryAlts: seen.galleryAlts }));
+      familyCheck(`${width}px both images decode and the single caption is authored`,
+        seen.galleryDecoded.every((value) => value > 0) && seen.captions.length === 1 && seen.captions[0] === "First fixture image",
+        JSON.stringify({ decoded: seen.galleryDecoded, captions: seen.captions }));
+      familyCheck(`${width}px the media family uses a server-owned locator`,
+        ownedLocator.test(seen.mediaSource) && seen.mediaAlt.trim().length > 0, seen.mediaSource);
+      familyCheck(`${width}px the contact notice is visible and inert`,
+        seen.contactStatus === "Delivery is switched off. Nothing entered here is sent or stored."
+          && seen.contactControls === 0 && seen.contactHandlers === false
+          && !seen.contactHtml.includes("wo066-contact") && !seen.contactHtml.includes("contactForms"),
+        JSON.stringify({ status: seen.contactStatus, controls: seen.contactControls, handlers: seen.contactHandlers }));
+      familyCheck(`${width}px the composed actions are two real same-document links`,
+        seen.actionCount === 2 && seen.html.includes('href="#family-4-media"') && seen.html.includes('href="#family-6-contactform"'),
+        String(seen.actionCount));
+
+      const familySummary = tab.locator("#family-3-faq summary").first();
+      const familyDetails = tab.locator("#family-3-faq details").first();
+      await familySummary.focus();
+      familyCheck(`${width}px the FAQ summary takes keyboard focus`,
+        await familySummary.evaluate((element) => document.activeElement === element));
+      await tab.keyboard.press("Enter");
+      familyCheck(`${width}px Enter opens the FAQ disclosure`, await familyDetails.evaluate((element) => element.open),
+        String(await familyDetails.evaluate((element) => element.open)));
+      await tab.keyboard.press("Space");
+      familyCheck(`${width}px Space closes the FAQ disclosure and keeps focus`,
+        !(await familyDetails.evaluate((element) => element.open))
+          && await familySummary.evaluate((element) => document.activeElement === element),
+        String(await familyDetails.evaluate((element) => element.open)));
+
+      await tab.getByRole("link", { name: "Contact notice", exact: true }).click();
+      await delay(200);
+      const reached = await tab.evaluate(() => ({
+        hash: window.location.hash,
+        path: window.location.pathname,
+        targetVisible: (() => {
+          const target = document.getElementById("family-6-contactform");
+          return target !== null && target.getBoundingClientRect().height > 0;
+        })(),
+      }));
+      familyCheck(`${width}px the contact action stays in the same document and reaches its target`,
+        reached.hash === "#family-6-contactform" && reached.path === "/en-001/wo066-family-composition" && reached.targetVisible,
+        JSON.stringify(reached));
+      familyCheck(`${width}px the family visit made no foreign or provider request`,
+        requests.length === 0 && requests.every((entry) => !entry.foreign && !entry.provider), JSON.stringify(requests.slice(0, 3)));
+    }
+    familyCheck("the family Page raised no new console or page error", consoleErrors.length === errorsBefore,
+      consoleErrors.slice(errorsBefore).join(" | ").slice(0, 180));
+    check("FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px", familyOk);
+  }
 
   check("the Page logged no console error", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
 }
