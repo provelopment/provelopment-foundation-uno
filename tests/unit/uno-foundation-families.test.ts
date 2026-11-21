@@ -1445,9 +1445,9 @@ describe("composeUnoFoundationSubset — cards and features refusal", () => {
     const base = { type, items: [{ title: "A", body: "B" }] };
     // `columns` is required here even though the donor renderer defaults an omitted value.
     expectRefusal(envelope(base), "family:unsupported-feature");
-    // `UNO-WO-070 / R01` accepts the donor's optional authored `heading`, so it is no longer an extra key; its own
-    // strictness, refusal reasons and byte-compatible absence are proved by the dedicated section below.
-    for (const extra of ["lede", "surface", "align", "ratio", "href", "route", "link", "style", "onClick", "visibility"]) {
+    // `UNO-WO-070 / R01` accepts the donor's optional authored `heading`, and `UNO-WO-071 / R01` its optional authored
+    // `lede`, so neither is an extra key; both are proved by their own dedicated sections below.
+    for (const extra of ["surface", "align", "ratio", "href", "route", "link", "style", "onClick", "visibility"]) {
       expectRefusal(
         envelope({ ...base, columns: 2, [extra]: extra === "align" ? "center" : "X" }),
         "family:unsupported-feature",
@@ -2376,12 +2376,14 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).not.toMatch(/FAMILY_PARITY=17\/17/u);
     expect(ledger).toContain("ADAPT (divider semantic parity candidate)");
     expect(ledger).toContain("one of seventeen fully parity-evidenced candidates");
-    expect(ledger).toContain("subject to independent Architect acceptance");
+    // `UNO-WO-071 / R01` normalizes the divider wording to its already independently accepted status.
+    expect(ledger).toContain("independently accepted under `UNO-WO-069 / R01`");
+    expect(ledger).not.toContain("awaiting independent Architect acceptance");
     expect(ledger).toContain("sixteen still bounded");
     // `UNO-WO-070 / R01`: the two grid families gained a bounded authored-heading mode, which must never be recorded as
     // full parity, a second/third accepted family or a closed stage.
-    expect(ledger).toContain("ADAPT (bounded grid plus authored section heading)");
-    expect(ledger.split("ADAPT (bounded grid plus authored section heading)").length - 1).toBe(2);
+    expect(ledger).toContain("ADAPT (bounded grid plus authored section heading and plain-text lede)");
+    expect(ledger.split("ADAPT (bounded grid plus authored section heading and plain-text lede)").length - 1).toBe(2);
     expect(ledger).toContain("authored section heading");
     expect(ledger).toContain("item titles step to `content.heading {level:3}`");
     expect(ledger).toContain("byte-identically");
@@ -3819,7 +3821,7 @@ describe("composeUnoFoundationSubset — cards and features authored heading", (
   it("still refuses every out-of-subset cards and features donor field, headed or not", () => {
     for (const type of ["cards", "features"] as const) {
       const base = { type, heading: "Headed", columns: 2, items: [{ title: "One" }] };
-      expectRefusal(envelope({ ...base, lede: "A lede." }), "family:unsupported-feature");
+      // `lede` is now accepted (see the dedicated lede section); every other donor field stays out of this subset.
       expectRefusal(envelope({ ...base, surface: "muted" }), "family:unsupported-feature");
       expectRefusal(envelope({ ...base, href: "#next" }), "family:unsupported-feature");
       expectRefusal(envelope({ ...base, style: "color:red" }), "family:unsupported-feature");
@@ -3834,5 +3836,276 @@ describe("composeUnoFoundationSubset — cards and features authored heading", (
       expectRefusal(envelope({ ...base, items: [{ title: "One", action: { label: "Go", href: "#go" } }] }), "family:unsupported-feature");
       expectRefusal(envelope({ ...base, items: [{ title: "One", icon: "star" }] }), "family:unsupported-feature");
     }
+  });
+});
+
+/**
+ * `UNO-WO-071 / R01`: the donor's optional authored section lede for the two bounded grid families.
+ *
+ * The donor `lede` is Markdown-capable (`markdownTextSchema`); this subset accepts one literal plain-text string and
+ * renders it as `content.prose {text}` in source order above the native item list. No heading is ever synthesized and no
+ * input without a lede changes its JSON.
+ */
+describe("composeUnoFoundationSubset — cards and features authored lede", () => {
+  /** The four pre-WO-071 section baselines, captured from the committed output before this change. */
+  const PRE_WO071_CARDSUNHEADED =
+    '{"id":"family-0-cards","module":"layout.grid","props":{"columns":2,"itemSemantics":"list"},"children":[{"id":"family-0-cards-item-0","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-cards-item-0-title","module":"content.heading","props":{"text":"Card one","level":2}},{"id":"family-0-cards-item-0-body","module":"content.prose","props":{"text":"First card body."}}]},{"id":"family-0-cards-item-1","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-cards-item-1-title","module":"content.heading","props":{"text":"Card two","level":2}}]}]}';
+  const PRE_WO071_CARDSHEADEDONLY =
+    '{"id":"family-0-cards","module":"layout.stack","props":{},"children":[{"id":"family-0-cards-heading","module":"content.heading","props":{"text":"Synthetic cards","level":2}},{"id":"family-0-cards-grid","module":"layout.grid","props":{"columns":2,"itemSemantics":"list"},"children":[{"id":"family-0-cards-item-0","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-cards-item-0-title","module":"content.heading","props":{"text":"Card one","level":3}},{"id":"family-0-cards-item-0-body","module":"content.prose","props":{"text":"First card body."}}]},{"id":"family-0-cards-item-1","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-cards-item-1-title","module":"content.heading","props":{"text":"Card two","level":3}}]}]}]}';
+  const PRE_WO071_FEATURESUNHEADED =
+    '{"id":"family-0-features","module":"layout.grid","props":{"columns":3,"itemSemantics":"list"},"children":[{"id":"family-0-features-item-0","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-features-item-0-title","module":"content.heading","props":{"text":"Feature one","level":2}},{"id":"family-0-features-item-0-body","module":"content.prose","props":{"text":"First feature body."}}]},{"id":"family-0-features-item-1","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-features-item-1-title","module":"content.heading","props":{"text":"Feature two","level":2}}]}]}';
+  const PRE_WO071_FEATURESHEADEDONLY =
+    '{"id":"family-0-features","module":"layout.stack","props":{},"children":[{"id":"family-0-features-heading","module":"content.heading","props":{"text":"Synthetic features","level":2}},{"id":"family-0-features-grid","module":"layout.grid","props":{"columns":3,"itemSemantics":"list"},"children":[{"id":"family-0-features-item-0","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-features-item-0-title","module":"content.heading","props":{"text":"Feature one","level":3}},{"id":"family-0-features-item-0-body","module":"content.prose","props":{"text":"First feature body."}}]},{"id":"family-0-features-item-1","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-features-item-1-title","module":"content.heading","props":{"text":"Feature two","level":3}}]}]}]}';
+
+  /** One cards/features source with the caller-chosen heading and lede fields. */
+  function ledePage(
+    type: "cards" | "features",
+    fields: Record<string, unknown>,
+    columns: 2 | 3 | 4 = type === "cards" ? 2 : 3,
+  ): Record<string, unknown> {
+    const titled = type === "cards"
+      ? [{ title: "Card one", body: "First card body." }, { title: "Card two" }]
+      : [{ title: "Feature one", body: "First feature body." }, { title: "Feature two" }];
+    return { version: 1, title: "Lede fixture", sections: [{ type, ...fields, columns, items: titled }] };
+  }
+
+  it("keeps all four pre-WO-071 baselines byte-identical when no lede is authored", () => {
+    expect(JSON.stringify(composed(ledePage("cards", {})).sections[0])).toBe(PRE_WO071_CARDSUNHEADED);
+    expect(JSON.stringify(composed(ledePage("cards", { heading: "Synthetic cards" })).sections[0])).toBe(PRE_WO071_CARDSHEADEDONLY);
+    expect(JSON.stringify(composed(ledePage("features", {})).sections[0])).toBe(PRE_WO071_FEATURESUNHEADED);
+    expect(JSON.stringify(composed(ledePage("features", { heading: "Synthetic features" })).sections[0])).toBe(PRE_WO071_FEATURESHEADEDONLY);
+  });
+
+
+
+  it("composes heading+lede for cards as an ordered heading, lede paragraph and grid", () => {
+    const source = ledePage("cards", { heading: "Synthetic cards", lede: "Synthetic cards explain the choices." });
+    const before = JSON.stringify(source);
+    const document = composed(source);
+    expect(JSON.stringify(source)).toBe(before);
+    const section = document.sections[0]!;
+    expect(section.id).toBe("family-0-cards");
+    expect(section.module).toBe("layout.stack");
+    expect(JSON.stringify(section.props)).toBe("{}");
+    if (section.module !== "layout.stack") return;
+    expect(section.children).toHaveLength(3);
+    const [heading, lede, grid] = section.children;
+    expect(heading!.id).toBe("family-0-cards-heading");
+    expect(heading!.module).toBe("content.heading");
+    expect(heading!.props).toEqual({ text: "Synthetic cards", level: 2 });
+    expect(lede!.id).toBe("family-0-cards-lede");
+    expect(lede!.module).toBe("content.prose");
+    expect(lede!.props).toEqual({ text: "Synthetic cards explain the choices." });
+    expect(grid!.id).toBe("family-0-cards-grid");
+    expect(grid!.props).toEqual({ columns: 2, itemSemantics: "list" });
+    if (grid!.module !== "layout.grid") return;
+    expect(grid!.children.map((item) => item.id)).toEqual(["family-0-cards-item-0", "family-0-cards-item-1"]);
+    for (const [index, item] of grid!.children.entries()) {
+      if (item.module !== "layout.stack") continue;
+      expect(item.children[0]!.props).toEqual({ text: index === 0 ? "Card one" : "Card two", level: 3 });
+      expect(item.children.filter((child) => child.module === "content.prose")).toHaveLength(index === 0 ? 1 : 0);
+    }
+    // Deep freeze, real reader re-acceptance as object and JSON, and JSON roundtrip stability.
+    expect(Object.isFrozen(section)).toBe(true);
+    expect(Object.isFrozen(section.children)).toBe(true);
+    expect(Object.isFrozen(lede!.props)).toBe(true);
+    expect(Object.isFrozen(grid!.props)).toBe(true);
+    const asObject = readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown);
+    const asJson = readUnoPageDocument(JSON.stringify(document));
+    expect(asObject.accepted).toBe(true);
+    expect(asJson.accepted).toBe(true);
+    expect(JSON.stringify(document)).toBe(JSON.stringify(JSON.parse(JSON.stringify(document)) as unknown));
+  });
+
+  it("composes heading+lede for features with the same three ordered children", () => {
+    const document = composed(ledePage("features", { heading: "Synthetic features", lede: "Synthetic features describe the work." }));
+    const section = document.sections[0]!;
+    expect(section.id).toBe("family-0-features");
+    expect(section.module).toBe("layout.stack");
+    if (section.module !== "layout.stack") return;
+    expect(section.children.map((child) => child.id)).toEqual([
+      "family-0-features-heading",
+      "family-0-features-lede",
+      "family-0-features-grid",
+    ]);
+    expect(section.children[1]!.props).toEqual({ text: "Synthetic features describe the work." });
+    expect(section.children[2]!.props).toEqual({ columns: 3, itemSemantics: "list" });
+    expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+  });
+
+  it("composes lede-only for both families with level-2 item titles and no synthetic heading", () => {
+    for (const type of ["cards", "features"] as const) {
+      const page = ledePage(type, { lede: "A plain authored lede." });
+      const document = composed(page);
+      const section = document.sections[0]!;
+      expect(document.sections).toHaveLength(1);
+      expect(section.id).toBe(`family-0-${type}`);
+      expect(section.module).toBe("layout.stack");
+      expect(JSON.stringify(section.props)).toBe("{}");
+      if (section.module !== "layout.stack") continue;
+      expect(section.children).toHaveLength(2);
+      const [lede, grid] = section.children;
+      expect(lede!.id).toBe(`family-0-${type}-lede`);
+      expect(lede!.module).toBe("content.prose");
+      expect(lede!.props).toEqual({ text: "A plain authored lede." });
+      expect(grid!.id).toBe(`family-0-${type}-grid`);
+      if (grid!.module !== "layout.grid") continue;
+      // The heading-less outline is preserved: item titles stay level 2 and no heading is invented.
+      for (const [index, item] of grid!.children.entries()) {
+        if (item.module !== "layout.stack") continue;
+        const title = item.children[0]!;
+        expect(title.module).toBe("content.heading");
+        expect(title.props).toEqual({ text: type === "cards" ? (index === 0 ? "Card one" : "Card two") : (index === 0 ? "Feature one" : "Feature two"), level: 2 });
+        expect(title.id).toBe(`family-0-${type}-item-${index}-title`);
+      }
+      expect(section.children.some((child) => child.module === "content.heading")).toBe(false);
+      // Standalone as the first Page section, and accepted by the unchanged reader as object and JSON.
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+      expect(readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown).accepted).toBe(true);
+    }
+  });
+
+  it("keeps authored order and ids for lede-bearing families mixed with the divider in either order", () => {
+    const divider = { type: "divider" };
+    const cards = { type: "cards", heading: "Synthetic cards", lede: "A cards lede.", columns: 2, items: [{ title: "Card one" }] };
+    const features = { type: "features", lede: "A features lede.", columns: 3, items: [{ title: "Feature one" }] };
+    for (const sections of [[divider, cards, features], [features, divider, cards]] as const) {
+      const document = composed({ version: 1, title: "Mixed lede", sections });
+      expect(document.sections.map((section) => section.id)).toEqual(
+        sections.map((section, index) => `family-${index}-${section.type}`),
+      );
+      expect(document.sections.filter((section) => section.module === "layout.stack")).toHaveLength(2);
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+    }
+  });
+
+
+  it("renders exactly one escaped lede paragraph between the authored heading and the native list", () => {
+    const document = composed(ledePage("cards", { heading: "Synthetic cards", lede: 'Plans & "prices" stay plain' }));
+    const html = render(document);
+    const start = html.indexOf('id="family-0-cards"');
+    expect(start).toBeGreaterThan(0);
+    const region = html.slice(start - 60, html.length);
+    expect(region).toContain('<p class="uno-json-prose" id="family-0-cards-lede">Plans &amp; &quot;prices&quot; stay plain</p>');
+    expect((region.match(/family-0-cards-lede/gu) ?? []).length).toBe(1);
+    expect((region.match(/<p class="uno-json-prose"/gu) ?? []).length).toBe(2);
+    expect(region.indexOf("<h2")).toBeGreaterThan(0);
+    expect(region.indexOf("<h2")).toBeLessThan(region.indexOf("family-0-cards-lede"));
+    expect(region.indexOf("family-0-cards-lede")).toBeLessThan(region.indexOf("<ul"));
+    expect((region.match(/<h2/gu) ?? []).length).toBe(1);
+    expect((region.match(/<h3/gu) ?? []).length).toBe(2);
+    for (const forbidden of ["<h1", "<h4", "<a ", "<img", "<script", "<iframe", "<button", "<form", "onclick", "<article"]) {
+      expect(region).not.toContain(forbidden);
+    }
+  });
+
+  it("renders lede-only as one paragraph before the list with level-2 item titles and no invented heading", () => {
+    for (const type of ["cards", "features"] as const) {
+      const html = render(composed(ledePage(type, { lede: "A plain authored lede." })));
+      const start = html.indexOf(`id="family-0-${type}"`);
+      expect(start).toBeGreaterThan(0);
+      const region = html.slice(start - 60, html.length);
+      expect(region).toContain(`<p class="uno-json-prose" id="family-0-${type}-lede">A plain authored lede.</p>`);
+      expect(region.indexOf(`family-0-${type}-lede`)).toBeLessThan(region.indexOf("<ul"));
+      expect((region.match(/<h2 class="uno-json-heading"/gu) ?? []).length).toBe(2);
+      expect(region).not.toContain("<h3");
+      expect(region).not.toContain(`id="family-0-${type}-heading"`);
+      expect((region.match(/<li class="uno-json-cell"/gu) ?? []).length).toBe(2);
+    }
+  });
+
+  it("accepts 4000 code points, including astral characters, and refuses 4001", () => {
+    const bmp = "x".repeat(4000);
+    const astral = "\u{1F600}".repeat(4000);
+    expect(Array.from(astral)).toHaveLength(4000);
+    for (const type of ["cards", "features"] as const) {
+      for (const text of [bmp, astral, "Grüße — 日本語 ✓"]) {
+        const document = composed(ledePage(type, { lede: text }));
+        const section = document.sections[0]!;
+        expect(section.module).toBe("layout.stack");
+        if (section.module === "layout.stack") expect(section.children[0]!.props).toEqual({ text });
+        expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+      }
+      expectRefusal(ledePage(type, { lede: `${bmp}x` }), "family:target-refused");
+      expectRefusal(ledePage(type, { lede: `${astral}\u{1F600}` }), "family:target-refused");
+    }
+  });
+
+
+  it("refuses every malformed lede with the closed reason that matches its cause", () => {
+    const cases: Array<[string, unknown, string]> = [
+      ["a number", 7, "family:unsupported-feature"],
+      ["null", null, "family:unsupported-feature"],
+      ["an array", ["A lede."], "family:unsupported-feature"],
+      ["an object", { text: "A lede." }, "family:unsupported-feature"],
+      ["a boolean", true, "family:unsupported-feature"],
+      ["an empty string", "", "family:target-refused"],
+      ["whitespace only", "   ", "family:target-refused"],
+      ["a leading space", " Lede", "family:target-refused"],
+      ["a trailing space", "Lede ", "family:target-refused"],
+      ["bold", "**Bold**", "family:unsupported-feature"],
+      ["asterisk italic", "*Italic*", "family:unsupported-feature"],
+      ["underscore italic", "_Italic_", "family:unsupported-feature"],
+      ["strike", "~~Strike~~", "family:unsupported-feature"],
+      ["a backtick", "`code`", "family:unsupported-feature"],
+      ["a link", "[label](https://example.com)", "family:unsupported-feature"],
+      ["an image", "![alt](https://example.com/i.png)", "family:unsupported-feature"],
+      ["a heading", "# Heading", "family:unsupported-feature"],
+      ["a bullet entry", "- entry", "family:unsupported-feature"],
+      ["an ordered entry", "1. entry", "family:unsupported-feature"],
+      ["a blockquote", "> quote", "family:unsupported-feature"],
+    ];
+    for (const type of ["cards", "features"] as const) {
+      for (const [label, lede, reason] of cases) {
+        expectRefusal(ledePage(type, { lede }), reason);
+        expect(label.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("refuses markup, control characters, unpaired surrogates and an accessor lede with zero getter runs", () => {
+    for (const type of ["cards", "features"] as const) {
+      expectRefusal(ledePage(type, { lede: "<script>alert(1)</script>" }), "family:unsupported-feature");
+      expectRefusal(ledePage(type, { lede: "a < b" }), "family:unsupported-feature");
+      expectRefusal(ledePage(type, { lede: "Two\nlines" }), "family:unsupported-feature");
+      expectRefusal(ledePage(type, { lede: "Tabbed\ttext" }), "family:unsupported-feature");
+      expectRefusal(ledePage(type, { lede: "Nul\u0000text" }), "family:unsupported-feature");
+      expectRefusal(ledePage(type, { lede: "Lead \uD800 tail" }), "family:target-refused");
+    }
+    for (const type of ["cards", "features"] as const) {
+      let runs = 0;
+      const hostile: Record<string, unknown> = { type, columns: 2, items: [{ title: "One" }] };
+      Object.defineProperty(hostile, "lede", { enumerable: true, get() { runs += 1; return "Read me"; } });
+      expectRefusal(envelope(hostile), "family:unsafe-source");
+      expect(runs).toBe(0);
+      expectRefusal(
+        { version: 1, title: "Hostile lede fixture", sections: [{ type: "prose", body: "A plain paragraph." }, hostile] },
+        "family:unsafe-source",
+      );
+      expect(runs).toBe(0);
+      expectRefusal(
+        {
+          version: 1,
+          title: "Hostile lede fixture",
+          sections: [hostile, { type, heading: "Header", columns: 2, items: [{ title: "One" }] }],
+        },
+        "family:unsafe-source",
+      );
+      expect(runs).toBe(0);
+    }
+  });
+
+  it("keeps the lede subset recorded in the ledger without claiming a second parity family", () => {
+    const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
+    expect(ledger.split("plain-text `lede`").length - 1).toBeGreaterThanOrEqual(2);
+    expect(ledger).toContain("heading+lede");
+    expect(ledger).toContain("lede-only");
+    expect(ledger).toContain("no-lede");
+    expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
+    expect(ledger).toContain("one of seventeen fully parity-evidenced candidates");
+    expect(ledger).not.toContain("2/17");
+    expect(ledger).not.toContain("3/17");
+    expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
+    expect(ledger).not.toMatch(/features[^.\n]*full semantic parity/u);
   });
 });

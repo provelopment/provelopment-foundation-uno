@@ -542,10 +542,27 @@ function readNewFamilyText(value: PlainValue | undefined): string {
  * out-of-subset feature, while a blank, padded or overlength string refuses the target itself.
  */
 function readSectionHeading(value: PlainValue | undefined): string {
+  return readSectionPlainText(value, 160);
+}
+
+/**
+ * Read one authored section lede of the two bounded grid families.
+ *
+ * `UNO-WO-071 / R01`: the donor's `lede` is Markdown-capable, while this subset renders one literal plain-text
+ * paragraph. The shared reader therefore refuses Markdown, markup, line breaks, control characters and unpaired
+ * surrogates instead of printing raw syntax as if it were equivalent, and the donor's whole-text bound becomes the Uno
+ * target's own `textCodePoints` limit.
+ */
+function readSectionLede(value: PlainValue | undefined): string {
+  return readSectionPlainText(value, 4000);
+}
+
+/** One authored plain-text section field: literal, unpadded, bounded, Markdown-free and well-formed. */
+function readSectionPlainText(value: PlainValue | undefined, codePointLimit: number): string {
   if (typeof value !== "string") refuseUnsupportedFeature();
   if (value.length === 0) refuseTarget();
   if (value.trim() !== value) refuseTarget();
-  if (codePointLength(value) > 160) refuseTarget();
+  if (codePointLength(value) > codePointLimit) refuseTarget();
   // An unpaired surrogate cannot be represented as well-formed text, so it refuses the target rather than being
   // replaced or normalized.
   for (let index = 0; index < value.length; index += 1) {
@@ -808,8 +825,9 @@ function composeSection(
     case "features": {
       // The donor card also accepts image/meta/action and the donor feature an icon; this subset composes neither, and
       // it requires `columns` explicitly instead of manufacturing the donor renderer's default. `UNO-WO-070 / R01` adds
-      // exactly one optional donor field: the authored plain-text section heading.
-      requireExactKeys(record, ["type", "columns", "items"], ["heading"]);
+      // exactly one optional donor field: the authored plain-text section heading, plus `UNO-WO-071 / R01`'s authored
+      // plain-text lede. No other donor field becomes representable.
+      requireExactKeys(record, ["type", "columns", "items"], ["heading", "lede"]);
       const cols = record["columns"];
       if (cols !== 2 && cols !== 3 && cols !== 4) refuseTarget();
       const rawItems = record["items"];
@@ -817,9 +835,12 @@ function composeSection(
       // Uno's `itemSemantics: "list"` grid carries one native `<li>` per child, within its own bounded child count.
       if (rawItems.length < 1 || rawItems.length > 8) refuseTarget();
       // The donor's own outline: an authored section heading is the `<h2>` and its item titles are `<h3>`; without one
-      // the legacy grid keeps its level-2 item titles and invents no section heading.
+      // the legacy grid keeps its level-2 item titles and invents no section heading. `UNO-WO-071 / R01` adds the donor's
+      // optional authored lede as one plain-text paragraph above the list, never as Markdown or a synthesized default.
       const headingAuthored = ownsKey(record, "heading");
+      const ledeAuthored = ownsKey(record, "lede");
       const headingText = headingAuthored ? readSectionHeading(record["heading"]) : null;
+      const ledeText = ledeAuthored ? readSectionLede(record["lede"]) : null;
       const itemLevel = headingAuthored ? 3 : 2;
       const children: CandidateSection[] = [];
       for (let itemIndex = 0; itemIndex < rawItems.length; itemIndex += 1) {
@@ -844,23 +865,28 @@ function composeSection(
         }
         children.push({ id: itemId, module: "layout.stack", props: { gap: "tight" }, children: nested });
       }
-      if (!headingAuthored) {
-        // Byte-compatible legacy output: the original grid root with its original id and no heading wrapper.
+      if (!headingAuthored && !ledeAuthored) {
+        // Byte-compatible legacy output: the original grid root with its original id and no heading or lede wrapper.
         return { id, module: "layout.grid", props: { columns: cols, itemSemantics: "list" }, children };
       }
-      const heading: CandidateSection = {
-        id: `${id}-heading`,
-        module: "content.heading",
-        props: { text: headingText, level: 2 },
-      };
       const grid: CandidateSection = {
         id: `${id}-grid`,
         module: "layout.grid",
         props: { columns: cols, itemSemantics: "list" },
         children,
       };
-      // One top-level node per authored family: the same stable anchor id now wraps the authored heading and its grid.
-      return { id, module: "layout.stack", props: {}, children: [heading, grid] };
+      // One top-level node per authored family: the same stable anchor id wraps the authored text in source order — the
+      // optional heading, the optional lede and then the list grid. A lede alone invents no heading and keeps the
+      // heading-less level-2 item titles.
+      const wrapped: CandidateSection[] = [];
+      if (headingAuthored) {
+        wrapped.push({ id: `${id}-heading`, module: "content.heading", props: { text: headingText, level: 2 } });
+      }
+      if (ledeAuthored) {
+        wrapped.push({ id: `${id}-lede`, module: "content.prose", props: { text: ledeText } });
+      }
+      wrapped.push(grid);
+      return { id, module: "layout.stack", props: {}, children: wrapped };
     }
     case "actions": {
       // The donor also accepts `href`/`route`/`link` destinations, an action `variant` and section heading/lede/align/

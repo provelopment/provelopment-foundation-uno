@@ -259,6 +259,27 @@ const PHASE_C_REQUIRED = Object.freeze([
   "seen.features.h2 === 1 && seen.features.h3 === 2",
   "seen.cards.uniqueIds",
   "(familyHtml.match(/<h3[\\s>]/giu) ?? []).length === 4",
+  // `UNO-WO-071 / R01`: the authored plain-text lede — labels plus the executable predicates behind them.
+  'lede: "Synthetic cards explain the choices.",',
+  'lede: "Synthetic features describe the work.",',
+  "FAMILY_LEDE_SOURCE cards compose exactly one lede paragraph in the ordered heading, lede and grid stack",
+  "FAMILY_LEDE_SOURCE features compose exactly one lede paragraph in the same ordered stack",
+  "FAMILY_LEDE_SOURCE the ledes add no node outside the two families and keep the seventeen top-level ids",
+  "FAMILY_LEDE_SOURCE the composed JSON matches the installed buffer and the caller source is unmutated",
+  "FAMILY_LEDE_REFUSALS each lede probe refuses the whole Page with its documented reason and no partial document",
+  "FAMILY_LEDE_REFUSALS an authored card lede getter yields family:unsafe-source with zero invocations",
+  "FAMILY_LEDE_HTTP each headed family serves exactly one lede paragraph after its h2 and before its native list",
+  "FAMILY_LEDE_BROWSER the authored ledes were measured in real Chromium at both viewports",
+  "${width}px each headed family shows its authored lede as one visible paragraph between the h2 and the list",
+  'lede?.id === `family-${index}-${type}-lede`',
+  'JSON.stringify(lede?.props) === JSON.stringify({ text: expectedText })',
+  "ledeAt > headingEnd",
+  "ledeAt < listAt",
+  "ledeGetterCalls === 0",
+  "family.ledeAfterHeading",
+  "family.ledeBeforeGrid",
+  "family.ledeVisible",
+  "ledeBrowserChecks === 2",
 ]);
 
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
@@ -588,7 +609,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ['  "family-15-cards",', '  "family-15-cardsRenamed",'],
       ['  "family-16-features",', '  "family-16-featuresRenamed",'],
     ]) {
-      const mutated = source.replace(token, replacement);
+      const mutated = source.split(token).join(replacement);
       assert.notEqual(mutated, source, token);
       assert.ok(audit(mutated).some((entry) => entry.includes(token)), `${token}: ${audit(mutated).join(",")}`);
     }
@@ -675,7 +696,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ["let dividerOk = true;", "let dividerAccepted = true;"],
     ];
     for (const [token, replacement] of mutations) {
-      const mutated = source.replace(token, replacement);
+      const mutated = source.split(token).join(replacement);
       assert.notEqual(mutated, source, token);
       assert.ok(
         audit(mutated).some((entry) => entry.includes(token.split("\n")[0].slice(0, 40))),
@@ -696,7 +717,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ["near(seen.divider.spaceAfter, expectedOffset, 1.5)", "true"],
     ];
     for (const [token, replacement] of mutations) {
-      const mutated = source.replace(token, replacement);
+      const mutated = source.split(token).join(replacement);
       assert.notEqual(mutated, source, token);
       assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
     }
@@ -712,7 +733,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ["parseFloat(dark.transitionDuration) <= 1e-4", "true"],
     ];
     for (const [token, replacement] of mutations) {
-      const mutated = source.replace(token, replacement);
+      const mutated = source.split(token).join(replacement);
       assert.notEqual(mutated, source, token);
       assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
     }
@@ -748,7 +769,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ["seen.cards.uniqueIds", "true"],
     ];
     for (const [token, replacement] of mutations) {
-      const mutated = source.replace(token, replacement);
+      const mutated = source.split(token).join(replacement);
       assert.notEqual(mutated, source, token);
       assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
     }
@@ -758,7 +779,43 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       "FAMILY_ITEM_OUTLINE_HTTP both headed families serve exactly one authored h2 before two nested h3 titles, one list and no duplicate id",
       "${width}px the headed families keep one h2 before every item h3 with no invented control or overflow",
     ]) {
-      const mutated = source.replace(label, "outline evidence removed");
+      const mutated = source.split(label).join("outline evidence removed");
+      assert.notEqual(mutated, source, label);
+      assert.ok(audit(mutated).some((entry) => entry.includes(label)), `${label}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit fails when the authored lede source or served evidence is neutered", () => {
+    const mutations = [
+      // The fixture source loses the authored lede.
+      ['lede: "Synthetic cards explain the choices.",', ""],
+      ['lede: "Synthetic features describe the work.",', ""],
+      // The composed shape: lede id and text comparisons turned unconditional.
+      ["lede?.id === `family-${index}-${type}-lede`", "true"],
+      ["JSON.stringify(lede?.props) === JSON.stringify({ text: expectedText })", "true"],
+      // The served order predicate collapsed.
+      ["ledeAt > headingEnd", "true"],
+      ["ledeAt < listAt", "true"],
+      // The refusal probe's zero-getter assertion removed.
+      ["ledeGetterCalls === 0", "true"],
+      // The Chromium lede predicates neutralized.
+      ["family.ledeAfterHeading", "true"],
+      ["family.ledeBeforeGrid", "true"],
+      ["family.ledeVisible", "true"],
+      ["ledeBrowserChecks === 2", "true"],
+    ];
+    for (const [token, replacement] of mutations) {
+      const mutated = source.split(token).join(replacement);
+      assert.notEqual(mutated, source, token);
+      assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
+    }
+    for (const label of [
+      "FAMILY_LEDE_SOURCE cards compose exactly one lede paragraph in the ordered heading, lede and grid stack",
+      "FAMILY_LEDE_REFUSALS each lede probe refuses the whole Page with its documented reason and no partial document",
+      "FAMILY_LEDE_HTTP each headed family serves exactly one lede paragraph after its h2 and before its native list",
+      "FAMILY_LEDE_BROWSER the authored ledes were measured in real Chromium at both viewports",
+    ]) {
+      const mutated = source.split(label).join("lede evidence removed");
       assert.notEqual(mutated, source, label);
       assert.ok(audit(mutated).some((entry) => entry.includes(label)), `${label}: ${audit(mutated).join(",")}`);
     }
@@ -773,7 +830,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       "FAMILY_MEDIA=3/3 three distinct locators serve the one Page-owned plate with GET and HEAD",
       "FAMILY_CONTACT_OFF_HTTP the contact subtree carries no form, control, handler or destination",
     ]) {
-      const mutated = source.replace(gate, "gate removed");
+      const mutated = source.split(gate).join("gate removed");
       assert.notEqual(mutated, source, gate);
       assert.ok(audit(mutated).some((entry) => entry.includes(gate)), `${gate}: ${audit(mutated).join(",")}`);
     }

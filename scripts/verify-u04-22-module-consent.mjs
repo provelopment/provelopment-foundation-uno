@@ -438,9 +438,10 @@ function familySource() {
       },
       {
         type: "cards",
-        // `UNO-WO-070 / R01`: the authored heading is the only source change at index 15; columns, items and bodies
-        // stay exactly as before.
+        // `UNO-WO-070 / R01` added the authored heading; `UNO-WO-071 / R01` adds the authored plain-text lede. Columns,
+        // items and bodies stay exactly as committed.
         heading: "Synthetic cards",
+        lede: "Synthetic cards explain the choices.",
         columns: 2,
         items: [
           { title: "Card one", body: "First card body." },
@@ -449,8 +450,9 @@ function familySource() {
       },
       {
         type: "features",
-        // `UNO-WO-070 / R01`: the authored heading is the only source change at index 16.
+        // `UNO-WO-070 / R01` added the authored heading; `UNO-WO-071 / R01` adds the authored plain-text lede.
         heading: "Synthetic features",
+        lede: "Synthetic features describe the work.",
         columns: 3,
         items: [
           { title: "Feature one", body: "First feature body." },
@@ -973,6 +975,47 @@ async function main() {
       JSON.stringify(lastFourProbes),
     );
 
+    // `UNO-WO-071 / R01`: eight further whole-Page refusals over the two newly lede-bearing families, each from a fresh
+    // source, plus a zero-invocation accessor probe. Every probe mutates exactly one authored lede.
+    const ledeProbes = [
+      ["card lede Markdown emphasis", "family:unsupported-feature", (s) => { s.sections[15].lede = "**Bold** lede"; }],
+      ["card lede Markdown link", "family:unsupported-feature", (s) => { s.sections[15].lede = "[label](https://example.test)"; }],
+      ["card lede markup", "family:unsupported-feature", (s) => { s.sections[15].lede = "<b>bold</b>"; }],
+      ["card lede wrong type", "family:unsupported-feature", (s) => { s.sections[15].lede = 7; }],
+      ["feature lede blank", "family:target-refused", (s) => { s.sections[16].lede = ""; }],
+      ["feature lede padded", "family:target-refused", (s) => { s.sections[16].lede = " Padded lede"; }],
+      ["feature lede oversize", "family:target-refused", (s) => { s.sections[16].lede = "x".repeat(4001); }],
+      ["feature lede unpaired surrogate", "family:target-refused", (s) => { s.sections[16].lede = "Lead \uD800 tail"; }],
+    ].map(([expectedLabel, expected, mutate]) => {
+      const ledeSource = familySource();
+      mutate(ledeSource);
+      const outcome = composeUnoFoundationSubset(ledeSource, familyBindings());
+      return {
+        label: expectedLabel,
+        expected,
+        actual: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+        partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+      };
+    });
+    check(
+      "FAMILY_LEDE_REFUSALS each lede probe refuses the whole Page with its documented reason and no partial document",
+      ledeProbes.every((probe) => probe.actual === probe.expected && probe.partial === false),
+      JSON.stringify(ledeProbes),
+    );
+    const ledeGetterSource = familySource();
+    let ledeGetterCalls = 0;
+    Object.defineProperty(ledeGetterSource.sections[15], "lede", {
+      enumerable: true,
+      get() { ledeGetterCalls += 1; return "Read me"; },
+    });
+    const ledeGetterOutcome = composeUnoFoundationSubset(ledeGetterSource, familyBindings());
+    check(
+      "FAMILY_LEDE_REFUSALS an authored card lede getter yields family:unsafe-source with zero invocations",
+      ledeGetterOutcome.status === "refused" && ledeGetterOutcome.reason === "family:unsafe-source"
+        && ledeGetterCalls === 0 && !Object.prototype.hasOwnProperty.call(ledeGetterOutcome, "document"),
+      `${String(ledeGetterOutcome.status === "refused" ? ledeGetterOutcome.reason : ledeGetterOutcome.status)} calls=${ledeGetterCalls}`,
+    );
+
     // A hostile accessor on an appended item must be classified, never executed: zero invocations and no partial Page.
     const getterSource = familySource();
     let getterCalls = 0;
@@ -1094,19 +1137,25 @@ async function main() {
           && section.id === `family-${index}-${type}`
           && JSON.stringify(section.props) === "{}"
           && Array.isArray(section.children)
-          && section.children.length === 2;
+          && section.children.length === 3;
         const detail = `${section.id}/${section.module}/${JSON.stringify(section.props)}`;
         if (!stackOk) return { ok: false, detail };
-        const [heading, grid] = section.children;
+        const [heading, lede, grid] = section.children;
         const headingOk = heading.module === "content.heading"
           && heading.id === `family-${index}-${type}-heading`
           && JSON.stringify(heading.props) === JSON.stringify({ text: headingText, level: 2 });
+        const ledeOk = lede.module === "content.prose"
+          && lede.id === `family-${index}-${type}-lede`
+          && typeof lede.props.text === "string"
+          && lede.props.text.length > 0;
         const gridOk = grid.module === "layout.grid"
           && grid.id === `family-${index}-${type}-grid`
           && JSON.stringify(grid.props) === JSON.stringify({ columns, itemSemantics: "list" })
           && Array.isArray(grid.children)
           && grid.children.length === 2;
-        if (!headingOk || !gridOk) return { ok: false, detail: `${detail} ${JSON.stringify(heading.props)} ${gridOk}` };
+        if (!headingOk || !ledeOk || !gridOk) {
+          return { ok: false, detail: `${detail} heading=${headingOk} lede=${ledeOk} grid=${gridOk}` };
+        }
         const itemsOk = grid.children.every((item, itemIndex) => {
           const title = item.children?.[0];
           const idsOk = item.module === "layout.stack"
@@ -1154,9 +1203,67 @@ async function main() {
           && reFeatures?.module === "layout.stack"
           && reCards?.children?.[0]?.props?.level === 2
           && reFeatures?.children?.[0]?.props?.level === 2
-          && reCards?.children?.[1]?.children?.every((item) => item.children?.[0]?.props?.level === 3) === true
-          && reFeatures?.children?.[1]?.children?.every((item) => item.children?.[0]?.props?.level === 3) === true,
+          && reCards?.children?.[2]?.children?.every((item) => item.children?.[0]?.props?.level === 3) === true
+          && reFeatures?.children?.[2]?.children?.every((item) => item.children?.[0]?.props?.level === 3) === true,
         `${reCards?.module ?? "missing"}/${reFeatures?.module ?? "missing"}`,
+      );
+    }
+    // `UNO-WO-071 / R01`: the two authored plain-text ledes on the composed document and the installed buffer.
+    {
+      const ledeEvidence = (index, type, expectedText) => {
+        const section = familyAccepted.sections[index];
+        if (section === undefined || section.module !== "layout.stack") return { ok: false, detail: `missing ${index}` };
+        const [heading, lede, grid] = section.children ?? [];
+        const shapeOk = section.id === `family-${index}-${type}`
+          && JSON.stringify(section.props) === "{}"
+          && (section.children ?? []).length === 3
+          && heading?.module === "content.heading"
+          && heading?.props?.level === 2
+          && lede?.module === "content.prose"
+          && lede?.id === `family-${index}-${type}-lede`
+          && JSON.stringify(lede?.props) === JSON.stringify({ text: expectedText })
+          && grid?.module === "layout.grid"
+          && grid?.id === `family-${index}-${type}-grid`
+          && grid?.props?.itemSemantics === "list";
+        const itemsOk = grid?.children?.every((item) => item?.children?.[0]?.props?.level === 3) === true;
+        return {
+          ok: shapeOk && itemsOk && Object.isFrozen(section) && Object.isFrozen(section.children) && Object.isFrozen(lede?.props),
+          detail: `${section.id} children=${(section.children ?? []).length} lede=${String(lede?.props?.text ?? "missing")}`,
+        };
+      };
+      const cardsLede = ledeEvidence(15, "cards", "Synthetic cards explain the choices.");
+      const featuresLede = ledeEvidence(16, "features", "Synthetic features describe the work.");
+      check(
+        "FAMILY_LEDE_SOURCE cards compose exactly one lede paragraph in the ordered heading, lede and grid stack",
+        cardsLede.ok,
+        cardsLede.detail,
+      );
+      check(
+        "FAMILY_LEDE_SOURCE features compose exactly one lede paragraph in the same ordered stack",
+        featuresLede.ok,
+        featuresLede.detail,
+      );
+      const ledeIds = familyAccepted.sections.map((section) => section.id);
+      check(
+        "FAMILY_LEDE_SOURCE the ledes add no node outside the two families and keep the seventeen top-level ids",
+        JSON.stringify(ledeIds) === JSON.stringify(FAMILY_IDS)
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 2
+          && familyAccepted.sections[8]?.id === "family-8-divider"
+          && JSON.stringify(familyAccepted.sections[8]?.props) === JSON.stringify({ variant: "divider" }),
+        `${ledeIds.length}/${ledeIds.join(",")}`,
+      );
+      const ledeSource = familySource();
+      const ledeSourceSnapshot = JSON.stringify(ledeSource);
+      const recomposed = composeUnoFoundationSubset(ledeSource, familyBindings());
+      check(
+        "FAMILY_LEDE_SOURCE the composed JSON matches the installed buffer and the caller source is unmutated",
+        recomposed.status === "composed"
+          && JSON.stringify(recomposed.document) === JSON.stringify(familyAccepted)
+          && JSON.stringify(ledeSource) === ledeSourceSnapshot
+          && familyJsonBytes.toString("utf8") === `${JSON.stringify(familyAccepted, null, 2)}\n`
+          && JSON.parse(familyJsonBytes.toString("utf8")).sections.length === 17
+          && familyReparsed.accepted === true,
+        recomposed.status === "composed" ? `${familyJsonBytes.length}B` : String(recomposed.reason),
       );
     }
     const { planUnoServingPage: planFamily } = await import("../src/config/uno-serving.ts");
@@ -1444,7 +1551,8 @@ async function main() {
         && (cardsRegion.match(/<h3 class="uno-json-heading"/gu) ?? []).length === 2
         && cardsRegion.indexOf(">Card one</h3>") > 0
         && cardsRegion.indexOf(">Card one</h3>") < cardsRegion.indexOf(">Card two</h3>")
-        && (cardsRegion.match(/<p class="uno-json-prose"/gu) ?? []).length === 1
+        && (cardsRegion.match(/<p class="uno-json-prose"/gu) ?? []).length === 2
+        && cardsRegion.includes('<p class="uno-json-prose" id="family-15-cards-lede">Synthetic cards explain the choices.</p>')
         && cardsRegion.includes(">First card body.</p>")
         && !/data-uno-ratio|<article\b|<a\b|<img\b|<button\b|<form\b|icon/iu.test(cardsRegion),
       cardsRegion.slice(0, 240),
@@ -1460,7 +1568,8 @@ async function main() {
         && (featuresRegion.match(/<h3 class="uno-json-heading"/gu) ?? []).length === 2
         && featuresRegion.indexOf(">Feature one</h3>") > 0
         && featuresRegion.indexOf(">Feature one</h3>") < featuresRegion.indexOf(">Feature two</h3>")
-        && (featuresRegion.match(/<p class="uno-json-prose"/gu) ?? []).length === 1
+        && (featuresRegion.match(/<p class="uno-json-prose"/gu) ?? []).length === 2
+        && featuresRegion.includes('<p class="uno-json-prose" id="family-16-features-lede">Synthetic features describe the work.</p>')
         && featuresRegion.includes(">First feature body.</p>")
         && !/data-uno-ratio|<article\b|<a\b|<img\b|<button\b|<form\b|icon/iu.test(featuresRegion),
       featuresRegion.slice(0, 240),
@@ -1493,6 +1602,33 @@ async function main() {
           && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
           && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1,
         `cards=${cardsIds.length} features=${featuresIds.length} unique=${new Set(allIds).size}`,
+      );
+    }
+    // `UNO-WO-071 / R01`: the two authored ledes exactly as served, in source order inside each family root.
+    {
+      const ledeOk = (region, index, type, text) => {
+        const ledeTag = `<p class="uno-json-prose" id="family-${index}-${type}-lede">${text}</p>`;
+        const headingEnd = region.indexOf("</h2>");
+        const ledeAt = region.indexOf(ledeTag);
+        const listAt = region.indexOf(`id="family-${index}-${type}-grid"`);
+        return (region.match(new RegExp(`id="family-${index}-${type}-lede"`, "gu")) ?? []).length === 1
+          && ledeAt > 0
+          && headingEnd > 0
+          && ledeAt > headingEnd
+          && listAt > 0
+          && ledeAt < listAt
+          && (region.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
+          && (region.match(/<h3 class="uno-json-heading"/gu) ?? []).length === 2
+          && (region.match(/<li class="uno-json-cell"/gu) ?? []).length === 2
+          && (region.match(/<p class="uno-json-prose"/gu) ?? []).length === 2
+          && !/<main\b|<h1\b|<script\b|<a\b|<iframe\b|<form\b|<button\b|<img\b|example\.test|donor/iu.test(region);
+      };
+      check(
+        "FAMILY_LEDE_HTTP each headed family serves exactly one lede paragraph after its h2 and before its native list",
+        ledeOk(cardsRegion, 15, "cards", "Synthetic cards explain the choices.")
+          && ledeOk(featuresRegion, 16, "features", "Synthetic features describe the work.")
+          && (familyHtml.match(/<p class="uno-json-prose" id="family-\d+-(?:cards|features)-lede"/gu) ?? []).length === 2,
+        `cards=${cardsRegion.length} features=${featuresRegion.length}`,
       );
     }
     {
@@ -1951,6 +2087,18 @@ async function consentPhase(base) {
       if (!ok) familyOk = false;
       return check(`FAMILY_BROWSER ${label}`, ok, detail);
     };
+    // `UNO-WO-071 / R01`: the lede evidence is counted under its own label and still gates `FAMILY_BROWSER=PASS`, so a
+    // deleted or neutered lede assertion both fails the runner and withholds the overall family label.
+    let ledeBrowserOk = true;
+    let ledeBrowserChecks = 0;
+    const ledeCheck = (label, ok, detail = "") => {
+      ledeBrowserChecks += 1;
+      if (!ok) {
+        ledeBrowserOk = false;
+        familyOk = false;
+      }
+      return check(`FAMILY_LEDE_BROWSER ${label}`, ok, detail);
+    };
     // `UNO-WO-069 / R01`: the divider evidence is counted and gated separately, so a deleted or neutered divider check
     // both fails the runner and suppresses the overall parity label.
     let dividerOk = true;
@@ -2119,6 +2267,8 @@ async function consentPhase(base) {
             const grid = root?.querySelector(":scope > ul.uno-json-grid") ?? null;
             const items = [...(grid?.children ?? [])];
             const ids = [...(root?.querySelectorAll("[id]") ?? [])].map((node) => node.id);
+            const lede = root?.querySelector("#family-15-cards-lede") ?? null;
+            const ledeRect = lede?.getBoundingClientRect();
             return {
               rootTag: root?.tagName ?? "",
               rootGap: root?.getAttribute("data-uno-gap") ?? "",
@@ -2126,6 +2276,14 @@ async function consentPhase(base) {
               headingId: heading?.id ?? "",
               headingText: heading?.textContent ?? "",
               headingIsFirst: root !== null && root.firstElementChild === heading,
+              ledeTag: lede?.tagName ?? "",
+              ledeId: lede?.id ?? "",
+              ledeText: lede?.textContent ?? "",
+              ledeVisible: ledeRect !== undefined && ledeRect.height > 0 && ledeRect.width > 0,
+              ledeAfterHeading: heading !== null && lede !== null
+                && (heading.compareDocumentPosition(lede) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+              ledeBeforeGrid: grid !== null && lede !== null
+                && (lede.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
               gridTag: grid?.tagName ?? "",
               gridId: grid?.id ?? "",
               columns: grid?.getAttribute("data-uno-columns") ?? "",
@@ -2149,6 +2307,8 @@ async function consentPhase(base) {
             const grid = root?.querySelector(":scope > ul.uno-json-grid") ?? null;
             const items = [...(grid?.children ?? [])];
             const ids = [...(root?.querySelectorAll("[id]") ?? [])].map((node) => node.id);
+            const lede = root?.querySelector("#family-16-features-lede") ?? null;
+            const ledeRect = lede?.getBoundingClientRect();
             return {
               rootTag: root?.tagName ?? "",
               rootGap: root?.getAttribute("data-uno-gap") ?? "",
@@ -2156,6 +2316,14 @@ async function consentPhase(base) {
               headingId: heading?.id ?? "",
               headingText: heading?.textContent ?? "",
               headingIsFirst: root !== null && root.firstElementChild === heading,
+              ledeTag: lede?.tagName ?? "",
+              ledeId: lede?.id ?? "",
+              ledeText: lede?.textContent ?? "",
+              ledeVisible: ledeRect !== undefined && ledeRect.height > 0 && ledeRect.width > 0,
+              ledeAfterHeading: heading !== null && lede !== null
+                && (heading.compareDocumentPosition(lede) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+              ledeBeforeGrid: grid !== null && lede !== null
+                && (lede.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
               gridTag: grid?.tagName ?? "",
               gridId: grid?.id ?? "",
               columns: grid?.getAttribute("data-uno-columns") ?? "",
@@ -2278,7 +2446,9 @@ async function consentPhase(base) {
           && JSON.stringify(seen.cards.itemTitles) === JSON.stringify(["Card one", "Card two"])
           && JSON.stringify(seen.cards.itemTitleIds) === JSON.stringify(["family-15-cards-item-0-title", "family-15-cards-item-1-title"])
           && seen.cards.h2 === 1 && seen.cards.h3 === 2
-          && JSON.stringify(seen.cards.paragraphs) === JSON.stringify(["First card body."])
+          && JSON.stringify(seen.cards.paragraphs) === JSON.stringify(["Synthetic cards explain the choices.", "First card body."])
+          && seen.cards.ledeTag === "P" && seen.cards.ledeId === "family-15-cards-lede"
+          && seen.cards.ledeText === "Synthetic cards explain the choices."
           && seen.cards.articles === 0 && seen.cards.controls === 0 && seen.cards.uniqueIds,
         JSON.stringify(seen.cards).slice(0, 240));
       familyCheck(`${width}px features show a separate headed stack with one authored h2, a three-column list grid and two h3 titles`,
@@ -2291,7 +2461,9 @@ async function consentPhase(base) {
           && JSON.stringify(seen.features.itemTitles) === JSON.stringify(["Feature one", "Feature two"])
           && JSON.stringify(seen.features.itemTitleIds) === JSON.stringify(["family-16-features-item-0-title", "family-16-features-item-1-title"])
           && seen.features.h2 === 1 && seen.features.h3 === 2
-          && JSON.stringify(seen.features.paragraphs) === JSON.stringify(["First feature body."])
+          && JSON.stringify(seen.features.paragraphs) === JSON.stringify(["Synthetic features describe the work.", "First feature body."])
+          && seen.features.ledeTag === "P" && seen.features.ledeId === "family-16-features-lede"
+          && seen.features.ledeText === "Synthetic features describe the work."
           && seen.features.articles === 0 && seen.features.controls === 0 && seen.features.uniqueIds,
         JSON.stringify(seen.features).slice(0, 240));
       // `UNO-WO-070 / R01`: the accessible document outline of the two headed families, measured in the real browser.
@@ -2313,7 +2485,25 @@ async function consentPhase(base) {
           cards: [seen.cards.h2, seen.cards.h3], features: [seen.features.h2, seen.features.h3],
           mains: seen.mains, h1: seen.h1s, overflow: seen.overflow,
         }));
-      // `UNO-WO-069 / R01`: the divider region, measured in the real browser at this viewport.
+      // `UNO-WO-071 / R01`: the authored lede paragraphs as the browser lays them out at this viewport.
+      ledeCheck(`${width}px each headed family shows its authored lede as one visible paragraph between the h2 and the list`,
+        [seen.cards, seen.features].every((family) =>
+          family.ledeTag === "P"
+          && family.ledeVisible
+          && family.ledeAfterHeading
+          && family.ledeBeforeGrid
+          && family.paragraphs.length === 2
+          && family.paragraphs[0].length > 0
+          && family.controls === 0)
+          && seen.cards.ledeText === "Synthetic cards explain the choices."
+          && seen.features.ledeText === "Synthetic features describe the work."
+          && seen.cards.ledeId !== seen.features.ledeId
+          && seen.overflow === 0,
+        JSON.stringify({
+          cards: [seen.cards.ledeId, seen.cards.ledeVisible, seen.cards.ledeAfterHeading, seen.cards.ledeBeforeGrid],
+          features: [seen.features.ledeId, seen.features.ledeVisible, seen.features.ledeAfterHeading, seen.features.ledeBeforeGrid],
+          overflow: seen.overflow,
+        }));
       const gap = parseFloat(seen.divider.parentGap ?? "NaN");
       const marginTop = parseFloat(String(seen.divider.marginTop).replace("px", ""));
       const marginBottom = parseFloat(String(seen.divider.marginBottom).replace("px", ""));
@@ -2482,7 +2672,12 @@ async function consentPhase(base) {
     await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
     familyCheck("the family Page raised no new console or page error", consoleErrors.length === errorsBefore,
       consoleErrors.slice(errorsBefore).join(" | ").slice(0, 180));
-    check("FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px", familyOk);
+    check(
+      "FAMILY_LEDE_BROWSER the authored ledes were measured in real Chromium at both viewports",
+      ledeBrowserOk && ledeBrowserChecks === 2,
+      `checks=${ledeBrowserChecks}`,
+    );
+    check("FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px", familyOk && ledeBrowserOk && ledeBrowserChecks === 2);
     // `UNO-WO-069 / R01`: the divider parity gate. It depends on every executed divider check (three per light viewport
     // and three per dark/reduced-motion viewport) AND on the surrounding family gates, so no single label can stand
     // in for the evidence.
