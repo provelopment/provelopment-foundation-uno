@@ -1,159 +1,173 @@
-# Execution Report — UNO-WO-074 / R01
+# Execution Report — UNO-WO-075 / R01
 
-**CORRECTIVE REPORT / AWAITING INDEPENDENT ARCHITECT REVIEW**
+**PRODUCT + REPORT RECORD / AWAITING INDEPENDENT ARCHITECT REVIEW**
 
-This document replaces the previous contents of this path under a single new Owner-authorized overwrite. It records a
-report-only correction to the `UNO-WO-073 / R01` record. It is not an acceptance, it closes no stage, and it makes no
-claim about the hosted checks that run after it is committed.
+This document replaces the previous contents of this path under one new Owner-authorized overwrite. It records the
+`UNO-WO-075 / R01` bounded authored-text work for five Foundation families, the exact local and product-head hosted
+evidence, and the report-head checks that were still pending when it was committed. It is not an acceptance, closes no
+stage and grants no parity credit.
 
-## 1. Authority, start and provenance
+## 1. Authority, start and preflight
 
 | Item | Observed |
 | --- | --- |
-| Order | `UNO-WO-074 / R01`, Edition `FINAL — EXECUTE`, corrective and report-only |
-| ACTIVE verification | `.documents/WIP/workorder-active.md` measured **23,503 bytes**, SHA-256 `e7e919bbb6fbd68d1689134e48f8ae9a2babe589596f757ec8b101905a8ef02b`, both matching the Owner activation; present only in the permitted private WIP slot, Git-ignored, untracked and unstaged throughout. The ACTIVE text, the activation message and every private path are deliberately not reproduced here. |
-| Required start | `2b6801b70fa3b86eb16a9e3e7033a283d5bdb36e`, matched by local `HEAD`, local `main`, `origin/main` and the remote `main` ref before any write |
-| Predecessor report head | `UNO-WO-073 / R01` report commit `2b6801b70fa3b86eb16a9e3e7033a283d5bdb36e`, whose sole change from parent `35796d37742ea98fe8d5637d5313ced8022803a5` is this one report file at committed Git blob `c0766a25042ac7767929f48cd805d0822babe46b` |
-| Product provenance | unchanged: `UNO-WO-072 / R01` product `622538700d9d07166ec6b51722c5af4e69f5c5e0`, parent `5e407d3e47846e0be6f835fbfa3dd79e9d06c141` |
-| Operation | exactly one new tracked overwrite of `.documents/Reports/execution-report.md` (`R01_WRITE_COUNT=1`), followed by one ordinary report-only commit and one non-force push; **no product, source, test, script, workflow, dependency, declaration or governance file changed** |
-| Read-only ledger | all eighteen pinned Git blobs of the correction order recomputed with `git rev-parse HEAD:<path>` at the required start; every one matched, before the overwrite and again before staging |
+| Order | `UNO-WO-075 / R01`, Edition `FINAL — EXECUTE`, stage U04 — bounded capability, not a parity claim |
+| Owner activation identity | ACTIVE `.documents/WIP/workorder-active.md` measured **31,008 bytes**, SHA-256 `07215ea2caa7e68c2b63e70b721c1ba46c1c52ec3c32c05b9bd417f562e4bf35`; both matching the Owner activation. The ACTIVE text, the activation message, private paths and credentials are deliberately not reproduced. |
+| Required start | `d2247ec9411cde0feaeb7bad9ef433c9d178020c`, matched by local `HEAD`, local `main`, `origin/main` and the remote `main` ref before any write; parent `2b6801b70fa3b86eb16a9e3e7033a283d5bdb36e` |
+| Product commit | **`32cc350b36b8fabd94ad7430ea4956e6c52f729b`**, parent exactly `d2247ec…`, five tracked paths changed |
+| Report overwrite | exactly one tracked overwrite of `.documents/Reports/execution-report.md` (`R01_WRITE_COUNT=1`), after the complete ignored-scratch draft passed validation |
+| Agent-observed local conditions (not independently certified) | the authorized physical Uno checkout and every inspected ancestor resolve to one physical location with no junction, symlink or reparse escape; the parent-owned anchored ignore entry for this checkout is present and was not modified; exactly one worktree, one local `main` tracking `origin/main`, one remote whose fetch and push URLs resolve only to the Uno repository; clean index and worktree at the start, no stash, no conflict, no hook-path override and no active hook; `.documents/WIP/` held exactly the three tracked plan files and the one ignored private ACTIVE |
+| Read-only pins | all twenty pinned Git blobs of this order recomputed with `git rev-parse HEAD:<path>` at the required start; every one matched, before any edit and again before the product commit |
+| Donor evidence | read-only inspection of the pinned donor commit and its six pinned blobs; every one matched exactly |
+| Host and toolchain | Windows, Node `v26.13.1`, pnpm `11.6.0`, Next `16.4.6`, React `19.2.9`, Playwright `1.65.1`; no install, dependency, lockfile or workflow change |
 
-Agent-observed local conditions, classified as observed and **not independently certified**: the authorized physical Uno
-root and all inspected ancestors resolve to one physical checkout with no junction, symlink or reparse escape; the
-parent-owned anchored ignore entry for this checkout is present and was not modified; exactly one worktree, one local
-`main` branch tracking `origin/main`, one remote named `origin` whose fetch and push URLs both resolve only to the Uno
-repository; clean index, clean working tree, no stash, no conflict, no hook path override and no active hook. Independent
-GitHub evidence is limited to the workflow runs cited in §3 and is not evidence of any stage closure.
+## 2. Changed paths and operations (exactly A01–A05)
 
-## 2. Deviation being corrected: two precommit report writes under WO-073
-
-The preceding Owner-authorized `UNO-WO-073 / R01` ACTIVE permitted **only one** tracked overwrite of this report path.
-The Agent wrote `.documents/Reports/execution-report.md` **twice before its one commit**: first with a sanitized
-candidate, then again with a finalized copy after `git diff --check` reported a trailing blank line at end of file. The
-second write changed only line endings and the trailing blank line; nothing was published, staged or pushed between the
-two writes, and only one commit (`2b6801b70fa3b86eb16a9e3e7033a283d5bdb36e`) and one push followed.
-
-Three statements must be corrected or qualified as a result:
-
-1. The `UNO-WO-073 / R01` report asserted that it was overwritten once and that "no second overwrite occurred". That
-   statement was **inaccurate**: two writes to the path did occur before the commit. This report replaces that claim.
-2. The departure was **not compliant with the strict ledger** of that order, and it is not retroactively authorized,
-   backdated or described as acceptable here. The Agent disclosed it instead of concealing it.
-3. The Architect disposition for `UNO-WO-073 / R01` is **`REVISE`** for this ledger departure, independently of the fact
-   that its committed head passed hosted CI. Passing hosted tests do not cure an exceeded operation ledger, and this
-   report does not self-accept, reinterpret or bury the deviation.
-
-For the same reason, the single permitted overwrite in **this** run is counted explicitly as `R01_WRITE_COUNT=1`, and any
-need for a further modification after that copy would have been a STOP rather than another write.
-
-## 3. Three distinct CI states, kept separate
-
-| Head | Workflow | Run | ubuntu-24.04 | windows-2025 |
+| ID | Path | Start blob | Product blob | Operation |
 | --- | --- | --- | --- | --- |
-| WO-072 product `6225387…` | `Verify U01 baseline` | 44898168498 | success | success |
-| WO-072 product `6225387…` | `Uno Bootstrap Verify` | 44898168520 | success | success |
-| WO-072 report `35796d3…` | `Verify U01 baseline` | 44898776904 | **failure** at the bootstrap governance gate | **failure** at the bootstrap governance gate |
-| WO-072 report `35796d3…` | `Uno Bootstrap Verify` | 44898776965 | **failure** | **failure** |
-| WO-073 report `2b6801b…` | `Verify U01 baseline` | 44899961616 | success, 36 steps, none skipped or failing | success, 36 steps, none skipped or failing |
-| WO-073 report `2b6801b…` | `Uno Bootstrap Verify` | 44899961685 | success | success |
+| A01 | `src/application/compose-uno-foundation-families.ts` | `ec6a26939a4f8260300b1010055bfcb787feb475` | `a7022d3b50776bc84a3da5c606278aff7c5a9635` | the `prose`, `callout`, `list`, `faq` and `table` cases accept the optional `heading`/`lede`, compose them through the existing `wrapAuthoredText` helper before the unchanged native node, and keep every other family and helper semantics identical |
+| A02 | `scripts/verify-u04-22-module-consent.mjs` | `41be476c59ff4eb272611db68e0b87acd974b056` | `5a00664924651fc68aec3c786523dca0b938e37d` | the seventeen-family fixture gains only the five authored pairs; nine wrapped stacks, eleven family `<h2>` elements and the four existing `<h3>` item titles are asserted; new `FAMILY_TEXT_FIVE_SOURCE/REFUSALS/HTTP/BROWSER` predicates, the region extractor and the affected counter assertions are updated |
+| A03 | `tests/deployment/u04-22-module-consent.test.mjs` | `9d6b1f8a6a271e11b01547563161f02736a3bfa5` | `33bd5f9b70497ce6a85e84b3682c060ba783e001` | every new label and its predicate is required, with one mutation test that removes each label and neutralizes each predicate; previous tokens and cases are preserved |
+| A04 | `tests/unit/uno-foundation-families.test.ts` | `4e3defafff821b04bfe11d397dffd7c3d74ddabc` | `1593b1c603084a0c853fc188117611366855bdf0` | nine captured pre-change baselines, five-family heading-only/lede-only/both, bounds, Unicode/escaping, ids/order, mixed-order, immutability, round-trip and the per-family refusal matrix |
+| A05 | `.documents/Architecture/u04-family-parity.md` | `803dd6e5d35a40c78925b44198d4ded2c39a53f3` | `edb144420ff2ae39b06cdb6ecd6e035d208223fb` | the five donor rows, the bounded authored-text evidence paragraph, the authoring/refusal/rights/test evidence and the remaining-gap wording; no parity promotion |
+| R01 | `.documents/Reports/execution-report.md` | `e7a894de3099045f8f40a5b908aa790eb17cb7da` | this commit | one overwrite, report only |
 
-- The WO-072 product head was **verified green** for the specific product commit only.
-- The WO-072 report head was **red** on both workflows and both operating systems: the committed report repeated a
-  machine-specific private user-profile path that the frozen published-document privacy guard refuses, which produced one
-  failing assertion (`18 pass / 1 fail`) and caused every downstream test step to be **skipped, not passed**. No
-  all-steps-PASS claim is made about that head, and its red state was never converted into success.
-- The WO-073 report head was **green** on both workflows and both operating systems, with the privacy/governance gate,
-  lint, typecheck, unit, build and real HTTP/Chromium stages **executed rather than skipped**, including
-  `FAMILY_STATS_STEPS_HTTP`, `FAMILY_BROWSER=PASS`, `DIVIDER_PARITY=PASS`, `BROWSER_MATRIX=16/16`, the U04 22-module
-  consent runner at `715 passed, 0 failed` and the U03 HTTP suite at `91 passed, 0 failed`. Those are checks for that
-  specific report head and say nothing about stage acceptance.
+No other tracked path changed: frozen `AGENTS.md`, `README.md`, the implementation SOP, `package.json`, the lockfile,
+`src/core/**`, `src/components/**`, `src/app/**`, the deployment declarations, workflows, hooks and configuration all
+keep their committed identity. Two prior test assertions that named a now-accepted pair were corrected in place, with an
+adjacent comment: the `prose` out-of-subset case now refuses `align`/`surface`, the `faq` out-of-subset case refuses
+`align`/`surface`/`eyebrow`, and the still-unmapped `divider` carries the neighbouring-family refusal. No assertion was
+loosened to an arbitrary permissive value.
 
-## 4. This correction run
+## 3. Composed capability and its immutable contract
 
-1. **Read-only evidence freeze:** start head, the eighteen pinned blobs, the three predecessor commits, the red WO-072
-   report-head jobs and the green WO-073 report-head jobs were inspected read-only, including job steps and logs.
-2. **Draft only in ignored task-owned scratch** under `.temp/uno-u04-074/`; the draft was iterated there, reviewed in full
-   for factual consistency, and checked before the tracked path was touched for UTF-8 encoding, LF endings, exactly one
-   final newline, no trailing whitespace, no personal name, no machine-specific path, no credential and no activation text.
-3. **Exactly one tracked overwrite** of `.documents/Reports/execution-report.md`, with the old content replaced rather
-   than appended and no additional tracked file created.
-4. **All mandatory local gates then run against the changed public report** and the unchanged product, before the commit;
-   results in §5. No test, privacy or governance rule was weakened, muted, skipped by choice or set to continue on error.
-5. **One staged path, one ordinary commit, one non-force push**, performed only after every gate passed. The subject of
-   that commit carries no private path and no personal identifier.
+Five *already mapped* donor families now additionally accept their existing optional donor `heading` and `lede` as
+individually validated literal plain text, read through the already pinned `readSectionHeading` (1..160 Unicode code
+points) and `readSectionLede` (1..4000) policies and wrapped by the already tested `wrapAuthoredText` helper:
 
-## 5. Gate results for this run
+| Family | New optional fields | Wrapped original node suffix |
+| --- | --- | --- |
+| `prose` | `heading`, `lede` | `-prose` |
+| `callout` | `heading`, `lede` (existing `tone` unchanged) | `-callout` |
+| `list` | `heading`, `lede` (existing `ordered` unchanged) | `-list` |
+| `faq` | `heading`, `lede` | `-accordion` |
+| `table` | `heading`, `lede` (existing `caption` unchanged) | `-table` |
+
+With neither field authored the adapter returns the untouched one-node output: **nine captured pre-change serializations**
+(plain `prose`; `callout` with and without `tone`; ordered and unordered `list`; `faq` with one and two entries; `table`
+with and without `caption`) are `JSON.stringify`-byte-identical, including ids, key order, absent optionals and legacy
+shapes. With one valid field the family keeps its anchor id and becomes one `layout.stack {}`; `heading` renders as
+`content.heading {level:2}` at `${id}-heading`, `lede` as `content.prose` at `${id}-lede`, and the original node keeps
+every prop, child id and optional-absence apart from its documented suffix. Text is trimmed-only literal plain text: no
+normalization, truncation, getter execution or authored code evaluation, and a wrong type, markup, Markdown, line break,
+control character, padding, emptiness, over-length value or unpaired surrogate refuses the **whole** source with the
+established `family:unsupported-feature`, `family:target-refused` or `family:unsafe-source` reason and no own `document`.
+`prose` `align`/`surface`, `callout` `align`/`surface`, `list` item destinations/`surface`, `faq` `surface`/open state,
+`table` `surface`/spans/merged cells and all Markdown and link forms stay refused. React escapes the served text; the
+authored heading/lede sit **outside** the native callout accent, table caption and disclosure container, so this is
+bounded authored-text coverage, not donor Markdown, design or accessibility parity.
+
+## 4. Donor provenance and rights
+
+The only source provenance is the curated committed Foundation donor `provelopment/provelopment-foundation` at
+`c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, Apache-2.0 `LICENSE` Git blob
+`d645695673349e3947e8e5ae42332d0ac3164cd7`, inspected read-only. Pinned evidence blobs: donor schema
+`src/core/page-document.ts` `a12d964c43626c6313a621bf628f5cc24b65d444` (each of the five families spreads the optional
+`headingFields` pair), `text-sections.tsx` `caeee57798bdd533867e5bef350422618187612f`,
+`items-sections.tsx` `bc729d6a2e6484dc2c26ed997e65ee644bc8a7e6`, `structure-sections.tsx`
+`65d254e192a6a8ef4886590026c2ea58e02264be` and `section-support.tsx` `19c9bee3b3b200af2455813e5f842c30b062a6ac`. Only
+concepts and semantics were adapted: no donor code, CSS, design tokens, HTML, brand, imagery or copy was imported or
+reproduced, no extra package was added, and no Foundation Solo runtime or separately licensed Connect module is used. The
+donor's Markdown-capable `lede` is *evidence of donor input shape*, not permission to render Markdown here.
+
+## 5. Local gate outcomes (product bytes as committed; one whitespace-only follow-up disclosed below)
 
 | Gate | Result |
 | --- | --- |
-| ACTIVE bytes, hash, order and edition against the Owner activation; private slot, ignore, untracked state | PASS — Agent-observed |
-| Start head on `HEAD`, `main`, `origin/main` and the remote `main` ref | PASS — Agent-observed |
-| Authorized physical root, ancestor reparse check, parent ignore entry, one worktree, one origin, upstream, clean tree, hooks | PASS — Agent-observed, not independently certified |
-| Eighteen pinned read-only blobs at the required start, rechecked before staging | PASS — no mismatch |
-| `node --test tests/bootstrap.test.mjs` on the changed report | PASS — `19 passed, 0 failed` |
-| `node scripts/verify-bootstrap.mjs` on the changed report | PASS — required files present, licence verified, four-slot WIP discipline intact, private authority screened, no Hub/Spoke data, no credential or private-path leak |
-| `pnpm test:bootstrap` | PASS — exit 0 |
-| `node --test tests/governance-docs.test.mjs` and `node scripts/verify-governance-docs.mjs` | PASS — frozen governance bytes unchanged |
-| `pnpm test:architecture` | PASS — `46 tests`, `46 pass`, `0` skipped |
-| `pnpm typecheck`, `pnpm lint`, `pnpm exec eslint . --max-warnings 0` | PASS — exit 0, zero warnings allowed and observed |
-| `pnpm test` | PASS — `30` test files and `1095` tests passed |
-| Working tree | exactly one tracked `M` (this report), no staged leftovers before `git add`, no unexplained untracked file, `git diff --check` clean |
-| Staged set and `git diff --cached --check` | exactly `M .documents/Reports/execution-report.md`, check exit 0 |
-| Hosted CI at this new report head | **UNVERIFIED / PENDING at the time of writing** — this file is committed before those checks run. Their outcomes are reported to the Owner outside this document, and the report is not edited afterwards to include them. |
-| Commit SHA and remote agreement for this correction | **UNVERIFIED / PENDING at the time of writing** — no commit SHA is predicted or fabricated here |
+| `pnpm exec vitest run tests/unit/uno-foundation-families.test.ts` | PASS — `180` tests, `0` failed (168 → 180) |
+| `node --test tests/deployment/u04-22-module-consent.test.mjs` | PASS — `43` tests, `0` failed (42 → 43), including one new mutant test that removes each `FAMILY_TEXT_FIVE_*` label and neutralizes each new predicate |
+| `pnpm test:architecture` | PASS — `46` tests, `46` pass, `0` skipped |
+| `pnpm test` | PASS — `30` test files, `1107` tests (1095 → 1107) |
+| `pnpm typecheck`, `pnpm lint`, `pnpm exec eslint . --max-warnings 0` | PASS — exit 0 each |
+| `pnpm test:bootstrap` | PASS — bootstrap suite plus `verify-bootstrap: OK` |
+| `node --test tests/governance-docs.test.mjs`, `node scripts/verify-governance-docs.mjs` | PASS — `9` tests, `0` failed; frozen governance bytes unchanged |
+| `node --test tests/deployment/node26-security-floor.test.mjs` | PASS |
+| `node --test tests/deployment/u03-fixture-transaction.test.mjs` | PASS |
+| `node --test tests/deployment/u03-trace.test.mjs` | PASS |
+| `node --test tests/deployment/u04-json-slice.test.mjs` | PASS |
+| `node --test tests/deployment/u04-security-exception.test.mjs` | PASS |
+| `node --test tests/deployment/uno-brand-copy.test.mjs` | PASS |
+| `node --test tests/deployment/verify-vercel-readiness.test.mjs` | PASS |
+| `node scripts/verify-vercel-readiness.mjs` | PASS |
+| `node scripts/verify-u04-security-exception.mjs` | PASS |
+| `node scripts/verify-u03-published-http.mjs` | PASS — `542 passed, 0 failed`, committed declarations restored |
+| `node scripts/verify-u04-json-slice.mjs` | PASS — `464 passed, 0 failed`, byte-exact restoration |
+| `node scripts/verify-u04-22-module-consent.mjs` | PASS — `733 passed, 0 failed` (715 → 733), including `FAMILY_TEXT_FIVE_SOURCE` (6), `FAMILY_TEXT_FIVE_REFUSALS` (3), `FAMILY_TEXT_FIVE_HTTP` (6), `FAMILY_TEXT_FIVE_BROWSER` (3), `FAMILY_STATS_STEPS_*`, `FAMILY_LEDE_*`, `FAMILY_ITEM_OUTLINE_*`, `DIVIDER_PARITY_*`, `FOUR_ZONE_HTTP=4/4`, `BROWSER_MATRIX=16/16`, `FAMILY_MEDIA=3/3`, `FAMILY_BROWSER=PASS` and the twenty-two-module consent proof |
+| `pnpm build` | PASS |
+| `node scripts/verify-u03-trace.mjs --expect committed` | PASS — only declared inputs and authored sources are shipped |
+| `pnpm test:http` | PASS — `103 passed, 0 failed` |
+| `node scripts/verify-u03-http.mjs` | PASS — `91 passed, 0 failed` |
+| Deployment declarations | filesystem SHA-256 re-checked after every stateful runner and at the end: `deployment/efs/manifest.json` `ba232d46edcd13e95231f627f67058d383bc4479f076eb2be1ca9c576de6e3f0`, `deployment/uno.config.json` `4f656c93a45873d85b133aa99adaec1b6821ac9983b9e9818452773952df9a0c` — both restored exactly, no leftover fixture Page, capsule, plate or server |
+| Working tree before the product commit | exactly the five A01–A05 tracked modifications, no unexplained untracked path, `git diff --check` clean after one trailing blank line at end of file was removed from A04 |
+| Post-verification note | the A04 trailing-blank-line fix was whitespace-only at end of file; the unit suite was re-run afterwards (`180` passed) and no other gate content changed |
 
-A green report cannot clear the historical exposure of §7, cannot convert the red WO-072 report head into a pass, and
-cannot substitute for any stage exit gate.
+No privacy, governance, architecture, licence, brand or security gate was weakened, muted, skipped or set to continue on
+error, and no dependency, lockfile or workflow was touched.
 
-## 6. Retained product evidence and unchanged accounting
+## 6. Product-head hosted proof (independent GitHub evidence)
 
-`UNO-WO-072 / R01` delivered one bounded two-family capability with no parity uplift: `stats` and `steps` accept the
-donor's optional authored `heading` (1..160 code points) and `lede` (1..4000 code points) as literal plain text through
-the already pinned text readers, refuse markup, Markdown, control characters and accessor objects, and emit one
-`layout.stack {}` on the unchanged family id containing `content.heading {level:2}` at `${id}-heading`, `content.prose` at
-`${id}-lede` and the unchanged `content.stats` at `${id}-stats` or `content.timeline` at `${id}-timeline`. An input with
-neither field still produces the original one-node output byte-identically for every pre-change baseline, and
-`stats.surface`, per-item links, `steps` lifecycle states, dates and icons and every rich-content gap remain unsupported.
+Both existing workflows ran at the exact product commit `32cc350b36b8fabd94ad7430ea4956e6c52f729b`, with both
+operating systems and every required step executed:
 
-Retained product-head measurements, historical and specific to product commit `6225387…`: focused family tests 168,
-hermetic consent guard 42 with 0 failures, architecture 46/46, the whole unit suite at 30 files and 1095 tests, typecheck,
-lint and `eslint --max-warnings 0`, the bootstrap and governance suites, the deployment suites with Vercel readiness and
-the security exception, published-Page HTTP 542/0, the U04 JSON slice 464/0, the 22-module consent runner 715/0 including
-real HTTP and Chromium, build, committed-build tracing, `test:http` and the U03 HTTP suite 91/0, with the deployment
-declarations byte-exact after every stateful suite. These describe the product head only and do not describe any red head.
+| Workflow | Run | ubuntu-24.04 | windows-2025 |
+| --- | --- | --- | --- |
+| `Verify U01 baseline` | `44906487214` | success — 36 steps, none skipped or failing | success — 36 steps, none skipped or failing |
+| `Uno Bootstrap Verify` | `44906487210` | success — 10 steps, none skipped or failing | success — 10 steps, none skipped or failing |
 
-Accounting is unchanged and unimproved by any report repair: 22/22 required Uno module IDs, 4/4 asset zones, 16/16
-browser matrix, 17/17 bounded Foundation-family mappings and 17/17 temporary family samples, **1/17** full-parity family
-(`divider`), **16/17** below full parity, stage proxy **43/59 = 72.88%**, and **zero** durable published family Pages.
-**U04 remains OPEN**; no parity, stage or release credit arises from this document.
+Job logs, not badges, were inspected: the frozen privacy/governance bootstrap passed
+(`verify-bootstrap: OK … no credential or private-path leaks`), and the full lint, typecheck, unit, build, trace, HTTP,
+asset, rights, security and privacy stages ran. The new evidence executed on both systems:
+`FAMILY_TEXT_FIVE_SOURCE` (one frozen stack per family plus the whole-Page summary), `FAMILY_TEXT_FIVE_REFUSALS`
+(including the zero-invocation accessor and the valid-sibling probe), `FAMILY_TEXT_FIVE_HTTP` (one `<h2>` then exactly one
+`<p class="uno-json-prose">` before the native prose/callout/list/FAQ/table markup, no duplicate id, extra `main`/`h1` or
+external destination), `FAMILY_TEXT_FIVE_BROWSER` at 390 and 1280 CSS px, `BROWSER_MATRIX=16/16`, `FAMILY_BROWSER=PASS`,
+`DIVIDER_PARITY=PASS`, `verify-u04-22-module-consent: 733 passed, 0 failed` and `verify-u03-http: 91 passed, 0 failed`.
+These are checks for that specific product commit and are not stage acceptance.
 
-## 7. Historical exposure, rights and security posture
+## 7. Report-head status and known warnings
 
-`historical exposure: unresolved — Owner decision required`. The private machine-specific path formerly published in
-`UNO-WO-072 / R01` may remain retrievable from earlier commits, earlier workflow logs, caches or copies taken from them.
-Replacing this report does **not** purge those disclosures, and no history rewrite, workflow-log purge, repository
-visibility or settings change, force push, release or deployment is authorized here. A privileged remediation, if any,
-requires separate Owner authorization after its effects and any key-rotation or disclosure-response obligation are
-assessed.
+- **Report-head hosted checks: `UNVERIFIED / PENDING` at authoring time.** This file is committed before those runs
+  exist; no run ID, SHA or outcome is predicted here and the report is not edited afterwards to insert them. Their
+  results are conveyed to the Owner outside this document.
+- **Report commit SHA: `UNVERIFIED / PENDING`** — deliberately not predicted.
+- Known and still open, none introduced by this run: one **unwaived moderate** development-only dependency advisory;
+  zero known production audit vulnerabilities at previously verified heads; the known Windows Node/pnpm `DEP0190` setup
+  warning. No waiver, silencing or dependency edit was made.
+- Guard classes: local product gates `PASS` (Agent-observed); product-head hosted gates `PASS` (independent GitHub
+  evidence); report-head hosted gates `UNVERIFIED / PENDING`; Drive/Documentation timeline actions `NOT APPLICABLE`
+  (no Agent Drive write was attempted or claimed).
 
-Rights are unchanged: curated committed Foundation donor `provelopment/provelopment-foundation` at
-`c05c55ea61b5347cf5032211dd0bf37f2cc5083c` with Apache-2.0 `LICENSE` Git blob
-`d645695673349e3947e8e5ae42332d0ac3164cd7`, read-only context only. No donor code, styles, markup, tokens, imagery, brand
-or text was copied; no Foundation Solo runtime and no separately licensed Connect module is used; no trademark claim is
-made; and no provider, contact, delivery, asset, deployment, dependency or rights change occurred in this run.
+## 8. Accounting, scratch and remaining obligations
 
-Security posture is unchanged and unresolved where noted: one pre-existing, **unwaived moderate** development-only
-dependency advisory remains, zero known production audit vulnerabilities were evidenced at previously verified heads, and
-the known Windows pnpm/Node `DEP0190` setup warning remains. None of these was cured, waived, muted or introduced anew by
-this correction.
+- Accounting is unchanged and receives **no** uplift: 22/22 required Uno module IDs, 4/4 asset zones, 16/16 browser
+  matrix, 17/17 bounded Foundation-family mappings and 17/17 temporary family samples, **1/17** full-parity family
+  (`divider`), **16/17** below full parity, stage proxy **43/59 = 72.88%**, and **zero** durable published family Pages.
+  **U04 remains OPEN**; this bounded authored-text capability adds no parity, stage, release or deployment credit.
+- Fixture and scratch hygiene: the seventeen-shape composition Page is still one **temporary** hermetic fixture, restored
+  byte-exactly by its own transaction; task scratch stayed inside the ignored task-owned directory and is removed after
+  review; no prior-run scratch, prior STOP evidence or the ignored private ACTIVE was deleted.
+- **historical exposure: unresolved — Owner decision required.** A private machine-specific path disclosed in an earlier
+  order's published report may remain retrievable from historical commits, workflow logs, caches or copies. Nothing in
+  this run purges, rewrites or remediates it, and no history rewrite, force push, settings change, release or deployment
+  is authorized or performed.
+- Remaining U04 closure blockers are unchanged: donor Markdown and link rendering, the donor heading outlines for
+  `steps`, `faq` and `columns`, donor card/feature borders, media, meta and icons, donor media and gallery richness,
+  remote image sources, the donor contact seam, a durable composition Page and family-Page accessibility proof, plus the
+  outstanding `UNO-WO-071` activation-evidence and `UNO-WO-072`/`UNO-WO-073` `REVISE` records, which are not reversed here.
 
-## 8. Limitations and handback
+## 9. Handback
 
-This run corrects one public report only. It changes no product, code, test, script, workflow, package, lockfile,
-declaration, asset, page, metadata, right or provider setting, and it grants no subsequent authorization. `UNO-WO-071`
-unverified original Owner activation evidence is still unresolved, and `UNO-WO-072` remains `REVISE` for its
-privacy/report phase; neither record is rewritten, repaired or retroactively accepted here. `UNO-WO-073` remains `REVISE`
-for the ledger departure documented in §2, notwithstanding its green hosted head. Only the Architect may return an
-independent `ACCEPT / REVISE / STOP`, and only the Owner may authorize a further report order, stage closure, merge, tag,
-release, deployment, provider action or historical remediation. Task-owned scratch for this run is removed after review;
-prior task-owned scratch, prior STOP evidence and the ignored private ACTIVE are preserved untouched.
+The Agent did not accept this run and makes no self-acceptance claim. Only the Architect may return an independent
+`ACCEPT / REVISE / STOP`; only the Owner may install and activate a successor order, decide the historical-exposure
+response, and separately close U04, release or deploy. A green product slice and a sanitized report do not close the
+project.
