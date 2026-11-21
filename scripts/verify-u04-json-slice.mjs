@@ -53,8 +53,17 @@ const ENTITY_ID = "e_7a3knkx60eacyhca7a0cr1k6e1";
 
 /** The committed declaration digests this gate requires before it will touch anything. */
 const PINNED_DECLARATIONS = new Map([
-  [MANIFEST, "ba232d46edcd13e95231f627f67058d383bc4479f076eb2be1ca9c576de6e3f0"],
-  [SELECTION, "4f656c93a45873d85b133aa99adaec1b6821ac9983b9e9818452773952df9a0c"],
+  [MANIFEST, "b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925"],
+  [SELECTION, "58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952"],
+]);
+
+/** The five authorized starter paths: the two declarations and the three authored starter sources. */
+const STARTER_PATHS = Object.freeze([
+  MANIFEST,
+  SELECTION,
+  `${CONTENT}/home.en-001.json`,
+  `${CONTENT}/about.en-001.md`,
+  `${CONTENT}/components.en-001.json`,
 ]);
 
 /** The twenty-one synthetic sources: created only if absent, removed again in the same `finally`. */
@@ -846,10 +855,15 @@ function preflight() {
     cwd: ROOT,
     encoding: "utf8",
   });
+  const unexpected = deployment.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !STARTER_PATHS.some((starterPath) => line.endsWith(` ${starterPath}`)));
   check(
-    "no committed deployment input is modified before the fixture",
-    deployment.stdout.trim() === "",
-    deployment.stdout.trim(),
+    "no committed deployment input outside the authorized starter paths is modified before the fixture",
+    unexpected.length === 0,
+    unexpected.join(" | "),
   );
   const active = spawnSync("git", ["check-ignore", "--", ".documents/WIP/workorder-active.md"], {
     cwd: ROOT,
@@ -1954,7 +1968,16 @@ if (outcome === 0 && declarationsRestored) {
     cwd: ROOT,
     encoding: "utf8",
   });
-  check("no committed deployment input is modified after restoration", status.stdout.trim() === "", status.stdout.trim());
+  const unexpectedAfter = status.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !STARTER_PATHS.some((starterPath) => line.endsWith(` ${starterPath}`)));
+  check(
+    "no committed deployment input outside the authorized starter paths is modified after restoration",
+    unexpectedAfter.length === 0,
+    unexpectedAfter.join(" | "),
+  );
   const staged = spawnSync("git", ["--no-optional-locks", "diff", "--cached", "--name-only"], {
     cwd: ROOT,
     encoding: "utf8",

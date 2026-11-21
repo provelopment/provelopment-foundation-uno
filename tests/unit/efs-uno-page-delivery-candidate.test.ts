@@ -27,6 +27,8 @@ import { loadUnoCandidateSource } from "../../src/adapters/efs/uno-confined-sour
 const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const SCRATCH_ROOT = join(REPO_ROOT, ".temp");
 const HOME_SOURCE = "deployment/efs/content/home.en-001.md";
+/** The declared JSON Home candidate of the committed starter. */
+const HOME_JSON_SOURCE = "deployment/efs/content/home.en-001.json";
 const MANIFEST_SOURCE = "deployment/efs/manifest.json";
 const SELECTION_SOURCE = "deployment/uno.config.json";
 const ENTITY_ID = "e_7a3knkx60eacyhca7a0cr1k6e1";
@@ -139,16 +141,24 @@ describe("the committed Home through the real confined loader", () => {
       localeTag: "en-001",
       pathname: "/en-001",
     });
-    expect(result.document.kind).toBe("markdown");
+    expect(result.document.kind).toBe("json");
     expect(result.document.title).toBe("Foundation Uno");
     expect(result.document.visibility).toBe("public");
+    expect(result.document.markdownBody).toBeUndefined();
+    expect(result.document.pageDocument?.sections.length).toBe(4);
     expect(result.ifServed.canonicalUrl).toBe("http://localhost:3000/en-001");
     expect(result.ifServed.robots).toBeNull();
     expect(Object.keys(result).sort()).toEqual(["accepted", "document", "identity", "ifServed"]);
-    expect(Object.keys(result.document).sort()).toEqual(["kind", "markdownBody", "title", "visibility"]);
+    expect(Object.keys(result.document).sort()).toEqual([
+      "description",
+      "kind",
+      "pageDocument",
+      "title",
+      "visibility",
+    ]);
   });
 
-  it("carries raw unrendered Markdown and no publication, response or route authority", async () => {
+  it("carries a validated JSON document and no publication, response or route authority", async () => {
     const loaded = await loadUnoCandidateSource({ repoRoot: REPO_ROOT, pathname: "/en-001" });
     const result = prepareUnoPageDeliveryCandidate({
       manifest: readJson(MANIFEST_SOURCE),
@@ -160,12 +170,13 @@ describe("the committed Home through the real confined loader", () => {
     expect(result.accepted).toBe(true);
     if (!result.accepted) return;
 
-    const onDisk = readFileSync(join(REPO_ROOT, HOME_SOURCE), "utf8");
-    const body = result.document.markdownBody as string;
-    expect(onDisk.includes(body)).toBe(true);
-    expect(body.startsWith("One organisation.")).toBe(true);
-    expect(body.includes("# Foundation Uno")).toBe(false);
-    expect(body).not.toMatch(/<h1|<html/);
+    // The candidate carries the validated document, never the raw authored text of any file.
+    const onDisk = readFileSync(join(REPO_ROOT, HOME_JSON_SOURCE), "utf8");
+    const document = result.document.pageDocument;
+    expect(document).toBeDefined();
+    expect(document?.title).toBe(JSON.parse(onDisk).title);
+    expect(JSON.stringify(result).includes(onDisk)).toBe(false);
+    expect(result.document.markdownBody).toBeUndefined();
 
     const serialised = JSON.stringify(result);
     for (const forbidden of ["published", "authorized", "live", "status", "redirect", "html"]) {

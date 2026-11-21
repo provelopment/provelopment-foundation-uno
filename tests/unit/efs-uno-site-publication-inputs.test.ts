@@ -12,6 +12,7 @@ import {
   type UnoSitePublicationResult,
 } from "../../src/application/validate-uno-site-publication-inputs";
 import { resolveUnoCommittedLocales } from "../../src/application/resolve-uno-committed-locales";
+import { resolveUnoCommittedBase } from "../../src/application/resolve-uno-committed-base";
 
 /**
  * U03 Site publication-inputs tests (`UNO-WO-024 / R01`).
@@ -121,8 +122,8 @@ describe("the real committed manifest and selection", () => {
     expect(result.localePolicy.supportedLocales).toEqual(["en-001"]);
     expect(result.localePolicy.defaultLocale).toBe("en-001");
     expect({ ...result.localePolicy.languagePreferences }).toEqual({ en: "en-001" });
-    // One declared candidate address — the authored Home at en-001 — not a published Page.
-    expect(result.candidateCount).toBe(1);
+    // Three declared candidate addresses — Home, About and Components at en-001 — never a published Page.
+    expect(result.candidateCount).toBe(3);
 
     for (const forbidden of ["published", "authorized", "ready", "redirect", "canonicalUrl", "hreflang", "sitemap"]) {
       expect(Object.keys(result)).not.toContain(forbidden);
@@ -566,11 +567,30 @@ describe("the stored policy composes with this validator (`UNO-WO-025 / R01`)", 
     expect(checked.localePolicy.supportedLocales).toEqual(["en-001"]);
     expect(checked.localePolicy.defaultLocale).toBe("en-001");
     expect({ ...checked.localePolicy.languagePreferences }).toEqual({ en: "en-001" });
-    expect(checked.candidateCount).toBe(1);
+    expect(checked.candidateCount).toBe(3);
     expect(JSON.stringify(checked).includes("https://")).toBe(false);
     for (const forbidden of ["published", "authorized", "ready", "canonicalUrl", "hreflang", "sitemap"]) {
       expect(Object.keys(checked)).not.toContain(forbidden);
     }
+  });
+
+  it("reads the committed stored base as the reserved sample canonical, not a test-only proposal", () => {
+    const stored = resolveUnoCommittedBase({ manifest: readJson(MANIFEST_URL), selection: readJson(CONFIG_URL) });
+    expect(stored.accepted).toBe(true);
+    if (!stored.accepted) return;
+    expect(stored.base).toEqual({ canonical: "https://uno-starter.example", aliases: [] });
+    expect(stored.site).toEqual({ entityId: ENTITY_ID, facetId: "foundation", siteId: "main" });
+
+    // A candidate count is never a publication decision: the composition still reports three candidates only.
+    const checked = validateUnoSitePublicationInputs({
+      manifest: readJson(MANIFEST_URL),
+      selection: readJson(CONFIG_URL),
+      base: { canonical: "https://uno-starter.example", aliases: [] },
+      localePolicy: EN_ONLY(),
+    });
+    expectAccepted(checked);
+    expect(checked.candidateCount).toBe(3);
+    expect(JSON.stringify(checked).includes('"published"')).toBe(false);
   });
 
   it("fails when either stored authority is deleted, without inventing an alias", () => {

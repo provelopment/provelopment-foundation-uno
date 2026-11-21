@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "title": "Foundation Uno",
+  "description": "A neutral sample of one Entity, one selected Site and three published Pages.",
+  "visibility": "public",
+  "sections": [
+    {
+      "id": "home-hero",
+      "module": "content.hero",
+      "props": {
+        "eyebrow": "Sample foundation",
+        "lede": "One organisation. One connected digital presence.",
+        "support": "This neutral starter shows a single Entity, one selected Site and explicit regional editions. It is a sample, not a finished website."
+      }
+    },
+    {
+      "id": "home-intro",
+      "module": "content.heading",
+      "props": { "text": "A deliberately small starting point", "level": 2 }
+    },
+    {
+      "id": "home-copy",
+      "module": "content.prose",
+      "props": {
+        "text": "Every Page in this installation is authored, declared and validated before it can be served. Nothing is inferred from a hostname, a preference cookie or a visitor's location."
+      }
+    },
+    {
+      "id": "home-facts",
+      "module": "content.stats",
+      "props": {
+        "items": [
+          { "value": "3", "label": "Published sample Pages" },
+          { "value": "1", "label": "Selected Site" },
+          { "value": "en-001", "label": "Authored locale" }
+        ]
+      }
+    }
+  ]
+}

@@ -313,22 +313,47 @@ describe("real source through the confined loader and the header use case", () =
     expect(readFileSync(absolute).equals(before)).toBe(true);
   });
 
-  it("refuses a forged unlisted visibility on the real Markdown Home as a projection mismatch", async () => {
+  it("refuses a forged unlisted visibility on the committed JSON Home", async () => {
     const loaded = await loadUnoCandidateSource({ repoRoot: REPO_ROOT, pathname: "/en-001" });
     const header = resolveUnoPageHeader(loaded);
     expect(header.accepted).toBe(true);
     if (!header.accepted) return;
-    expect(header.kind).toBe("markdown");
+    expect(header.kind).toBe("json");
+    expect(header.visibility).toBe("public");
 
-    // Markdown may never declare a visibility, so the forged value cannot reach the Home rule at all:
-    // it is a projection mismatch, and the Home rule itself is proved by the JSON case below.
-    expectRefused(
-      classifyUnoPageDiscoverability({ kind: header.kind, routePath: "home", visibility: "unlisted" }),
-      "discovery:projection-mismatch",
-    );
+    // The committed Home carries the reserved route, so an unlisted claim is refused by the Home rule.
     expectRefused(
       classifyUnoPageDiscoverability({ kind: "json", routePath: "home", visibility: "unlisted" }),
       "home-cannot-be-unlisted",
+    );
+  });
+
+  it("classifies the committed About Markdown and Components JSON as public eligibility", async () => {
+    for (const [pathname, routePath, expectedKind] of [
+      ["/en-001/about", "about", "markdown"],
+      ["/en-001/components", "components", "json"],
+    ] as const) {
+      const loaded = await loadUnoCandidateSource({ repoRoot: REPO_ROOT, pathname });
+      const header = resolveUnoPageHeader(loaded);
+      expect(header.accepted).toBe(true);
+      if (!header.accepted) return;
+      expect(header.kind).toBe(expectedKind);
+      expect(header.visibility).toBe("public");
+
+      const result = classifyUnoPageDiscoverability({
+        kind: header.kind,
+        routePath,
+        visibility: header.visibility,
+      });
+      expectAllFlags(result, true);
+      if (!result.accepted) return;
+      expect(result.robotsIfDirectlyServed).toBeNull();
+    }
+
+    // Markdown can never declare a visibility of its own: a forged value is a projection mismatch.
+    expectRefused(
+      classifyUnoPageDiscoverability({ kind: "markdown", routePath: "about", visibility: "unlisted" }),
+      "discovery:projection-mismatch",
     );
   });
 

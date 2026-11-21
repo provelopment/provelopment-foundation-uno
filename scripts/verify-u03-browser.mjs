@@ -148,7 +148,7 @@ function assertPage(observation, response, page, viewport, record, report) {
  * The single exported entry point. Accepts only the internally generated loopback base and the immutable fixture
  * expectations; returns counted results so the host runner keeps one authoritative tally and its own restoration path.
  */
-export async function verifyUnoU03Browser({ base, pages, refusedPaths }) {
+export async function verifyUnoU03Browser({ base, pages, refusedPaths, keyboardPage = null }) {
   const passes = [];
   const failures = [];
   const check = (name, condition, detail) => {
@@ -283,6 +283,60 @@ export async function verifyUnoU03Browser({ base, pages, refusedPaths }) {
         );
       } finally {
         await demo.close();
+      }
+
+      // A published starter Page must expose at least one keyboard-operable control of its own.
+      if (keyboardPage !== null) {
+        const starter = await keyboardContext.newPage();
+        const starterRecord = watchPage(starter, base);
+        try {
+          await starter.goto(`${base}${keyboardPage.pathname}`, { waitUntil: "networkidle", timeout: LOAD_TIMEOUT_MS });
+          await starter.keyboard.press("Tab");
+          const focusable = await starter.evaluate(() => {
+            const element = document.activeElement;
+            const tag = element?.tagName ?? null;
+            return {
+              tag,
+              focusable: element !== null && element !== document.body && typeof element?.focus === "function",
+              text: (element?.textContent ?? "").trim().slice(0, 80),
+            };
+          });
+          check(
+            `${keyboardPage.pathname} exposes a keyboard-reachable control`,
+            focusable.focusable === true,
+            `${focusable.tag} ${focusable.text}`,
+          );
+          check(
+            `${keyboardPage.pathname} raises no page error while focused`,
+            starterRecord.pageErrors.length === 0,
+            starterRecord.pageErrors.join("; "),
+          );
+          check(
+            `${keyboardPage.pathname} requests nothing outside loopback`,
+            starterRecord.foreignRequests.length === 0,
+            [...new Set(starterRecord.foreignRequests)].join(","),
+          );
+
+          // A native disclosure, when authored, must be operable from the keyboard without any script.
+          const disclosure = await starter.evaluate(() => {
+            const summary = document.querySelector("summary");
+            if (summary === null) return null;
+            summary.focus();
+            const before = summary.parentElement?.hasAttribute("open") ?? false;
+            summary.click();
+            const after = summary.parentElement?.hasAttribute("open") ?? false;
+            return { focused: document.activeElement === summary, before, after };
+          });
+          if (disclosure !== null) {
+            check(
+              `${keyboardPage.pathname} toggles its native disclosure from the keyboard`,
+              disclosure.focused === true && disclosure.before !== disclosure.after,
+              JSON.stringify(disclosure),
+            );
+          }
+        } finally {
+          await starter.close();
+        }
       }
 
       const missing = await keyboardContext.newPage();

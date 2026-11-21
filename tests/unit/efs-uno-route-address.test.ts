@@ -111,11 +111,21 @@ function expectMatchRefused(
 }
 
 describe("the committed fixture", () => {
-  it("builds exactly one candidate for the committed manifest and selection", () => {
+  it("builds exactly three candidates for the committed manifest and selection", () => {
     const result = buildUnoCandidateRouteIndex(readManifest(), readConfig());
     expect(result.accepted).toBe(true);
     if (!result.accepted) return;
-    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates).toHaveLength(3);
+    expect(result.candidates.map((candidate) => candidate.pathname)).toEqual([
+      "/en-001",
+      "/en-001/about",
+      "/en-001/components",
+    ]);
+    expect(result.candidates.map((candidate) => candidate.pageId)).toEqual([
+      "home",
+      "about",
+      "components",
+    ]);
   });
 
   it("identifies the one Entity, Facet, Site and Page of that candidate", () => {
@@ -147,12 +157,19 @@ describe("the committed fixture", () => {
     expect(candidate?.routePath).toBe("");
   });
 
-  it("preserves the one declared Markdown source without opening it", () => {
+  it("preserves one declared source per starter candidate without opening it", () => {
     const result = buildUnoCandidateRouteIndex(readManifest(), readConfig());
     expect(result.accepted).toBe(true);
     if (!result.accepted) return;
-    const candidate = result.candidates[0];
-    expect(candidate?.sources).toEqual([{ kind: "markdown", path: HOME_PATH }]);
+    expect(result.candidates.map((candidate) => candidate.sources)).toEqual([
+      [{ kind: "json", path: "deployment/efs/content/home.en-001.json" }],
+      [{ kind: "markdown", path: "deployment/efs/content/about.en-001.md" }],
+      [{ kind: "json", path: "deployment/efs/content/components.en-001.json" }],
+    ]);
+    // The preserved legacy Markdown Home is not a declared candidate of any Page.
+    for (const candidate of result.candidates) {
+      expect(candidate.sources).not.toContainEqual({ kind: "markdown", path: HOME_PATH });
+    }
   });
 
   it("carries no publication, visibility, host or SEO authority", () => {
@@ -406,8 +423,10 @@ describe("a synthetic two-Page Site with a nested Page authored in de-DE", () =>
     expect(second.accepted).toBe(true);
     if (!first.accepted || !second.accepted) return;
     expect(first.candidates).toHaveLength(2);
-    expect(second.candidates).toHaveLength(1);
-    expect(first.candidates[0]).not.toEqual(second.candidates[0]);
+    expect(second.candidates).toHaveLength(3);
+    for (const candidate of first.candidates) {
+      expect(second.candidates).not.toContainEqual(candidate);
+    }
   });
 });
 

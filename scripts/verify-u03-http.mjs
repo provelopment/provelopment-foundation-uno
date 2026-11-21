@@ -7,15 +7,17 @@
  * ephemeral loopback port, waits for readiness within a bounded deadline, makes real `fetch` requests against
  * the production output, and always terminates the exact child process — including on failure paths.
  *
- * WHAT IT PROVES. The committed deployment declares no canonical base and publishes no Page, so every localized
- * address, `robots.txt` and `sitemap.xml` must answer a genuine 404 — not an empty 200, not a redirect, not a
- * soft page carrying metadata. The English demonstration at `/` must keep its 200, its noindex policy and its
- * single `h1`, so this gate cannot be passed by breaking the page an earlier order froze.
+ * WHAT IT PROVES. The committed declaration now carries the reserved sample canonical base and publishes exactly
+ * three `en-001` starter Pages, so `/en-001`, `/en-001/about` and `/en-001/components` must answer a real 200 with
+ * one `main`, one `h1`, the reserved canonical, agreeing OpenGraph/hreflang metadata and a sitemap that lists the
+ * same three addresses. Every other address — the suppressed `home` alias, another locale, a child of a leaf Page,
+ * a query, a percent escape or an unknown route — must still answer a genuine 404, not an empty 200 and not a
+ * redirect. The English demonstration at `/` must keep its 200, its noindex policy and its single `h1`, so this
+ * gate cannot be passed by breaking the page an earlier order froze.
  *
- * WHAT IT DOES NOT CLAIM. No positive public Page is served by this build: a positive decision needs a chosen
- * canonical domain and an explicit publication of a real Page, neither of which exists. Positive serving is
- * proved in the focused suites against synthetic confined fixtures instead. No browser, no screenshot, no
- * provider call, no non-loopback request, no write outside the repository.
+ * WHAT IT DOES NOT CLAIM. The `.example` origin is reserved illustrative metadata: nothing here proves DNS, TLS, an
+ * owned domain or a deployment. No browser, no screenshot, no provider call, no non-loopback request, no write
+ * outside the repository.
  */
 
 import { spawn } from "node:child_process";
@@ -29,16 +31,34 @@ const READY_TIMEOUT_MS = 60_000;
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 
-/** Every address that must stay a real 404 while the committed declaration publishes nothing. */
+/** The reserved, illustrative sample origin. Never a deployment, a DNS record or an owned domain. */
+const SAMPLE_ORIGIN = "https://uno-starter.example";
+
+/** Every address that must stay a real 404 even though three starter Pages are published. */
 const REFUSED_PATHS = Object.freeze([
-  "/en",
-  "/en-001",
-  "/en-001/about",
   "/en-001/home",
   "/de",
+  "/de-001",
   "/en-001/does-not-exist",
-  "/robots.txt",
-  "/sitemap.xml",
+  "/en-001/about/extra",
+  "/en-001/components/extra",
+]);
+
+/** Every published starter Page and the exact text its single `h1` must carry. */
+const PUBLISHED_PAGES = Object.freeze([
+  { path: "/en-001", title: "Foundation Uno", localeTag: "en-001", canonical: `${SAMPLE_ORIGIN}/en-001` },
+  {
+    path: "/en-001/about",
+    title: "About this starter",
+    localeTag: "en-001",
+    canonical: `${SAMPLE_ORIGIN}/en-001/about`,
+  },
+  {
+    path: "/en-001/components",
+    title: "Components",
+    localeTag: "en-001",
+    canonical: `${SAMPLE_ORIGIN}/en-001/components`,
+  },
 ]);
 
 /** Fragments a 404 body must never carry: they would advertise a site nothing publishes. */
@@ -131,8 +151,9 @@ async function stopChild(child) {
   }
 }
 
-async function request(url) {
+async function request(url, method = "GET") {
   const response = await fetch(url, {
+    method,
     redirect: "manual",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
@@ -142,6 +163,7 @@ async function request(url) {
     contentType: response.headers.get("content-type") ?? "",
     location: response.headers.get("location"),
     robotsTag: response.headers.get("x-robots-tag"),
+    cacheControl: response.headers.get("cache-control") ?? "",
     body,
   };
 }
@@ -167,7 +189,84 @@ function checkHomePage(home) {
   );
 }
 
-/** One refusal: a real 404 with no redirect and no advertising of any kind. */
+/** One published starter Page: real 200, one main, one h1, agreeing canonical/OpenGraph/hreflang metadata. */
+async function checkPublishedPage(base, entry, index) {
+  const response = await request(`${base}${entry.path}`);
+  const raw = response.body;
+  const mains = raw.match(/<main\b/gi) ?? [];
+  const headings = raw.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/gi) ?? [];
+  const h1Text = normalise(visibleHtml((headings[0] ?? "").replace(/<[^>]+>/g, " "))).trim();
+
+  check(`${entry.path} returns 200`, response.status === 200, `status ${response.status}`);
+  check(`${entry.path} is served as HTML`, /text\/html/i.test(response.contentType), response.contentType);
+  check(`${entry.path} renders exactly one main`, mains.length === 1, `${mains.length} main elements`);
+  check(`${entry.path} renders exactly one h1`, headings.length === 1, `${headings.length} h1 elements`);
+  check(`${entry.path} keeps its authored title`, h1Text === entry.title, h1Text);
+  check(
+    `${entry.path} advertises the reserved canonical`,
+    raw.includes(`rel="canonical" href="${entry.canonical}"`),
+  );
+  check(`${entry.path} advertises a matching OpenGraph URL`, raw.includes(`property="og:url" content="${entry.canonical}"`));
+  const alternate = new RegExp(`<link[^>]+hreflang="${entry.localeTag}"[^>]+href="${entry.canonical}"`, "i");
+  const defaultAlternate = new RegExp(`<link[^>]+hreflang="x-default"[^>]+href="${entry.canonical}"`, "i");
+  check(`${entry.path} carries an ${entry.localeTag} alternate`, alternate.test(raw));
+  check(
+    `${entry.path} advertises the default alternate only on the default Page`,
+    index === 0 ? defaultAlternate.test(raw) : !/x-default/iu.test(raw),
+  );
+  check(`${entry.path} is indexable`, /<meta[^>]+name="robots"[^>]+content="index, follow"/i.test(raw));
+  check(`${entry.path} is not noindex`, !/<meta[^>]+name="robots"[^>]+noindex/i.test(raw));
+  check(
+    `${entry.path} keeps the reserved origin out of every other host`,
+    !/https?:\/\/(?!uno-starter\.example)[a-z0-9.-]+/i.test(raw.replace(/https?:\/\/uno-starter\.example/gi, "")),
+  );
+
+  // HEAD must agree with GET and must never stream a body of its own.
+  const head = await request(`${base}${entry.path}`, "HEAD");
+  check(`${entry.path} HEAD status matches GET`, head.status === response.status, `status ${head.status}`);
+  check(`${entry.path} HEAD body stays empty`, head.body.length === 0, `${head.body.length} bytes`);
+}
+
+/** The short language alias redirects to the real published root, and never to an invented address. */
+async function checkShortAlias(base) {
+  const response = await request(`${base}/en`);
+  check(
+    "/en answers one explicit redirect to the published root",
+    response.status === 307 || response.status === 308,
+    `status ${response.status}`,
+  );
+  check(
+    "/en redirects to the published en-001 root",
+    response.location === `/en-001` || response.location === `${SAMPLE_ORIGIN}/en-001`,
+    `location ${response.location}`,
+  );
+}
+
+/** `robots.txt` and `sitemap.xml` must advertise exactly the three committed addresses. */
+async function checkDiscovery(base) {
+  const robots = await request(`${base}/robots.txt`);
+  check("/robots.txt returns 200", robots.status === 200, `status ${robots.status}`);
+  check(
+    "/robots.txt names the reserved sitemap",
+    robots.body.includes(`Sitemap: ${SAMPLE_ORIGIN}/sitemap.xml`),
+  );
+  check("/robots.txt never disallows a published Page", !/Disallow:\s*\/en-001/u.test(robots.body));
+
+  const sitemap = await request(`${base}/sitemap.xml`);
+  check("/sitemap.xml returns 200", sitemap.status === 200, `status ${sitemap.status}`);
+  check("/sitemap.xml is XML", /xml/i.test(sitemap.contentType), sitemap.contentType);
+  const locations = sitemap.body.match(/<loc>[^<]+<\/loc>/gu) ?? [];
+  check("/sitemap.xml lists exactly three addresses", locations.length === 3, `${locations.length} loc elements`);
+  for (const entry of PUBLISHED_PAGES) {
+    check(`/sitemap.xml lists ${entry.canonical}`, sitemap.body.includes(`<loc>${entry.canonical}</loc>`));
+  }
+  check(
+    "/sitemap.xml lists no suppressed or unknown address",
+    !sitemap.body.includes("/en-001/home") && !sitemap.body.includes("/en-001/does-not-exist"),
+  );
+}
+
+/** Every refused path: a real 404 with no redirect and no advertising of any kind. */
 async function checkRefusal(base, path, expectHtml) {
   const response = await request(`${base}${path}`);
   check(`${path} returns 404`, response.status === 404, `status ${response.status}`);
@@ -245,10 +344,17 @@ async function main() {
 
     checkHomePage(await request(`${base}/`));
 
-    for (const path of REFUSED_PATHS) {
-      const isHtmlSurface = path !== "/robots.txt" && path !== "/sitemap.xml";
-      await checkRefusal(base, path, isHtmlSurface);
+    for (const [index, entry] of PUBLISHED_PAGES.entries()) {
+      await checkPublishedPage(base, entry, index);
     }
+    await checkShortAlias(base);
+    await checkDiscovery(base);
+
+    for (const path of REFUSED_PATHS) {
+      await checkRefusal(base, path, true);
+    }
+    // A percent-encoded space never becomes a different published address.
+    await checkRefusal(base, "/en-001/a%20b", true);
 
     const root = await request(`${base}/`);
     check(
@@ -270,7 +376,7 @@ async function main() {
     return 1;
   }
   process.stdout.write(
-    "verify-u03-http: OK - every unpublished address is a real 404 and the demonstration is intact.\n",
+    "verify-u03-http: OK - the three committed starter Pages are served with the reserved canonical and every other address is a real 404.\n",
   );
   return 0;
 }

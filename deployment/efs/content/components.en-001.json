@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "title": "Components",
+  "description": "A small sample of the text-only building blocks an authored JSON Page can use.",
+  "visibility": "public",
+  "sections": [
+    {
+      "id": "components-intro",
+      "module": "content.heading",
+      "props": { "text": "A sample of authored sections", "level": 2 }
+    },
+    {
+      "id": "components-copy",
+      "module": "content.prose",
+      "props": {
+        "text": "A JSON Page is an ordered list of validated sections. The modules on this Page are already implemented and render as plain, accessible text."
+      }
+    },
+    {
+      "id": "components-list",
+      "module": "content.prose",
+      "props": {
+        "variant": "list",
+        "items": [
+          { "label": "Heading and prose", "detail": "Authored titles and paragraphs." },
+          { "label": "Native list", "detail": "Ordered or unordered text entries." },
+          { "label": "Disclosure group", "detail": "Platform details and summary elements." }
+        ]
+      }
+    },
+    {
+      "id": "components-stack",
+      "module": "layout.stack",
+      "props": {},
+      "children": [
+        {
+          "id": "components-stack-heading",
+          "module": "content.heading",
+          "props": { "text": "Keyboard-accessible disclosure", "level": 3 }
+        },
+        {
+          "id": "components-stack-copy",
+          "module": "content.prose",
+          "props": {
+            "text": "The disclosure group below uses native details and summary elements, so it needs no script, provider or network request."
+          }
+        }
+      ]
+    },
+    {
+      "id": "components-faq",
+      "module": "interaction.accordion",
+      "props": {
+        "items": [
+          { "sectionId": "components-faq-answer-0", "label": "Does this Page contact a server?" },
+          { "sectionId": "components-faq-answer-1", "label": "Is any provider involved?" }
+        ]
+      },
+      "children": [
+        {
+          "id": "components-faq-answer-0",
+          "module": "content.prose",
+          "props": { "text": "No. The disclosure is rendered by the browser from the authored document." }
+        },
+        {
+          "id": "components-faq-answer-1",
+          "module": "content.prose",
+          "props": { "text": "No provider, analytics event or external request is part of this sample." }
+        }
+      ]
+    },
+    {
+      "id": "components-callout",
+      "module": "content.prose",
+      "props": {
+        "variant": "callout",
+        "text": "This Page demonstrates a selection of modules. It does not claim that every registered module is used here.",
+        "tone": "note"
+      }
+    }
+  ]
+}

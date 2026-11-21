@@ -25,6 +25,8 @@ import { projectUnoSelectedPageHeader } from "../../src/core/efs/uno-page-header
 const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const SCRATCH_ROOT = join(REPO_ROOT, ".temp");
 const HOME_SOURCE = "deployment/efs/content/home.en-001.md";
+/** The declared JSON Home candidate of the committed starter. */
+const HOME_JSON_SOURCE = "deployment/efs/content/home.en-001.json";
 const ENTITY_ID = "e_7a3knkx60eacyhca7a0cr1k6e1";
 
 const createdRoots: string[] = [];
@@ -104,22 +106,42 @@ afterAll(() => {
 });
 
 describe("the committed repository through the real loader", () => {
-  it("projects the real Home heading and body from disk", async () => {
+  it("projects the real JSON Home header from disk", async () => {
     const loaded = await loadUnoCandidateSource({ repoRoot: REPO_ROOT, pathname: "/en-001" });
     expect(loaded.accepted).toBe(true);
+    if (!loaded.accepted) return;
+
+    const header = resolveUnoPageHeader(loaded);
+    expect(header.accepted).toBe(true);
+    if (!header.accepted) return;
+    expect(header.kind).toBe("json");
+    expect(header.title).toBe("Foundation Uno");
+    expect(header.visibility).toBe("public");
+    expect(header.markdownBody).toBeUndefined();
+    expect(header.description).toBe(
+      "A neutral sample of one Entity, one selected Site and three published Pages.",
+    );
+
+    // The header is projected from the declared JSON source actually on disk, not from any Markdown body.
+    const onDisk = readFileSync(join(REPO_ROOT, HOME_JSON_SOURCE), "utf8");
+    expect(loaded.text).toBe(onDisk);
+    expect(JSON.parse(onDisk).title).toBe(header.title);
+  });
+
+  it("projects the committed About Markdown header from disk", async () => {
+    const loaded = await loadUnoCandidateSource({ repoRoot: REPO_ROOT, pathname: "/en-001/about" });
+    expect(loaded.accepted).toBe(true);
+    if (!loaded.accepted) return;
 
     const header = resolveUnoPageHeader(loaded);
     expect(header.accepted).toBe(true);
     if (!header.accepted) return;
     expect(header.kind).toBe("markdown");
-    expect(header.title).toBe("Foundation Uno");
+    expect(header.title).toBe("About this starter");
     expect(header.visibility).toBe("public");
     expect(typeof header.markdownBody).toBe("string");
     expect((header.markdownBody as string).length).toBeGreaterThan(200);
-
-    const onDisk = readFileSync(join(REPO_ROOT, HOME_SOURCE), "utf8");
-    const firstHeading = onDisk.split("\n").find((line) => line.startsWith("# ")) as string;
-    expect(header.title).toBe(firstHeading.slice(2).trim());
+    expect((header.markdownBody as string).startsWith("# ")).toBe(false);
   });
 
   it("returns a header with no address, publication or metadata authority", async () => {
@@ -128,7 +150,7 @@ describe("the committed repository through the real loader", () => {
     expect(header.accepted).toBe(true);
     if (!header.accepted) return;
 
-    expect(Object.keys(header).sort()).toEqual(["accepted", "kind", "markdownBody", "title", "visibility"]);
+    expect(Object.keys(header).sort()).toEqual(["accepted", "description", "kind", "title", "visibility"]);
     const serialised = JSON.stringify(header);
     for (const forbidden of [
       '"published"',
@@ -354,7 +376,7 @@ describe("candidate trust and hostile application input", () => {
 
   it("refuses a candidate that does not declare the supplied kind", async () => {
     const loaded = await realLoaded();
-    loaded.kind = "json";
+    loaded.kind = "markdown";
     expectRefused(resolveUnoPageHeader(loaded), "page-header:kind-inconsistent");
 
     const unknown = await realLoaded();

@@ -64,8 +64,55 @@ const PUBLISHED_MANIFEST = {
   ],
 };
 
-/** The committed, unpublished manifest: one Page, no publication. */
+/** The committed starter sources: Home JSON, About Markdown and Components JSON. */
+const HOME_JSON = `${CONTENT}/home.en-001.json`;
+const ABOUT_MD = `${CONTENT}/about.en-001.md`;
+const COMPONENTS_JSON = `${CONTENT}/components.en-001.json`;
+/** The preserved, now *undeclared* legacy Markdown Home: it exists on disk but is not a selected source. */
+const LEGACY_HOME_MD = `${CONTENT}/home.en-001.md`;
+
+/** The committed starter manifest: exactly three published public `en-001` Pages, one declared source each. */
 const COMMITTED_MANIFEST = {
+  entities: [
+    {
+      id: "e_7a3knkx60eacyhca7a0cr1k6e1",
+      facets: [
+        {
+          id: "foundation",
+          sites: [
+            {
+              id: "main",
+              locales: { supportedLocales: ["en-001"], defaultLocale: "en-001" },
+              pages: [
+                {
+                  id: "home",
+                  publication: "published",
+                  route: ["home"],
+                  representations: [{ locale: "en-001", sources: [{ kind: "json", path: HOME_JSON }] }],
+                },
+                {
+                  id: "about",
+                  publication: "published",
+                  route: ["about"],
+                  representations: [{ locale: "en-001", sources: [{ kind: "markdown", path: ABOUT_MD }] }],
+                },
+                {
+                  id: "components",
+                  publication: "published",
+                  route: ["components"],
+                  representations: [{ locale: "en-001", sources: [{ kind: "json", path: COMPONENTS_JSON }] }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+/** A synthetic manifest with one unpublished Home Markdown Page: the shape this order replaced. */
+const UNPUBLISHED_MANIFEST = {
   entities: [
     {
       id: "e_7a3knkx60eacyhca7a0cr1k6e1",
@@ -80,7 +127,9 @@ const COMMITTED_MANIFEST = {
                   id: "home",
                   publication: null,
                   route: ["home"],
-                  representations: [{ locale: "en-001", sources: [{ kind: "markdown", path: `${CONTENT}/home.en-001.md` }] }],
+                  representations: [
+                    { locale: "en-001", sources: [{ kind: "markdown", path: LEGACY_HOME_MD }] },
+                  ],
                 },
               ],
             },
@@ -118,9 +167,9 @@ function entriesFor(paths) {
   return paths.map((path) => `../../../${path}`);
 }
 
-/** A bounded, correct synthetic trace: the two declarations plus the authored Home source. */
+/** A bounded, correct synthetic trace: the two declarations plus every declared starter source. */
 function boundedEntries() {
-  return entriesFor([MANIFEST, SELECTION, `${CONTENT}/home.en-001.md`]);
+  return entriesFor([MANIFEST, SELECTION, HOME_JSON, ABOUT_MD, COMPONENTS_JSON]);
 }
 
 /** Inspect one synthetic root, cleaning it up afterwards. */
@@ -147,7 +196,23 @@ test('accepts a bounded committed build: declarations traced, nothing else', () 
   assert.deepEqual(result.reasons, []);
   assert.equal(result.accepted, true);
   assert.equal(result.notes.manifests, 1);
-  assert.equal(result.notes.projectEntries, 3);
+  assert.equal(result.notes.projectEntries, 5);
+});
+
+test('accepts the committed starter with every declared source and no legacy Markdown', () => {
+  const root = makeRoot();
+  writeTrace(root, "page", boundedEntries());
+  const result = inspect(root, { expectPublishedSources: true });
+  assert.deepEqual(result.reasons, []);
+  assert.equal(result.accepted, true);
+  assert.equal(result.notes.publishedSources, 3);
+});
+
+test('refuses a build that ships only the undeclared legacy Markdown Home', () => {
+  // The preserved Markdown file is not a selected source, so it can never stand in for the declared sources.
+  const root = makeRoot();
+  writeTrace(root, "page", entriesFor([MANIFEST, SELECTION, LEGACY_HOME_MD]));
+  assertRefused(inspect(root, { expectPublishedSources: true }), "source:not-traced");
 });
 
 test('accepts a bounded fixture build: every published source traced', () => {
@@ -271,7 +336,7 @@ test('refuses an empty trace that would otherwise look like success', () => {
 
 test('refuses declarations that a bounded trace omits', () => {
   const root = makeRoot();
-  writeTrace(root, "page", entriesFor([`${CONTENT}/home.en-001.md`]));
+  writeTrace(root, "page", entriesFor([LEGACY_HOME_MD]));
   assertRefused(inspect(root), "source:not-traced");
 });
 
@@ -284,7 +349,7 @@ test('refuses a fixture build whose published source is not shipped', () => {
 });
 
 test('refuses a fixture build with no published source declared at all', () => {
-  const root = makeRoot({ manifest: COMMITTED_MANIFEST });
+  const root = makeRoot({ manifest: UNPUBLISHED_MANIFEST });
   writeTrace(root, "page", boundedEntries());
   assertRefused(inspect(root, { expectPublishedSources: true }), "source:missing");
 });

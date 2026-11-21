@@ -36,6 +36,8 @@ import {
 
 const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const HOME_SOURCE = "deployment/efs/content/home.en-001.md";
+/** The declared JSON Home candidate of the committed starter. */
+const HOME_JSON_SOURCE = "deployment/efs/content/home.en-001.json";
 const SCRATCH_ROOT = join(REPO_ROOT, ".temp");
 
 /** One isolated repository-shaped scratch root. */
@@ -144,13 +146,27 @@ describe("the real committed Home source", () => {
     expect(after.equals(before)).toBe(true);
   });
 
-  it("refuses to read the committed Markdown as JSON", () => {
-    expectDiagnosis(
-      REPO_ROOT,
-      { kind: "json", path: HOME_SOURCE.replace(/\.md$/, ".json") },
-      "absent",
-      "path:absent",
-    );
+  it("reads the committed Home JSON as the declared JSON candidate", () => {
+    const observation = observeUnoConfinedSource({
+      repoRoot: REPO_ROOT,
+      declaration: { kind: "json", path: HOME_JSON_SOURCE },
+    });
+    expect(observation.state).toBe("valid");
+    if (observation.state !== "valid") return;
+    expect(observation.source.kind).toBe("json");
+    expect(observation.source.text).toBe(readFileSync(join(REPO_ROOT, HOME_JSON_SOURCE), "utf8"));
+    expect(observation.source.text).toContain('"version": 1');
+  });
+
+  it("refuses to read the undeclared legacy Markdown Home as JSON", () => {
+    // Direct observation of an existing legacy file is possible, but a JSON declaration that points at a
+    // Markdown path is refused outright: observability never turns the legacy file into a candidate.
+    const diagnosis = diagnoseUnoConfinedSource({
+      repoRoot: REPO_ROOT,
+      declaration: { kind: "json", path: HOME_SOURCE },
+    });
+    expect(diagnosis.state).not.toBe("valid");
+    expect(UNO_SOURCE_READER_CODES).toContain(diagnosis.code);
   });
 });
 

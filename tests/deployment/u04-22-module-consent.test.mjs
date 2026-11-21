@@ -117,8 +117,8 @@ const PHASE_B_REQUIRED = Object.freeze([
 ]);
 
 const PINNED = Object.freeze([
-  "ba232d46edcd13e95231f627f67058d383bc4479f076eb2be1ca9c576de6e3f0",
-  "4f656c93a45873d85b133aa99adaec1b6821ac9983b9e9818452773952df9a0c",
+  "b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925",
+  "58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952",
 ]);
 
 /**

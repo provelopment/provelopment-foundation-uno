@@ -33,7 +33,11 @@ const MANIFEST_URL = new URL("deployment/efs/manifest.json", REPO_ROOT);
 const HOME_URL = new URL("deployment/efs/content/home.en-001.md", REPO_ROOT);
 
 const ENTITY_ID = "e_7a3knkx60eacyhca7a0cr1k6e1";
+/** The preserved, now *undeclared* legacy Markdown Home: evidence only, never a declared candidate. */
 const HOME_PATH = "deployment/efs/content/home.en-001.md";
+const HOME_JSON_PATH = "deployment/efs/content/home.en-001.json";
+const ABOUT_PATH = "deployment/efs/content/about.en-001.md";
+const COMPONENTS_PATH = "deployment/efs/content/components.en-001.json";
 
 interface MutableSource {
   kind: string;
@@ -151,14 +155,21 @@ describe("the committed authored graph", () => {
     expect(facet.sites).toHaveLength(1);
     const site = facet.sites[0]!;
     expect(site.id).toBe("main");
-    expect(site.pages).toHaveLength(1);
-    const page = site.pages[0]!;
-    expect(page.id).toBe("home");
-    expect(page.route).toEqual(["home"]);
-    expect(page.representations).toHaveLength(1);
-    const representation = page.representations[0]!;
-    expect(representation.locale).toBe("en-001");
-    expect(representation.sources).toEqual([{ kind: "markdown", path: HOME_PATH }]);
+
+    // Exactly three declared Pages — the neutral starter — each owned by this Entity, Facet and Site.
+    expect(site.pages).toHaveLength(3);
+    expect(site.pages.map((page) => page.id)).toEqual(["home", "about", "components"]);
+    expect(site.pages.map((page) => page.route)).toEqual([["home"], ["about"], ["components"]]);
+    for (const page of site.pages) {
+      expect(page.publication).toBe("published");
+      expect(page.representations).toHaveLength(1);
+      const representation = page.representations[0]!;
+      expect(representation.locale).toBe("en-001");
+      expect(representation.sources).toHaveLength(1);
+    }
+    expect(site.pages[0]!.representations[0]!.sources).toEqual([{ kind: "json", path: HOME_JSON_PATH }]);
+    expect(site.pages[1]!.representations[0]!.sources).toEqual([{ kind: "markdown", path: ABOUT_PATH }]);
+    expect(site.pages[2]!.representations[0]!.sources).toEqual([{ kind: "json", path: COMPONENTS_PATH }]);
   });
 
   it("finds the committed Home Markdown as truthful English source content", () => {
@@ -173,7 +184,7 @@ describe("the committed authored graph", () => {
     expect(markdown).not.toMatch(/!\[/);
   });
 
-  it("declares only the committed Home candidate, inside the authored content root", () => {
+  it("declares exactly the three starter candidates, inside the authored content root", () => {
     const parsed = JSON.parse(readFileSync(MANIFEST_URL, "utf8")) as MutableGraph;
     const paths = parsed.entities.flatMap((entity) =>
       entity.facets.flatMap((facet) =>
@@ -186,9 +197,15 @@ describe("the committed authored graph", () => {
         ),
       ),
     );
-    expect(paths).toEqual([HOME_PATH]);
-    expect(paths[0]!.startsWith(MANIFEST_CONTENT_ROOT)).toBe(true);
-    expect(() => readFileSync(new URL(paths[0]!, REPO_ROOT), "utf8")).not.toThrow();
+    expect(paths).toEqual([HOME_JSON_PATH, ABOUT_PATH, COMPONENTS_PATH]);
+    for (const path of paths) {
+      expect(path.startsWith(MANIFEST_CONTENT_ROOT)).toBe(true);
+      expect(() => readFileSync(new URL(path, REPO_ROOT), "utf8")).not.toThrow();
+    }
+
+    // The preserved legacy Markdown Home still exists on disk but is no longer a declared candidate.
+    expect(paths).not.toContain(HOME_PATH);
+    expect(() => readFileSync(new URL(HOME_PATH, REPO_ROOT), "utf8")).not.toThrow();
   });
 });
 
@@ -1062,20 +1079,24 @@ describe("the optional Page publication declaration (UNO-WO-028 / R01)", () => {
     expectRefused(onSite, "shape:unsupported-field");
   });
 
-  it("keeps the committed manifest unpublished", () => {
+  it("publishes exactly the three declared starter Pages and nothing more", () => {
     const parsed: unknown = JSON.parse(readFileSync(MANIFEST_URL, "utf8"));
     const result = validateUnoManifestGraph(parsed);
     expect(result.accepted).toBe(true);
     if (!result.accepted) return;
 
+    const published: string[] = [];
     for (const entity of result.graph.entities) {
       for (const facet of entity.facets) {
         for (const site of facet.sites) {
           for (const page of site.pages) {
-            expect(page.publication).not.toBe("published");
+            expect(page.publication).toBe("published");
+            expect(page.representations.map((entry) => entry.locale)).toEqual(["en-001"]);
+            published.push(page.id);
           }
         }
       }
     }
+    expect(published).toEqual(["home", "about", "components"]);
   });
 });

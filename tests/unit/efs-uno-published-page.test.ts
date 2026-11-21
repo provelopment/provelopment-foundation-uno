@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { loadUnoCandidateSource } from "../../src/adapters/efs/uno-confined-source-reader";
 import { planUnoPublicDiscovery } from "../../src/application/plan-uno-public-discovery";
+import { resolveUnoCommittedBase } from "../../src/application/resolve-uno-committed-base";
 import {
   listUnoServingAddresses,
   planUnoServingDiscovery,
@@ -25,8 +26,8 @@ import {
  *
  * Every positive decision is produced from a **real synthetic Uno fixture** on disk — the fixed committed
  * declaration paths, the confined loader and the accepted route matcher — so nothing here fabricates a loader
- * result. The committed deployment's own declaration is never touched: it stays base-free and unpublished,
- * which is why the production surface answers 404.
+ * result. The committed deployment's own declaration also carries three published starter Pages, which the
+ * final suite proves through the real serving adapter, discovery plan, robots and sitemap.
  */
 
 const ENTITY_ID = "e_7a3knkx60eacyhca7a0cr1k6e1";
@@ -327,21 +328,91 @@ describe("the publication gate", () => {
 });
 
 
-describe("the committed deployment refuses everything", () => {
-  it("serves no Page, lists no address, plans no discovery and emits no robots or sitemap", async () => {
-    // The committed Declaration is base-free and publishes no Page, so the server adapter must refuse before
-    // any of these surfaces can answer. This is the same truth the production HTTP gate observes.
-    const page = await planUnoServingPage("/en-001");
-    expect(page.status).toBe("not-served");
-    if (page.status === "not-served") expect(page.reason).toBe("serving:authority-unavailable");
+describe("the committed starter serves its three declared Pages", () => {
+  it("serves Home, About and Components with the reserved canonical addresses", async () => {
+    const expected = [
+      { pathname: "/en-001", pageId: "home", kind: "json", canonical: "https://uno-starter.example/en-001" },
+      { pathname: "/en-001/about", pageId: "about", kind: "markdown", canonical: "https://uno-starter.example/en-001/about" },
+      {
+        pathname: "/en-001/components",
+        pageId: "components",
+        kind: "json",
+        canonical: "https://uno-starter.example/en-001/components",
+      },
+    ] as const;
 
-    expect(await listUnoServingAddresses()).toEqual([]);
+    for (const entry of expected) {
+      const page = await planUnoServingPage(entry.pathname);
+      expect(page.status, entry.pathname).toBe("served");
+      if (page.status !== "served") continue;
+      expect(page.page.identity.pageId).toBe(entry.pageId);
+      expect(page.page.identity.localeTag).toBe("en-001");
+      expect(page.page.document.kind).toBe(entry.kind);
+      expect(page.page.document.visibility).toBe("public");
+      expect(page.page.delivery.canonicalUrl).toBe(entry.canonical);
+      expect(page.page.delivery.public).toBe(true);
+      expect(page.page.delivery.indexable).toBe(true);
+      expect(page.page.delivery.robots).toBeNull();
+      if (entry.kind === "json") expect(page.page.document.pageDocument).toBeDefined();
+      else expect(typeof page.page.document.markdownBody).toBe("string");
+    }
+  });
 
+  it("lists exactly the committed address shapes", async () => {
+    const addresses = await listUnoServingAddresses();
+    expect(addresses.map((address) => [address.locale, address.segments.join("/")])).toEqual([
+      ["en", ""],
+      ["en-001", ""],
+      ["en-001", "about"],
+      ["en-001", "components"],
+    ]);
+  });
+
+  it("plans public discovery, robots and sitemap from the same authority", async () => {
     const discovery = await planUnoServingDiscovery();
-    expect(discovery.status).toBe("unavailable");
+    expect(discovery.status).toBe("planned");
+    if (discovery.status !== "planned") return;
+    expect(discovery.plan.site).toEqual({ entityId: ENTITY_ID, facetId: "foundation", siteId: "main" });
+    expect(discovery.plan.defaultLocale).toBe("en-001");
+    expect(discovery.plan.entries.map((entry) => entry.canonicalUrl)).toEqual([
+      "https://uno-starter.example/en-001",
+      "https://uno-starter.example/en-001/about",
+      "https://uno-starter.example/en-001/components",
+    ]);
+    for (const entry of discovery.plan.entries) {
+      expect(entry.localeTag).toBe("en-001");
+      expect(entry.alternates).toEqual([]);
+    }
+    // The single authored locale makes the default entry its own x-default; the child Pages carry none.
+    expect(discovery.plan.entries[0]!.xDefault).toBe("https://uno-starter.example/en-001");
+    expect(discovery.plan.entries[1]!.xDefault).toBeUndefined();
+    expect(discovery.plan.entries[2]!.xDefault).toBeUndefined();
+    expect(discovery.plan.sitemapUrls).toEqual([
+      "https://uno-starter.example/en-001",
+      "https://uno-starter.example/en-001/about",
+      "https://uno-starter.example/en-001/components",
+    ]);
 
-    expect(await renderUnoServingRobots()).toBeNull();
-    expect(await renderUnoServingSitemap()).toBeNull();
+    const robots = await renderUnoServingRobots();
+    expect(robots).toContain("Sitemap: https://uno-starter.example/sitemap.xml");
+
+    const sitemap = await renderUnoServingSitemap();
+    expect(sitemap).not.toBeNull();
+    expect((sitemap as string).match(/<loc>/gu)?.length).toBe(3);
+  });
+
+  it("refuses every address outside the declared set", async () => {
+    for (const pathname of [
+      "/en-001/nope",
+      "/en-001/home",
+      "/en-001/about/extra",
+      "/en-001/components/extra",
+      "/de-001",
+      "/en-001/draft",
+    ]) {
+      const page = await planUnoServingPage(pathname);
+      expect(page.status, pathname).toBe("not-served");
+    }
   });
 
   it("refuses an input that is not an absolute address", async () => {
@@ -350,6 +421,25 @@ describe("the committed deployment refuses everything", () => {
       expect(outcome.status).toBe("not-served");
       if (outcome.status === "not-served") expect(outcome.reason).toBe("serving:input-invalid");
     }
+  });
+
+  it("still refuses everything on a base-free or unpublished synthetic declaration", async () => {
+    // A separate synthetic fixture: removing every publication declaration refuses each Page on its own authority.
+    const unpublished = JSON.parse(JSON.stringify(MANIFEST)) as Record<string, unknown>;
+    const entity = (unpublished["entities"] as Record<string, unknown>[])[0] as Record<string, unknown>;
+    const facet = (entity["facets"] as Record<string, unknown>[])[0] as Record<string, unknown>;
+    const site = (facet["sites"] as Record<string, unknown>[])[0] as Record<string, unknown>;
+    for (const page of site["pages"] as Record<string, unknown>[]) delete page["publication"];
+
+    expectRefused(await plan("/en-001", { manifest: unpublished }), "publication:not-published");
+    expectRefused(await plan("/en-001/about", { manifest: unpublished }), "publication:not-published");
+
+    // A base-free selection is refused by the committed-base reader rather than defaulted to a domain.
+    const baseFree = { ...SELECTION } as Record<string, unknown>;
+    delete baseFree["base"];
+    const stored = resolveUnoCommittedBase({ manifest: MANIFEST, selection: baseFree });
+    expect(stored.accepted).toBe(false);
+    if (!stored.accepted) expect(stored.reason).toBe("committed-base:missing");
   });
 });
 

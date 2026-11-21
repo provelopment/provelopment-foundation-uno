@@ -72,8 +72,8 @@ const ENTITY_ID = "e_7a3knkx60eacyhca7a0cr1k6e1";
 
 /** SHA-256 of the two committed declarations, asserted before and after the temporary substitution. */
 const PINNED_DECLARATIONS = new Map([
-  [MANIFEST, "ba232d46edcd13e95231f627f67058d383bc4479f076eb2be1ca9c576de6e3f0"],
-  [SELECTION, "4f656c93a45873d85b133aa99adaec1b6821ac9983b9e9818452773952df9a0c"],
+  [MANIFEST, "b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925"],
+  [SELECTION, "58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952"],
 ]);
 
 /** The nine fixture sources: created only if absent, removed again in the same `finally`. */
@@ -430,6 +430,52 @@ async function request(url, extraHeaders) {
   };
 }
 
+/** The reserved, illustrative sample origin. Never a deployment, a DNS record or an owned domain. */
+const SAMPLE_ORIGIN = "https://uno-starter.example";
+
+/** The five authorized starter paths: the two declarations and the three authored starter sources. */
+const STARTER_PATHS = Object.freeze([
+  MANIFEST,
+  SELECTION,
+  `${CONTENT}/home.en-001.json`,
+  `${CONTENT}/about.en-001.md`,
+  `${CONTENT}/components.en-001.json`,
+]);
+
+/** The three committed starter Pages, proven at the committed head before the reversible fixture replaces them. */
+const COMMITTED_PAGES = Object.freeze([
+  {
+    pathname: "/en-001",
+    locale: "en-001",
+    title: "Foundation Uno",
+    body: "One organisation. One connected digital presence.",
+    xDefault: `${SAMPLE_ORIGIN}/en-001`,
+    canonical: `${SAMPLE_ORIGIN}/en-001`,
+  },
+  {
+    pathname: "/en-001/about",
+    locale: "en-001",
+    title: "About this starter",
+    body: "This sample installation is an illustrative placeholder",
+    canonical: `${SAMPLE_ORIGIN}/en-001/about`,
+  },
+  {
+    pathname: "/en-001/components",
+    locale: "en-001",
+    title: "Components",
+    body: "A JSON Page is an ordered list of validated sections.",
+    canonical: `${SAMPLE_ORIGIN}/en-001/components`,
+  },
+]);
+
+/** Every address the committed starter must refuse, with a real 404 and no advertised link. */
+const COMMITTED_REFUSALS = Object.freeze([
+  "/en-001/home",
+  "/en-001/does-not-exist",
+  "/de-001",
+  "/en-001/about/extra",
+]);
+
 /** The two user agents the parity proof compares: an ordinary browser and a crawler-shaped one. */
 const CRAWLER_AGENTS = Object.freeze([
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/159.0.0.0 Safari/537.36",
@@ -747,6 +793,114 @@ async function validateFixtureInProcess() {
 }
 
 
+/**
+ * Prove the COMMITTED starter head before any fixture replaces it: a real production build of the committed
+ * declarations, real loopback HTTP for the three Pages, their canonical/SEO agreement, the sitemap, the refusals and
+ * a real Chromium pass. Any failure here stops before the reversible fixture, so a green fixture run can never be
+ * mistaken for a green committed starter.
+ */
+async function committedStarterPhase(nextBin) {
+  process.stdout.write("\nverify-u03-published-http: committed-starter proof before the reversible fixture\n");
+  rmSync(resolve(ROOT, ".next"), { recursive: true, force: true });
+  const build = await runChild([nextBin, "build"], BUILD_TIMEOUT_MS);
+  if (!check("the committed starter production build succeeds", build.code === 0, `exit ${build.code}`)) {
+    process.stderr.write(build.output.slice(-4000));
+    return;
+  }
+  checkBuildClean("the committed starter build", build.output);
+  checkTrace("the committed starter build", "committed");
+  if (failures.length > 0) {
+    process.stderr.write("verify-u03-published-http: the committed starter build is not clean or not bounded.\n");
+    return;
+  }
+
+  const starterPort = await freeLoopbackPort();
+  const base = `http://${HOST}:${starterPort}`;
+  const child = spawn(process.execPath, [nextBin, "start", "-H", HOST, "-p", String(starterPort)], {
+    cwd: ROOT,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, NODE_ENV: "production" },
+    windowsHide: true,
+  });
+  let serverOutput = "";
+  child.stdout.on("data", (chunk) => (serverOutput += String(chunk)));
+  child.stderr.on("data", (chunk) => (serverOutput += String(chunk)));
+  try {
+    let ready = false;
+    const deadline = Date.now() + READY_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      if (child.exitCode !== null || child.signalCode !== null) break;
+      try {
+        await request(`${base}/`);
+        ready = true;
+        break;
+      } catch {
+        await delay(250);
+      }
+    }
+    if (!check("the committed starter server reached readiness", ready, serverOutput.slice(-500))) return;
+
+    const alternates = new Map();
+    for (const page of COMMITTED_PAGES) {
+      const response = await request(`${base}${page.pathname}`);
+      alternates.set(page.pathname, checkPublicPage(page.pathname, page, response));
+    }
+    check(
+      "the committed Home carries the reserved x-default",
+      alternates.get("/en-001")?.get("x-default") === `${SAMPLE_ORIGIN}/en-001`,
+    );
+    for (const pathname of ["/en-001/about", "/en-001/components"]) {
+      check(`the committed ${pathname} carries no x-default`, alternates.get(pathname)?.get("x-default") === undefined);
+    }
+
+    const robots = await request(`${base}/robots.txt`);
+    check("the committed robots.txt answers 200", robots.status === 200, `status ${robots.status}`);
+    check(
+      "the committed robots.txt names the reserved sitemap",
+      robots.body.includes(`Sitemap: ${SAMPLE_ORIGIN}/sitemap.xml`),
+    );
+    const sitemap = await request(`${base}/sitemap.xml`);
+    check("the committed sitemap.xml answers 200", sitemap.status === 200, `status ${sitemap.status}`);
+    const locations = sitemap.body.match(/<loc>[^<]+<\/loc>/gu) ?? [];
+    check("the committed sitemap.xml lists exactly three addresses", locations.length === 3, `${locations.length}`);
+    for (const page of COMMITTED_PAGES) {
+      check(`the committed sitemap lists ${page.canonical}`, sitemap.body.includes(`<loc>${page.canonical}</loc>`));
+    }
+    check(
+      "the committed sitemap never lists the undeclared legacy Home or a suppressed alias",
+      !sitemap.body.includes("home.en-001.md") && !sitemap.body.includes("/en-001/home"),
+    );
+
+    const shortAlias = await request(`${base}/en`);
+    check(
+      "the committed /en answers one explicit redirect to the published root",
+      [307, 308].includes(shortAlias.status),
+      `status ${shortAlias.status}`,
+    );
+
+    for (const pathname of COMMITTED_REFUSALS) {
+      await checkRefusal(base, pathname);
+    }
+
+    const browserProof = await verifyUnoU03Browser({
+      base,
+      pages: COMMITTED_PAGES,
+      refusedPaths: COMMITTED_REFUSALS,
+      keyboardPage: COMMITTED_PAGES[2],
+    });
+    for (const name of browserProof.passes) check(name, true);
+    for (const failure of browserProof.failures) {
+      failures.push(failure);
+      process.stdout.write(`  FAIL  ${failure}\n`);
+    }
+    check("the committed starter server stayed up", child.exitCode === null && child.signalCode === null);
+  } finally {
+    await stopChild(child);
+    check("the committed starter port was released", (await portStillOpen(starterPort)) === false);
+  }
+}
+
+
 /** Assert every precondition: pinned declarations, absent fixture sources, clean tracked tree. */
 function preflight() {
   check("the gate runs from the Uno checkout root", existsSync(resolve(ROOT, "package.json")));
@@ -760,7 +914,10 @@ function preflight() {
   for (const relativePath of FIXTURE_SOURCES) {
     check(`the fixture source ${relativePath} is absent`, !existsSync(resolve(ROOT, relativePath)));
   }
-  check("the committed Home Markdown is present", existsSync(resolve(ROOT, `${CONTENT}/home.en-001.md`)));
+  check("the preserved legacy Home Markdown is present", existsSync(resolve(ROOT, `${CONTENT}/home.en-001.md`)));
+  for (const starterPath of STARTER_PATHS) {
+    check(`the authorized starter path ${starterPath} exists`, existsSync(resolve(ROOT, starterPath)));
+  }
 
   const staged = spawnSync("git", ["--no-optional-locks", "diff", "--cached", "--name-only"], {
     cwd: ROOT,
@@ -771,10 +928,15 @@ function preflight() {
     cwd: ROOT,
     encoding: "utf8",
   });
+  const unexpected = deployment.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !STARTER_PATHS.some((starterPath) => line.endsWith(` ${starterPath}`)));
   check(
-    "no committed deployment input is modified before the fixture",
-    deployment.stdout.trim() === "",
-    deployment.stdout.trim(),
+    "no committed deployment input outside the authorized starter paths is modified before the fixture",
+    unexpected.length === 0,
+    unexpected.join(" | "),
   );
   const active = spawnSync("git", ["check-ignore", "--", ".documents/WIP/workorder-active.md"], {
     cwd: ROOT,
@@ -937,6 +1099,15 @@ async function main() {
       return 1;
     }
 
+    // --- The committed starter head is proven first, before any fixture replaces it --------------
+    await committedStarterPhase(nextBin);
+    if (failures.length > 0) {
+      process.stderr.write(
+        "verify-u03-published-http: the committed starter head failed; the fixture was never installed.\n",
+      );
+      return 1;
+    }
+
     // --- Armed transaction: preconditions, verified backups, exclusive writes -------------------
     // Restoration is armed before the first destructive write, so no failure position can leave a modified
     // declaration without a recovery path.
@@ -1084,10 +1255,15 @@ if (outcome === 0 && declarationsRestored) {
     ["--no-optional-locks", "status", "--porcelain=v1", "--", "deployment"],
     { cwd: ROOT, encoding: "utf8" },
   );
+  const unexpectedAfter = status.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !STARTER_PATHS.some((starterPath) => line.endsWith(` ${starterPath}`)));
   check(
-    "no committed deployment input is modified after restoration",
-    status.stdout.trim() === "",
-    status.stdout.trim(),
+    "no committed deployment input outside the authorized starter paths is modified after restoration",
+    unexpectedAfter.length === 0,
+    unexpectedAfter.join(" | "),
   );
   const staged = spawnSync("git", ["--no-optional-locks", "diff", "--cached", "--name-only"], {
     cwd: ROOT,

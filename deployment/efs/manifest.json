@@ -22,13 +22,46 @@
                 {
                   "id": "home",
                   "route": ["home"],
+                  "publication": "published",
+                  "representations": [
+                    {
+                      "locale": "en-001",
+                      "sources": [
+                        {
+                          "kind": "json",
+                          "path": "deployment/efs/content/home.en-001.json"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "about",
+                  "route": ["about"],
+                  "publication": "published",
                   "representations": [
                     {
                       "locale": "en-001",
                       "sources": [
                         {
                           "kind": "markdown",
-                          "path": "deployment/efs/content/home.en-001.md"
+                          "path": "deployment/efs/content/about.en-001.md"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "components",
+                  "route": ["components"],
+                  "publication": "published",
+                  "representations": [
+                    {
+                      "locale": "en-001",
+                      "sources": [
+                        {
+                          "kind": "json",
+                          "path": "deployment/efs/content/components.en-001.json"
                         }
                       ]
                     }

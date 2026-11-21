@@ -82,8 +82,19 @@ function expectRefused(result: UnoCommittedBaseResult, code: UnoCommittedBaseRef
 }
 
 describe("the committed declaration", () => {
-  it("reports the missing base rather than supplying a domain", () => {
+  it("accepts the reserved sample canonical with no aliases", () => {
     const result = resolveUnoCommittedBase({ manifest: readManifest(), selection: readSelection() });
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect(Object.keys(result).sort()).toEqual(["accepted", "base", "site"]);
+    expect(result.base.canonical).toBe("https://uno-starter.example");
+    expect(result.base.aliases).toEqual([]);
+    expect(result.site).toEqual({ entityId: ENTITY_ID, facetId: "foundation", siteId: "main" });
+  });
+
+  it("still reports a missing base on a synthetic base-free declaration", () => {
+    // A separate synthetic fixture: the reader refuses a declaration with no base and never supplies a domain.
+    const result = resolveUnoCommittedBase({ manifest: manifest(), selection: selection() });
     expectRefused(result, "committed-base:missing");
     expect(JSON.stringify(result).includes("https://")).toBe(false);
   });

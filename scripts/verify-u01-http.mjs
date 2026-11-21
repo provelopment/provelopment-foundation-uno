@@ -11,9 +11,10 @@
  * The assertions describe what a visitor receives, not what a source file contains: content type,
  * the single `h1`, the title and description actually served, the explanatory sections, the source
  * link, in-page anchor integrity, the preserved `noindex, nofollow` policy, the absence of
- * fabricated metadata and analytics, and the six declared 404 refusals. Each check is separately
- * counted, and a negative check fails if the page regresses to the old placeholder or starts
- * implying a published Site.
+ * fabricated metadata and analytics, and the declared 404 refusals. The committed neutral starter now owns
+ * `/en-001`, the `/en` short-alias redirect and the two discovery documents, so those are asserted as explicit
+ * positives instead of refusals. Each check is separately counted, and a negative check fails if the page regresses
+ * to the old placeholder or starts implying an unlisted Site.
  *
  * Deliberate non-goals: no CDP/browser dependency, no screenshot claim, no provider call, no
  * non-loopback request, no write outside the repository, and no claim about later real EFS routing
@@ -92,13 +93,13 @@ const LOGO_SHA256 = "bd804ce683824ad85852615b0e0a700badb80cf2cdff38dd642d9f1947d
  * bytes; a Windows checkout may deliver CRLF for the same content.
  */
 const canonicalSvg = (text) => text.replace(/\r\n/g, "\n");
+/**
+ * Addresses that must stay genuine 404s for this gate. The committed starter owns `/en-001`, the `/en` short-alias
+ * redirect, `/robots.txt` and `/sitemap.xml`; those are asserted as explicit positives below rather than refusals.
+ */
 const REFUSED_PATHS = Object.freeze([
-  "/en",
-  "/en-001",
   "/about",
   "/does-not-exist-9f3",
-  "/robots.txt",
-  "/sitemap.xml",
 ]);
 
 const failures = [];
@@ -495,6 +496,26 @@ async function main() {
       const response = await fetchText(`${base}${path}`);
       check(`${path} returns 404`, response.status === 404, `status ${response.status}`);
     }
+
+    // The committed neutral starter now owns these addresses: they must answer as real positives, never as
+    // refusals, and the redirect must point only at the published root.
+    const starterRoot = await fetchText(`${base}/en-001`);
+    check("/en-001 serves the committed starter root", starterRoot.status === 200, `status ${starterRoot.status}`);
+    check(
+      "/en-001 declares the reserved canonical",
+      starterRoot.body.includes('<link rel="canonical" href="https://uno-starter.example/en-001"/>'),
+    );
+    const shortAlias = await fetch(`${base}/en`, { redirect: "manual" });
+    check("/en answers one explicit redirect", [307, 308].includes(shortAlias.status), `status ${shortAlias.status}`);
+    check(
+      "/en redirects only to the published en-001 root",
+      (shortAlias.headers.get("location") ?? "").endsWith("/en-001"),
+      String(shortAlias.headers.get("location")),
+    );
+    const robotsDocument = await fetchText(`${base}/robots.txt`);
+    check("/robots.txt is published", robotsDocument.status === 200, `status ${robotsDocument.status}`);
+    const sitemapDocument = await fetchText(`${base}/sitemap.xml`);
+    check("/sitemap.xml is published", sitemapDocument.status === 200, `status ${sitemapDocument.status}`);
 
     const notFound = await fetchText(`${base}/does-not-exist-9f3`);
     const notFoundText = normalise(

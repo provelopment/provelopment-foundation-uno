@@ -108,13 +108,31 @@ afterAll(() => {
 });
 
 describe("the committed repository, end to end", () => {
-  it("loads /en-001 from the real checkout as a real Markdown read", async () => {
+  it("loads /en-001 from the real checkout as a real JSON read", async () => {
     const result = await loadUnoCandidateSource({ repoRoot: REPO_ROOT, pathname: "/en-001" });
     expect(result.accepted).toBe(true);
     if (!result.accepted) return;
+    expect(result.kind).toBe("json");
+    expect(result.text).toBe(
+      readFileSync(join(REPO_ROOT, "deployment/efs/content/home.en-001.json"), "utf8"),
+    );
+    expect(JSON.parse(result.text).title).toBe("Foundation Uno");
+    // The preserved legacy Markdown Home is not the served body.
+    expect(result.text).not.toBe(
+      readFileSync(join(REPO_ROOT, "deployment/efs/content/home.en-001.md"), "utf8"),
+    );
+  });
+
+  it("loads /en-001/about from the real checkout as a real Markdown read", async () => {
+    const result = await loadUnoCandidateSource({ repoRoot: REPO_ROOT, pathname: "/en-001/about" });
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
     expect(result.kind).toBe("markdown");
-    expect(result.text.startsWith("# Foundation Uno")).toBe(true);
-    expect(result.text).toBe(readFileSync(join(REPO_ROOT, "deployment/efs/content/home.en-001.md"), "utf8"));
+    expect(result.candidate.pageId).toBe("about");
+    expect(result.text.startsWith("# About this starter")).toBe(true);
+    expect(result.text).toBe(
+      readFileSync(join(REPO_ROOT, "deployment/efs/content/about.en-001.md"), "utf8"),
+    );
   });
 
   it("returns the exact matched candidate identity", async () => {
@@ -149,8 +167,14 @@ describe("the committed repository, end to end", () => {
     }
   });
 
-  it("observes only the declared Markdown kind", async () => {
+  it("observes only the declared JSON kind and never the undeclared legacy source", async () => {
     const traced = await traceUnoCandidateSource({ repoRoot: REPO_ROOT, pathname: "/en-001" });
+    expect(traced.result.accepted).toBe(true);
+    expect(traced.observed).toEqual(["json"]);
+  });
+
+  it("observes only the declared Markdown kind for About", async () => {
+    const traced = await traceUnoCandidateSource({ repoRoot: REPO_ROOT, pathname: "/en-001/about" });
     expect(traced.result.accepted).toBe(true);
     expect(traced.observed).toEqual(["markdown"]);
   });
