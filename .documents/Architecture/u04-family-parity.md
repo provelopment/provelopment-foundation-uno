@@ -4,8 +4,10 @@
 document — `prose`, `callout`, `table`, `list`, `divider`, `hero`, `stats`, `steps`, `quote`, `faq`, `columns`, `cards`,
 `features`, `actions`, `media`, `gallery`, `contactForm` — out of the donor's **seventeen** families. It is a narrow
 provenance and rights ledger, not a parity record: **seventeen bounded source mappings; zero entirely unimplemented donor
-families; zero of seventeen full semantic parity; one temporary family-composition fixture verified over production HTTP and
+families; one of seventeen fully parity-evidenced candidates (`divider`), sixteen still bounded/non-parity, subject to
+independent Architect acceptance; one temporary family-composition fixture verified over production HTTP and
 Chromium; no durable published family Page.** U04 remains OPEN.
+This one candidate remains subject to independent Architect acceptance and is not Owner closure.
 
 ## 1. Provenance and licence
 
@@ -44,7 +46,7 @@ features; they are **not** additional donor family keys and must never be listed
 | `callout` | `text-sections.tsx` `caeee577…` | `COMPOSE (plain-text subset)` | `type`, `body`, optional `tone` | other tones, role/alert semantics, links, Markdown | `content.prose {variant:"callout",text,tone?}` → `<section class="uno-json-callout">` | composed + refusal + markup |
 | `table` | `structure-sections.tsx` `65d254e1…` | `COMPOSE (plain-text subset)` | `type`, `columns`, `rows`, optional `caption` | sorting, spans, merged cells, Markdown, links | `content.prose {variant:"table",…}` → scroll wrapper, `<caption>`, `<th scope="col">` | composed + rectangularity refusal + markup |
 | `list` | `items-sections.tsx` `bc729d6a…` | `COMPOSE (plain-text subset)` | `type`, `items`, optional `ordered` | item destinations/hrefs, icons, Markdown, nested lists | `content.prose {variant:"list",…}` → `<ol>`/`<ul class="uno-json-list">` | composed + destination refusal + markup |
-| `divider` | `text-sections.tsx` `caeee577…` | `COMPOSE (plain-text subset)` | `type` | any content, tone, spacing | `content.prose {variant:"divider"}` → `<hr class="uno-json-divider">` | composed + content refusal + markup |
+| `divider` | `page-document.ts` `a12d964c…` (schema), `text-sections.tsx` `caeee577…` (renderer), `section-support.tsx` `19c9bee3…` (theme border) | `ADAPT (divider semantic parity candidate)` | `type` only — the pinned donor schema is `z.strictObject({ type: z.literal("divider") })` | content, heading, lede, surface, align, spacing, children, `href`, `style`, handlers, raw HTML or script | `content.prose {variant:"divider"}` → one native `<hr class="uno-json-divider">`, no content, no focus, no interaction, no delivery behaviour; 1px `var(--uno-border)` top rule and a 2.5rem section offset (1.5rem root flex `gap` + 1rem own margin) matching the donor's `mt-10` | donor schema/renderer read-only pins; strict-shape and 12 invented-key refusals; getter-zero proof; composed/reader/HTTP/Chromium (`DIVIDER_PARITY_*`) at 390 and 1280 px in light and dark/reduced-motion |
 | `hero` | `page-document.ts` `a12d964c…`; `media-sections.tsx` `e3f3a12e…` | `COMPOSE (plain-text subset)` | `type`, `lede` (required by this subset), optional `eyebrow`, `support`, `align`, `surface` | donor `actions`, hero forms with only `support`/`eyebrow`, Markdown, links/routes | `content.hero {lede,eyebrow?,support?,align?,surface?}` → `<section class="uno-json-hero" data-uno-align data-uno-surface>` with plain eyebrow/lede/support | composed + form/align refusal + markup |
 | `stats` | `page-document.ts` `a12d964c…`; `items-sections.tsx` `bc729d6a…` | `COMPOSE (plain-text subset)` | `type`, `items[1..6]{value,label,detail?}` | donor heading/lede/surface, embedded links, Markdown, extra keys or entries | `content.stats {items}` → `<section class="uno-json-stats">` with `<dl>`/`<dt>`/`<dd>` | composed + count/link refusal + markup |
 | `steps` | `page-document.ts` `a12d964c…`; `items-sections.tsx` `bc729d6a…` | `COMPOSE (ordered plain-text subset)` | `type`, `items[1..12]{title,body?}`, optional `surface` | donor `heading`/`lede`, item `href`/`route`/`link`/`status`/`dateLabel`/`icon`, Markdown, links, states and dates | `content.timeline {items,surface?}` → `<ol class="uno-json-timeline-list">`, one `<li>` per authored step in source order | composed + order/count/state refusal + markup |
@@ -240,6 +242,24 @@ ingress JSON-depth bounds that disagreed with the frozen Page-document contract 
   records zero foreign or provider requests and no new console error.
   The contact region still shows only the fixed delivery-OFF notice: zero forms, controls, handlers or destinations, and
   neither the donor identity nor the acknowledgement appears in the DOM.
+* **`divider` is the one locally evidenced parity candidate.** The pinned donor divider is a strict `{type:"divider"}`
+  object rendered as a native `<hr>` inside an unlabelled layout wrapper carrying the `mt-10` (2.5rem) section offset;
+  it has no authoring id, text, heading, action, media, form, route, styling override or lifecycle field. Uno composes
+  the identical authored shape into `content.prose {variant:"divider"}`, which renders one native
+  `<hr class="uno-json-divider" id="family-8-divider">` — the extra anchor is Uno's own stable section id and adds no
+  authoring authority or accessible name, and the omitted donor wrapper is a nonsemantic implementation detail, so the
+  separator's role, content and behaviour are unchanged. Measured evidence, all executed by
+  `scripts/verify-u04-22-module-consent.mjs`: `DIVIDER_PARITY_SOURCE` (frozen node, `props` exactly `{variant:"divider"}`,
+  no children, neighbours `family-7-actions`/`family-9-hero`, reader re-accept), `DIVIDER_PARITY_HTTP` (exactly one
+  native rule, direct child of `.uno-json`, no wrapper/label/control attribute, one `main`/`h1`) and
+  `DIVIDER_PARITY_BROWSER` at 390 and 1280 px in light **and** dark/reduced-motion: computed `1px solid` theme-token
+  border with all other border widths `0px`, `margin-top`/`margin-bottom` `1rem`, root flex `gap` `1.5rem`, measured
+  space of `2.5rem` ±1.5 px on both sides against the browser's own root font size, `tabIndex -1`, no role, no
+  controls, no animation and no perceptible transition. `DIVIDER_PARITY=PASS` is emitted only when every one of those
+  executed checks passed and the surrounding family gates held. The 1rem margin is the single authorized presentation
+  correction in `.uno-json-divider`; the fixture, temporary source and generated plate remain test-only and are torn
+  down by the existing reversible transaction. **This classification is a local evidence claim awaiting independent
+  Architect acceptance; it is not Owner stage closure, changes no other family and raises no stage proxy.**
 * **No parity follows from this.** The acknowledged `formRef` is still consumed and discarded, and the donor's own
   absent-seam null render still differs from Uno's visible OFF notice. The donor `steps` outline uses `<h3>` headings where
   this bounded target renders `<p>` titles, the donor `faq`, `columns`, `cards` and `features` heading outlines differ
@@ -248,13 +268,15 @@ ingress JSON-depth bounds that disagreed with the frozen Page-document contract 
   `table` is not a donor Markdown table and carries no links, sorting or merged cells, `columns` discloses the
   h2-versus-h3 outline difference, and `cards`/`features` deliberately share one list-grid target with no donor borders,
   media, meta, actions or icons. This is **one temporary seventeen-shape integration slice** with
-  all seventeen bounded shapes sampled over the temporary Page, **zero of seventeen full semantic parity**,
-  **no durable published family Page**, no deployment and no owner Site decision.
+  all seventeen bounded shapes sampled over the temporary Page; sixteen of the seventeen remain bounded and non-parity,
+  and the single `divider` candidate above is locally evidenced only. There is **no durable published family Page**, no
+  deployment and no owner Site decision.
 
 ## 6. Remaining obligations
 
-No donor family is entirely unimplemented (the exact line in section 2), but **all seventeen remain bounded subsets, not
-parity**. Outstanding for the seventeen composed shapes: donor Markdown rendering, link/destination representation beyond
+No donor family is entirely unimplemented (the exact line in section 2). **Sixteen of the seventeen remain bounded
+subsets, not parity**; the single `divider` candidate is locally evidenced and awaits independent Architect acceptance.
+Outstanding for those sixteen shapes: donor Markdown rendering, link/destination representation beyond
 same-document fragments, rich donor forms, the
 other hero, stats, steps, quote, FAQ, columns, cards, features and actions options, the donor `steps`, `faq`, `columns`,
 `cards` and `features` heading outlines, donor card borders/media/meta/actions and feature icons, the donor decorative

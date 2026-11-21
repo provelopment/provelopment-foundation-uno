@@ -2347,7 +2347,6 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).toContain("fc35a52d");
     expect(ledger).toContain("These seventeen mappings");
     expect(ledger).toContain("seventeen bounded");
-    expect(ledger).toContain("zero of seventeen full semantic parity");
     expect(ledger).toContain("zero entirely unimplemented");
     // `UNO-WO-066 / R01`: one temporary fixture Page is now proven over production HTTP and Chromium, so the older
     // blanket claim of no family-Page evidence must be gone and replaced by the exact, bounded positive words.
@@ -2364,10 +2363,19 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).toContain("one temporary seventeen-shape integration slice");
     expect(ledger).toContain("all seventeen bounded shapes sampled over the temporary Page");
     expect(ledger).toContain("no durable published family Page");
-    expect(ledger).toContain("zero of seventeen full semantic parity");
     expect(ledger).not.toContain("one temporary thirteen-shape integration slice");
     expect(ledger).not.toContain("four bounded shapes keep their validator/renderer tests only");
     expect(ledger).not.toContain("zero bounded shapes lacking temporary Page evidence");
+    // `UNO-WO-069 / R01`: one family is now a parity candidate, so the obsolete blanket zero claim must be gone and
+    // the ledger may never assert Owner closure, universal parity or a self-awarded stage proxy.
+    expect(ledger).not.toContain("zero of seventeen full semantic parity");
+    expect(ledger).not.toContain("Owner closed U04");
+    expect(ledger).not.toContain("17/17 full semantic parity");
+    expect(ledger).not.toMatch(/FAMILY_PARITY=17\/17/u);
+    expect(ledger).toContain("ADAPT (divider semantic parity candidate)");
+    expect(ledger).toContain("one of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("subject to independent Architect acceptance");
+    expect(ledger).toContain("sixteen still bounded");
     expect(ledger).toContain("family-<index>-contactform");
     expect(ledger).toContain("Deliberately absent donor design (media and its binding)");
     expect(ledger).toContain("Deliberately absent donor design (gallery)");
@@ -3321,5 +3329,156 @@ describe("composeUnoFoundationSubset — acknowledged delivery-OFF contact", () 
     );
     expect(renderer).toContain("Delivery is switched off. Nothing entered here is sent or stored.");
     expect(renderer).not.toContain("formRef");
+  });
+});
+
+/**
+ * `UNO-WO-069 / R01`: the `divider` parity candidate.
+ *
+ * Pinned donor `src/core/page-document.ts` `a12d964c…` declares `z.strictObject({ type: z.literal("divider") })`, and
+ * pinned `text-sections.tsx` `caeee577…` renders `DividerSection()` as one native `<hr>` inside an unlabelled `<div>`
+ * carrying the `mt-10` (2.5rem) section offset. These cases prove the same authored vocabulary, the same native
+ * separator semantics and the same closed refusals on the real adapter, reader and renderer — never a mock node.
+ */
+describe("composeUnoFoundationSubset — divider semantic parity candidate", () => {
+  function dividerSource(): Record<string, unknown> {
+    return { version: 1, title: "Divider parity fixture", sections: [{ type: "divider" }] };
+  }
+
+  it("composes the complete donor shape {type:\"divider\"} into one frozen divider prose node", () => {
+    const source = dividerSource();
+    const before = JSON.stringify(source);
+    const document = composed(source);
+    expect(JSON.stringify(source)).toBe(before);
+    expect(document.sections).toHaveLength(1);
+    const node = document.sections[0]!;
+    expect(node.id).toBe("family-0-divider");
+    expect(node.module).toBe("content.prose");
+    expect(node.props).toEqual({ variant: "divider" });
+    expect(Object.keys(node.props)).toEqual(["variant"]);
+    expect("children" in node).toBe(false);
+    expect(Object.isFrozen(document)).toBe(true);
+    expect(Object.isFrozen(node)).toBe(true);
+    expect(Object.isFrozen(node.props)).toBe(true);
+    expect(() => readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown)).not.toThrow();
+    expect(() => readUnoPageDocument(JSON.stringify(document))).not.toThrow();
+  });
+
+  it("renders exactly one native, contentless, noninteractive horizontal rule", () => {
+    const html = render(composed(dividerSource()));
+    const rule = '<hr class="uno-json-divider" id="family-0-divider"/>';
+    expect(html).toContain(rule);
+    expect(html.match(/<hr/gu) ?? []).toHaveLength(1);
+    for (const forbidden of ["<h1", "<h2", "<h3", "<p", "<a ", "<img", "<button", "<form", "<iframe", "tabindex", "role=", "aria-", "href", "src="]) {
+      expect(html).not.toContain(forbidden);
+    }
+    // The root `.uno-json` wrapper carries the one rule and nothing else.
+    expect(html.startsWith('<div class="uno-json"')).toBe(true);
+    expect(html.endsWith(`>${rule}</div>`)).toBe(true);
+  });
+
+  it("refuses every invented divider key, field and nested value with a closed reason and no partial Page", () => {
+    const invented: Array<[string, Record<string, unknown>]> = [
+      ["a heading", { type: "divider", heading: "Break" }],
+      ["a lede", { type: "divider", lede: "Between things." }],
+      ["a surface", { type: "divider", surface: "muted" }],
+      ["an align", { type: "divider", align: "center" }],
+      ["a spacing", { type: "divider", spacing: "lg" }],
+      ["children", { type: "divider", children: [] }],
+      ["an href", { type: "divider", href: "#next" }],
+      ["a style", { type: "divider", style: "color:red" }],
+      ["an onClick", { type: "divider", onClick: "run()" }],
+      ["raw html", { type: "divider", html: "<hr/>" }],
+      ["a script", { type: "divider", script: "alert(1)" }],
+      ["a text body", { type: "divider", body: "Not a divider." }],
+    ];
+    for (const [label, section] of invented) {
+      expectRefusal(envelope(section), "family:unsupported-feature");
+      // The refusal must be about this section, not a silent drop: the same envelope with a real divider composes.
+      expect(composed(envelope({ type: "divider" })).sections).toHaveLength(1);
+      expect(label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("refuses a malformed or non-string divider type before composing any node", () => {
+    // Strings that are not the exact donor literal are outside the family vocabulary; non-string types are refused
+    // as an out-of-subset feature. Both are closed literals and neither returns a partial Page.
+    for (const type of ["Divider", "DIVIDER", "divider ", ""]) {
+      expectRefusal(envelope({ type }), "family:unsupported-family");
+    }
+    for (const type of [7, null, { type: "divider" }, ["divider"]]) {
+      expectRefusal(envelope({ type }), "family:unsupported-feature");
+    }
+  });
+
+  it("refuses an accessor divider and a hostile sibling without invoking any getter", () => {
+    let runs = 0;
+    const hostile: Record<string, unknown> = { type: "divider" };
+    Object.defineProperty(hostile, "heading", { enumerable: true, get() { runs += 1; return "Break"; } });
+    expectRefusal(envelope(hostile), "family:unsafe-source");
+    expect(runs).toBe(0);
+    // A valid neighbour plus a hostile divider refuses the WHOLE Page: the good section is never partially returned.
+    expectRefusal(
+      {
+        version: 1,
+        title: "Mixed divider fixture",
+        sections: [{ type: "prose", body: "A plain paragraph." }, hostile],
+      },
+      "family:unsafe-source",
+    );
+    expect(runs).toBe(0);
+  });
+
+  it("keeps the divider between list and hero in the real thirteen-section fixture order", () => {
+    const document = composed(thirteenSectionSource());
+    expect(document.sections).toHaveLength(13);
+    const divider = document.sections[4]!;
+    expect(divider.id).toBe("family-4-divider");
+    expect(divider.module).toBe("content.prose");
+    expect(divider.props).toEqual({ variant: "divider" });
+    expect(document.sections[3]!.id).toBe("family-3-list");
+    expect(document.sections[5]!.id).toBe("family-5-hero");
+    const html = render(document);
+    expect(html).toContain('<hr class="uno-json-divider" id="family-4-divider"/>');
+    expect(html.match(/<hr/gu) ?? []).toHaveLength(1);
+  });
+});
+
+/**
+ * `UNO-WO-069 / R01`: the single authorized presentation correction, asserted at source level.
+ *
+ * The donor expresses a 2.5rem section offset (`mt-10`). Uno's root is a 1.5rem flex column, so the divider's own
+ * vertical margin must be 1rem to reach 2.5rem on each side without inventing a wrapper. Nothing else may change.
+ */
+describe("divider presentation contract in the Uno stylesheet", () => {
+  const css = readFileSync(fileURLToPath(new URL("../../src/app/globals.css", import.meta.url)), "utf8");
+
+  function block(selector: string): string {
+    const start = css.indexOf(`\n${selector} {`);
+    expect(start).toBeGreaterThan(-1);
+    const end = css.indexOf("}", start);
+    return css.slice(start, end + 1);
+  }
+
+  it("keeps the one divider rule scoped, themed and corrected to a 1rem vertical margin", () => {
+    const divider = block(".uno-json-divider");
+    expect(css.split(".uno-json-divider {").length - 1).toBe(1);
+    expect(divider).toContain("margin: 1rem 0;");
+    expect(divider).toContain("border: 0;");
+    expect(divider).toContain("border-top: 1px solid var(--uno-border);");
+    expect(divider).not.toContain("1.5rem 0");
+    expect(css).not.toContain("margin: 1.5rem 0;");
+    // The 1.5rem flex gap and the vertical column root are unchanged, so 1.5 + 1 = 2.5rem is the whole offset.
+    const root = block(".uno-json");
+    expect(root).toContain("display: flex;");
+    expect(root).toContain("flex-direction: column;");
+    expect(root).toContain("gap: 1.5rem;");
+  });
+
+  it("declares no animation, transition, focus or width override for the divider", () => {
+    const divider = block(".uno-json-divider");
+    for (const forbidden of ["animation", "transition", ":focus", "width", "height", "position", "cursor"]) {
+      expect(divider).not.toContain(forbidden);
+    }
   });
 });

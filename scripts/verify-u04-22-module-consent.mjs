@@ -1046,6 +1046,40 @@ async function main() {
         && Object.keys(loadedHeader).every((key) => ["accepted", "description", "kind", "title", "visibility"].includes(key)),
       loadedHeader.accepted ? Object.keys(loadedHeader).sort().join(",") : String(loadedHeader.reason),
     );
+    // `UNO-WO-069 / R01`: the unchanged composed divider node, read from the same accepted document and the same bytes.
+    {
+      const divider = familyAccepted.sections[8];
+      const dividerNode = divider === undefined ? null : divider;
+      check(
+        "DIVIDER_PARITY_SOURCE the composed family-8-divider is one frozen content.prose {variant:\"divider\"} with no children",
+        dividerNode !== null
+          && dividerNode.id === "family-8-divider"
+          && dividerNode.module === "content.prose"
+          && JSON.stringify(dividerNode.props) === JSON.stringify({ variant: "divider" })
+          && Object.keys(dividerNode.props).length === 1
+          && Object.prototype.hasOwnProperty.call(dividerNode, "children") === false
+          && Object.isFrozen(dividerNode) === true
+          && Object.isFrozen(dividerNode.props) === true
+          && familyAccepted.sections[7]?.id === "family-7-actions"
+          && familyAccepted.sections[9]?.id === "family-9-hero",
+        dividerNode === null ? "missing" : `${dividerNode.id}/${dividerNode.module}/${JSON.stringify(dividerNode.props)}`,
+      );
+      check(
+        "DIVIDER_PARITY_SOURCE the serialized buffer carries that one divider node and no authored divider content",
+        familyJsonBytes.toString("utf8").includes('"id": "family-8-divider"')
+          && familyJsonBytes.toString("utf8").includes('"variant": "divider"')
+          && familyJsonBytes.toString("utf8").split('"variant": "divider"').length - 1 === 1,
+      );
+      const reDivider = familyReparsed.accepted === true ? familyReparsed.document.sections[8] : undefined;
+      check(
+        "DIVIDER_PARITY_SOURCE the real reader re-reads the same divider node from serialized JSON",
+        reDivider !== undefined
+          && reDivider.id === "family-8-divider"
+          && reDivider.module === "content.prose"
+          && JSON.stringify(reDivider.props) === JSON.stringify({ variant: "divider" }),
+        reDivider === undefined ? "missing" : reDivider.id,
+      );
+    }
     const { planUnoServingPage: planFamily } = await import("../src/config/uno-serving.ts");
     const familyServing = await planFamily("/en-001/wo066-family-composition");
     if (
@@ -1356,6 +1390,40 @@ async function main() {
           && !familyHtml.includes(FAMILY_DONOR_SOURCE)
           && !familyHtml.includes("formRef"),
         `${lastFourRegions.map((region) => region.length).join("/")} h2=${(familyHtml.match(/<h2[\s>]/giu) ?? []).length}`,
+      );
+    }
+    // `UNO-WO-069 / R01`: the divider as served. The donor authors `{type:"divider"}` and renders one native `<hr>`;
+    // here the same element must be the direct child of the Uno root, with no wrapper, label, text or control.
+    {
+      const tag = '<hr class="uno-json-divider" id="family-8-divider"/>';
+      const occurrences = familyHtml.split(tag).length - 1;
+      const actionsAt = familyHtml.indexOf('id="family-7-actions"');
+      const dividerAt = familyHtml.indexOf(tag);
+      const heroAt = familyHtml.indexOf('id="family-9-hero"');
+      const beforeTag = dividerAt < 0 ? "" : familyHtml.slice(0, dividerAt);
+      const afterTag = dividerAt < 0 ? "" : familyHtml.slice(dividerAt + tag.length);
+      check(
+        "DIVIDER_PARITY_HTTP the composed Page serves exactly one native hr divider directly in the Uno root",
+        occurrences === 1
+          && dividerAt > 0
+          // The donor puts the rule between the actions block and the hero block; in Uno's root flex column the
+          // previous element is the authored actions list and the next is the hero section, with no wrapper between.
+          && beforeTag.endsWith("</ul>")
+          && afterTag.startsWith("<section")
+          && beforeTag.lastIndexOf('id="family-7-actions"') > 0
+          && actionsAt > 0 && actionsAt < dividerAt
+          && dividerAt < heroAt
+          && familyHtml.split('id="family-8-divider"').length - 1 === 1,
+        `occurrences=${occurrences} actions=${actionsAt} divider=${dividerAt} hero=${heroAt} near=${familyHtml.slice(Math.max(0, dividerAt - 26), dividerAt + 70)}`,
+      );
+      check(
+        "DIVIDER_PARITY_HTTP the served divider carries no heading, text, focus, interactive or media attribute",
+        occurrences === 1
+          && !/aria-|role=|tabindex|href|src=|title=|id="family-8-divider"[^>]*\s(class|style)/iu.test(tag)
+          && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
+          && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
+          && !familyHtml.includes("/assets/"),
+        tag,
       );
     }
     const contactStart = familyHtml.indexOf('<section class="uno-json-contact" id="family-6-contactform">');
@@ -1765,6 +1833,15 @@ async function consentPhase(base) {
       if (!ok) familyOk = false;
       return check(`FAMILY_BROWSER ${label}`, ok, detail);
     };
+    // `UNO-WO-069 / R01`: the divider evidence is counted and gated separately, so a deleted or neutered divider check
+    // both fails the runner and suppresses the overall parity label.
+    let dividerOk = true;
+    let dividerChecks = 0;
+    const dividerCheck = (label, ok, detail = "") => {
+      dividerChecks += 1;
+      if (!ok) dividerOk = false;
+      return check(`DIVIDER_PARITY_BROWSER ${label}`, ok, detail);
+    };
     for (const width of [390, 1280]) {
       requests.length = 0;
       await tab.setViewportSize({ width, height: 900 });
@@ -1801,6 +1878,55 @@ async function consentPhase(base) {
             .some((element) => ["action", "method", "href", "onsubmit", "onclick"].some((name) => element.hasAttribute(name))),
           contactHtml: contact?.outerHTML ?? "",
           actionCount: document.querySelectorAll("#family-7-actions a").length,
+          divider: (() => {
+            const el = document.getElementById("family-8-divider");
+            if (el === null) return { found: false };
+            const style = getComputedStyle(el);
+            const parent = el.parentElement;
+            const parentStyle = parent === null ? null : getComputedStyle(parent);
+            const previous = el.previousElementSibling;
+            const next = el.nextElementSibling;
+            const box = el.getBoundingClientRect();
+            const previousBox = previous === null ? null : previous.getBoundingClientRect();
+            const nextBox = next === null ? null : next.getBoundingClientRect();
+            const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize);
+            const beforeCount = document.body.childElementCount;
+            const probe = document.createElement("span");
+            probe.style.color = "var(--uno-border)";
+            document.body.appendChild(probe);
+            const tokenColor = getComputedStyle(probe).color;
+            probe.remove();
+            return {
+              found: true,
+              tag: el.tagName,
+              childCount: el.childElementCount,
+              text: (el.textContent ?? "").trim(),
+              parentIsRoot: parent?.classList.contains("uno-json") ?? false,
+              parentGap: parentStyle?.rowGap ?? "",
+              previousId: previous?.id ?? "",
+              nextId: next?.id ?? "",
+              marginTop: style.marginTop,
+              marginBottom: style.marginBottom,
+              borderTopWidth: style.borderTopWidth,
+              borderTopStyle: style.borderTopStyle,
+              borderTopColor: style.borderTopColor,
+              otherBorderWidths: [style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+              tabIndex: el.tabIndex,
+              hasTabIndexAttribute: el.hasAttribute("tabindex"),
+              role: el.getAttribute("role") ?? "",
+              controls: el.querySelectorAll("a, img, button, form, input, textarea, select, iframe").length,
+              transitionDuration: style.transitionDuration,
+              animationName: style.animationName,
+              width: box.width,
+              parentWidth: parent?.clientWidth ?? 0,
+              spaceBefore: previousBox === null ? null : box.top - previousBox.bottom,
+              spaceAfter: nextBox === null ? null : nextBox.top - box.bottom,
+              rootFont,
+              tokenDefined: getComputedStyle(document.documentElement).getPropertyValue("--uno-border").trim(),
+              tokenColor,
+              probeCleaned: document.body.childElementCount === beforeCount,
+            };
+          })(),
           hero: (() => {
             const region = document.querySelector("#family-9-hero");
             return {
@@ -2010,7 +2136,51 @@ async function consentPhase(base) {
           && JSON.stringify(seen.features.paragraphs) === JSON.stringify(["First feature body."])
           && seen.features.articles === 0 && seen.features.controls === 0,
         JSON.stringify(seen.features));
+      // `UNO-WO-069 / R01`: the divider region, measured in the real browser at this viewport.
+      const gap = parseFloat(seen.divider.parentGap ?? "NaN");
+      const marginTop = parseFloat(String(seen.divider.marginTop).replace("px", ""));
+      const marginBottom = parseFloat(String(seen.divider.marginBottom).replace("px", ""));
+      const expectedOffset = 2.5 * seen.divider.rootFont;
+      const near = (value, wanted, tolerance) => Number.isFinite(value) && Math.abs(value - wanted) <= tolerance;
+      dividerCheck(`${width}px divider is one native non-focusable hr directly in a 1.5rem flex column`,
+        seen.divider.found === true
+          && seen.divider.tag === "HR"
+          && seen.divider.parentIsRoot === true
+          && near(gap, 1.5 * seen.divider.rootFont, 0.5)
+          && seen.divider.tabIndex === -1
+          && seen.divider.hasTabIndexAttribute === false
+          && seen.divider.role === ""
+          && seen.divider.controls === 0
+          && seen.divider.childCount === 0
+          && seen.divider.text === ""
+          && seen.divider.probeCleaned === true,
+        JSON.stringify({ tag: seen.divider.tag, gap, rootFont: seen.divider.rootFont, role: seen.divider.role }));
+      dividerCheck(`${width}px divider is a 1px theme-token rule with 1rem margins and 2.5rem separation each side`,
+        seen.divider.borderTopWidth === "1px"
+          && seen.divider.borderTopStyle === "solid"
+          && seen.divider.otherBorderWidths.every((value) => value === "0px")
+          && seen.divider.borderTopColor === seen.divider.tokenColor
+          && seen.divider.borderTopColor !== "rgba(0, 0, 0, 0)"
+          && seen.divider.tokenDefined.length > 0
+          && near(marginTop, seen.divider.rootFont, 0.5)
+          && near(marginBottom, seen.divider.rootFont, 0.5)
+          && near(seen.divider.spaceBefore, expectedOffset, 1.5)
+          && near(seen.divider.spaceAfter, expectedOffset, 1.5)
+          && seen.divider.transitionDuration === "0s"
+          && seen.divider.animationName === "none"
+          && near(seen.divider.width, seen.divider.parentWidth, 1.5),
+        JSON.stringify({
+          border: `${seen.divider.borderTopWidth} ${seen.divider.borderTopStyle} ${seen.divider.borderTopColor}`,
+          token: seen.divider.tokenColor,
+          margins: [marginTop, marginBottom],
+          spaces: [seen.divider.spaceBefore, seen.divider.spaceAfter],
+          expected: expectedOffset,
+        }));
+      dividerCheck(`${width}px divider sits exactly between the actions and hero siblings`,
+        seen.divider.previousId === "family-7-actions" && seen.divider.nextId === "family-9-hero",
+        `${seen.divider.previousId}/${seen.divider.nextId}`);
       familyCheck(`${width}px the composed Page carries seventeen unique top-level sections with no nested inflation`,
+
         seen.tops.length === 17 && new Set(seen.tops).size === 17
           && seen.mains === 1 && seen.h1s === 1 && seen.overflow === 0,
         `${seen.tops.length}/${new Set(seen.tops).size} mains=${seen.mains} h1=${seen.h1s} overflow=${seen.overflow}`);
@@ -2045,9 +2215,105 @@ async function consentPhase(base) {
       familyCheck(`${width}px the family visit made no foreign or provider request`,
         requests.length === 0 && requests.every((entry) => !entry.foreign && !entry.provider), JSON.stringify(requests.slice(0, 3)));
     }
+    // `UNO-WO-069 / R01`: the same separator invariants under `prefers-color-scheme: dark` and
+    // `prefers-reduced-motion: reduce`, at both viewports, then the regular media settings are restored.
+    for (const width of [390, 1280]) {
+      requests.length = 0;
+      await tab.setViewportSize({ width, height: 900 });
+      await tab.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+      await tab.goto(FAMILY_URL, { waitUntil: "load" });
+      await delay(300);
+      const dark = await tab.evaluate(() => {
+        const el = document.getElementById("family-8-divider");
+        if (el === null) return { found: false };
+        const style = getComputedStyle(el);
+        const parent = el.parentElement;
+        const box = el.getBoundingClientRect();
+        const previous = el.previousElementSibling;
+        const next = el.nextElementSibling;
+        const previousBox = previous === null ? null : previous.getBoundingClientRect();
+        const nextBox = next === null ? null : next.getBoundingClientRect();
+        const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize);
+        const probe = document.createElement("span");
+        probe.style.color = "var(--uno-border)";
+        document.body.appendChild(probe);
+        const tokenColor = getComputedStyle(probe).color;
+        probe.remove();
+        return {
+          found: true,
+          scheme: matchMedia("(prefers-color-scheme: dark)").matches,
+          reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+          tag: el.tagName,
+          role: el.getAttribute("role") ?? "",
+          tabIndex: el.tabIndex,
+          borderTopWidth: style.borderTopWidth,
+          borderTopStyle: style.borderTopStyle,
+          borderTopColor: style.borderTopColor,
+          otherBorderWidths: [style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+          marginTop: parseFloat(style.marginTop),
+          marginBottom: parseFloat(style.marginBottom),
+          parentGap: parseFloat(parent === null ? "NaN" : getComputedStyle(parent).rowGap),
+          spaceBefore: previousBox === null ? null : box.top - previousBox.bottom,
+          spaceAfter: nextBox === null ? null : nextBox.top - box.bottom,
+          transitionDuration: style.transitionDuration,
+          animationName: style.animationName,
+          rootFont,
+          tokenDefined: getComputedStyle(document.documentElement).getPropertyValue("--uno-border").trim(),
+          tokenColor,
+          mains: document.querySelectorAll("main").length,
+          h1s: document.querySelectorAll("h1").length,
+        };
+      });
+      dividerCheck(`dark ${width}px divider keeps its native role, 1px theme rule and no focus or motion`,
+        dark.found === true
+          && dark.scheme === true
+          && dark.reducedMotion === true
+          && dark.tag === "HR"
+          && dark.role === ""
+          && dark.tabIndex === -1
+          && dark.borderTopWidth === "1px"
+          && dark.borderTopStyle === "solid"
+          && dark.borderTopColor === dark.tokenColor
+          && dark.borderTopColor !== "rgba(0, 0, 0, 0)"
+          && dark.tokenDefined.length > 0
+          && dark.otherBorderWidths.every((value) => value === "0px")
+          // Under `prefers-reduced-motion: reduce` the stylesheet clamps transitions to an effectively zero duration
+          // (measured `1e-05s`), so the truthful assertion is "no perceptible transition and no animation", not the
+          // literal `0s` the default scheme reports.
+          && parseFloat(dark.transitionDuration) <= 1e-4
+          && dark.animationName === "none"
+          && dark.mains === 1
+          && dark.h1s === 1,
+        JSON.stringify({
+          scheme: dark.scheme, motion: dark.reducedMotion, border: `${dark.borderTopWidth} ${dark.borderTopColor}`,
+          token: dark.tokenColor, transition: dark.transitionDuration, animation: dark.animationName,
+        }));
+      dividerCheck(`dark ${width}px divider keeps 1rem margins and 2.5rem separation on both sides`,
+        Math.abs(dark.marginTop - dark.rootFont) <= 0.5
+          && Math.abs(dark.marginBottom - dark.rootFont) <= 0.5
+          && Math.abs(dark.parentGap - 1.5 * dark.rootFont) <= 0.5
+          && Math.abs(dark.spaceBefore - 2.5 * dark.rootFont) <= 1.5
+          && Math.abs(dark.spaceAfter - 2.5 * dark.rootFont) <= 1.5,
+        JSON.stringify({
+          margins: [dark.marginTop, dark.marginBottom], gap: dark.parentGap,
+          spaces: [dark.spaceBefore, dark.spaceAfter], rootFont: dark.rootFont,
+        }));
+      dividerCheck(`dark ${width}px divider visit made no foreign or provider request`,
+        requests.length === 0 && requests.every((entry) => !entry.foreign && !entry.provider),
+        JSON.stringify(requests.slice(0, 3)));
+    }
+    await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
     familyCheck("the family Page raised no new console or page error", consoleErrors.length === errorsBefore,
       consoleErrors.slice(errorsBefore).join(" | ").slice(0, 180));
     check("FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px", familyOk);
+    // `UNO-WO-069 / R01`: the divider parity gate. It depends on every executed divider check (three per light viewport
+    // and three per dark/reduced-motion viewport) AND on the surrounding family gates, so no single label can stand
+    // in for the evidence.
+    check(
+      "DIVIDER_PARITY=PASS the divider passed source, HTTP and light/dark Chromium evidence",
+      dividerOk === true && familyOk === true && dividerChecks === 12,
+      `checks=${dividerChecks} dividerOk=${dividerOk} familyOk=${familyOk}`,
+    );
   }
 
   check("the Page logged no console error", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));

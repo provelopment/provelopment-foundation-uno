@@ -205,6 +205,38 @@ const PHASE_C_REQUIRED = Object.freeze([
   "${width}px cards show a native two-column list grid with exactly one authored body",
   "${width}px features show a separate native three-column list grid with one authored body",
   "${width}px the composed Page carries seventeen unique top-level sections with no nested inflation",
+  // `UNO-WO-069 / R01`: the divider parity candidate. Labels alone are not enough, so the executable predicates that
+  // make each label meaningful are required tokens too, and A03 mutates them one at a time.
+  "DIVIDER_PARITY_SOURCE the composed family-8-divider is one frozen content.prose",
+  "DIVIDER_PARITY_SOURCE the serialized buffer carries that one divider node",
+  "DIVIDER_PARITY_SOURCE the real reader re-reads the same divider node",
+  "DIVIDER_PARITY_HTTP the composed Page serves exactly one native hr divider directly in the Uno root",
+  "DIVIDER_PARITY_HTTP the served divider carries no heading, text, focus, interactive or media attribute",
+  "${width}px divider is one native non-focusable hr directly in a 1.5rem flex column",
+  "${width}px divider is a 1px theme-token rule with 1rem margins and 2.5rem separation each side",
+  "${width}px divider sits exactly between the actions and hero siblings",
+  "dark ${width}px divider keeps its native role, 1px theme rule and no focus or motion",
+  "dark ${width}px divider keeps 1rem margins and 2.5rem separation on both sides",
+  "dark ${width}px divider visit made no foreign or provider request",
+  "DIVIDER_PARITY=PASS the divider passed source, HTTP and light/dark Chromium evidence",
+  '<hr class="uno-json-divider" id="family-8-divider"/>',
+  'seen.divider.borderTopWidth === "1px"',
+  'seen.divider.borderTopStyle === "solid"',
+  'seen.divider.borderTopColor === seen.divider.tokenColor',
+  'seen.divider.tabIndex === -1',
+  'seen.divider.previousId === "family-7-actions" && seen.divider.nextId === "family-9-hero"',
+  'near(seen.divider.spaceBefore, expectedOffset, 1.5)',
+  'near(seen.divider.spaceAfter, expectedOffset, 1.5)',
+  "const expectedOffset = 2.5 * seen.divider.rootFont;",
+  'await tab.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });',
+  'scheme: matchMedia("(prefers-color-scheme: dark)").matches',
+  'reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches',
+  "dark.scheme === true",
+  "dark.reducedMotion === true",
+  "parseFloat(dark.transitionDuration) <= 1e-4",
+  "let dividerOk = true;",
+  "dividerChecks += 1;",
+  "dividerOk === true && familyOk === true && dividerChecks === 12",
 ]);
 
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
@@ -606,6 +638,80 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     );
     assert.notEqual(countedGetter, source);
     assert.ok(audit(countedGetter).some((entry) => entry.includes("getterCalls === 0")), audit(countedGetter).join(","));
+  });
+
+  // `UNO-WO-069 / R01`: independent mutations over the divider evidence. Each replaces a real predicate (or deletes a
+  // real check) and must make the audit fail, so a label alone can never stand in for measured evidence.
+  it("the audit genuinely fails when the divider source, HTTP or parity gate is neutered", () => {
+    const mutations = [
+      ["DIVIDER_PARITY_SOURCE the composed family-8-divider is one frozen content.prose", "DIVIDER_PARITY_SOURCE recorded"],
+      ["DIVIDER_PARITY_SOURCE the real reader re-reads the same divider node", "DIVIDER_PARITY_SOURCE reread"],
+      ["DIVIDER_PARITY_HTTP the composed Page serves exactly one native hr divider directly in the Uno root", "DIVIDER_PARITY_HTTP served"],
+      ['<hr class="uno-json-divider" id="family-8-divider"/>', '<hr class="uno-json-divider" id="family-8-divider" data-x="1"/>'],
+      ["dividerOk === true && familyOk === true && dividerChecks === 12", "true"],
+      ["dividerChecks += 1;", ""],
+      ["let dividerOk = true;", "let dividerAccepted = true;"],
+    ];
+    for (const [token, replacement] of mutations) {
+      const mutated = source.replace(token, replacement);
+      assert.notEqual(mutated, source, token);
+      assert.ok(
+        audit(mutated).some((entry) => entry.includes(token.split("\n")[0].slice(0, 40))),
+        `${token.slice(0, 40)}: ${audit(mutated).join(",")}`,
+      );
+    }
+  });
+
+  it("the audit genuinely fails when a divider border, role, spacing or sibling predicate is neutered", () => {
+    const mutations = [
+      ['seen.divider.borderTopWidth === "1px"', "true"],
+      ['seen.divider.borderTopStyle === "solid"', "true"],
+      ['seen.divider.borderTopColor === seen.divider.tokenColor', "true"],
+      ["seen.divider.tabIndex === -1", "true"],
+      ['seen.divider.previousId === "family-7-actions" && seen.divider.nextId === "family-9-hero"', "true"],
+      ["const expectedOffset = 2.5 * seen.divider.rootFont;", "const expectedOffset = 40;"],
+      ["near(seen.divider.spaceBefore, expectedOffset, 1.5)", "true"],
+      ["near(seen.divider.spaceAfter, expectedOffset, 1.5)", "true"],
+    ];
+    for (const [token, replacement] of mutations) {
+      const mutated = source.replace(token, replacement);
+      assert.notEqual(mutated, source, token);
+      assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit genuinely fails when the dark or reduced-motion divider probe is removed", () => {
+    const mutations = [
+      ['await tab.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });', 'await tab.emulateMedia({ colorScheme: "light" });'],
+      ['scheme: matchMedia("(prefers-color-scheme: dark)").matches', "scheme: true"],
+      ['reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches', "reducedMotion: true"],
+      ["dark.scheme === true", ""],
+      ["dark.reducedMotion === true", ""],
+      ["parseFloat(dark.transitionDuration) <= 1e-4", "true"],
+    ];
+    for (const [token, replacement] of mutations) {
+      const mutated = source.replace(token, replacement);
+      assert.notEqual(mutated, source, token);
+      assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
+    }
+    // Deleting a whole dark-viewport assertion must be caught by its label, not merely by the media token.
+    for (const label of [
+      "dark ${width}px divider keeps its native role, 1px theme rule and no focus or motion",
+      "dark ${width}px divider keeps 1rem margins and 2.5rem separation on both sides",
+      "dark ${width}px divider visit made no foreign or provider request",
+    ]) {
+      const mutated = source.replace(label, "dark divider probe removed");
+      assert.notEqual(mutated, source, label);
+      assert.ok(audit(mutated).some((entry) => entry.includes(label)), `${label}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit still fails when the retained browser matrix or family gates are dropped", () => {
+    for (const gate of ["BROWSER_MATRIX=16/16", "FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px"]) {
+      const mutated = source.replace(gate, "gate removed");
+      assert.notEqual(mutated, source, gate);
+      assert.ok(audit(mutated).some((entry) => entry.includes(gate)), `${gate}: ${audit(mutated).join(",")}`);
+    }
   });
 
   it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {
