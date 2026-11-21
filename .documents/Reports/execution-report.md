@@ -1,173 +1,156 @@
-# Execution Report — UNO-WO-075 / R01
+# Execution Report — UNO-WO-077 / R01
 
 **PRODUCT + REPORT RECORD / AWAITING INDEPENDENT ARCHITECT REVIEW**
 
 This document replaces the previous contents of this path under one new Owner-authorized overwrite. It records the
-`UNO-WO-075 / R01` bounded authored-text work for five Foundation families, the exact local and product-head hosted
-evidence, and the report-head checks that were still pending when it was committed. It is not an acceptance, closes no
-stage and grants no parity credit.
+`UNO-WO-077 / R01` committed neutral three-Page starter, the exact local and product-head hosted evidence, and the
+report-head checks that were still pending when it was committed. It is not an acceptance, closes no stage and grants
+no parity credit.
 
 ## 1. Authority, start and preflight
 
 | Item | Observed |
 | --- | --- |
-| Order | `UNO-WO-075 / R01`, Edition `FINAL — EXECUTE`, stage U04 — bounded capability, not a parity claim |
-| Owner activation identity | ACTIVE `.documents/WIP/workorder-active.md` measured **31,008 bytes**, SHA-256 `07215ea2caa7e68c2b63e70b721c1ba46c1c52ec3c32c05b9bd417f562e4bf35`; both matching the Owner activation. The ACTIVE text, the activation message, private paths and credentials are deliberately not reproduced. |
-| Required start | `d2247ec9411cde0feaeb7bad9ef433c9d178020c`, matched by local `HEAD`, local `main`, `origin/main` and the remote `main` ref before any write; parent `2b6801b70fa3b86eb16a9e3e7033a283d5bdb36e` |
-| Product commit | **`32cc350b36b8fabd94ad7430ea4956e6c52f729b`**, parent exactly `d2247ec…`, five tracked paths changed |
-| Report overwrite | exactly one tracked overwrite of `.documents/Reports/execution-report.md` (`R01_WRITE_COUNT=1`), after the complete ignored-scratch draft passed validation |
-| Agent-observed local conditions (not independently certified) | the authorized physical Uno checkout and every inspected ancestor resolve to one physical location with no junction, symlink or reparse escape; the parent-owned anchored ignore entry for this checkout is present and was not modified; exactly one worktree, one local `main` tracking `origin/main`, one remote whose fetch and push URLs resolve only to the Uno repository; clean index and worktree at the start, no stash, no conflict, no hook-path override and no active hook; `.documents/WIP/` held exactly the three tracked plan files and the one ignored private ACTIVE |
-| Read-only pins | all twenty pinned Git blobs of this order recomputed with `git rev-parse HEAD:<path>` at the required start; every one matched, before any edit and again before the product commit |
-| Donor evidence | read-only inspection of the pinned donor commit and its six pinned blobs; every one matched exactly |
-| Host and toolchain | Windows, Node `v26.13.1`, pnpm `11.6.0`, Next `16.4.6`, React `19.2.9`, Playwright `1.65.1`; no install, dependency, lockfile or workflow change |
+| Order | `UNO-WO-077 / R01`, Edition `FINAL — EXECUTE`, stage focus U06 neutral starter / U03 serving assurance, not a release or deployment |
+| Owner activation identity | ACTIVE `.documents/WIP/workorder-active.md` measured **39,335 bytes**, SHA-256 `24383056b1ebfd3fc9eecb7c43692426924a7066541e2977bd3b9085fd99f331`; both matching the Owner activation. The ACTIVE text, the activation message, private paths and credentials are deliberately not reproduced. |
+| Required start | `065761324c3e35d9936adf74a33eaa090c210be2`, matched by local `HEAD`, local `main`, `origin/main` and the remote `main` ref before any write; its parent remains `32cc350b36b8fabd94ad7430ea4956e6c52f729b` |
+| Product commit | **`e38e0e6cd210570e7895da8b33ffec3638fd43e5`**, parent exactly `065761324c3e…`, subject `UNO-WO-077 / R01: committed neutral three-page starter`, **24** tracked paths changed (20 modified, 4 added) |
+| Report overwrite | exactly one tracked overwrite of `.documents/Reports/execution-report.md` (`R01_WRITE_COUNT=1`), after the complete ignored-scratch draft passed format and privacy validation |
+| Preceding stopped run (context, not repaired or backdated) | `UNO-WO-076 / R01` is reported by the preceding Agent to have stopped before a product commit after 19 committed-baseline assertion failures across ten unlisted unit files, restoring both declarations, removing its three exclusively created candidates, preserving its own evidence under ignored scratch and leaving this report untouched. GitHub independently confirmed the required start and this report's Git blob were unchanged. That local STOP log and physical restoration are **Agent-observed only, not independently certified here**; this successor migrates the obsolete baseline under its own U01–U10 ledger instead of accepting the stopped run. |
+| Agent-observed local conditions (not independently certified) | the authorized physical checkout and every inspected ancestor resolve to one physical location with no junction, symlink or reparse escape; the parent-owned anchored ignore entry for this checkout is present and was not modified; exactly one worktree, one local `main` tracking `origin/main`, one remote whose fetch and push URLs resolve only to the Uno repository; clean index and worktree at the start, no stash, no conflict, no hook-path override and no active hook; `.documents/WIP/` held exactly the three tracked plan files and the one ignored private ACTIVE |
+| Read-only pins | all **forty-two** pinned Git blobs of this order recomputed with `git rev-parse HEAD:<path>` at the required start; every one matched before any edit and again before the product commit |
+| New-file targets | the three Page paths and `.documents/Architecture/u06-starter.md` were proven absent before creation and were created exclusively |
+| Baseline declaration digests | manifest `ba232d46…` and selection `4f656c93…` before the edit; after the authorized edit manifest **`b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925`** and selection **`58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952`**, re-verified after every stateful runner and after both commits |
+| Host and toolchain | Windows, Node `v26.13.1`, pnpm `11.6.0`, Next `16.4.6`, repo-local Playwright Chromium cache; no install, dependency, lockfile, workflow, config or hook change |
 
-## 2. Changed paths and operations (exactly A01–A05)
+## 2. Changed paths and operations (A01–A05, T01–T04/T06/T07, G01/G03, U01–U10, E01)
 
 | ID | Path | Start blob | Product blob | Operation |
 | --- | --- | --- | --- | --- |
-| A01 | `src/application/compose-uno-foundation-families.ts` | `ec6a26939a4f8260300b1010055bfcb787feb475` | `a7022d3b50776bc84a3da5c606278aff7c5a9635` | the `prose`, `callout`, `list`, `faq` and `table` cases accept the optional `heading`/`lede`, compose them through the existing `wrapAuthoredText` helper before the unchanged native node, and keep every other family and helper semantics identical |
-| A02 | `scripts/verify-u04-22-module-consent.mjs` | `41be476c59ff4eb272611db68e0b87acd974b056` | `5a00664924651fc68aec3c786523dca0b938e37d` | the seventeen-family fixture gains only the five authored pairs; nine wrapped stacks, eleven family `<h2>` elements and the four existing `<h3>` item titles are asserted; new `FAMILY_TEXT_FIVE_SOURCE/REFUSALS/HTTP/BROWSER` predicates, the region extractor and the affected counter assertions are updated |
-| A03 | `tests/deployment/u04-22-module-consent.test.mjs` | `9d6b1f8a6a271e11b01547563161f02736a3bfa5` | `33bd5f9b70497ce6a85e84b3682c060ba783e001` | every new label and its predicate is required, with one mutation test that removes each label and neutralizes each predicate; previous tokens and cases are preserved |
-| A04 | `tests/unit/uno-foundation-families.test.ts` | `4e3defafff821b04bfe11d397dffd7c3d74ddabc` | `1593b1c603084a0c853fc188117611366855bdf0` | nine captured pre-change baselines, five-family heading-only/lede-only/both, bounds, Unicode/escaping, ids/order, mixed-order, immutability, round-trip and the per-family refusal matrix |
-| A05 | `.documents/Architecture/u04-family-parity.md` | `803dd6e5d35a40c78925b44198d4ded2c39a53f3` | `edb144420ff2ae39b06cdb6ecd6e035d208223fb` | the five donor rows, the bounded authored-text evidence paragraph, the authoring/refusal/rights/test evidence and the remaining-gap wording; no parity promotion |
-| R01 | `.documents/Reports/execution-report.md` | `e7a894de3099045f8f40a5b908aa790eb17cb7da` | this commit | one overwrite, report only |
+| A01 | `deployment/efs/manifest.json` | `848662904b351bc111551c76bcfaedde79efe3f0` | `f1670864c643644ba9cb660d251f34bb32676ea7` | selected Site's `pages` list now declares exactly three `en-001` Pages, each `publication:"published"` with one source: Home JSON, About Markdown, Components JSON; graph IDs, locales and Entity properties unchanged |
+| A02 | `deployment/uno.config.json` | `fda8188c75027aff7a10493d64c60eb6a656d7c4` | `bff0e86523465fa84c75686548eb123e91a7ec35` | only `base:{"canonical":"https://uno-starter.example","aliases":[]}` added; `version`, Entity/Facet/Site and language preferences preserved |
+| A03 | `deployment/efs/content/home.en-001.json` | NEW | `3d639b060238a620874bc90a9d17ddba95adca40` | exclusive-create v1 JSON Home: `visibility:"public"`, four text-only sections (`content.hero`, `content.heading` level 2, `content.prose`, `content.stats` with three facts); no asset, link, provider or delivery claim |
+| A04 | `deployment/efs/content/about.en-001.md` | NEW | `55c13316dede24bcfcc419b70d26085fa92f15d7` | exclusive-create safe Markdown About: one `#` title, two `##` sections, one bullet list; no HTML, image, link, blockquote or second `h1` |
+| A05 | `deployment/efs/content/components.en-001.json` | NEW | `f215b094918be97f85b5d9c9a5a6ac16845fec0d` | exclusive-create v1 JSON Components: six sections (`content.heading`, `content.prose`, list variant, `layout.stack` with heading/prose children, `interaction.accordion` with two native disclosure panels, callout variant); text-only, no provider |
+| T01 | `scripts/verify-u01-http.mjs` | `220b1fb7c46c4824a032ac7e733ef9ba05fcba17` | `0be82d749cee27544f0ec80bebed2e1d1d335546` | obsolete committed-site 404 expectations replaced by explicit positives for `/en-001`, the `/en` redirect to the published root, `/robots.txt` and `/sitemap.xml`; `/about` and the unknown path stay real 404s and every demonstration, negative and route-security gate is unchanged |
+| T02 | `scripts/verify-u03-http.mjs` | `efb9ff48b9ee5d9aca44eae494089213f6ca62ef` | `74e67209ab2c1323e5c238fcde9cbe0cf3e98a4a` | committed 3-Page HTTP assertions added (one `main`, one `h1`, authored title, reserved canonical, `og:url`, `en-001` alternate, `x-default` only on the default Page, `index, follow`, `HEAD`/`GET` parity, redirect, robots, three-loc sitemap); six genuine 404 paths and a percent-escaped segment retained; malicious locale/query/redirect refusals untouched |
+| T03 | `scripts/verify-u03-browser.mjs` | `9955228756d0daa7ad748e100243a2e095396968` | `5fb2b1e2b0ba9ba165263873c553e0faa6c0df88` | optional `keyboardPage` proof added: keyboard-reachable control, page errors, foreign requests and native disclosure toggling; every existing case preserved |
+| T04 | `scripts/verify-u03-published-http.mjs` | `0aa2c6b39c7d49dece37fca87610435d4c4c4552` | `0d478edd73a64619270a6f837d5350176ed90301` | new committed-starter phase (real build, trace, loopback HTTP, SEO agreement, sitemap, refusals, real Chromium) executed **before** the reversible fixture; declaration pins re-pinned; the pre/post deployment-tree guards now refuse any change outside the five authorized starter paths while still refusing everything else; fixture transaction, malformed-JSON-no-fallback, unlisted non-discovery and byte-exact restoration retained |
+| T06 | `scripts/verify-u04-json-slice.mjs` | `258b395fe39427d090f9f727f216a625d207b5ff` | `96099c105bd347644a96c3d5463b82436048738c` | declaration pins re-pinned; the two deployment-tree guards now tolerate exactly the five authorized starter paths and still refuse any other deployment change; production HTTP/Chromium, JSON selection, owned media, malformed preferred JSON and reversible restoration unchanged |
+| T07 | `scripts/verify-u04-22-module-consent.mjs` | `5a00664924651fc68aec3c786523dca0b938e37d` | `81784950434a1df7852d0597ca6bf7b322215687` | declaration pins re-pinned only; all 733 executable predicates, 17-family mapping, 22 modules, four asset zones, browser matrix and provider-OFF proof intact |
+| G01 | `tests/deployment/u03-trace.test.mjs` | `8064260aae9241ea8b7042fe2950e75b371516a8` | `5a0d67cc3b54a7703dbefa8668b044e6b8e967a3` | committed fixture migrated to the three declared starter sources; added proofs that the declared sources and no legacy file are accepted, and that a trace shipping only the undeclared legacy Markdown refuses with `source:not-traced`; the previous unpublished-shape guard kept as a separate synthetic fixture; traversal/unknown-source guards unchanged |
+| G03 | `tests/deployment/u04-22-module-consent.test.mjs` | `33bd5f9b70497ce6a85e84b3682c060ba783e001` | `7ad1ab66099bf0532cd3924747293f51d039e8a7` | only the two pinned declaration digests updated; every previous guard and mutant preserved |
+| U01 | `tests/unit/efs-confined-source-reader.test.ts` | `2ed497aefa5dad41aacf1c0931f87ad2ceb03ccd` | `97e610821f3b0932d18f1613413ee1bde870f828` | committed Home now read as the declared JSON candidate with byte-exact text; direct observation of the preserved legacy Markdown retained; a JSON declaration naming the Markdown path refuses; every real-path, UTF-8, symlink/traversal, malformed and type-mismatch refusal kept |
+| U02 | `tests/unit/efs-manifest-graph.test.ts` | `3891e4b0c6dd0e32e4b1ef711e9cbe547455da2a` | `a94008eb6a39f949c9df4f2e0827a26ac211213c` | committed graph asserts exact one Entity/Facet/Site, three published `en-001` Page identities, one source kind each and the three declared candidate paths; the preserved Markdown Home is asserted as existing but undeclared; all synthetic malformed/duplicate/collision/ownership refusals kept |
+| U03 | `tests/unit/efs-page-header-pipeline.test.ts` | `87a98b407d14e297cc44987406ad14562180fa17` | `7449812dfa41536f4f8a0a9838f22402661b22bd` | `/en-001` now projects the JSON header (`kind:"json"`, validated title, description, public, no `markdownBody`); About Markdown projection added; the kind-mismatch refusal now uses Markdown against the JSON candidate; all synthetic header/smuggling tests kept |
+| U04 | `tests/unit/efs-source-resolution-pipeline.test.ts` | `3877007de6247ce2070712696de117ad0d73702a` | `3cf7d30fc80264407f2b939c9cf956c1d5789909` | committed Home read as JSON with exact identity and no rescue by the legacy Markdown; About read added; observed kinds asserted `["json"]` and `["markdown"]`; confined-read, matching and malicious path/locale negatives kept |
+| U05 | `tests/unit/efs-uno-committed-base.test.ts` | `64d272d3f6ff2c0726abbf1f554fedeec12291c8` | `999386d7a8b1f4d836e3b28804149e701d12862f` | committed base now accepts `https://uno-starter.example` with no aliases and the exact Site identity; a separate synthetic base-free fixture still refuses `committed-base:missing`; invalid hostname/alias/path/credential cases kept |
 
-No other tracked path changed: frozen `AGENTS.md`, `README.md`, the implementation SOP, `package.json`, the lockfile,
-`src/core/**`, `src/components/**`, `src/app/**`, the deployment declarations, workflows, hooks and configuration all
-keep their committed identity. Two prior test assertions that named a now-accepted pair were corrected in place, with an
-adjacent comment: the `prose` out-of-subset case now refuses `align`/`surface`, the `faq` out-of-subset case refuses
-`align`/`surface`/`eyebrow`, and the still-unmapped `divider` carries the neighbouring-family refusal. No assertion was
-loosened to an arbitrary permissive value.
+| U06 | `tests/unit/efs-uno-discovery-policy.test.ts` | `5f4f8d536d872d96b79cc28c721adb35a30b27f7` | `9356079ee234819c2578177a38634d981accfef5` | committed Home is public JSON and an unlisted claim still refuses `home-cannot-be-unlisted`; About Markdown and Components JSON are proven public with no robots suppression; forged Markdown visibility still refuses `discovery:projection-mismatch`; unlisted non-discovery kept |
+| U07 | `tests/unit/efs-uno-page-delivery-candidate.test.ts` | `65e414de23c458a58da6a65bf8a1ee09554482cb` | `5408c20ebeeeeb0875079e56d8f15d92e334cc4f` | committed Home candidate now carries a validated JSON document and no raw authored text, with the test-only loopback base preserved; candidate-is-not-publication, malformed JSON and unlisted refusals kept |
+| U08 | `tests/unit/efs-uno-published-page.test.ts` | `376581a248b757bae4e0809d5811d5bfbaf4fb76` | `e6e8fbe0c7b2241e89c6db7781023950d0f7454f` | the obsolete "committed deployment serves nothing" suite replaced by exact three-Page serve/discovery/robots/sitemap positives, canonical and SEO agreement, out-of-set 404s and a separate unpublished/base-free synthetic refusal; scratch fixture refusal suite untouched |
+| U09 | `tests/unit/efs-uno-route-address.test.ts` | `c197a96b64f48b2ef13cbc96412145d35df38de4` | `c2bcbd39f7c53f82b2aa5f4410e5be67a69924e3` | committed index now yields exactly three candidates at `/en-001`, `/en-001/about`, `/en-001/components` with one source kind each and no publication authority; candidate-vs-serving distinction and all case/duplicate/locale/foreign-Site/malicious-path refusals kept |
+| U10 | `tests/unit/efs-uno-site-publication-inputs.test.ts` | `ad5999c9db1af8434c520cba5d8f4c40751de82c` | `7a65aecc7e49b3820b78b6dc349a378ce8b83c10` | committed composition reports three candidates and the reserved stored canonical with exact Site and locale mapping; test-only alternate-base proposals preserved; duplicate/owner/locale/alias/forged-property/hostile-input refusals kept |
+| E01 | `.documents/Architecture/u06-starter.md` | NEW | `a0ef2cc128dabf7ec0a3b4e6d0b3cecc83376ad6` | new evidence ledger: declared graph and three sources, selection/canonical, preserved undeclared Markdown, visibility/SEO rules, proven positives/refusals, ownership/rights and the still-open U04/U05/U06/U07 gaps |
 
-## 3. Composed capability and its immutable contract
+**Not changed:** `deployment/efs/content/home.en-001.md` remains byte-identical at Git blob
+`ef4254a37778c38a575c4924901760a36650ad05` and is undeclared; `scripts/verify-u03-trace.mjs`,
+`tests/deployment/u04-json-slice.test.mjs` and `tests/deployment/u03-fixture-transaction.test.mjs` were authorised but
+required no change once the runners were re-pinned, so they keep their exact start blobs. No source implementation,
+schema, parser, renderer, CSS, dependency, workflow, hook or provider file changed.
 
-Five *already mapped* donor families now additionally accept their existing optional donor `heading` and `lede` as
-individually validated literal plain text, read through the already pinned `readSectionHeading` (1..160 Unicode code
-points) and `readSectionLede` (1..4000) policies and wrapped by the already tested `wrapAuthoredText` helper:
+## 3. The committed starter contract
 
-| Family | New optional fields | Wrapped original node suffix |
+| Page | Route | Served address | Source | Publication | Visibility |
+| --- | --- | --- | --- | --- | --- |
+| `home` | `["home"]` reserved | `/en-001` | `deployment/efs/content/home.en-001.json` (JSON) | `published` | `public` |
+| `about` | `["about"]` | `/en-001/about` | `deployment/efs/content/about.en-001.md` (Markdown) | `published` | public by policy (Markdown may not declare one) |
+| `components` | `["components"]` | `/en-001/components` | `deployment/efs/content/components.en-001.json` (JSON) | `published` | `public` |
+
+Selection: Entity `e_7a3knkx60eacyhca7a0cr1k6e1`, Facet `foundation`, Site `main`, supported/default locale `en-001`,
+language preference `en → en-001`, reserved `base.canonical` `https://uno-starter.example` with `aliases: []`. The
+`.example` origin is inert illustrative metadata approved by the Owner for local and hosted proof only: no owned
+domain, DNS, TLS, environment binding, provider setting, deployment or ownership claim exists, and nothing here proves
+a live website. Publication authority remains the manifest Page's own flag combined with the selected Site, the
+committed base, the confined declared source and the validated visibility. The preserved `home.en-001.md` is neither
+declared nor used as fallback: removing or corrupting the selected Home JSON refuses the whole Page.
+
+## 4. Local evidence (Agent-observed, Windows, this checkout)
+
+| Gate | Result | Observed |
 | --- | --- | --- |
-| `prose` | `heading`, `lede` | `-prose` |
-| `callout` | `heading`, `lede` (existing `tone` unchanged) | `-callout` |
-| `list` | `heading`, `lede` (existing `ordered` unchanged) | `-list` |
-| `faq` | `heading`, `lede` | `-accordion` |
-| `table` | `heading`, `lede` (existing `caption` unchanged) | `-table` |
+| `pnpm test:bootstrap` | PASS | bootstrap contract and scaffold verify |
+| `node --test tests/governance-docs.test.mjs` / `node scripts/verify-governance-docs.mjs` | PASS / PASS | frozen governance bytes intact, positive and refusal cases |
+| `pnpm test:architecture` | PASS | boundary suite |
+| Focused ten U suites | PASS | 10 files, **386** tests |
+| `pnpm test` | PASS | 30 files, **1,118** tests (from 1,107; the migration added assertions and deleted none) |
+| `pnpm typecheck` / `pnpm lint` / `pnpm exec eslint . --max-warnings 0` | PASS / PASS / PASS | zero errors, zero warnings |
+| Deployment suites (trace, fixture transaction, JSON slice, 22-module consent, Node 26 floor, security exception, brand copy, Vercel readiness) | PASS | eight suites |
+| `node scripts/verify-vercel-readiness.mjs` / `node scripts/verify-u04-security-exception.mjs` | PASS / PASS | offline, no provider action |
+| `node scripts/verify-u03-published-http.mjs` | PASS | **754 passed, 0 failed**; committed-starter build, loopback HTTP, SEO, sitemap, refusals and real Chromium ran before the reversible fixture, which restored byte-exact and rebuilt the committed head |
+| `node scripts/verify-u04-json-slice.mjs` | PASS | **464 passed, 0 failed** |
+| `node scripts/verify-u04-22-module-consent.mjs` | PASS | **733 passed, 0 failed**, unchanged predicate count, `FAMILY_BROWSER` and `DIVIDER_PARITY` pass |
+| `pnpm build` / `node scripts/verify-u03-trace.mjs --expect committed` | PASS / PASS | bounded trace; the three declared sources shipped, nothing else from the repository |
+| `pnpm test:http` (`verify-u01-http`) | PASS | **105 passed, 0 failed** |
+| `node scripts/verify-u03-http.mjs` | PASS | **135 passed, 0 failed** |
+| Declaration digests after every stateful runner and after both commits | PASS | manifest `b6213ed6…3c9925`, selection `58011c43…e8c952`; legacy Markdown unchanged |
 
-With neither field authored the adapter returns the untouched one-node output: **nine captured pre-change serializations**
-(plain `prose`; `callout` with and without `tone`; ordered and unordered `list`; `faq` with one and two entries; `table`
-with and without `caption`) are `JSON.stringify`-byte-identical, including ids, key order, absent optionals and legacy
-shapes. With one valid field the family keeps its anchor id and becomes one `layout.stack {}`; `heading` renders as
-`content.heading {level:2}` at `${id}-heading`, `lede` as `content.prose` at `${id}-lede`, and the original node keeps
-every prop, child id and optional-absence apart from its documented suffix. Text is trimmed-only literal plain text: no
-normalization, truncation, getter execution or authored code evaluation, and a wrong type, markup, Markdown, line break,
-control character, padding, emptiness, over-length value or unpaired surrogate refuses the **whole** source with the
-established `family:unsupported-feature`, `family:target-refused` or `family:unsafe-source` reason and no own `document`.
-`prose` `align`/`surface`, `callout` `align`/`surface`, `list` item destinations/`surface`, `faq` `surface`/open state,
-`table` `surface`/spans/merged cells and all Markdown and link forms stay refused. React escapes the served text; the
-authored heading/lede sit **outside** the native callout accent, table caption and disclosure container, so this is
-bounded authored-text coverage, not donor Markdown, design or accessibility parity.
+Real committed behaviour observed locally: `/en-001`, `/en-001/about`, `/en-001/components` answer `200` with exactly
+one `main` and one `h1`, the authored titles, `index, follow`, the reserved canonical and matching `og:url`, an
+`en-001` alternate, and `x-default` only on the default Page; `HEAD` agrees with `GET`; `/en` answers one `307` to the
+published root; `robots.txt` names `https://uno-starter.example/sitemap.xml`; `sitemap.xml` lists exactly three
+canonical URLs; Chromium at 390px and 1280px shows no overflow, a keyboard-reachable control and a native disclosure
+that toggles without script, with zero requests outside loopback. `/en-001/home`, `/de-001`, `/en-001/about/extra`,
+`/en-001/components/extra`, an unknown segment and a percent-escaped segment remain genuine 404s. No outbound provider,
+webhook, analytics event, geolocation, unsafe scheme or delivery claim was introduced.
 
-## 4. Donor provenance and rights
+## 5. Hosted evidence at the exact product commit
 
-The only source provenance is the curated committed Foundation donor `provelopment/provelopment-foundation` at
-`c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, Apache-2.0 `LICENSE` Git blob
-`d645695673349e3947e8e5ae42332d0ac3164cd7`, inspected read-only. Pinned evidence blobs: donor schema
-`src/core/page-document.ts` `a12d964c43626c6313a621bf628f5cc24b65d444` (each of the five families spreads the optional
-`headingFields` pair), `text-sections.tsx` `caeee57798bdd533867e5bef350422618187612f`,
-`items-sections.tsx` `bc729d6a2e6484dc2c26ed997e65ee644bc8a7e6`, `structure-sections.tsx`
-`65d254e192a6a8ef4886590026c2ea58e02264be` and `section-support.tsx` `19c9bee3b3b200af2455813e5f842c30b062a6ac`. Only
-concepts and semantics were adapted: no donor code, CSS, design tokens, HTML, brand, imagery or copy was imported or
-reproduced, no extra package was added, and no Foundation Solo runtime or separately licensed Connect module is used. The
-donor's Markdown-capable `lede` is *evidence of donor input shape*, not permission to render Markdown here.
-
-## 5. Local gate outcomes (product bytes as committed; one whitespace-only follow-up disclosed below)
-
-| Gate | Result |
-| --- | --- |
-| `pnpm exec vitest run tests/unit/uno-foundation-families.test.ts` | PASS — `180` tests, `0` failed (168 → 180) |
-| `node --test tests/deployment/u04-22-module-consent.test.mjs` | PASS — `43` tests, `0` failed (42 → 43), including one new mutant test that removes each `FAMILY_TEXT_FIVE_*` label and neutralizes each new predicate |
-| `pnpm test:architecture` | PASS — `46` tests, `46` pass, `0` skipped |
-| `pnpm test` | PASS — `30` test files, `1107` tests (1095 → 1107) |
-| `pnpm typecheck`, `pnpm lint`, `pnpm exec eslint . --max-warnings 0` | PASS — exit 0 each |
-| `pnpm test:bootstrap` | PASS — bootstrap suite plus `verify-bootstrap: OK` |
-| `node --test tests/governance-docs.test.mjs`, `node scripts/verify-governance-docs.mjs` | PASS — `9` tests, `0` failed; frozen governance bytes unchanged |
-| `node --test tests/deployment/node26-security-floor.test.mjs` | PASS |
-| `node --test tests/deployment/u03-fixture-transaction.test.mjs` | PASS |
-| `node --test tests/deployment/u03-trace.test.mjs` | PASS |
-| `node --test tests/deployment/u04-json-slice.test.mjs` | PASS |
-| `node --test tests/deployment/u04-security-exception.test.mjs` | PASS |
-| `node --test tests/deployment/uno-brand-copy.test.mjs` | PASS |
-| `node --test tests/deployment/verify-vercel-readiness.test.mjs` | PASS |
-| `node scripts/verify-vercel-readiness.mjs` | PASS |
-| `node scripts/verify-u04-security-exception.mjs` | PASS |
-| `node scripts/verify-u03-published-http.mjs` | PASS — `542 passed, 0 failed`, committed declarations restored |
-| `node scripts/verify-u04-json-slice.mjs` | PASS — `464 passed, 0 failed`, byte-exact restoration |
-| `node scripts/verify-u04-22-module-consent.mjs` | PASS — `733 passed, 0 failed` (715 → 733), including `FAMILY_TEXT_FIVE_SOURCE` (6), `FAMILY_TEXT_FIVE_REFUSALS` (3), `FAMILY_TEXT_FIVE_HTTP` (6), `FAMILY_TEXT_FIVE_BROWSER` (3), `FAMILY_STATS_STEPS_*`, `FAMILY_LEDE_*`, `FAMILY_ITEM_OUTLINE_*`, `DIVIDER_PARITY_*`, `FOUR_ZONE_HTTP=4/4`, `BROWSER_MATRIX=16/16`, `FAMILY_MEDIA=3/3`, `FAMILY_BROWSER=PASS` and the twenty-two-module consent proof |
-| `pnpm build` | PASS |
-| `node scripts/verify-u03-trace.mjs --expect committed` | PASS — only declared inputs and authored sources are shipped |
-| `pnpm test:http` | PASS — `103 passed, 0 failed` |
-| `node scripts/verify-u03-http.mjs` | PASS — `91 passed, 0 failed` |
-| Deployment declarations | filesystem SHA-256 re-checked after every stateful runner and at the end: `deployment/efs/manifest.json` `ba232d46edcd13e95231f627f67058d383bc4479f076eb2be1ca9c576de6e3f0`, `deployment/uno.config.json` `4f656c93a45873d85b133aa99adaec1b6821ac9983b9e9818452773952df9a0c` — both restored exactly, no leftover fixture Page, capsule, plate or server |
-| Working tree before the product commit | exactly the five A01–A05 tracked modifications, no unexplained untracked path, `git diff --check` clean after one trailing blank line at end of file was removed from A04 |
-| Post-verification note | the A04 trailing-blank-line fix was whitespace-only at end of file; the unit suite was re-run afterwards (`180` passed) and no other gate content changed |
-
-No privacy, governance, architecture, licence, brand or security gate was weakened, muted, skipped or set to continue on
-error, and no dependency, lockfile or workflow was touched.
-
-## 6. Product-head hosted proof (independent GitHub evidence)
-
-Both existing workflows ran at the exact product commit `32cc350b36b8fabd94ad7430ea4956e6c52f729b`, with both
-operating systems and every required step executed:
-
-| Workflow | Run | ubuntu-24.04 | windows-2025 |
+| Workflow | Commit | Result | Jobs |
 | --- | --- | --- | --- |
-| `Verify U01 baseline` | `44906487214` | success — 36 steps, none skipped or failing | success — 36 steps, none skipped or failing |
-| `Uno Bootstrap Verify` | `44906487210` | success — 10 steps, none skipped or failing | success — 10 steps, none skipped or failing |
+| `Verify U01 baseline` (run `44913557489`) | `e38e0e6cd210570e7895da8b33ffec3638fd43e5` | PASS | `windows-2025` and `ubuntu-24.04`, every executed step success, no skipped mandatory step |
+| `Uno Bootstrap Verify` (run `44913557531`) | `e38e0e6cd210570e7895da8b33ffec3638fd43e5` | PASS | `windows-2025` and `ubuntu-24.04`, governance, bootstrap tests and scaffold verify success |
 
-Job logs, not badges, were inspected: the frozen privacy/governance bootstrap passed
-(`verify-bootstrap: OK … no credential or private-path leaks`), and the full lint, typecheck, unit, build, trace, HTTP,
-asset, rights, security and privacy stages ran. The new evidence executed on both systems:
-`FAMILY_TEXT_FIVE_SOURCE` (one frozen stack per family plus the whole-Page summary), `FAMILY_TEXT_FIVE_REFUSALS`
-(including the zero-invocation accessor and the valid-sibling probe), `FAMILY_TEXT_FIVE_HTTP` (one `<h2>` then exactly one
-`<p class="uno-json-prose">` before the native prose/callout/list/FAQ/table markup, no duplicate id, extra `main`/`h1` or
-external destination), `FAMILY_TEXT_FIVE_BROWSER` at 390 and 1280 CSS px, `BROWSER_MATRIX=16/16`, `FAMILY_BROWSER=PASS`,
-`DIVIDER_PARITY=PASS`, `verify-u04-22-module-consent: 733 passed, 0 failed` and `verify-u03-http: 91 passed, 0 failed`.
-These are checks for that specific product commit and are not stage acceptance.
+Both hosted logs contain, on both operating systems: the committed-starter production build, `/en-001/components`
+`200`, the three-address committed sitemap, the Components keyboard control, all `FAMILY_TEXT_FIVE_HTTP` labels, the
+seventeen-section family browser matrix, `DIVIDER_PARITY`, and the issued counts `105/0`, `135/0`, `754/0`, `464/0`,
+`733/0` with `1,118` unit tests. The Windows job visibly reports the pre-existing `DEP0190` deprecation warning and the
+unwaived `1 moderate` development advisory; the production dependency graph audits clean and the high/critical counts
+are zero. No hosted run was red, and no step was skipped for a mandatory gate.
 
-## 7. Report-head status and known warnings
+## 6. Report-head checks (as at the moment of this overwrite)
 
-- **Report-head hosted checks: `UNVERIFIED / PENDING` at authoring time.** This file is committed before those runs
-  exist; no run ID, SHA or outcome is predicted here and the report is not edited afterwards to insert them. Their
-  results are conveyed to the Owner outside this document.
-- **Report commit SHA: `UNVERIFIED / PENDING`** — deliberately not predicted.
-- Known and still open, none introduced by this run: one **unwaived moderate** development-only dependency advisory;
-  zero known production audit vulnerabilities at previously verified heads; the known Windows Node/pnpm `DEP0190` setup
-  warning. No waiver, silencing or dependency edit was made.
-- Guard classes: local product gates `PASS` (Agent-observed); product-head hosted gates `PASS` (independent GitHub
-  evidence); report-head hosted gates `UNVERIFIED / PENDING`; Drive/Documentation timeline actions `NOT APPLICABLE`
-  (no Agent Drive write was attempted or claimed).
+| Item | Status |
+| --- | --- |
+| Frozen bootstrap against the newly written report | PASS (run before the report commit) |
+| `tests/bootstrap.test.mjs`, `verify-bootstrap`, governance test and `verify-governance-docs` against the new report | PASS |
+| Report-only staging (exactly one `M`), `git diff --check` and `git diff --cached --check` | PASS |
+| Exact report-head `Verify U01 baseline` / `Uno Bootstrap Verify` on Ubuntu and Windows | **UNVERIFIED at write time** — deliberately not claimed here; observed separately after the report-only push |
+| Independent Architect `ACCEPT / REVISE / STOP` | PENDING, not self-granted |
 
-## 8. Accounting, scratch and remaining obligations
+## 7. Rights, privacy and standing disclosures
 
-- Accounting is unchanged and receives **no** uplift: 22/22 required Uno module IDs, 4/4 asset zones, 16/16 browser
-  matrix, 17/17 bounded Foundation-family mappings and 17/17 temporary family samples, **1/17** full-parity family
-  (`divider`), **16/17** below full parity, stage proxy **43/59 = 72.88%**, and **zero** durable published family Pages.
-  **U04 remains OPEN**; this bounded authored-text capability adds no parity, stage, release or deployment credit.
-- Fixture and scratch hygiene: the seventeen-shape composition Page is still one **temporary** hermetic fixture, restored
-  byte-exactly by its own transaction; task scratch stayed inside the ignored task-owned directory and is removed after
-  review; no prior-run scratch, prior STOP evidence or the ignored private ACTIVE was deleted.
-- **historical exposure: unresolved — Owner decision required.** A private machine-specific path disclosed in an earlier
-  order's published report may remain retrievable from historical commits, workflow logs, caches or copies. Nothing in
-  this run purges, rewrites or remediates it, and no history rewrite, force push, settings change, release or deployment
-  is authorized or performed.
-- Remaining U04 closure blockers are unchanged: donor Markdown and link rendering, the donor heading outlines for
-  `steps`, `faq` and `columns`, donor card/feature borders, media, meta and icons, donor media and gallery richness,
-  remote image sources, the donor contact seam, a durable composition Page and family-Page accessibility proof, plus the
-  outstanding `UNO-WO-071` activation-evidence and `UNO-WO-072`/`UNO-WO-073` `REVISE` records, which are not reversed here.
+Donor reference remains the pinned read-only `provelopment/provelopment-foundation` commit
+`c05c55ea61b5347cf5032211dd0bf37f2cc5083c` with its Apache-2.0 `LICENSE` blob
+`d645695673349e3947e8e5ae42332d0ac3164cd7`. This order used no donor implementation, no Foundation Solo Rust, no
+separately licensed `modules/connect/**`, no brand, art or donor copy, and added no dependency, notice exception or
+licence waiver. All authored copy is neutral Uno starter text; no private path, machine-specific profile path,
+credential, token, ACTIVE text, activation message or runtime secret appears in the rendered HTML, static output,
+logs, commit subject or this report. No release, domain purchase, DNS, TLS, Vercel setting, provider operation,
+history rewrite, log purge or deployment occurred. Historical private-path exposure remains **unresolved — Owner
+decision required**, and the earlier `UNO-WO-071`, `UNO-WO-072` and `UNO-WO-073` `REVISE` findings stand unchanged.
 
-## 9. Handback
+## 8. Accounting and what remains open
 
-The Agent did not accept this run and makes no self-acceptance claim. Only the Architect may return an independent
-`ACCEPT / REVISE / STOP`; only the Owner may install and activate a successor order, decide the historical-exposure
-response, and separately close U04, release or deploy. A green product slice and a sanitized report do not close the
-project.
+Unchanged: 22/22 modules, 4/4 asset zones, 16/16 browser matrix, 17/17 bounded donor family mappings, **1/17** fully
+evidenced donor parity (`divider`), 16/17 below parity, 43/59 = 72.88% proxy. This run earns committed starter and
+publication evidence only; it cannot raise 1/17 to 2/17 and closes no stage.
+
+| Remaining gap | Status |
+| --- | --- |
+| U03 serving/publication assurance closure | NOT APPLICABLE to this order; serving evidence added, closure is Owner-controlled |
+| U04 sixteen family parity gaps | OPEN, unchanged |
+| U05 safe actions and provider gating | OPEN, outside this order |
+| U06 two independent installs, clean-room/upgrade/rollback | OPEN; NOT DONE here |
+| U07 security and release audit | OPEN, outside this order |
+| Historical exposure remediation | OPEN, Owner decision required |
