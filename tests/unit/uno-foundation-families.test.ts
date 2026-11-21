@@ -2354,6 +2354,13 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).toContain("temporary family-composition fixture verified over production HTTP and Chromium");
     expect(ledger).toContain("no durable published family Page");
     expect(ledger).not.toContain("zero published family Page acceptance evidence");
+    // `UNO-WO-067 / R01`: the same temporary Page now carries thirteen bounded shapes, and exactly four remain without
+    // fixture-Page HTTP/browser proof. The stale nine-shape accounting must not survive.
+    expect(ledger).toContain("one temporary thirteen-shape integration slice");
+    expect(ledger).toContain("appended `hero`, `stats`, `steps`, `quote`");
+    expect(ledger).toContain("four bounded shapes keep their validator/renderer tests only");
+    expect(ledger).not.toContain("one temporary nine-shape integration slice");
+    expect(ledger).not.toContain("eight bounded shapes keep their validator/renderer tests only");
     expect(ledger).toContain("family-<index>-contactform");
     expect(ledger).toContain("Deliberately absent donor design (media and its binding)");
     expect(ledger).toContain("Deliberately absent donor design (gallery)");

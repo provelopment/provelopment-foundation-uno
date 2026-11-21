@@ -128,7 +128,7 @@ const PINNED = Object.freeze([
 const PHASE_C_REQUIRED = Object.freeze([
   'await import("../src/application/compose-uno-foundation-families.ts")',
   "composeUnoFoundationSubset(familySource(), familyBindings())",
-  "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the nine-section source once",
+  "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the thirteen-section source once",
   "FAMILY_COMPOSE_ACCEPTED exact source-index ids and no extra section",
   "FAMILY_COMPOSE_ACCEPTED the accepted document is deeply frozen",
   "FAMILY_DOCUMENT_REACCEPTED the real reader reaccepts the same bytes with equal values",
@@ -145,13 +145,32 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_SERVING_SERVED the trusted serving planner serves the composed Page",
   "FAMILY_SERVING_SERVED one JSON Page and exactly three owned image occurrences in document order",
   "FAMILY_HTTP=200 the composed Page answers HTTP 200",
-  "FAMILY_HTTP=200 the Page renders the nine authored section ids in document order",
+  "FAMILY_HTTP=200 the Page renders the thirteen authored section ids in document order",
   "FAMILY_CONTACT_OFF_HTTP the contact subtree carries no form, control, handler or destination",
   "FAMILY_CONTACT_OFF_HTTP neither the donor identity nor the acknowledgement appears anywhere in the HTML",
   "FAMILY_MEDIA=3/3 three distinct locators serve the one Page-owned plate with GET and HEAD",
   "FAMILY_UNPUBLISHED_404 an unlisted path stays a closed 404",
   "FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px",
   "family-6-contactform",
+  // `UNO-WO-067 / R01`: the four appended donor shapes, their contractual ids and their executed evidence.
+  'type: "hero",',
+  'type: "stats",',
+  'type: "steps",',
+  'type: "quote",',
+  '"family-9-hero"',
+  '"family-10-stats"',
+  '"family-11-steps"',
+  '"family-12-quote"',
+  "FAMILY_FOUR_REFUSALS each appended-family probe refuses the whole Page with its documented reason",
+  "composeUnoFoundationSubset(probeSource, familyBindings())",
+  "FAMILY_HERO_HTTP the hero region carries the authored alignment, surface and text in order",
+  "FAMILY_STATS_HTTP the stats region is one definition list with two authored pairs in order",
+  "FAMILY_STEPS_HTTP the steps region is one ordered list of two authored items with no invented status",
+  "FAMILY_QUOTE_HTTP the quote region is one figure, blockquote and caption with separate attribution and role",
+  "${width}px hero shows the authored eyebrow, lede and support with no action control",
+  "${width}px stats show two authored pairs with one detail on the first item",
+  "${width}px steps show two ordered titles and one description with no invented status",
+  "${width}px quote shows one figure, blockquote and caption with separate attribution and role",
   "FAMILY_BROWSER ${label}",
   "${width}px the contact action stays in the same document and reaches its target",
   "${width}px Enter opens the FAQ disclosure",
@@ -381,6 +400,95 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       assert.notEqual(mutated, source);
       assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
     }
+  });
+
+  // `UNO-WO-067 / R01` §5: five independent mutations over the appended families, each failing for its own token.
+  it("the audit genuinely fails when an appended source shape is changed", () => {
+    const shapes = [
+      [source.replaceAll('type: "hero",', 'type: "prose",'), 'type: "hero",'],
+      [source.replaceAll('type: "stats",', 'type: "prose",'), 'type: "stats",'],
+      [source.replaceAll('type: "steps",', 'type: "prose",'), 'type: "steps",'],
+      [source.replaceAll('type: "quote",', 'type: "prose",'), 'type: "quote",'],
+    ];
+    for (const [mutated, contract] of shapes) {
+      assert.notEqual(mutated, source);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit genuinely fails when an appended top-level id is changed", () => {
+    const mutated = source.replaceAll('"family-12-quote"', '"family-12-testimonial"');
+    assert.notEqual(mutated, source);
+    assert.ok(audit(mutated).some((entry) => entry.includes('"family-12-quote"')), audit(mutated).join(","));
+  });
+
+  it("the audit genuinely fails when a new family HTTP assertion is replaced", () => {
+    const shapes = [
+      [
+        source.replace(
+          "FAMILY_STEPS_HTTP the steps region is one ordered list of two authored items with no invented status",
+          "steps region unchecked",
+        ),
+        "FAMILY_STEPS_HTTP",
+      ],
+      [
+        source.replace(
+          "FAMILY_HERO_HTTP the hero region carries the authored alignment, surface and text in order",
+          "hero region unchecked",
+        ),
+        "FAMILY_HERO_HTTP",
+      ],
+      [
+        source.replace(
+          "FAMILY_STATS_HTTP the stats region is one definition list with two authored pairs in order",
+          "stats region unchecked",
+        ),
+        "FAMILY_STATS_HTTP",
+      ],
+    ];
+    for (const [mutated, contract] of shapes) {
+      assert.notEqual(mutated, source);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit genuinely fails when a new family browser assertion is replaced", () => {
+    const shapes = [
+      [
+        source.replace(
+          "${width}px quote shows one figure, blockquote and caption with separate attribution and role",
+          "${width}px quote unverified",
+        ),
+        "${width}px quote shows one figure",
+      ],
+      [
+        source.replace(
+          "${width}px hero shows the authored eyebrow, lede and support with no action control",
+          "${width}px hero unverified",
+        ),
+        "${width}px hero shows the authored eyebrow",
+      ],
+    ];
+    for (const [mutated, contract] of shapes) {
+      assert.notEqual(mutated, source);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit genuinely fails when the whole-Page refusal probe is neutered", () => {
+    const mutated = source.replace(
+      "FAMILY_FOUR_REFUSALS each appended-family probe refuses the whole Page with its documented reason",
+      "FAMILY_FOUR_REFUSALS recorded",
+    );
+    assert.notEqual(mutated, source);
+    assert.ok(audit(mutated).some((entry) => entry.includes("FAMILY_FOUR_REFUSALS")), audit(mutated).join(","));
+    // A probe that no longer composes the adapter cannot refuse anything.
+    const unprobed = source.replace("composeUnoFoundationSubset(probeSource, familyBindings())", "({ status: \"refused\" })");
+    assert.notEqual(unprobed, source);
+    assert.ok(
+      audit(unprobed).some((entry) => entry.includes("composeUnoFoundationSubset(probeSource, familyBindings())")),
+      audit(unprobed).join(","),
+    );
   });
 
   it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {

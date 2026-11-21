@@ -12,7 +12,7 @@
  * FAIL-CLOSED. A refused fixture, an unclean build, a missing browser, a pre-consent provider request, a failed
  * assertion or an unproven restoration fails this gate. Nothing here can pass on a stale build.
  *
- * `UNO-WO-066 / R01` adds one further ephemeral proof inside this same lifecycle: a nine-family donor subset is composed
+ * `UNO-WO-066 / R01` adds one further ephemeral proof inside this same lifecycle: a donor subset is composed
  * by the real, unmodified `composeUnoFoundationSubset`, installed as a fifth temporary fixture source, and then accepted
  * by the confined loader, the serving planner, real production HTTP and Chromium. It is a test fixture at a loopback
  * server — not a durable Page, not a deployment and not publication authority — and it is removed in the same `finally`.
@@ -389,6 +389,38 @@ function familySource() {
         ],
       },
       { type: "divider" },
+      // `UNO-WO-067 / R01`: appended after the unchanged nine; still donor-shaped input, never a hand-authored Uno node.
+      {
+        type: "hero",
+        eyebrow: "Synthetic introduction",
+        lede: "The composed Page is visible.",
+        support: "This is a bounded, original fixture example.",
+        align: "center",
+        surface: "muted",
+      },
+      {
+        type: "stats",
+        items: [
+          { value: "13", label: "Sampled sections", detail: "Fixture only" },
+          { value: "4", label: "New examples" },
+        ],
+      },
+      {
+        type: "steps",
+        surface: "muted",
+        items: [
+          { title: "Draft", body: "Prepare the fixture source." },
+          { title: "Review" },
+        ],
+      },
+      {
+        type: "quote",
+        body: "The fixture does not establish full parity.",
+        attribution: "Synthetic contributor",
+        role: "Reviewer",
+        align: "center",
+        surface: "bordered",
+      },
     ],
   };
 }
@@ -415,6 +447,10 @@ const FAMILY_IDS = Object.freeze([
   "family-6-contactform",
   "family-7-actions",
   "family-8-divider",
+  "family-9-hero",
+  "family-10-stats",
+  "family-11-steps",
+  "family-12-quote",
 ]);
 
 /** Recursively frozen: an accepted Page must not be rewritten after composition. */
@@ -753,7 +789,7 @@ async function main() {
   const familyComposed = composeUnoFoundationSubset(familySource(), familyBindings());
   const familyAccepted = familyComposed.status === "composed" ? familyComposed.document : null;
   check(
-    "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the nine-section source once",
+    "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the thirteen-section source once",
     familyAccepted !== null,
     familyComposed.status === "composed" ? "" : String(familyComposed.reason),
   );
@@ -761,7 +797,7 @@ async function main() {
   const familyIds = familyAccepted.sections.map((node) => node.id);
   check(
     "FAMILY_COMPOSE_ACCEPTED exact source-index ids and no extra section",
-    familyIds.length === 9 && familyIds.every((id, index) => id === FAMILY_IDS[index]),
+    familyIds.length === 13 && familyIds.every((id, index) => id === FAMILY_IDS[index]),
     familyIds.join(","),
   );
   check(
@@ -802,6 +838,51 @@ async function main() {
       "FAMILY_BINDING_REFUSED the identical source refuses with every incomplete binding",
       refusals.every((entry) => entry.refused && entry.partial === false),
       JSON.stringify(refusals),
+    );
+
+    // `UNO-WO-067 / R01`: five representative whole-Page refusals in the four newly appended families. Each probe gets a
+    // fresh source, mutates one value, and must refuse with the adapter's own vocabulary and no own `document` key.
+    const familyProbes = [
+      {
+        label: "hero actions with a route destination",
+        expected: "family:unsupported-feature",
+        mutate: (source) => { source.sections[9].actions = [{ label: "Open", href: "/outside" }]; },
+      },
+      {
+        label: "stats item carrying a remote href",
+        expected: "family:unsupported-feature",
+        mutate: (source) => { source.sections[10].items[0].href = "https://example.test"; },
+      },
+      {
+        label: "steps item carrying a lifecycle status",
+        expected: "family:unsupported-feature",
+        mutate: (source) => { source.sections[11].items[0].status = "current"; },
+      },
+      {
+        label: "quote role without an attribution",
+        expected: "family:unsupported-feature",
+        mutate: (source) => { source.sections[12] = { type: "quote", body: "Q", role: "Reviewer" }; },
+      },
+      {
+        label: "hero with an empty lede",
+        expected: "family:target-refused",
+        mutate: (source) => { source.sections[9].lede = ""; },
+      },
+    ].map((probe) => {
+      const probeSource = familySource();
+      probe.mutate(probeSource);
+      const outcome = composeUnoFoundationSubset(probeSource, familyBindings());
+      return {
+        label: probe.label,
+        expected: probe.expected,
+        actual: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+        partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+      };
+    });
+    check(
+      "FAMILY_FOUR_REFUSALS each appended-family probe refuses the whole Page with its documented reason",
+      familyProbes.every((probe) => probe.actual === probe.expected && probe.partial === false),
+      JSON.stringify(familyProbes),
     );
   }
 
@@ -984,8 +1065,10 @@ async function main() {
     check("FAMILY_HTTP=200 the composed Page answers HTTP 200", familyHtmlResponse.status === 200, String(familyHtmlResponse.status));
     const positions = FAMILY_IDS.map((id) => familyHtml.indexOf(`id="${id}"`));
     check(
-      "FAMILY_HTTP=200 the Page renders the nine authored section ids in document order",
-      positions.every((position) => position >= 0) && positions.every((position, index) => index === 0 || position > positions[index - 1]),
+      "FAMILY_HTTP=200 the Page renders the thirteen authored section ids in document order",
+      positions.every((position) => position >= 0)
+        && positions.every((position, index) => index === 0 || position > positions[index - 1])
+        && FAMILY_IDS.every((id) => familyHtml.split(`id="${id}"`).length - 1 === 1),
       positions.join(","),
     );
     check(
@@ -1030,6 +1113,55 @@ async function main() {
       familyHtml.includes('<a class="uno-json-action" href="#family-4-media">See the image</a>')
         && familyHtml.includes('<a class="uno-json-action" href="#family-6-contactform">Contact notice</a>'),
     );
+    // `UNO-WO-067 / R01`: each appended family is inspected only inside its own top-level region, so an older module can
+    // never satisfy a new claim. These four sections nest no further `<section>`, so their own close tag ends the region.
+    const familyRegionOf = (id) => {
+      const at = familyHtml.indexOf(`id="${id}"`);
+      const start = at < 0 ? -1 : familyHtml.lastIndexOf("<section", at);
+      const end = at < 0 ? -1 : familyHtml.indexOf("</section>", at);
+      return start < 0 || end < 0 ? "" : familyHtml.slice(start, end);
+    };
+    check(
+      "FAMILY_STEPS_HTTP the steps region is one ordered list of two authored items with no invented status",
+      (() => {
+        const stepsRegion = familyRegionOf("family-11-steps");
+        return stepsRegion.startsWith('<section class="uno-json-timeline" data-uno-surface="muted" id="family-11-steps">')
+          && stepsRegion.includes('<ol class="uno-json-timeline-list">')
+          && (stepsRegion.match(/<li class="uno-json-timeline-item"[^>]*>/gu) ?? []).length === 2
+          && stepsRegion.includes('<p class="uno-json-timeline-title">Draft</p>')
+          && stepsRegion.includes('<p class="uno-json-timeline-title">Review</p>')
+          && stepsRegion.indexOf(">Draft</p>") < stepsRegion.indexOf(">Review</p>")
+          && (stepsRegion.match(/<p class="uno-json-timeline-description">/gu) ?? []).length === 1
+          && stepsRegion.includes('<p class="uno-json-timeline-description">Prepare the fixture source.</p>')
+          && !/data-uno-status|aria-current|uno-json-timeline-date|uno-json-timeline-heading|<h[1-6]\b|<h3/iu.test(stepsRegion);
+      })(),
+      familyRegionOf("family-11-steps").slice(0, 200),
+    );
+    check(
+      "FAMILY_QUOTE_HTTP the quote region is one figure, blockquote and caption with separate attribution and role",
+      (() => {
+        const quoteRegion = familyRegionOf("family-12-quote");
+        return quoteRegion.startsWith('<section class="uno-json-testimonials" data-uno-align="center" data-uno-surface="bordered" id="family-12-quote">')
+          && (quoteRegion.match(/<figure class="uno-json-testimonial">/gu) ?? []).length === 1
+          && (quoteRegion.match(/<blockquote class="uno-json-testimonial-quote">/gu) ?? []).length === 1
+          && quoteRegion.includes("The fixture does not establish full parity.")
+          && (quoteRegion.match(/<figcaption class="uno-json-testimonial-caption">/gu) ?? []).length === 1
+          && quoteRegion.includes('<span class="uno-json-testimonial-attribution">Synthetic contributor</span>')
+          && quoteRegion.includes('<span class="uno-json-testimonial-role">Reviewer</span>')
+          && !/<a\b|<iframe\b|<form\b|<button\b/iu.test(quoteRegion);
+      })(),
+      familyRegionOf("family-12-quote").slice(0, 200),
+    );
+    {
+      const appendedRegions = ["family-9-hero", "family-10-stats", "family-11-steps", "family-12-quote"].map(familyRegionOf);
+      check(
+        "FAMILY_HTTP=200 the four appended regions add no second main, h1, script or frame",
+        appendedRegions.every((region) => region.length > 0)
+          && appendedRegions.every((region) => !/<main\b|<h1\b|<script\b|<iframe\b/iu.test(region))
+          && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
+          && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1,
+      );
+    }
     const contactStart = familyHtml.indexOf('<section class="uno-json-contact" id="family-6-contactform">');
     const contactMarkup = contactStart < 0 ? "" : familyHtml.slice(contactStart, familyHtml.indexOf("</section>", contactStart));
     check(
@@ -1038,6 +1170,43 @@ async function main() {
         && contactMarkup.includes('<p class="uno-json-contact-status">Delivery is switched off. Nothing entered here is sent or stored.</p>'),
     );
     check("FAMILY_HTTP=200 the divider is rendered", familyHtml.includes('id="family-8-divider"') && /<hr\b/u.test(familyHtml));
+
+    const heroRegion = familyRegionOf("family-9-hero");
+    check(
+      "FAMILY_HERO_HTTP the hero region carries the authored alignment, surface and text in order",
+      heroRegion.startsWith('<section class="uno-json-hero" data-uno-align="center" data-uno-surface="muted" id="family-9-hero">')
+        && heroRegion.includes('<p class="uno-json-eyebrow">Synthetic introduction</p>')
+        && heroRegion.includes('<p class="uno-json-hero-lede">The composed Page is visible.</p>')
+        && heroRegion.includes('<p class="uno-json-hero-support">This is a bounded, original fixture example.</p>')
+        && heroRegion.indexOf("Synthetic introduction") < heroRegion.indexOf("The composed Page is visible.")
+        && heroRegion.indexOf("The composed Page is visible.") < heroRegion.indexOf("This is a bounded, original fixture example."),
+      heroRegion.slice(0, 160),
+    );
+    check(
+      "FAMILY_HERO_HTTP the hero region holds no link, action list, control or frame",
+      heroRegion.length > 0 && !/<a\b|<ul\b|<iframe\b|<button\b|<form\b/iu.test(heroRegion),
+      heroRegion.slice(0, 160),
+    );
+    const statsRegion = familyRegionOf("family-10-stats");
+    const statsDetailAt = statsRegion.indexOf('<span class="uno-json-stat-detail">Fixture only</span>');
+    check(
+      "FAMILY_STATS_HTTP the stats region is one definition list with two authored pairs in order",
+      statsRegion.includes('class="uno-json-stats"') && statsRegion.includes('<dl class="uno-json-stats-list">')
+        && (statsRegion.match(/<dt class="uno-json-stat-label">/gu) ?? []).length === 2
+        && (statsRegion.match(/<dd class="uno-json-stat-value">/gu) ?? []).length === 2
+        && statsRegion.includes(">Sampled sections</dt>") && statsRegion.includes('>13<span class="uno-json-stat-detail">')
+        && statsRegion.includes(">New examples</dt>") && statsRegion.includes(">4</dd>")
+        && statsRegion.indexOf("Sampled sections") < statsRegion.indexOf("New examples"),
+      statsRegion.slice(0, 200),
+    );
+    check(
+      "FAMILY_STATS_HTTP exactly one detail span, attached to the first item, with no invented heading or currency",
+      statsDetailAt > 0
+        && statsDetailAt < statsRegion.indexOf('<dt class="uno-json-stat-label">New examples</dt>')
+        && (statsRegion.match(/uno-json-stat-detail/gu) ?? []).length === 1
+        && !/uno-json-stats-heading|<h[1-6]\b|[$€£]|aria-labelledby/iu.test(statsRegion),
+      statsRegion.slice(0, 200),
+    );
     check(
       "FAMILY_CONTACT_OFF_HTTP the contact subtree carries no form, control, handler or destination",
       ["<form", "<input", "<textarea", "<button", "action=", "method=", "href=", "onSubmit", "wo066-contact", "contactForms"]
@@ -1436,10 +1605,58 @@ async function consentPhase(base) {
             .some((element) => ["action", "method", "href", "onsubmit", "onclick"].some((name) => element.hasAttribute(name))),
           contactHtml: contact?.outerHTML ?? "",
           actionCount: document.querySelectorAll("#family-7-actions a").length,
+          hero: (() => {
+            const region = document.querySelector("#family-9-hero");
+            return {
+              align: region?.getAttribute("data-uno-align") ?? "",
+              surface: region?.getAttribute("data-uno-surface") ?? "",
+              eyebrow: region?.querySelector(".uno-json-eyebrow")?.textContent ?? "",
+              lede: region?.querySelector(".uno-json-hero-lede")?.textContent ?? "",
+              support: region?.querySelector(".uno-json-hero-support")?.textContent ?? "",
+              anchors: region?.querySelectorAll("a, ul, iframe, button").length ?? -1,
+              visible: region === null ? false : region.getBoundingClientRect().height > 0,
+            };
+          })(),
+          stats: (() => {
+            const region = document.querySelector("#family-10-stats");
+            return {
+              dts: [...(region?.querySelectorAll("dt") ?? [])].map((node) => node.textContent ?? ""),
+              dds: [...(region?.querySelectorAll("dd") ?? [])].map((node) => node.textContent ?? ""),
+              details: region?.querySelectorAll(".uno-json-stat-detail").length ?? -1,
+              firstItemDetail: region?.querySelector(".uno-json-stat .uno-json-stat-detail")?.textContent ?? "",
+              heading: region?.querySelectorAll("h1, h2, h3, h4, h5, h6").length ?? -1,
+            };
+          })(),
+          steps: (() => {
+            const region = document.querySelector("#family-11-steps");
+            const items = [...(region?.querySelectorAll("li.uno-json-timeline-item") ?? [])];
+            return {
+              items: items.length,
+              titles: items.map((item) => item.querySelector(".uno-json-timeline-title")?.textContent ?? ""),
+              descriptions: region?.querySelectorAll(".uno-json-timeline-description").length ?? -1,
+              ariaCurrent: items.filter((item) => item.hasAttribute("aria-current")).length,
+              statuses: items.filter((item) => item.hasAttribute("data-uno-status")).length,
+              dates: region?.querySelectorAll(".uno-json-timeline-date").length ?? -1,
+            };
+          })(),
+          quote: (() => {
+            const region = document.querySelector("#family-12-quote");
+            return {
+              align: region?.getAttribute("data-uno-align") ?? "",
+              surface: region?.getAttribute("data-uno-surface") ?? "",
+              figures: region?.querySelectorAll("figure.uno-json-testimonial").length ?? -1,
+              quotes: [...(region?.querySelectorAll("blockquote.uno-json-testimonial-quote") ?? [])]
+                .map((node) => node.textContent ?? ""),
+              captions: region?.querySelectorAll("figcaption.uno-json-testimonial-caption").length ?? -1,
+              attribution: region?.querySelector(".uno-json-testimonial-attribution")?.textContent ?? "",
+              role: region?.querySelector(".uno-json-testimonial-role")?.textContent ?? "",
+              anchors: region?.querySelectorAll("a, iframe, form").length ?? -1,
+            };
+          })(),
           html: document.documentElement.outerHTML,
         };
       });
-      familyCheck(`${width}px nine top-level section ids in order`,
+      familyCheck(`${width}px thirteen top-level section ids in order`,
         JSON.stringify(seen.tops) === JSON.stringify(FAMILY_IDS), seen.tops.join(","));
       familyCheck(`${width}px one main and one h1`, seen.mains === 1 && seen.h1s === 1, `${seen.mains}/${seen.h1s}`);
       familyCheck(`${width}px no horizontal document overflow`, seen.overflow <= 2, String(seen.overflow));
@@ -1468,6 +1685,30 @@ async function consentPhase(base) {
       familyCheck(`${width}px the composed actions are two real same-document links`,
         seen.actionCount === 2 && seen.html.includes('href="#family-4-media"') && seen.html.includes('href="#family-6-contactform"'),
         String(seen.actionCount));
+
+      // `UNO-WO-067 / R01`: hero, stats, steps and quote are each verified inside their own composed section only.
+      familyCheck(`${width}px hero shows the authored eyebrow, lede and support with no action control`,
+        seen.hero.align === "center" && seen.hero.surface === "muted" && seen.hero.visible
+          && seen.hero.eyebrow === "Synthetic introduction" && seen.hero.lede === "The composed Page is visible."
+          && seen.hero.support === "This is a bounded, original fixture example." && seen.hero.anchors === 0,
+        JSON.stringify(seen.hero));
+      familyCheck(`${width}px stats show two authored pairs with one detail on the first item`,
+        seen.stats.dts.length === 2 && seen.stats.dds.length === 2
+          && seen.stats.dts[0] === "Sampled sections" && seen.stats.dts[1] === "New examples"
+          && seen.stats.dds[0].replace("Fixture only", "") === "13" && seen.stats.dds[1] === "4"
+          && seen.stats.details === 1 && seen.stats.firstItemDetail === "Fixture only" && seen.stats.heading === 0,
+        JSON.stringify(seen.stats));
+      familyCheck(`${width}px steps show two ordered titles and one description with no invented status`,
+        seen.steps.items === 2 && seen.steps.titles[0] === "Draft" && seen.steps.titles[1] === "Review"
+          && seen.steps.descriptions === 1 && seen.steps.ariaCurrent === 0 && seen.steps.statuses === 0 && seen.steps.dates === 0,
+        JSON.stringify(seen.steps));
+      familyCheck(`${width}px quote shows one figure, blockquote and caption with separate attribution and role`,
+        seen.quote.figures === 1 && seen.quote.quotes.length === 1
+          && seen.quote.quotes[0] === "The fixture does not establish full parity."
+          && seen.quote.captions === 1 && seen.quote.attribution === "Synthetic contributor"
+          && seen.quote.role === "Reviewer" && seen.quote.align === "center" && seen.quote.surface === "bordered"
+          && seen.quote.anchors === 0,
+        JSON.stringify(seen.quote));
 
       const familySummary = tab.locator("#family-3-faq summary").first();
       const familyDetails = tab.locator("#family-3-faq details").first();
