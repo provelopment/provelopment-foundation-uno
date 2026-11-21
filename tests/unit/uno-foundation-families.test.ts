@@ -56,8 +56,8 @@ function expectRefusal(input: unknown, reason: string, bindings?: unknown): void
   expect(Object.prototype.hasOwnProperty.call(outcome, "document")).toBe(false);
 }
 
-describe("composeUnoFoundationSubset — sixteen bounded source shapes", () => {
-  it("declares exactly the sixteen bounded families and leaves the 22-module registry untouched", () => {
+describe("composeUnoFoundationSubset — seventeen bounded source shapes", () => {
+  it("declares exactly the seventeen bounded families and leaves the 22-module registry untouched", () => {
     expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([
       "prose",
       "callout",
@@ -75,6 +75,7 @@ describe("composeUnoFoundationSubset — sixteen bounded source shapes", () => {
       "actions",
       "media",
       "gallery",
+      "contactForm",
     ]);
     expect(Object.isFrozen(UNO_FOUNDATION_SUBSET_FAMILIES)).toBe(true);
     expect(UNO_RENDERABLE_MODULES.length).toBe(22);
@@ -332,11 +333,11 @@ describe("composeUnoFoundationSubset — envelope, family and feature refusal", 
     expectRefusal(oversized, "family:target-refused");
   });
 
-  it("refuses every donor family outside the sixteen, never degrading it to prose", () => {
-    // `contactForm` is the only donor family left entirely unimplemented.
-    expectRefusal(envelope({ type: "contactForm" }), "family:unsupported-family");
-    // `media` and `gallery` are composed now, so no unsupported-family refusal may be claimed for them.
-    expectRefusal(envelope({ type: "heading" }), "family:unsupported-family");
+  it("refuses every donor family outside the seventeen, never degrading it to prose", () => {
+    // Every one of the donor's seventeen families is now composed, so only an unknown type can reach this refusal — and
+    // the canonical `contactForm` spelling is required: the target-id suffix never becomes a source alias.
+    expectRefusal(envelope({ type: "contact" }), "family:unsupported-family");
+    expectRefusal(envelope({ type: "contactform", formRef: "sales-inquiry" }), "family:unsupported-family");
     expectRefusal(envelope("prose"), "family:unsafe-source");
     expectRefusal(envelope({ body: "No type." }), "family:unsupported-feature");
   });
@@ -738,8 +739,8 @@ const DONOR_17 = [
   "divider",
   "contactForm",
 ] as const;
-/** The sixteen bounded subsets this adapter composes, in adapter order. */
-const MAPPED_16 = [
+/** The seventeen bounded subsets this adapter composes, in adapter order. */
+const MAPPED_17 = [
   "prose",
   "callout",
   "table",
@@ -756,6 +757,7 @@ const MAPPED_16 = [
   "actions",
   "media",
   "gallery",
+  "contactForm",
 ] as const;
 
 describe("composeUnoFoundationSubset — steps and quote React markup", () => {
@@ -1882,6 +1884,34 @@ function galleryBinding(): Record<string, unknown> {
     ],
   };
 }
+/** One supported donor contact section: an intent reference only, never a destination. */
+const CONTACT_SECTION = { type: "contactForm", formRef: "sales-inquiry" };
+
+/** The sixteen-section fixture plus the newly mapped `contactForm` family at source index 16. */
+function seventeenSectionSource(): Record<string, unknown> {
+  const source = sixteenSectionSource();
+  const sections = source["sections"] as readonly unknown[];
+  return { ...source, sections: [...sections, CONTACT_SECTION] };
+}
+
+/** The separate migration acknowledgement for that reference: consent to an inert notice, never delivery. */
+function contactBinding(formRef = "sales-inquiry"): Record<string, unknown> {
+  return { contactForms: [{ formRef, mode: "delivery-off" }] };
+}
+
+/** One combined binder covering the images and the acknowledgement the seventeen-section fixture needs. */
+function combinedBinding(): Record<string, unknown> {
+  return {
+    images: galleryBinding()["images"],
+    contactForms: contactBinding()["contactForms"],
+  };
+}
+
+/** One contact-only source, so a single contact notice can be asserted in isolation. */
+function contactOnlySource(): Record<string, unknown> {
+  return { version: 1, title: "Contact-only", sections: [CONTACT_SECTION] };
+}
+
 
 describe("composeUnoFoundationSubset — explicitly bound media", () => {
   it("composes fifteen nodes and keeps the first fourteen byte-identical", () => {
@@ -2252,10 +2282,10 @@ describe("composeUnoFoundationSubset — hostile media source", () => {
 });
 
 describe("composeUnoFoundationSubset — canonical donor inventory", () => {
-  it("maps exactly sixteen of the donor's seventeen families and leaves one unimplemented", () => {
-    const left = DONOR_17.filter((name) => !(MAPPED_16 as readonly string[]).includes(name));
-    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([...MAPPED_16]);
-    expect(left).toEqual(["contactForm"]);
+  it("maps all seventeen donor families and leaves none unimplemented", () => {
+    const left = DONOR_17.filter((name) => !(MAPPED_17 as readonly string[]).includes(name));
+    expect([...UNO_FOUNDATION_SUBSET_FAMILIES]).toEqual([...MAPPED_17]);
+    expect(left).toEqual([]);
   });
 
   it("keeps the committed ledger identical to the canonical inventory", () => {
@@ -2263,14 +2293,12 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
       fileURLToPath(new URL("../../.documents/Architecture/u04-family-parity.md", import.meta.url)),
       "utf8",
     );
-    const unimplemented = "**UNIMPLEMENTED (1):** `contactForm`.";
+    const unimplemented = "**UNIMPLEMENTED (0):** none.";
     expect(ledger.split(unimplemented).length - 1).toBe(1);
-    expect(ledger).not.toContain("UNIMPLEMENTED (10)");
-    expect(ledger).not.toContain("UNIMPLEMENTED (8)");
-    expect(ledger).not.toContain("UNIMPLEMENTED (6)");
-    expect(ledger).not.toContain("UNIMPLEMENTED (4)");
-    expect(ledger).not.toContain("UNIMPLEMENTED (3)");
+    expect(ledger).not.toContain("UNIMPLEMENTED (1)");
     expect(ledger).not.toContain("UNIMPLEMENTED (2)");
+    expect(ledger).not.toContain("UNIMPLEMENTED (3)");
+    expect(ledger).not.toContain("UNIMPLEMENTED (4)");
     expect(ledger).not.toContain("These thirteen mappings");
     expect(ledger).not.toContain("These fifteen mappings");
     expect(ledger).not.toContain("seven bounded");
@@ -2281,6 +2309,10 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).not.toContain("fourteen composed");
     expect(ledger).not.toContain("fifteen bounded");
     expect(ledger).not.toContain("fifteen composed");
+    expect(ledger).not.toContain("sixteen bounded");
+    expect(ledger).not.toContain("These sixteen mappings");
+    expect(ledger).not.toContain("one donor family entirely unimplemented");
+    expect(ledger).not.toContain("sixteen composed");
     expect(ledger).not.toContain("four donor families");
     expect(ledger).not.toContain("three donor families");
     expect(ledger).not.toContain("two donor families");
@@ -2299,22 +2331,30 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
       "actions",
       "media",
       "gallery",
+      "contactForm",
     ]) {
       expect(ledger).toContain(`| \`${family}\` |`);
     }
     // Each newest row names its own disposition, donor and local Uno evidence.
     expect(ledger).toContain("`COMPOSE (explicit owned-image binding subset)`");
     expect(ledger).toContain("`COMPOSE (explicit owned-gallery binding subset)`");
+    expect(ledger).toContain("`COMPOSE (acknowledged delivery-OFF notice subset)`");
     expect(ledger).toContain("f988a0e5");
     expect(ledger).toContain("e3f3a12e");
     expect(ledger).toContain("2d968300");
     expect(ledger).toContain("cde15a6b");
-    expect(ledger).toContain("These sixteen mappings");
-    expect(ledger).toContain("sixteen bounded");
+    expect(ledger).toContain("a12d964c");
+    expect(ledger).toContain("fc35a52d");
+    expect(ledger).toContain("These seventeen mappings");
+    expect(ledger).toContain("seventeen bounded");
     expect(ledger).toContain("zero of seventeen full semantic parity");
+    expect(ledger).toContain("zero entirely unimplemented");
+    expect(ledger).toContain("zero published family Page acceptance evidence");
+    expect(ledger).toContain("family-<index>-contactform");
     expect(ledger).toContain("Deliberately absent donor design (media and its binding)");
     expect(ledger).toContain("Deliberately absent donor design (gallery)");
     expect(ledger).toContain("Deliberately absent donor design (actions)");
+    expect(ledger).toContain("Deliberately absent donor design (contactForm)");
   });
 });
 
@@ -2815,5 +2855,453 @@ describe("composeUnoFoundationSubset — hostile gallery source", () => {
     if (mixed.status === "refused") expect(mixed.reason).toBe("family:unsafe-source");
     expect(Object.prototype.hasOwnProperty.call(mixed, "document")).toBe(false);
     expect(ran).toBe(0);
+  });
+});
+
+describe("composeUnoFoundationSubset — acknowledged delivery-OFF contact", () => {
+  it("composes seventeen nodes and keeps the first sixteen byte-identical", () => {
+    const sixteen = composed(sixteenSectionSource(), galleryBinding());
+    const seventeen = composed(seventeenSectionSource(), combinedBinding());
+    expect(seventeen.sections.length).toBe(17);
+    expect(seventeen.sections[16]).toEqual({
+      id: "family-16-contactform",
+      module: "interaction.contact",
+      props: {},
+    });
+    expect(JSON.stringify(seventeen.sections.slice(0, 16))).toBe(JSON.stringify(sixteen.sections));
+    // The sixteen-shape source with its image-only binder (no `contactForms` key) still yields identical bytes.
+    expect(JSON.stringify(composed(sixteenSectionSource(), galleryBinding()))).toBe(JSON.stringify(sixteen));
+  });
+
+  it("composes one minimal contact notice, keeps both inputs unchanged and leaks nothing", () => {
+    const source = contactOnlySource();
+    const bindings = contactBinding();
+    const before = JSON.stringify([source, bindings]);
+    const outcome = composeUnoFoundationSubset(source, bindings);
+    expect(outcome.status).toBe("composed");
+    if (outcome.status !== "composed") return;
+    expect(outcome.document.sections).toEqual([
+      { id: "family-0-contactform", module: "interaction.contact", props: {} },
+    ]);
+    const node = outcome.document.sections[0];
+    expect(node === undefined ? null : Object.keys(node)).toEqual(["id", "module", "props"]);
+    expect(JSON.stringify([source, bindings])).toBe(before);
+    expect(Object.isFrozen(outcome.document)).toBe(true);
+    expect(node === undefined ? false : Object.isFrozen(node)).toBe(true);
+    expect(node === undefined ? false : Object.isFrozen(node.props)).toBe(true);
+    // The unchanged Uno reader reaccepts both the object and its JSON text.
+    expect(readUnoPageDocument(JSON.parse(JSON.stringify(outcome.document)) as unknown).accepted).toBe(true);
+    expect(readUnoPageDocument(JSON.stringify(outcome.document)).accepted).toBe(true);
+    const serialized = JSON.stringify(outcome.document);
+    for (const forbidden of [
+      "sales-inquiry",
+      "contactForms",
+      "delivery-off",
+      "webhook",
+      "provider",
+      "recipient",
+      "formRef",
+    ]) {
+      expect(serialized).not.toContain(forbidden);
+    }
+  });
+
+  it("keeps the frozen id grammar: camel-case target refuses, lowercase target is accepted", () => {
+    const camel = readUnoPageDocument({
+      version: 1,
+      title: "ID grammar",
+      sections: [{ id: "family-0-contactForm", module: "interaction.contact", props: {} }],
+    });
+    expect(camel.accepted).toBe(false);
+    if (camel.accepted) return;
+    expect(camel.reason).toBe("document:invalid-section-id");
+    const lower = readUnoPageDocument({
+      version: 1,
+      title: "ID grammar",
+      sections: [{ id: "family-0-contactform", module: "interaction.contact", props: {} }],
+    });
+    expect(lower.accepted).toBe(true);
+    if (!lower.accepted) return;
+    expect(lower.document.sections[0]?.id).toBe("family-0-contactform");
+    // The canonical donor `type` remains required; the target suffix is never a source alias.
+    expectRefusal(
+      envelope({ type: "contactform", formRef: "sales-inquiry" }),
+      "family:unsupported-family",
+      contactBinding(),
+    );
+  });
+
+  it("renders only the fixed delivery-OFF notice and no form, control or transport", () => {
+    const document = composed(contactOnlySource(), contactBinding());
+    const html = render(document);
+    expect(html).toContain('<section class="uno-json-contact" id="family-0-contactform">');
+    expect(html).toContain(
+      '<p class="uno-json-contact-status">Delivery is switched off. Nothing entered here is sent or stored.</p>',
+    );
+    const region = html.slice(html.indexOf('<section class="uno-json-contact"'));
+    for (const forbidden of [
+      "<form",
+      "<input",
+      "<textarea",
+      "<button",
+      "submit",
+      "action=",
+      "method=",
+      "onSubmit",
+      "href=",
+      "<iframe",
+      "<script",
+      "sales-inquiry",
+      "contactForms",
+      'role="alert"',
+    ]) {
+      expect(region).not.toContain(forbidden);
+    }
+    // The contact section is the whole body: no second landmark or heading is manufactured.
+    expect(html.split("<main").length - 1).toBe(0);
+    expect(html.split("<h1").length - 1).toBe(0);
+  });
+
+  it("requires an exact acknowledgement for every contact reference", () => {
+    // No binder at all: the acknowledgement is mandatory even though every notice is inert.
+    expectRefusal(contactOnlySource(), "family:unsupported-feature");
+    expectRefusal(contactOnlySource(), "family:unsupported-feature", {});
+    expectRefusal(contactOnlySource(), "family:target-refused", { images: [] });
+    // Wrong, extra, duplicate and mismatched acknowledgements.
+    expectRefusal(contactOnlySource(), "family:unsupported-feature", contactBinding("other-form"));
+    expectRefusal(
+      contactOnlySource(),
+      "family:unsupported-feature",
+      { contactForms: [{ formRef: "sales-inquiry", mode: "delivery-off" }, { formRef: "extra", mode: "delivery-off" }] },
+    );
+    expectRefusal(
+      contactOnlySource(),
+      "family:unsupported-feature",
+      {
+        contactForms: [
+          { formRef: "sales-inquiry", mode: "delivery-off" },
+          { formRef: "sales-inquiry", mode: "delivery-off" },
+        ],
+      },
+    );
+    // A binder on a Page that authored no contact section is unused authority.
+    expectRefusal(envelope({ type: "prose", body: "A" }), "family:unsupported-feature", contactBinding());
+    // Modes other than the single literal, and any extra entry key.
+    for (const mode of ["on", "preview", "webhook", "enabled", true, 1, null]) {
+      expectRefusal(
+        contactOnlySource(),
+        "family:unsupported-feature",
+        { contactForms: [{ formRef: "sales-inquiry", mode }] },
+      );
+    }
+    // An explicit `undefined` mode is not plain data at all.
+    expectRefusal(
+      contactOnlySource(),
+      "family:unsafe-source",
+      { contactForms: [{ formRef: "sales-inquiry", mode: undefined }] },
+    );
+    expectRefusal(
+      contactOnlySource(),
+      "family:unsupported-feature",
+      { contactForms: [{ formRef: "sales-inquiry", mode: "delivery-off", recipient: "team@example.test" }] },
+    );
+    expectRefusal(
+      contactOnlySource(),
+      "family:unsupported-feature",
+      { contactForms: [{ formRef: "sales-inquiry", mode: "delivery-off", url: "https://example.test" }] },
+    );
+    // Envelope shape: non-plain, extra keys and inherited keys.
+    expectRefusal(contactOnlySource(), "family:unsupported-feature", null);
+    expectRefusal(contactOnlySource(), "family:unsupported-feature", "contactForms");
+    expectRefusal(contactOnlySource(), "family:unsupported-feature", { contactForms: "sales-inquiry" });
+    expectRefusal(contactOnlySource(), "family:unsupported-feature", {
+      contactForms: [{ formRef: "sales-inquiry", mode: "delivery-off" }],
+      provider: "acme",
+    });
+  });
+
+  it("lets one acknowledgement serve repeated references but not two distinct ones", () => {
+    const shared = composed(
+      {
+        version: 1,
+        title: "Two contacts",
+        sections: [
+          { type: "contactForm", formRef: "sales-inquiry" },
+          { type: "contactForm", formRef: "sales-inquiry" },
+        ],
+      },
+      contactBinding(),
+    );
+    expect(shared.sections.map((section) => section.id)).toEqual([
+      "family-0-contactform",
+      "family-1-contactform",
+    ]);
+    expect(JSON.stringify(shared)).not.toContain("sales-inquiry");
+    // Two distinct references need two distinct acknowledgements, and order does not matter.
+    const twoDistinctSource = {
+      version: 1,
+      title: "Two contacts",
+      sections: [
+        { type: "contactForm", formRef: "sales-inquiry" },
+        { type: "contactForm", formRef: "support-request" },
+      ],
+    };
+    expectRefusal(twoDistinctSource, "family:unsupported-feature", contactBinding());
+    const twoAcknowledgements = {
+      contactForms: [
+        { formRef: "sales-inquiry", mode: "delivery-off" },
+        { formRef: "support-request", mode: "delivery-off" },
+      ],
+    };
+    const reversed = {
+      contactForms: [
+        { formRef: "support-request", mode: "delivery-off" },
+        { formRef: "sales-inquiry", mode: "delivery-off" },
+      ],
+    };
+    const forward = composed(twoDistinctSource, twoAcknowledgements);
+    expect(JSON.stringify(composed(twoDistinctSource, reversed))).toBe(JSON.stringify(forward));
+    expect(forward.sections.map((section) => section.id)).toEqual([
+      "family-0-contactform",
+      "family-1-contactform",
+    ]);
+  });
+
+  it("refuses source-authored contact fields, labels and delivery metadata instead of dropping them", () => {
+    for (const extra of [
+      { fields: [{ name: "email", type: "email" }] },
+      { heading: "Contact" },
+      { description: "Tell us." },
+      { submitLabel: "Send" },
+      { title: "Contact" },
+      { delivery: "on" },
+      { recipient: "team@example.test" },
+      { webhook: "https://example.test/hook" },
+      { transport: "email" },
+      { method: "POST" },
+      { action: "/api/contact" },
+      { onSubmit: "handler" },
+      { style: "color:red" },
+      { html: "<form>" },
+      { text: "Default copy" },
+      { interactive: true },
+      { metadata: { provider: "acme" } },
+      { provider: "acme" },
+      { token: "secret" },
+      { name: "sales" },
+    ]) {
+      expectRefusal(
+        envelope({ type: "contactForm", formRef: "sales-inquiry", ...extra }),
+        "family:unsupported-feature",
+        contactBinding(),
+      );
+    }
+    // A missing or non-string reference is a feature refusal; a malformed one is a target refusal, and an explicit
+    // `undefined` is not plain data at all.
+    expectRefusal(envelope({ type: "contactForm" }), "family:unsupported-feature", contactBinding());
+    expectRefusal(
+      envelope({ type: "contactForm", formRef: undefined }),
+      "family:unsafe-source",
+      contactBinding(),
+    );
+    for (const formRef of [1, true, null, ["sales-inquiry"], { ref: "sales-inquiry" }]) {
+      expectRefusal(envelope({ type: "contactForm", formRef }), "family:unsupported-feature", contactBinding());
+    }
+    for (const formRef of [
+      "",
+      "   ",
+      " sales-inquiry",
+      "sales-inquiry ",
+      "Sales-Inquiry",
+      "sales_inquiry",
+      "sales/inquiry",
+      "sales.inquiry",
+      "sales@inquiry",
+      "-sales-inquiry",
+      "s".repeat(65),
+    ]) {
+      expectRefusal(envelope({ type: "contactForm", formRef }), "family:target-refused", {
+        contactForms: [{ formRef, mode: "delivery-off" }],
+      });
+    }
+  });
+
+  it("accepts the full pinned grammar and refuses a ninth acknowledgement or a ninth reference", () => {
+    const ref64 = "a".repeat(64);
+    const full = composed(
+      envelope({ type: "contactForm", formRef: ref64 }),
+      { contactForms: [{ formRef: ref64, mode: "delivery-off" }] },
+    );
+    expect(full.sections[0]?.id).toBe("family-0-contactform");
+    expect(JSON.stringify(full)).not.toContain(ref64);
+    // Internal and trailing hyphens are inside the pinned donor grammar; the subset never trims or normalises.
+    for (const formRef of ["sales-inquiry", "sales-inquiry-", "a-1-b", "9lives"]) {
+      expect(
+        composed(envelope({ type: "contactForm", formRef }), {
+          contactForms: [{ formRef, mode: "delivery-off" }],
+        }).sections.length,
+      ).toBe(1);
+    }
+    // One to eight acknowledgements, matching one to eight authored sections.
+    const contacts = (count: number): Record<string, unknown>[] =>
+      Array.from({ length: count }, (_unused, position) => ({
+        type: "contactForm",
+        formRef: `form-${position}`,
+      }));
+    const acknowledgement = (count: number): Record<string, unknown> => ({
+      contactForms: Array.from({ length: count }, (_unused, position) => ({
+        formRef: `form-${position}`,
+        mode: "delivery-off",
+      })),
+    });
+    expect(composed({ version: 1, title: "Eight", sections: contacts(1) }, acknowledgement(1)).sections.length).toBe(1);
+    expect(composed({ version: 1, title: "Eight", sections: contacts(8) }, acknowledgement(8)).sections.length).toBe(8);
+    expectRefusal({ version: 1, title: "Nine", sections: contacts(8) }, "family:target-refused", acknowledgement(9));
+    expectRefusal({ version: 1, title: "Zero", sections: contacts(1) }, "family:target-refused", { contactForms: [] });
+    // Nine authored contact sections exceed the acknowledgement bound, so the binder refuses before composition.
+    expectRefusal({ version: 1, title: "Nine", sections: contacts(9) }, "family:target-refused", acknowledgement(9));
+  });
+
+
+
+
+  it("shares one binder across images and contacts without weakening either exact set", () => {
+    const source = {
+      version: 1,
+      title: "Media and contact",
+      sections: [
+        { type: "media", image: { src: "/assets/portrait.png", alt: "Portrait of the founder" } },
+        {
+          type: "gallery",
+          columns: 2,
+          items: [
+            { image: { src: "/assets/scene.webp", alt: "A city square" } },
+            { image: { src: "/assets/portrait.png", alt: "Portrait of the founder" } },
+          ],
+        },
+        { type: "contactForm", formRef: "sales-inquiry" },
+      ],
+    };
+    const shared = {
+      images: [
+        { source: "/assets/portrait.png", owned: { zone: "page", path: "images/portrait.png" } },
+        { source: "/assets/scene.webp", owned: { zone: "theme", path: "gallery/scene.webp" } },
+      ],
+      contactForms: [{ formRef: "sales-inquiry", mode: "delivery-off" }],
+    };
+    const document = composed(source, shared);
+    expect(document.sections.map((section) => section.id)).toEqual([
+      "family-0-media",
+      "family-1-gallery",
+      "family-2-contactform",
+    ]);
+    // Removing either key leaves unused authority on the other side and refuses the whole Page.
+    expectRefusal(source, "family:unsupported-feature", { images: shared.images });
+    expectRefusal(source, "family:unsupported-feature", { contactForms: shared.contactForms });
+    // Extra image or contact authority refuses too.
+    expectRefusal(source, "family:unsupported-feature", {
+      ...shared,
+      contactForms: [...shared.contactForms, { formRef: "extra-form", mode: "delivery-off" }],
+    });
+    expectRefusal(source, "family:unsupported-feature", {
+      images: [...shared.images, { source: "/assets/spare.png", owned: { zone: "page", path: "images/spare.png" } }],
+      contactForms: shared.contactForms,
+    });
+  });
+
+  it("never invokes a source accessor and refuses hostile contact data as unsafe", () => {
+    let getterRuns = 0;
+    const hostileSection = (): Record<string, unknown> => {
+      const section: Record<string, unknown> = { type: "contactForm" };
+      Object.defineProperty(section, "formRef", {
+        enumerable: true,
+        get() {
+          getterRuns += 1;
+          return "sales-inquiry";
+        },
+      });
+      return section;
+    };
+    expectRefusal(envelope(hostileSection()), "family:unsafe-source", contactBinding());
+    expectRefusal(contactOnlySource(), "family:unsafe-source", {
+      get contactForms() {
+        getterRuns += 1;
+        return [{ formRef: "sales-inquiry", mode: "delivery-off" }];
+      },
+    });
+    // Entry-level accessors on `formRef` and on `mode`.
+    const entryAccessor: Record<string, unknown> = { mode: "delivery-off" };
+    Object.defineProperty(entryAccessor, "formRef", {
+      enumerable: true,
+      get() {
+        getterRuns += 1;
+        return "sales-inquiry";
+      },
+    });
+    expectRefusal(contactOnlySource(), "family:unsafe-source", { contactForms: [entryAccessor] });
+    const modeAccessor: Record<string, unknown> = { formRef: "sales-inquiry" };
+    Object.defineProperty(modeAccessor, "mode", {
+      enumerable: true,
+      get() {
+        getterRuns += 1;
+        return "delivery-off";
+      },
+    });
+    expectRefusal(contactOnlySource(), "family:unsafe-source", { contactForms: [modeAccessor] });
+    // An accessor on the array index itself, a sparse array, a foreign prototype, `__proto__` and a cycle.
+    const indexAccessor: unknown[] = [];
+    Object.defineProperty(indexAccessor, "0", {
+      enumerable: true,
+      get() {
+        getterRuns += 1;
+        return { formRef: "sales-inquiry", mode: "delivery-off" };
+      },
+    });
+    indexAccessor.length = 1;
+    expectRefusal(contactOnlySource(), "family:unsafe-source", { contactForms: indexAccessor });
+    const sparse: unknown[] = [];
+    sparse[1] = { formRef: "sales-inquiry", mode: "delivery-off" };
+    expectRefusal(contactOnlySource(), "family:unsafe-source", { contactForms: sparse });
+    expectRefusal(
+      contactOnlySource(),
+      "family:unsafe-source",
+      Object.create({ contactForms: [] }) as Record<string, unknown>,
+    );
+    expectRefusal(contactOnlySource(), "family:unsafe-source", JSON.parse('{"__proto__":{}}') as unknown);
+    const cycle: Record<string, unknown> = { contactForms: [] };
+    (cycle["contactForms"] as unknown[]).push(cycle);
+    expectRefusal(contactOnlySource(), "family:unsafe-source", cycle);
+    // A valid older family before or after malicious contact data still refuses the whole Page.
+    expectRefusal(
+      { version: 1, title: "Mixed", sections: [{ type: "prose", body: "Before." }, hostileSection()] },
+      "family:unsafe-source",
+      contactBinding(),
+    );
+    expectRefusal(
+      { version: 1, title: "Mixed", sections: [CONTACT_SECTION, { type: "divider", html: "<b>" }] },
+      "family:unsupported-feature",
+      contactBinding(),
+    );
+    expect(getterRuns).toBe(0);
+  });
+
+  it("keeps the adapter commentary current and never widens the Uno contact renderer", () => {
+    const adapter = readFileSync(
+      fileURLToPath(new URL("../../src/application/compose-uno-foundation-families.ts", import.meta.url)),
+      "utf8",
+    );
+    expect(adapter).toContain("seventeen Foundation section families");
+    expect(adapter).toContain("inert-notice");
+    expect(adapter).not.toContain("sixteen Foundation section families");
+    expect(adapter).not.toContain("plain-text subset** of seventeen");
+    expect(adapter).not.toContain("family-${index}-contactForm");
+    // The generated target id is lowercase and conditional, so no prior family id changes spelling.
+    expect(adapter).toContain('type === "contactForm" ? `family-${index}-${CONTACT_TARGET_SUFFIX}`');
+    const renderer = readFileSync(
+      fileURLToPath(new URL("../../src/components/uno-page-sections.tsx", import.meta.url)),
+      "utf8",
+    );
+    expect(renderer).toContain("Delivery is switched off. Nothing entered here is sent or stored.");
+    expect(renderer).not.toContain("formRef");
   });
 });

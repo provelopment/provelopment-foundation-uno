@@ -1,12 +1,13 @@
 /**
  * Foundation Uno — the bounded Foundation→Uno family composition adapter (`UNO-WO-057 / R01`, extended by
  * `UNO-WO-058 / R01`, `UNO-WO-059 / R01`, `UNO-WO-060 / R01`, `UNO-WO-061 / R01`, `UNO-WO-062 / R01`,
- * `UNO-WO-063 / R01` and `UNO-WO-064 / R01`, U04).
+ * `UNO-WO-063 / R01`, `UNO-WO-064 / R01` and `UNO-WO-065 / R02`, U04).
  *
- * WHAT THIS IS. One pure, inward application function that translates a deliberately small **plain-text subset** of
- * sixteen Foundation section families into the already accepted Uno v1 JSON Page document. It closes the gap between a
- * donor source shape and Uno's own validated document: the caller supplies untrusted donor data, this module either
- * returns one accepted, deep-frozen `UnoPageDocument` or one closed refusal, and it never returns a partial Page.
+ * WHAT THIS IS. One pure, inward application function that translates a deliberately small **plain-text and inert-notice
+ * subset** of seventeen Foundation section families into the already accepted Uno v1 JSON Page document. It closes the
+ * gap between a donor source shape and Uno's own validated document: the caller supplies untrusted donor data, this
+ * module either returns one accepted, deep-frozen `UnoPageDocument` or one closed refusal, and it never returns a partial
+ * Page.
  *
  * WHY IT EXISTS. Uno's Page document is the single publication authority, and the Foundation families are the
  * vocabulary the migration must express. Composing that vocabulary by hand in a route or a component would spread
@@ -15,7 +16,7 @@
  *
  * WHAT IT IS NOT. It does not read a file, a manifest, a host, an environment variable or a provider; it publishes
  * nothing, routes nothing, renders nothing and owns no locale, Site, visibility or delivery authority. It implements
- * **sixteen** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
+ * **seventeen** bounded subset mappings only, out of the donor's seventeen families. It is not a Markdown parser, a link or
  * media converter, and it is not the seventeen family parity work: no full `FAMILY_PARITY` result may be derived
  * from it. In particular `steps` reproduces the donor's ordered sequence and optional body as plain text, but Uno's
  * timeline title is a `<p>` where the donor step title was an `<h3>`, so the donor heading outline is deliberately
@@ -37,7 +38,14 @@
  * descriptive images with an explicit authored `columns` of 2, 3 or 4 and the same kind of explicit owned-asset binding:
  * the donor's native `<ul>`/`<li>` grouping becomes Uno's `<div>` of `<figure>` children, the donor's optional heading,
  * lede, surface, decorative images and Markdown captions are outside the subset, and the donor's implicit column default
- * is never borrowed, so `gallery` is not full parity.
+ * is never borrowed, so `gallery` is not full parity. `contactForm` composes **only** one inert `interaction.contact`
+ * notice with empty props, and only when the caller separately acknowledges that exact donor `formRef` with
+ * `mode:"delivery-off"`: the donor reference is an intent key, never a recipient, URL, webhook, provider or secret, it is
+ * never copied into the Page, and no form field, submit control, handler, transport or storage exists. Its generated Uno
+ * node id uses the legal lowercase target suffix (`family-<index>-contactform`) because the frozen Uno section-id grammar
+ * admits no uppercase, while the donor `type` stays the canonical `contactForm`. Where the donor renders **nothing** when
+ * it has no authorized form renderer, Uno renders a visible OFF notice, so this is a documented behavioural difference and
+ * not contact parity.
  *
  * PROVENANCE. Original **Uno-owned** implementation, adaptation class **NEW / COMPOSE (plain-text subset)**. Concepts
  * — never copied source, CSS, components or assets — are adapted from `provelopment/provelopment-foundation` at
@@ -71,7 +79,7 @@ import {
   type UnoOwnedAssetRef,
 } from "../core/assets/uno-owned-media";
 
-/** The sixteen donor source families this bounded adapter accepts, in the order the ledger documents them. */
+/** The seventeen donor source families this bounded adapter accepts, in the order the ledger documents them. */
 export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "prose",
   "callout",
@@ -89,6 +97,7 @@ export const UNO_FOUNDATION_SUBSET_FAMILIES = Object.freeze([
   "actions",
   "media",
   "gallery",
+  "contactForm",
 ] as const);
 
 /** One accepted donor family name. */
@@ -98,7 +107,7 @@ export type UnoFoundationSubsetFamily = (typeof UNO_FOUNDATION_SUBSET_FAMILIES)[
  * The closed refusal vocabulary.
  *
  * `unsafe-source` — the input is not plain readable data (hostile object, accessor, cycle, sparse array, oversize).
- * `unsupported-family` — a real donor family outside these sixteen, never silently dropped.
+ * `unsupported-family` — a real donor family outside these seventeen, never silently dropped.
  * `unsupported-feature` — a supported family carrying an out-of-subset field or Markdown this subset cannot render.
  * `target-refused` — the composed candidate is not an acceptable Uno Page; no partial document is ever returned.
  */
@@ -143,6 +152,20 @@ const FORBIDDEN_SOURCE_KEYS: readonly string[] = Object.freeze(["__proto__", "co
  */
 const ACTIONS_FRAGMENT = /^#family-(?:0|[1-9][0-9]*)-[a-z][a-zA-Z0-9]*(?:-[a-zA-Z0-9]+)*$/u;
 
+/** The pinned donor `formRef` identity: lowercase ASCII start, lowercase/digit/hyphen remainder, at most 64 characters. */
+const CONTACT_FORM_REF = /^[a-z0-9][a-z0-9-]{0,63}$/u;
+
+/** The single acknowledgement mode this subset understands: an inert OFF notice, never delivery. */
+const CONTACT_ACKNOWLEDGEMENT_MODE = "delivery-off";
+
+/**
+ * The generated Uno node-id suffix for the donor `contactForm` family.
+ *
+ * The donor `type` stays canonical and camel-cased; only the composed id must satisfy the frozen Uno section-id grammar
+ * `/^[a-z][a-z0-9-]{0,47}$/u`, which admits no uppercase. This is a target-id spelling, not a renamed family.
+ */
+const CONTACT_TARGET_SUFFIX = "contactform";
+
 /** The donor media identity prefix. It is an opaque migration key, never an Uno-served path. */
 const MEDIA_SOURCE_PREFIX = "/assets/";
 
@@ -175,23 +198,94 @@ interface MediaBindingContext {
 }
 
 /**
- * Read the optional second argument — a migration binding, never source or publication authority.
+ * Read the optional second argument's envelope: at least one of the own keys `images` and `contactForms`.
  *
- * The whole value has already been snapshotted, so nothing here can run authored code. A present binder is exactly
- * `{images:[...]}` with one to eight dense `{source,owned}` entries; sources are unique validated donor identities and
- * each owned value is validated by the established Uno-owned image policy *before* any candidate exists. An absent
- * binder yields an empty lookup, which the `media` arm treats as a refusal rather than as permission to invent a path.
+ * The whole value has already been snapshotted, so nothing here can run authored code. Neither key is authority: they are
+ * migration declarations that make a donor identity representable, never a licence to serve an asset or to deliver
+ * anything. `{}`, an inherited shape, a non-plain value or an extra key refuses rather than being ignored, so a caller
+ * cannot smuggle a provider, recipient, URL or secret through the binder.
+ */
+interface MigrationBindingEnvelope {
+  readonly images: PlainValue | undefined;
+  readonly contactForms: PlainValue | undefined;
+}
+
+function readMigrationBindingEnvelope(value: PlainValue | undefined): MigrationBindingEnvelope | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || typeof value !== "object" || Array.isArray(value)) refuseUnsupportedFeature();
+  const binder = value as PlainRecord;
+  requireExactKeys(binder, [], ["images", "contactForms"]);
+  const images = ownsKey(binder, "images") ? binder["images"] : undefined;
+  const contactForms = ownsKey(binder, "contactForms") ? binder["contactForms"] : undefined;
+  // An empty envelope is neither an image nor a contact declaration; it is refused rather than treated as absent.
+  if (images === undefined && contactForms === undefined) refuseUnsupportedFeature();
+  return { images, contactForms };
+}
+
+/** One validated contact-migration context: acknowledged `formRef` identities plus the ones actually consumed. */
+interface ContactBindingContext {
+  readonly acknowledged: ReadonlyMap<string, true>;
+  readonly usedRefs: Set<string>;
+}
+
+/**
+ * Read one donor `formRef` identity, or `null` when it is not the pinned donor grammar.
+ *
+ * The value is a donor-side intent reference, never a provider, recipient, URL, webhook or secret. It is deliberately
+ * narrower than the donor's trim semantics: nothing is trimmed, lowercased, normalised or aliased, so a padded or
+ * upper-case reference refuses instead of silently becoming a different form identity.
+ */
+function readContactFormRef(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return CONTACT_FORM_REF.test(value) ? value : null;
+}
+
+/**
+ * Read the optional `contactForms` acknowledgement list: one to eight unique `{formRef, mode:"delivery-off"}` entries.
+ *
+ * The list is consent to render an inert notice, not consent to deliver anything. There is no entry field for a
+ * recipient, URL, provider, token, secret, status or callback, and an extra key refuses rather than being dropped.
+ */
+function readContactAcknowledgements(value: PlainValue | undefined): ReadonlyMap<string, true> {
+  const acknowledged = new Map<string, true>();
+  if (value === undefined) return acknowledged;
+  if (!Array.isArray(value)) refuseUnsupportedFeature();
+  if (value.length < 1 || value.length > 8) refuseTarget();
+  for (const rawAcknowledgement of value) {
+    if (
+      rawAcknowledgement === null ||
+      typeof rawAcknowledgement !== "object" ||
+      Array.isArray(rawAcknowledgement)
+    ) {
+      refuseUnsupportedFeature();
+    }
+    const entry = rawAcknowledgement as PlainRecord;
+    requireExactKeys(entry, ["formRef", "mode"], []);
+    const rawFormRef = entry["formRef"];
+    if (typeof rawFormRef !== "string") refuseUnsupportedFeature();
+    const formRef = readContactFormRef(rawFormRef);
+    if (formRef === null) refuseTarget();
+    if (entry["mode"] !== CONTACT_ACKNOWLEDGEMENT_MODE) refuseUnsupportedFeature();
+    if (acknowledged.has(formRef)) refuseUnsupportedFeature();
+    acknowledged.set(formRef, true);
+  }
+  return acknowledged;
+}
+
+/**
+ * Read the optional image binding list — exactly one to eight dense `{source, owned}` entries.
+ *
+ * A present list is a declaration, never source or publication authority: sources are unique validated donor identities
+ * and each owned value is validated by the established Uno-owned image policy *before* any candidate exists. An absent
+ * list yields an empty lookup, which the `media` and `gallery` arms treat as a refusal rather than as permission to invent
+ * a path.
  */
 function readImageBindings(value: PlainValue | undefined): ReadonlyMap<string, UnoOwnedAssetRef> {
   const lookup = new Map<string, UnoOwnedAssetRef>();
   if (value === undefined) return lookup;
-  if (value === null || typeof value !== "object" || Array.isArray(value)) refuseUnsupportedFeature();
-  const binder = value as PlainRecord;
-  requireExactKeys(binder, ["images"], []);
-  const images = binder["images"];
-  if (!Array.isArray(images)) refuseUnsupportedFeature();
-  if (images.length < 1 || images.length > 8) refuseTarget();
-  for (const rawImage of images) {
+  if (!Array.isArray(value)) refuseUnsupportedFeature();
+  if (value.length < 1 || value.length > 8) refuseTarget();
+  for (const rawImage of value) {
     if (rawImage === null || typeof rawImage !== "object" || Array.isArray(rawImage)) {
       refuseUnsupportedFeature();
     }
@@ -397,7 +491,8 @@ interface CandidateSection {
     | "content.heading"
     | "content.actions"
     | "media.image"
-    | "media.gallery";
+    | "media.gallery"
+    | "interaction.contact";
   readonly props: Record<string, unknown>;
   /**
    * Nested children of a child-bearing module (`interaction.accordion`, `layout.grid`, `layout.stack`).
@@ -445,7 +540,12 @@ function readNewFamilyText(value: PlainValue | undefined): string {
  * never degraded to a paragraph; a supported family carrying any extra field refuses as a feature. Section ids are
  * `family-<index>-<type>`, which stays inside Uno's own closed section-id grammar.
  */
-function composeSection(section: PlainValue, index: number, media: MediaBindingContext): CandidateSection {
+function composeSection(
+  section: PlainValue,
+  index: number,
+  media: MediaBindingContext,
+  contacts: ContactBindingContext,
+): CandidateSection {
   if (section === null || typeof section !== "object" || Array.isArray(section)) refuseUnsafeSource();
   const record = section as PlainRecord;
 
@@ -455,7 +555,11 @@ function composeSection(section: PlainValue, index: number, media: MediaBindingC
     throw new SourceRefusal("family:unsupported-family");
   }
 
-  const id = `family-${index}-${type}`;
+  // The donor `type` decides the family and stays canonical; only the generated Uno id must satisfy the frozen
+  // section-id grammar, which is why the `contactForm` family's target suffix is lowercase. Every prior family keeps its
+  // existing spelling byte-identically.
+  const id =
+    type === "contactForm" ? `family-${index}-${CONTACT_TARGET_SUFFIX}` : `family-${index}-${type}`;
 
   switch (type) {
     case "prose": {
@@ -792,6 +896,20 @@ function composeSection(section: PlainValue, index: number, media: MediaBindingC
       }
       return { id, module: "media.gallery", props: { columns, items } };
     }
+    case "contactForm": {
+      // The donor accepts `{type, formRef}` only: a reference to a form renderer it may or may not have. This subset
+      // composes an inert notice, never a form, so the reference must carry an exact, separate migration
+      // acknowledgement; nothing about it is ever copied into the Page.
+      requireExactKeys(record, ["type", "formRef"], []);
+      const rawFormRef = record["formRef"];
+      if (typeof rawFormRef !== "string") refuseUnsupportedFeature();
+      const formRef = readContactFormRef(rawFormRef);
+      if (formRef === null) refuseTarget();
+      if (!contacts.acknowledged.has(formRef)) refuseUnsupportedFeature();
+      contacts.usedRefs.add(formRef);
+      // Empty props: the existing Uno renderer supplies its own fixed delivery-OFF notice and no form controls.
+      return { id, module: "interaction.contact", props: {} };
+    }
     default:
       throw new SourceRefusal("family:unsupported-family");
   }
@@ -827,11 +945,19 @@ export function composeUnoFoundationSubset(input: unknown, bindings?: unknown): 
     if (sections.length < 1 || sections.length > SUBSET_LIMITS.sections) refuseUnsupportedFeature();
 
     const nodes: CandidateSection[] = [];
-    const media: MediaBindingContext = { lookup: readImageBindings(bindingSource), usedSources: new Set<string>() };
+    const migration = readMigrationBindingEnvelope(bindingSource);
+    const media: MediaBindingContext = {
+      lookup: readImageBindings(migration?.images),
+      usedSources: new Set<string>(),
+    };
+    const contacts: ContactBindingContext = {
+      acknowledged: readContactAcknowledgements(migration?.contactForms),
+      usedRefs: new Set<string>(),
+    };
     for (let index = 0; index < sections.length; index += 1) {
       const section = sections[index];
       if (section === undefined) refuseUnsafeSource();
-      nodes.push(composeSection(section, index, media));
+      nodes.push(composeSection(section, index, media, contacts));
     }
 
     // The binding must be exactly the set of donor sources the document consumed: no missing, extra or unused
@@ -840,6 +966,14 @@ export function composeUnoFoundationSubset(input: unknown, bindings?: unknown): 
     if (media.usedSources.size !== media.lookup.size) refuseUnsupportedFeature();
     for (const usedSource of media.usedSources) {
       if (!media.lookup.has(usedSource)) refuseUnsupportedFeature();
+    }
+
+    // The same exact-set rule for contact acknowledgements: every acknowledged `formRef` must be consumed by an authored
+    // section and every authored section must be acknowledged. An acknowledgement never becomes publication or delivery
+    // authority, and a Page with no contact section may not carry one.
+    if (contacts.usedRefs.size !== contacts.acknowledged.size) refuseUnsupportedFeature();
+    for (const usedRef of contacts.usedRefs) {
+      if (!contacts.acknowledged.has(usedRef)) refuseUnsupportedFeature();
     }
 
     // `content.actions` may name only a *top-level* section this composer itself just generated. This is an exact
