@@ -197,13 +197,13 @@ const PHASE_C_REQUIRED = Object.freeze([
   "family:unsafe-source",
   "FAMILY_TABLE_HTTP the table region is one scroll wrapper with a genuine captioned two-column table",
   "FAMILY_COLUMNS_HTTP the columns region is an authored plain two-column grid of two tight stacks",
-  "FAMILY_CARDS_HTTP the cards region is a native two-column list grid with one body only",
-  "FAMILY_FEATURES_HTTP the features region is a separate native three-column list grid with one body",
+  "FAMILY_CARDS_HTTP the cards region is a headed top-level stack with a native two-column list grid and one body",
+  "FAMILY_FEATURES_HTTP the features region is a separate headed top-level stack with a native three-column list grid",
   "FAMILY_SEVENTEEN_HTTP the last four regions add no second main, h1, script, frame or form control",
   "${width}px table shows a captioned two-column table and its wrapper takes focus",
   "${width}px columns show two authored tight stacks with one paragraph and one native list",
-  "${width}px cards show a native two-column list grid with exactly one authored body",
-  "${width}px features show a separate native three-column list grid with one authored body",
+  "${width}px cards show a headed stack with one authored h2, a two-column list grid and two h3 titles",
+  "${width}px features show a separate headed stack with one authored h2, a three-column list grid and two h3 titles",
   "${width}px the composed Page carries seventeen unique top-level sections with no nested inflation",
   // `UNO-WO-069 / R01`: the divider parity candidate. Labels alone are not enough, so the executable predicates that
   // make each label meaningful are required tokens too, and A03 mutates them one at a time.
@@ -237,6 +237,28 @@ const PHASE_C_REQUIRED = Object.freeze([
   "let dividerOk = true;",
   "dividerChecks += 1;",
   "dividerOk === true && familyOk === true && dividerChecks === 12",
+  // `UNO-WO-070 / R01`: the authored heading and item outline. Labels plus the executable predicates that make them
+  // meaningful, so a neutered comparison cannot pass as evidence.
+  'heading: "Synthetic cards",',
+  'heading: "Synthetic features",',
+  "FAMILY_ITEM_OUTLINE_SOURCE cards compose one frozen top-level stack with an authored h2 before a nested list grid of level-3 item titles",
+  "FAMILY_ITEM_OUTLINE_SOURCE features compose the same stack, authored h2 and nested level-3 item outline",
+  "FAMILY_ITEM_OUTLINE_SOURCE the seventeen top-level ids and all other fifteen families are unchanged",
+  "FAMILY_ITEM_OUTLINE_SOURCE the real reader re-accepts both headed families from the serialized JSON",
+  "FAMILY_ITEM_OUTLINE_HTTP both headed families serve exactly one authored h2 before two nested h3 titles, one list and no duplicate id",
+  "${width}px the headed families keep one h2 before every item h3 with no invented control or overflow",
+  'JSON.stringify(section.props) === "{}"',
+  'heading.module === "content.heading"',
+  "title.props.level === 3",
+  'outlineOk(cardsRegion, "cards", "Synthetic cards", 2)',
+  'outlineOk(featuresRegion, "features", "Synthetic features", 3)',
+  'region.indexOf("<h2") < region.indexOf("<h3")',
+  "new Set(allIds).size === allIds.length",
+  "family.headingIsFirst",
+  "seen.cards.h2 === 1 && seen.cards.h3 === 2",
+  "seen.features.h2 === 1 && seen.features.h3 === 2",
+  "seen.cards.uniqueIds",
+  "(familyHtml.match(/<h3[\\s>]/giu) ?? []).length === 4",
 ]);
 
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
@@ -591,8 +613,8 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     for (const contract of [
       "FAMILY_TABLE_HTTP the table region is one scroll wrapper with a genuine captioned two-column table",
       "FAMILY_COLUMNS_HTTP the columns region is an authored plain two-column grid of two tight stacks",
-      "FAMILY_CARDS_HTTP the cards region is a native two-column list grid with one body only",
-      "FAMILY_FEATURES_HTTP the features region is a separate native three-column list grid with one body",
+      "FAMILY_CARDS_HTTP the cards region is a headed top-level stack with a native two-column list grid and one body",
+      "FAMILY_FEATURES_HTTP the features region is a separate headed top-level stack with a native three-column list grid",
       "FAMILY_SEVENTEEN_HTTP the last four regions add no second main, h1, script, frame or form control",
     ]) {
       const mutated = source.replace(contract, "FAMILY_UNVERIFIED recorded");
@@ -605,8 +627,8 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     for (const contract of [
       "${width}px table shows a captioned two-column table and its wrapper takes focus",
       "${width}px columns show two authored tight stacks with one paragraph and one native list",
-      "${width}px cards show a native two-column list grid with exactly one authored body",
-      "${width}px features show a separate native three-column list grid with one authored body",
+      "${width}px cards show a headed stack with one authored h2, a two-column list grid and two h3 titles",
+      "${width}px features show a separate headed stack with one authored h2, a three-column list grid and two h3 titles",
       "${width}px the composed Page carries seventeen unique top-level sections with no nested inflation",
     ]) {
       const mutated = source.replace(contract, "${width}px region unverified");
@@ -706,8 +728,51 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     }
   });
 
-  it("the audit still fails when the retained browser matrix or family gates are dropped", () => {
-    for (const gate of ["BROWSER_MATRIX=16/16", "FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px"]) {
+  it("the audit fails when the authored heading or item-outline evidence is neutered", () => {
+    const mutations = [
+      // The source contract: an authored h2 before a nested level-3 grid, in one top-level stack with empty props.
+      ['heading: "Synthetic cards",', 'heading: "Cards",'],
+      ['JSON.stringify(section.props) === "{}"', "true"],
+      ['heading.module === "content.heading"', "true"],
+      ["title.props.level === 3", "true"],
+      // The served-HTML hierarchy for both headed families.
+      ['outlineOk(cardsRegion, "cards", "Synthetic cards", 2)', "true"],
+      ['outlineOk(featuresRegion, "features", "Synthetic features", 3)', "true"],
+      ['region.indexOf("<h2") < region.indexOf("<h3")', "true"],
+      ["new Set(allIds).size === allIds.length", "true"],
+      ["(familyHtml.match(/<h3[\\s>]/giu) ?? []).length === 4", "true"],
+      // The Chromium item-outline predicates.
+      ["family.headingIsFirst", "true"],
+      ["seen.cards.h2 === 1 && seen.cards.h3 === 2", "true"],
+      ["seen.features.h2 === 1 && seen.features.h3 === 2", "true"],
+      ["seen.cards.uniqueIds", "true"],
+    ];
+    for (const [token, replacement] of mutations) {
+      const mutated = source.replace(token, replacement);
+      assert.notEqual(mutated, source, token);
+      assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
+    }
+    // Deleting a whole outline assertion must be caught by its own label.
+    for (const label of [
+      "FAMILY_ITEM_OUTLINE_SOURCE cards compose one frozen top-level stack with an authored h2 before a nested list grid of level-3 item titles",
+      "FAMILY_ITEM_OUTLINE_HTTP both headed families serve exactly one authored h2 before two nested h3 titles, one list and no duplicate id",
+      "${width}px the headed families keep one h2 before every item h3 with no invented control or overflow",
+    ]) {
+      const mutated = source.replace(label, "outline evidence removed");
+      assert.notEqual(mutated, source, label);
+      assert.ok(audit(mutated).some((entry) => entry.includes(label)), `${label}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit still fails when a retained family, parity or matrix gate is dropped alongside the outline", () => {
+    for (const gate of [
+      "BROWSER_MATRIX=16/16",
+      "FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px",
+      "FAMILY_SEVENTEEN_HTTP the last four regions add no second main, h1, script, frame or form control",
+      "DIVIDER_PARITY=PASS the divider passed source, HTTP and light/dark Chromium evidence",
+      "FAMILY_MEDIA=3/3 three distinct locators serve the one Page-owned plate with GET and HEAD",
+      "FAMILY_CONTACT_OFF_HTTP the contact subtree carries no form, control, handler or destination",
+    ]) {
       const mutated = source.replace(gate, "gate removed");
       assert.notEqual(mutated, source, gate);
       assert.ok(audit(mutated).some((entry) => entry.includes(gate)), `${gate}: ${audit(mutated).join(",")}`);

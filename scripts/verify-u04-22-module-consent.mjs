@@ -438,6 +438,9 @@ function familySource() {
       },
       {
         type: "cards",
+        // `UNO-WO-070 / R01`: the authored heading is the only source change at index 15; columns, items and bodies
+        // stay exactly as before.
+        heading: "Synthetic cards",
         columns: 2,
         items: [
           { title: "Card one", body: "First card body." },
@@ -446,6 +449,8 @@ function familySource() {
       },
       {
         type: "features",
+        // `UNO-WO-070 / R01`: the authored heading is the only source change at index 16.
+        heading: "Synthetic features",
         columns: 3,
         items: [
           { title: "Feature one", body: "First feature body." },
@@ -1080,6 +1085,80 @@ async function main() {
         reDivider === undefined ? "missing" : reDivider.id,
       );
     }
+    // `UNO-WO-070 / R01`: the two headed grid families on the composed document itself.
+    {
+      const outline = (index, type, headingText, columns) => {
+        const section = familyAccepted.sections[index];
+        if (section === undefined) return { ok: false, detail: `missing index ${index}` };
+        const stackOk = section.module === "layout.stack"
+          && section.id === `family-${index}-${type}`
+          && JSON.stringify(section.props) === "{}"
+          && Array.isArray(section.children)
+          && section.children.length === 2;
+        const detail = `${section.id}/${section.module}/${JSON.stringify(section.props)}`;
+        if (!stackOk) return { ok: false, detail };
+        const [heading, grid] = section.children;
+        const headingOk = heading.module === "content.heading"
+          && heading.id === `family-${index}-${type}-heading`
+          && JSON.stringify(heading.props) === JSON.stringify({ text: headingText, level: 2 });
+        const gridOk = grid.module === "layout.grid"
+          && grid.id === `family-${index}-${type}-grid`
+          && JSON.stringify(grid.props) === JSON.stringify({ columns, itemSemantics: "list" })
+          && Array.isArray(grid.children)
+          && grid.children.length === 2;
+        if (!headingOk || !gridOk) return { ok: false, detail: `${detail} ${JSON.stringify(heading.props)} ${gridOk}` };
+        const itemsOk = grid.children.every((item, itemIndex) => {
+          const title = item.children?.[0];
+          const idsOk = item.module === "layout.stack"
+            && item.id === `family-${index}-${type}-item-${itemIndex}`
+            && JSON.stringify(item.props) === JSON.stringify({ gap: "tight" })
+            && title !== undefined
+            && title.module === "content.heading"
+            && title.id === `family-${index}-${type}-item-${itemIndex}-title`
+            && title.props.level === 3;
+          const bodyCount = (item.children ?? []).filter((child) => child.module === "content.prose").length;
+          return idsOk && bodyCount === (itemIndex === 0 ? 1 : 0);
+        });
+        return {
+          ok: itemsOk && Object.isFrozen(section) && Object.isFrozen(grid) && Object.isFrozen(section.children),
+          detail,
+        };
+      };
+      const cards = outline(15, "cards", "Synthetic cards", 2);
+      const features = outline(16, "features", "Synthetic features", 3);
+      check(
+        "FAMILY_ITEM_OUTLINE_SOURCE cards compose one frozen top-level stack with an authored h2 before a nested list grid of level-3 item titles",
+        cards.ok,
+        cards.detail,
+      );
+      check(
+        "FAMILY_ITEM_OUTLINE_SOURCE features compose the same stack, authored h2 and nested level-3 item outline",
+        features.ok,
+        features.detail,
+      );
+      const topIds = familyAccepted.sections.map((section) => section.id);
+      check(
+        "FAMILY_ITEM_OUTLINE_SOURCE the seventeen top-level ids and all other fifteen families are unchanged",
+        JSON.stringify(topIds) === JSON.stringify(FAMILY_IDS)
+          && familyAccepted.sections[8]?.module === "content.prose"
+          && JSON.stringify(familyAccepted.sections[8]?.props) === JSON.stringify({ variant: "divider" })
+          && familyAccepted.sections[7]?.module === "content.actions"
+          && familyAccepted.sections[9]?.module === "content.hero",
+        topIds.join(","),
+      );
+      const reCards = familyReparsed.accepted === true ? familyReparsed.document.sections[15] : undefined;
+      const reFeatures = familyReparsed.accepted === true ? familyReparsed.document.sections[16] : undefined;
+      check(
+        "FAMILY_ITEM_OUTLINE_SOURCE the real reader re-accepts both headed families from the serialized JSON",
+        reCards?.module === "layout.stack"
+          && reFeatures?.module === "layout.stack"
+          && reCards?.children?.[0]?.props?.level === 2
+          && reFeatures?.children?.[0]?.props?.level === 2
+          && reCards?.children?.[1]?.children?.every((item) => item.children?.[0]?.props?.level === 3) === true
+          && reFeatures?.children?.[1]?.children?.every((item) => item.children?.[0]?.props?.level === 3) === true,
+        `${reCards?.module ?? "missing"}/${reFeatures?.module ?? "missing"}`,
+      );
+    }
     const { planUnoServingPage: planFamily } = await import("../src/config/uno-serving.ts");
     const familyServing = await planFamily("/en-001/wo066-family-composition");
     if (
@@ -1334,8 +1413,10 @@ async function main() {
     );
     const columnsStart = familyHtml.indexOf('id="family-14-columns"');
     const cardsStart = familyHtml.indexOf('id="family-15-cards"');
+    const cardsOpen = cardsStart < 0 ? -1 : familyHtml.lastIndexOf("<div", cardsStart);
     const featuresStart = familyHtml.indexOf('id="family-16-features"');
-    const columnsRegion = columnsStart < 0 || cardsStart < 0 ? "" : familyHtml.slice(columnsStart, cardsStart);
+    const featuresOpen = featuresStart < 0 ? -1 : familyHtml.lastIndexOf("<div", featuresStart);
+    const columnsRegion = columnsStart < 0 || cardsOpen < 0 ? "" : familyHtml.slice(columnsStart, cardsOpen);
     check(
       "FAMILY_COLUMNS_HTTP the columns region is an authored plain two-column grid of two tight stacks",
       columnsRegion.length > 0
@@ -1351,33 +1432,69 @@ async function main() {
         && !/<h3\b|<a\b|<img\b|<button\b|<form\b/iu.test(columnsRegion),
       columnsRegion.slice(0, 200),
     );
-    const cardsRegion = cardsStart < 0 || featuresStart < 0 ? "" : familyHtml.slice(cardsStart, featuresStart);
+    const cardsRegion = cardsOpen < 0 || featuresOpen < 0 ? "" : familyHtml.slice(cardsOpen, featuresOpen);
     check(
-      "FAMILY_CARDS_HTTP the cards region is a native two-column list grid with one body only",
+      "FAMILY_CARDS_HTTP the cards region is a headed top-level stack with a native two-column list grid and one body",
       cardsRegion.length > 0
-        && familyHtml.includes('<ul class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="list" id="family-15-cards" role="list">')
+        && cardsRegion.includes('<div class="uno-json-stack" data-uno-gap="normal" id="family-15-cards">')
+        && cardsRegion.includes('<h2 class="uno-json-heading" id="family-15-cards-heading">Synthetic cards</h2>')
+        && /<ul class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="list" id="family-15-cards-grid" role="list">/u.test(cardsRegion)
         && (cardsRegion.match(/<li class="uno-json-cell"/gu) ?? []).length === 2
         && (cardsRegion.match(/<div class="uno-json-stack" data-uno-gap="tight"/gu) ?? []).length === 2
-        && cardsRegion.indexOf(">Card one</h2>") > 0
-        && cardsRegion.indexOf(">Card one</h2>") < cardsRegion.indexOf(">Card two</h2>")
+        && (cardsRegion.match(/<h3 class="uno-json-heading"/gu) ?? []).length === 2
+        && cardsRegion.indexOf(">Card one</h3>") > 0
+        && cardsRegion.indexOf(">Card one</h3>") < cardsRegion.indexOf(">Card two</h3>")
         && (cardsRegion.match(/<p class="uno-json-prose"/gu) ?? []).length === 1
         && cardsRegion.includes(">First card body.</p>")
         && !/data-uno-ratio|<article\b|<a\b|<img\b|<button\b|<form\b|icon/iu.test(cardsRegion),
-      cardsRegion.slice(0, 200),
+      cardsRegion.slice(0, 240),
     );
-    const featuresRegion = featuresStart < 0 ? "" : familyHtml.slice(featuresStart, familyHtml.indexOf("</main>", featuresStart));
+    const featuresRegion = featuresOpen < 0 ? "" : familyHtml.slice(featuresOpen, familyHtml.indexOf("</main>", featuresOpen));
     check(
-      "FAMILY_FEATURES_HTTP the features region is a separate native three-column list grid with one body",
+      "FAMILY_FEATURES_HTTP the features region is a separate headed top-level stack with a native three-column list grid",
       featuresRegion.length > 0
-        && familyHtml.includes('<ul class="uno-json-grid" data-uno-columns="3" data-uno-item-semantics="list" id="family-16-features" role="list">')
+        && featuresRegion.includes('<div class="uno-json-stack" data-uno-gap="normal" id="family-16-features">')
+        && featuresRegion.includes('<h2 class="uno-json-heading" id="family-16-features-heading">Synthetic features</h2>')
+        && /<ul class="uno-json-grid" data-uno-columns="3" data-uno-item-semantics="list" id="family-16-features-grid" role="list">/u.test(featuresRegion)
         && (featuresRegion.match(/<li class="uno-json-cell"/gu) ?? []).length === 2
-        && featuresRegion.indexOf(">Feature one</h2>") > 0
-        && featuresRegion.indexOf(">Feature one</h2>") < featuresRegion.indexOf(">Feature two</h2>")
+        && (featuresRegion.match(/<h3 class="uno-json-heading"/gu) ?? []).length === 2
+        && featuresRegion.indexOf(">Feature one</h3>") > 0
+        && featuresRegion.indexOf(">Feature one</h3>") < featuresRegion.indexOf(">Feature two</h3>")
         && (featuresRegion.match(/<p class="uno-json-prose"/gu) ?? []).length === 1
         && featuresRegion.includes(">First feature body.</p>")
         && !/data-uno-ratio|<article\b|<a\b|<img\b|<button\b|<form\b|icon/iu.test(featuresRegion),
-      featuresRegion.slice(0, 200),
+      featuresRegion.slice(0, 240),
     );
+    // `UNO-WO-070 / R01`: the authored h2 → h3 outline as actually served, for both headed families.
+    {
+      const regionIds = (region) => [...region.matchAll(/(?<![-\w])id="([^"]+)"/gu)].map((match) => match[1]);
+      const cardsIds = regionIds(cardsRegion);
+      const featuresIds = regionIds(featuresRegion);
+      const allIds = [...cardsIds, ...featuresIds];
+      const outlineOk = (region, type, headingText, columns) => {
+        const h2 = [...region.matchAll(/<h2 class="uno-json-heading" id="([^"]+)">([^<]*)<\/h2>/gu)];
+        const h3 = [...region.matchAll(/<h3 class="uno-json-heading" id="([^"]+)">([^<]*)<\/h3>/gu)];
+        return h2.length === 1
+          && h2[0][1] === `family-${type === "cards" ? 15 : 16}-${type}-heading`
+          && h2[0][2] === headingText
+          && h3.length === 2
+          && h3.every((match, index) => match[1] === `family-${type === "cards" ? 15 : 16}-${type}-item-${index}-title`)
+          && region.indexOf("<h2") < region.indexOf("<h3")
+          && (region.match(/<ul\b/gu) ?? []).length === 1
+          && (region.match(/<li class="uno-json-cell"/gu) ?? []).length === 2
+          && region.includes(`data-uno-columns="${columns}"`)
+          && !/<main\b|<h1\b|<script\b|<iframe\b/iu.test(region);
+      };
+      check(
+        "FAMILY_ITEM_OUTLINE_HTTP both headed families serve exactly one authored h2 before two nested h3 titles, one list and no duplicate id",
+        outlineOk(cardsRegion, "cards", "Synthetic cards", 2)
+          && outlineOk(featuresRegion, "features", "Synthetic features", 3)
+          && new Set(allIds).size === allIds.length
+          && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
+          && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1,
+        `cards=${cardsIds.length} features=${featuresIds.length} unique=${new Set(allIds).size}`,
+      );
+    }
     {
       const lastFourRegions = [tableRegion, columnsRegion, cardsRegion, featuresRegion];
       check(
@@ -1386,10 +1503,11 @@ async function main() {
           && lastFourRegions.every((region) => !/<main\b|<h1\b|<script\b|<iframe\b|<form\b|<input\b|<textarea\b|<button\b/iu.test(region))
           && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
           && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
-          && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 6
+          && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 4
+          && (familyHtml.match(/<h3[\s>]/giu) ?? []).length === 4
           && !familyHtml.includes(FAMILY_DONOR_SOURCE)
           && !familyHtml.includes("formRef"),
-        `${lastFourRegions.map((region) => region.length).join("/")} h2=${(familyHtml.match(/<h2[\s>]/giu) ?? []).length}`,
+        `${lastFourRegions.map((region) => region.length).join("/")} h2=${(familyHtml.match(/<h2[\s>]/giu) ?? []).length} h3=${(familyHtml.match(/<h3[\s>]/giu) ?? []).length}`,
       );
     }
     // `UNO-WO-069 / R01`: the divider as served. The donor authors `{type:"divider"}` and renders one native `<hr>`;
@@ -1996,35 +2114,63 @@ async function consentPhase(base) {
             };
           })(),
           cards: (() => {
-            const region = document.querySelector("#family-15-cards");
-            const items = [...(region?.children ?? [])];
+            const root = document.querySelector("#family-15-cards");
+            const heading = root?.querySelector(":scope > h2.uno-json-heading") ?? null;
+            const grid = root?.querySelector(":scope > ul.uno-json-grid") ?? null;
+            const items = [...(grid?.children ?? [])];
+            const ids = [...(root?.querySelectorAll("[id]") ?? [])].map((node) => node.id);
             return {
-              isList: region?.tagName ?? "",
-              columns: region?.getAttribute("data-uno-columns") ?? "",
-              semantics: region?.getAttribute("data-uno-item-semantics") ?? "",
-              ratio: region?.getAttribute("data-uno-ratio") ?? "",
+              rootTag: root?.tagName ?? "",
+              rootGap: root?.getAttribute("data-uno-gap") ?? "",
+              headingTag: heading?.tagName ?? "",
+              headingId: heading?.id ?? "",
+              headingText: heading?.textContent ?? "",
+              headingIsFirst: root !== null && root.firstElementChild === heading,
+              gridTag: grid?.tagName ?? "",
+              gridId: grid?.id ?? "",
+              columns: grid?.getAttribute("data-uno-columns") ?? "",
+              semantics: grid?.getAttribute("data-uno-item-semantics") ?? "",
+              ratio: grid?.getAttribute("data-uno-ratio") ?? "",
               items: items.length,
               itemsAreCells: items.every((item) => item.classList.contains("uno-json-cell")),
-              headings: [...(region?.querySelectorAll("h2.uno-json-heading") ?? [])].map((node) => node.textContent ?? ""),
-              paragraphs: [...(region?.querySelectorAll("p.uno-json-prose") ?? [])].map((node) => node.textContent ?? ""),
-              articles: region?.querySelectorAll("article").length ?? -1,
-              controls: region?.querySelectorAll("a, img, form, button, input").length ?? -1,
+              itemTitles: [...(grid?.querySelectorAll("h3.uno-json-heading") ?? [])].map((node) => node.textContent ?? ""),
+              itemTitleIds: [...(grid?.querySelectorAll("h3.uno-json-heading") ?? [])].map((node) => node.id),
+              h2: root?.querySelectorAll("h2").length ?? -1,
+              h3: root?.querySelectorAll("h3").length ?? -1,
+              paragraphs: [...(root?.querySelectorAll("p.uno-json-prose") ?? [])].map((node) => node.textContent ?? ""),
+              articles: root?.querySelectorAll("article").length ?? -1,
+              controls: root?.querySelectorAll("a, img, form, button, input, textarea, select, iframe").length ?? -1,
+              uniqueIds: new Set(ids).size === ids.length,
             };
           })(),
           features: (() => {
-            const region = document.querySelector("#family-16-features");
-            const items = [...(region?.children ?? [])];
+            const root = document.querySelector("#family-16-features");
+            const heading = root?.querySelector(":scope > h2.uno-json-heading") ?? null;
+            const grid = root?.querySelector(":scope > ul.uno-json-grid") ?? null;
+            const items = [...(grid?.children ?? [])];
+            const ids = [...(root?.querySelectorAll("[id]") ?? [])].map((node) => node.id);
             return {
-              isList: region?.tagName ?? "",
-              columns: region?.getAttribute("data-uno-columns") ?? "",
-              semantics: region?.getAttribute("data-uno-item-semantics") ?? "",
-              ratio: region?.getAttribute("data-uno-ratio") ?? "",
+              rootTag: root?.tagName ?? "",
+              rootGap: root?.getAttribute("data-uno-gap") ?? "",
+              headingTag: heading?.tagName ?? "",
+              headingId: heading?.id ?? "",
+              headingText: heading?.textContent ?? "",
+              headingIsFirst: root !== null && root.firstElementChild === heading,
+              gridTag: grid?.tagName ?? "",
+              gridId: grid?.id ?? "",
+              columns: grid?.getAttribute("data-uno-columns") ?? "",
+              semantics: grid?.getAttribute("data-uno-item-semantics") ?? "",
+              ratio: grid?.getAttribute("data-uno-ratio") ?? "",
               items: items.length,
               itemsAreCells: items.every((item) => item.classList.contains("uno-json-cell")),
-              headings: [...(region?.querySelectorAll("h2.uno-json-heading") ?? [])].map((node) => node.textContent ?? ""),
-              paragraphs: [...(region?.querySelectorAll("p.uno-json-prose") ?? [])].map((node) => node.textContent ?? ""),
-              articles: region?.querySelectorAll("article").length ?? -1,
-              controls: region?.querySelectorAll("a, img, form, button, input").length ?? -1,
+              itemTitles: [...(grid?.querySelectorAll("h3.uno-json-heading") ?? [])].map((node) => node.textContent ?? ""),
+              itemTitleIds: [...(grid?.querySelectorAll("h3.uno-json-heading") ?? [])].map((node) => node.id),
+              h2: root?.querySelectorAll("h2").length ?? -1,
+              h3: root?.querySelectorAll("h3").length ?? -1,
+              paragraphs: [...(root?.querySelectorAll("p.uno-json-prose") ?? [])].map((node) => node.textContent ?? ""),
+              articles: root?.querySelectorAll("article").length ?? -1,
+              controls: root?.querySelectorAll("a, img, form, button, input, textarea, select, iframe").length ?? -1,
+              uniqueIds: new Set(ids).size === ids.length,
             };
           })(),
           tableFocus: (() => {
@@ -2122,20 +2268,51 @@ async function consentPhase(base) {
           && JSON.stringify(seen.columns.listItems) === JSON.stringify(["Check one", "Check two"])
           && seen.columns.h3 === 0 && seen.columns.controls === 0,
         JSON.stringify(seen.columns));
-      familyCheck(`${width}px cards show a native two-column list grid with exactly one authored body`,
-        seen.cards.isList === "UL" && seen.cards.columns === "2" && seen.cards.semantics === "list"
-          && seen.cards.ratio === "" && seen.cards.items === 2 && seen.cards.itemsAreCells
-          && JSON.stringify(seen.cards.headings) === JSON.stringify(["Card one", "Card two"])
+      familyCheck(`${width}px cards show a headed stack with one authored h2, a two-column list grid and two h3 titles`,
+        seen.cards.rootTag === "DIV" && seen.cards.rootGap === "normal"
+          && seen.cards.headingTag === "H2" && seen.cards.headingId === "family-15-cards-heading"
+          && seen.cards.headingText === "Synthetic cards" && seen.cards.headingIsFirst
+          && seen.cards.gridTag === "UL" && seen.cards.gridId === "family-15-cards-grid"
+          && seen.cards.columns === "2" && seen.cards.semantics === "list" && seen.cards.ratio === ""
+          && seen.cards.items === 2 && seen.cards.itemsAreCells
+          && JSON.stringify(seen.cards.itemTitles) === JSON.stringify(["Card one", "Card two"])
+          && JSON.stringify(seen.cards.itemTitleIds) === JSON.stringify(["family-15-cards-item-0-title", "family-15-cards-item-1-title"])
+          && seen.cards.h2 === 1 && seen.cards.h3 === 2
           && JSON.stringify(seen.cards.paragraphs) === JSON.stringify(["First card body."])
-          && seen.cards.articles === 0 && seen.cards.controls === 0,
-        JSON.stringify(seen.cards));
-      familyCheck(`${width}px features show a separate native three-column list grid with one authored body`,
-        seen.features.isList === "UL" && seen.features.columns === "3" && seen.features.semantics === "list"
-          && seen.features.ratio === "" && seen.features.items === 2 && seen.features.itemsAreCells
-          && JSON.stringify(seen.features.headings) === JSON.stringify(["Feature one", "Feature two"])
+          && seen.cards.articles === 0 && seen.cards.controls === 0 && seen.cards.uniqueIds,
+        JSON.stringify(seen.cards).slice(0, 240));
+      familyCheck(`${width}px features show a separate headed stack with one authored h2, a three-column list grid and two h3 titles`,
+        seen.features.rootTag === "DIV" && seen.features.rootGap === "normal"
+          && seen.features.headingTag === "H2" && seen.features.headingId === "family-16-features-heading"
+          && seen.features.headingText === "Synthetic features" && seen.features.headingIsFirst
+          && seen.features.gridTag === "UL" && seen.features.gridId === "family-16-features-grid"
+          && seen.features.columns === "3" && seen.features.semantics === "list" && seen.features.ratio === ""
+          && seen.features.items === 2 && seen.features.itemsAreCells
+          && JSON.stringify(seen.features.itemTitles) === JSON.stringify(["Feature one", "Feature two"])
+          && JSON.stringify(seen.features.itemTitleIds) === JSON.stringify(["family-16-features-item-0-title", "family-16-features-item-1-title"])
+          && seen.features.h2 === 1 && seen.features.h3 === 2
           && JSON.stringify(seen.features.paragraphs) === JSON.stringify(["First feature body."])
-          && seen.features.articles === 0 && seen.features.controls === 0,
-        JSON.stringify(seen.features));
+          && seen.features.articles === 0 && seen.features.controls === 0 && seen.features.uniqueIds,
+        JSON.stringify(seen.features).slice(0, 240));
+      // `UNO-WO-070 / R01`: the accessible document outline of the two headed families, measured in the real browser.
+      familyCheck(`${width}px the headed families keep one h2 before every item h3 with no invented control or overflow`,
+        [seen.cards, seen.features].every((family) =>
+          family.rootTag === "DIV"
+          && family.headingTag === "H2"
+          && family.headingIsFirst
+          && family.gridTag === "UL"
+          && family.items === 2
+          && family.h3 === 2
+          && family.h2 === 1
+          && family.uniqueIds
+          && family.articles === 0
+          && family.controls === 0)
+          && seen.cards.h3 + seen.features.h3 === 4
+          && seen.mains === 1 && seen.h1s === 1 && seen.overflow === 0,
+        JSON.stringify({
+          cards: [seen.cards.h2, seen.cards.h3], features: [seen.features.h2, seen.features.h3],
+          mains: seen.mains, h1: seen.h1s, overflow: seen.overflow,
+        }));
       // `UNO-WO-069 / R01`: the divider region, measured in the real browser at this viewport.
       const gap = parseFloat(seen.divider.parentGap ?? "NaN");
       const marginTop = parseFloat(String(seen.divider.marginTop).replace("px", ""));

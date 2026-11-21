@@ -534,6 +534,38 @@ function readNewFamilyText(value: PlainValue | undefined): string {
 }
 
 /**
+ * Read one authored section heading of the two bounded grid families.
+ *
+ * `UNO-WO-070 / R01`: the donor's `heading` is a plain authored title, so this subset reads one literal string — no
+ * Markdown, markup or control text — that is nonempty, free of surrounding whitespace and at most 160 Unicode code
+ * points. The donor trims; this subset refuses padding instead of silently rewriting authored text. A wrong type is an
+ * out-of-subset feature, while a blank, padded or overlength string refuses the target itself.
+ */
+function readSectionHeading(value: PlainValue | undefined): string {
+  if (typeof value !== "string") refuseUnsupportedFeature();
+  if (value.length === 0) refuseTarget();
+  if (value.trim() !== value) refuseTarget();
+  if (codePointLength(value) > 160) refuseTarget();
+  // An unpaired surrogate cannot be represented as well-formed text, so it refuses the target rather than being
+  // replaced or normalized.
+  for (let index = 0; index < value.length; index += 1) {
+    const unit = value.charCodeAt(index);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) refuseTarget();
+      index += 1;
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+      refuseTarget();
+    }
+  }
+  // A heading is literal plain text: markup characters, line breaks and control characters are refused rather than
+  // rendered as inert punctuation or silently normalized. `&` and quotes are ordinary text and stay allowed.
+  if (/[<>\r\n\t\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value)) refuseUnsupportedFeature();
+  // The shared plain-text reader keeps the existing Markdown refusals for this new field too.
+  return readNewFamilyText(value);
+}
+
+/**
  * Map one donor section to exactly one Uno `content.prose` node.
  *
  * The donor family is decided by the closed `type` literal. An unsupported family refuses the whole source and is
@@ -775,14 +807,20 @@ function composeSection(
     case "cards":
     case "features": {
       // The donor card also accepts image/meta/action and the donor feature an icon; this subset composes neither, and
-      // it requires `columns` explicitly instead of manufacturing the donor renderer's default.
-      requireExactKeys(record, ["type", "columns", "items"], []);
+      // it requires `columns` explicitly instead of manufacturing the donor renderer's default. `UNO-WO-070 / R01` adds
+      // exactly one optional donor field: the authored plain-text section heading.
+      requireExactKeys(record, ["type", "columns", "items"], ["heading"]);
       const cols = record["columns"];
       if (cols !== 2 && cols !== 3 && cols !== 4) refuseTarget();
       const rawItems = record["items"];
       if (!Array.isArray(rawItems)) refuseUnsupportedFeature();
       // Uno's `itemSemantics: "list"` grid carries one native `<li>` per child, within its own bounded child count.
       if (rawItems.length < 1 || rawItems.length > 8) refuseTarget();
+      // The donor's own outline: an authored section heading is the `<h2>` and its item titles are `<h3>`; without one
+      // the legacy grid keeps its level-2 item titles and invents no section heading.
+      const headingAuthored = ownsKey(record, "heading");
+      const headingText = headingAuthored ? readSectionHeading(record["heading"]) : null;
+      const itemLevel = headingAuthored ? 3 : 2;
       const children: CandidateSection[] = [];
       for (let itemIndex = 0; itemIndex < rawItems.length; itemIndex += 1) {
         const rawItem = rawItems[itemIndex];
@@ -794,7 +832,7 @@ function composeSection(
         if (codePointLength(title) > 160) refuseTarget();
         const itemId = `${id}-item-${itemIndex}`;
         const nested: CandidateSection[] = [
-          { id: `${itemId}-title`, module: "content.heading", props: { text: title, level: 2 } },
+          { id: `${itemId}-title`, module: "content.heading", props: { text: title, level: itemLevel } },
         ];
         // An absent body stays absent: no manufactured paragraph, meta line, action or icon.
         if (ownsKey(entry, "body")) {
@@ -806,7 +844,23 @@ function composeSection(
         }
         children.push({ id: itemId, module: "layout.stack", props: { gap: "tight" }, children: nested });
       }
-      return { id, module: "layout.grid", props: { columns: cols, itemSemantics: "list" }, children };
+      if (!headingAuthored) {
+        // Byte-compatible legacy output: the original grid root with its original id and no heading wrapper.
+        return { id, module: "layout.grid", props: { columns: cols, itemSemantics: "list" }, children };
+      }
+      const heading: CandidateSection = {
+        id: `${id}-heading`,
+        module: "content.heading",
+        props: { text: headingText, level: 2 },
+      };
+      const grid: CandidateSection = {
+        id: `${id}-grid`,
+        module: "layout.grid",
+        props: { columns: cols, itemSemantics: "list" },
+        children,
+      };
+      // One top-level node per authored family: the same stable anchor id now wraps the authored heading and its grid.
+      return { id, module: "layout.stack", props: {}, children: [heading, grid] };
     }
     case "actions": {
       // The donor also accepts `href`/`route`/`link` destinations, an action `variant` and section heading/lede/align/

@@ -1445,7 +1445,9 @@ describe("composeUnoFoundationSubset — cards and features refusal", () => {
     const base = { type, items: [{ title: "A", body: "B" }] };
     // `columns` is required here even though the donor renderer defaults an omitted value.
     expectRefusal(envelope(base), "family:unsupported-feature");
-    for (const extra of ["heading", "lede", "surface", "align", "ratio", "href", "route", "link", "style", "onClick", "visibility"]) {
+    // `UNO-WO-070 / R01` accepts the donor's optional authored `heading`, so it is no longer an extra key; its own
+    // strictness, refusal reasons and byte-compatible absence are proved by the dedicated section below.
+    for (const extra of ["lede", "surface", "align", "ratio", "href", "route", "link", "style", "onClick", "visibility"]) {
       expectRefusal(
         envelope({ ...base, columns: 2, [extra]: extra === "align" ? "center" : "X" }),
         "family:unsupported-feature",
@@ -2376,6 +2378,20 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).toContain("one of seventeen fully parity-evidenced candidates");
     expect(ledger).toContain("subject to independent Architect acceptance");
     expect(ledger).toContain("sixteen still bounded");
+    // `UNO-WO-070 / R01`: the two grid families gained a bounded authored-heading mode, which must never be recorded as
+    // full parity, a second/third accepted family or a closed stage.
+    expect(ledger).toContain("ADAPT (bounded grid plus authored section heading)");
+    expect(ledger.split("ADAPT (bounded grid plus authored section heading)").length - 1).toBe(2);
+    expect(ledger).toContain("authored section heading");
+    expect(ledger).toContain("item titles step to `content.heading {level:3}`");
+    expect(ledger).toContain("byte-identically");
+    expect(ledger).toContain("heading-less");
+    expect(ledger).toContain("bounded capability, not parity");
+    expect(ledger).toContain("Sixteen of the seventeen remain bounded");
+    expect(ledger).not.toContain("2/17");
+    expect(ledger).not.toContain("3/17");
+    expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
+    expect(ledger).not.toMatch(/features[^.\n]*full semantic parity/u);
     expect(ledger).toContain("family-<index>-contactform");
     expect(ledger).toContain("Deliberately absent donor design (media and its binding)");
     expect(ledger).toContain("Deliberately absent donor design (gallery)");
@@ -3479,6 +3495,344 @@ describe("divider presentation contract in the Uno stylesheet", () => {
     const divider = block(".uno-json-divider");
     for (const forbidden of ["animation", "transition", ":focus", "width", "height", "position", "cursor"]) {
       expect(divider).not.toContain(forbidden);
+    }
+  });
+});
+
+/**
+ * `UNO-WO-070 / R01`: the donor's optional authored section heading for the two bounded grid families.
+ *
+ * Pinned donor `page-document.ts` `a12d964c…` gives `cards` and `features` `headingFields` (optional `heading`), and
+ * `section-support.tsx` `19c9bee3…` renders `SectionHeading` as the section `<h2>` while `ItemTitle` renders each item
+ * `<h3>`. Uno already owns `layout.stack`, `content.heading`, `layout.grid` and `content.prose`, so the new mode is a
+ * composition, never a new module. When no heading is authored the old grid — with level-2 item titles and no section
+ * heading — must stay byte-identical.
+ */
+describe("composeUnoFoundationSubset — cards and features authored heading", () => {
+  /** The committed pre-WO-070 output for the identical unheaded cards source, captured before the change. */
+  const LEGACY_CARDS =
+    '{"id":"family-0-cards","module":"layout.grid","props":{"columns":2,"itemSemantics":"list"},"children":[{"id":"family-0-cards-item-0","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-cards-item-0-title","module":"content.heading","props":{"text":"Card one","level":2}},{"id":"family-0-cards-item-0-body","module":"content.prose","props":{"text":"First card body."}}]},{"id":"family-0-cards-item-1","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-cards-item-1-title","module":"content.heading","props":{"text":"Card two","level":2}}]}]}';
+  const LEGACY_FEATURES =
+    '{"id":"family-0-features","module":"layout.grid","props":{"columns":3,"itemSemantics":"list"},"children":[{"id":"family-0-features-item-0","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-features-item-0-title","module":"content.heading","props":{"text":"Feature one","level":2}},{"id":"family-0-features-item-0-body","module":"content.prose","props":{"text":"First feature body."}}]},{"id":"family-0-features-item-1","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-features-item-1-title","module":"content.heading","props":{"text":"Feature two","level":2}}]}]}';
+
+  /** One unheaded cards Page, exactly the source used for the captured baseline. */
+  function unheadedCards(): Record<string, unknown> {
+    return {
+      version: 1,
+      title: "Baseline",
+      sections: [
+        {
+          type: "cards",
+          columns: 2,
+          items: [
+            { title: "Card one", body: "First card body." },
+            { title: "Card two" },
+          ],
+        },
+      ],
+    };
+  }
+
+  /** One unheaded features Page, exactly the source used for the captured baseline. */
+  function unheadedFeatures(): Record<string, unknown> {
+    return {
+      version: 1,
+      title: "Baseline",
+      sections: [
+        {
+          type: "features",
+          columns: 3,
+          items: [
+            { title: "Feature one", body: "First feature body." },
+            { title: "Feature two" },
+          ],
+        },
+      ],
+    };
+  }
+
+  /** One headed source of either grid family, with two titles and one authored body. */
+  function headedSource(type: "cards" | "features", columns: 2 | 3 | 4, heading: unknown = "Synthetic cards"): Record<string, unknown> {
+    return {
+      version: 1,
+      title: "Headed fixture",
+      sections: [
+        {
+          type,
+          heading,
+          columns,
+          items: [
+            { title: type === "cards" ? "Card one" : "Feature one", body: type === "cards" ? "First card body." : "First feature body." },
+            { title: type === "cards" ? "Card two" : "Feature two" },
+          ],
+        },
+      ],
+    };
+  }
+
+  it("keeps the heading-less cards node byte-identical to the pre-WO-070 committed output", () => {
+    const document = composed(unheadedCards());
+    expect(JSON.stringify(document.sections[0])).toBe(LEGACY_CARDS);
+    expect(document.sections[0]!.module).toBe("layout.grid");
+    expect(document.sections[0]!.id).toBe("family-0-cards");
+    expect(Object.keys(document.sections[0]!.props)).toEqual(["columns", "itemSemantics"]);
+  });
+
+  it("keeps the heading-less features node byte-identical to the pre-WO-070 committed output", () => {
+    const document = composed(unheadedFeatures());
+    expect(JSON.stringify(document.sections[0])).toBe(LEGACY_FEATURES);
+    expect(document.sections[0]!.module).toBe("layout.grid");
+    expect(document.sections[0]!.id).toBe("family-0-features");
+  });
+
+
+
+  it("composes the headed cards source into one stack with an authored h2 and level-3 item titles", () => {
+    const source = headedSource("cards", 2, "Synthetic cards");
+    const before = JSON.stringify(source);
+    const document = composed(source);
+    expect(JSON.stringify(source)).toBe(before);
+    expect(document.sections).toHaveLength(1);
+    const section = document.sections[0]!;
+    expect(section.id).toBe("family-0-cards");
+    expect(section.module).toBe("layout.stack");
+    expect(JSON.stringify(section.props)).toBe("{}");
+    if (section.module !== "layout.stack") return;
+    expect(section.children).toHaveLength(2);
+    const [heading, grid] = section.children;
+    expect(heading!.id).toBe("family-0-cards-heading");
+    expect(heading!.module).toBe("content.heading");
+    expect(heading!.props).toEqual({ text: "Synthetic cards", level: 2 });
+    expect(grid!.id).toBe("family-0-cards-grid");
+    expect(grid!.module).toBe("layout.grid");
+    expect(grid!.props).toEqual({ columns: 2, itemSemantics: "list" });
+    if (grid!.module !== "layout.grid") return;
+    expect(grid!.children.map((item) => item.id)).toEqual(["family-0-cards-item-0", "family-0-cards-item-1"]);
+    const [first, second] = grid!.children;
+    expect(first!.props).toEqual({ gap: "tight" });
+    if (first!.module !== "layout.stack") return;
+    expect(first!.children.map((child) => child.id)).toEqual(["family-0-cards-item-0-title", "family-0-cards-item-0-body"]);
+    expect(first!.children[0]!.props).toEqual({ text: "Card one", level: 3 });
+    expect(first!.children[1]!.props).toEqual({ text: "First card body." });
+    if (second!.module !== "layout.stack") return;
+    expect(second!.children).toHaveLength(1);
+    expect(second!.children[0]!.props).toEqual({ text: "Card two", level: 3 });
+    // Deep freeze down to the item props, and the real reader accepts both forms.
+    expect(Object.isFrozen(document)).toBe(true);
+    expect(Object.isFrozen(section)).toBe(true);
+    expect(Object.isFrozen(section.props)).toBe(true);
+    expect(Object.isFrozen(section.children)).toBe(true);
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Object.isFrozen(first.props)).toBe(true);
+    expect(Object.isFrozen(first.children[0]!.props)).toBe(true);
+    expect(readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown).accepted).toBe(true);
+    expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+  });
+
+  it("composes the headed features source with the same stack, h2 and level-3 item outline", () => {
+    const document = composed(headedSource("features", 3, "Synthetic features"));
+    const section = document.sections[0]!;
+    expect(section.id).toBe("family-0-features");
+    expect(section.module).toBe("layout.stack");
+    expect(JSON.stringify(section.props)).toBe("{}");
+    if (section.module !== "layout.stack") return;
+    expect(section.children[0]!.id).toBe("family-0-features-heading");
+    expect(section.children[0]!.props).toEqual({ text: "Synthetic features", level: 2 });
+    expect(section.children[1]!.id).toBe("family-0-features-grid");
+    expect(section.children[1]!.props).toEqual({ columns: 3, itemSemantics: "list" });
+    if (section.children[1]!.module !== "layout.grid") return;
+    expect(section.children[1]!.children.map((item) => item.id)).toEqual(["family-0-features-item-0", "family-0-features-item-1"]);
+    expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+  });
+
+
+  it("accepts a standalone headed family as the first Page section and keeps the h2-before-h3 order honest", () => {
+    for (const type of ["cards", "features"] as const) {
+      const document = composed(headedSource(type, type === "cards" ? 2 : 3));
+      const outcome = readUnoPageDocument(JSON.stringify(document));
+      expect(outcome.accepted).toBe(true);
+      if (outcome.accepted !== true) continue;
+      expect(outcome.document.sections).toHaveLength(1);
+      // The risk this case exists for: a level-3 item title with no authored level-2 heading is refused by the reader.
+      const orphaned = {
+        version: 1,
+        title: "Orphaned outline",
+        sections: [
+          {
+            id: `family-0-${type}`,
+            module: "layout.grid",
+            props: { columns: 2, itemSemantics: "list" },
+            children: [
+              {
+                id: `family-0-${type}-item-0`,
+                module: "layout.stack",
+                props: { gap: "tight" },
+                children: [
+                  { id: `family-0-${type}-item-0-title`, module: "content.heading", props: { text: "Orphan", level: 3 } },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const refused = readUnoPageDocument(JSON.stringify(orphaned));
+      expect(refused.accepted).toBe(false);
+      if (refused.accepted === false) expect(refused.reason).toBe("document:heading-order");
+    }
+  });
+
+  it("resets the authored heading order across a mixed two-family Page in both orders", () => {
+    const both = (order: readonly ("cards" | "features")[]) => ({
+      version: 1,
+      title: "Mixed headed",
+      sections: order.map((type) => ({
+        type,
+        heading: type === "cards" ? "Synthetic cards" : "Synthetic features",
+        columns: 2,
+        items: [{ title: `${type} one` }, { title: `${type} two` }],
+      })),
+    });
+    for (const order of [["cards", "features"], ["features", "cards"]] as const) {
+      const document = composed(both(order));
+      expect(document.sections.map((section) => section.id)).toEqual(order.map((type, index) => `family-${index}-${type}`));
+      for (const [index, type] of order.entries()) {
+        const section = document.sections[index]!;
+        expect(section.module).toBe("layout.stack");
+        if (section.module !== "layout.stack") continue;
+        expect(section.children[0]!.props).toEqual({
+          text: type === "cards" ? "Synthetic cards" : "Synthetic features",
+          level: 2,
+        });
+        const grid = section.children[1]!;
+        if (grid.module !== "layout.grid") continue;
+        expect(grid.children.map((item) => item.id)).toEqual([`family-${index}-${type}-item-0`, `family-${index}-${type}-item-1`]);
+        for (const [itemIndex, item] of grid.children.entries()) {
+          if (item.module !== "layout.stack") continue;
+          expect(item.children[0]!.props).toEqual({ text: `${type} ${itemIndex === 0 ? "one" : "two"}`, level: 3 });
+        }
+      }
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+    }
+  });
+
+  it("renders the headed regions with one authored h2, one h3 per item and no invented markup", () => {
+    const html = render(composed(headedSource("cards", 2, 'Plans & "prices"')));
+    const start = html.indexOf('id="family-0-cards"');
+    expect(start).toBeGreaterThan(0);
+    const region = html.slice(start - 60, html.length);
+    expect(region).toContain('<div class="uno-json-stack" data-uno-gap="normal" id="family-0-cards">');
+    expect(region).toContain('<h2 class="uno-json-heading" id="family-0-cards-heading">Plans &amp; &quot;prices&quot;</h2>');
+    expect(region).toContain('id="family-0-cards-grid"');
+    expect(region).toContain('data-uno-item-semantics="list"');
+    expect(region).toContain('role="list"');
+    expect((region.match(/<li class="uno-json-cell"/gu) ?? []).length).toBe(2);
+    expect(region).toContain('<h3 class="uno-json-heading" id="family-0-cards-item-0-title">Card one</h3>');
+    expect(region).toContain('<h3 class="uno-json-heading" id="family-0-cards-item-1-title">Card two</h3>');
+    expect((region.match(/<p class="uno-json-prose"/gu) ?? []).length).toBe(1);
+    expect(region).toContain('<p class="uno-json-prose" id="family-0-cards-item-0-body">First card body.</p>');
+    expect(region.indexOf("<h2")).toBeGreaterThan(0);
+    expect(region.indexOf("<h2")).toBeLessThan(region.indexOf("<h3"));
+    expect((region.match(/<h2/gu) ?? []).length).toBe(1);
+    expect((region.match(/<h3/gu) ?? []).length).toBe(2);
+    for (const forbidden of ["<h1", "<h4", "<a ", "<img", "<script", "<iframe", "<button", "<form", "onclick", "<article"]) {
+      expect(region).not.toContain(forbidden);
+    }
+  });
+
+  it("invents no section heading and keeps level-2 item titles for an unheaded source", () => {
+    for (const type of ["cards", "features"] as const) {
+      const document = composed(type === "cards" ? unheadedCards() : unheadedFeatures());
+      const html = render(document);
+      expect(html).not.toContain(`id="family-0-${type}-heading"`);
+      expect(html).not.toContain(`id="family-0-${type}-grid"`);
+      expect(html).toContain(`id="family-0-${type}"`);
+      expect((html.match(/<h2 class="uno-json-heading"/gu) ?? []).length).toBe(2);
+      expect(html).not.toContain("<h3");
+      expect(html).not.toContain("uno-json-stack\" data-uno-gap=\"normal\"");
+    }
+  });
+
+
+  it("accepts exactly 160 code points, counting astral characters once each", () => {
+    const bmp = "x".repeat(160);
+    const astral = "\u{1F600}".repeat(160);
+    expect(Array.from(astral)).toHaveLength(160);
+    for (const type of ["cards", "features"] as const) {
+      const bmpDocument = composed(headedSource(type, 2, bmp));
+      const section = bmpDocument.sections[0]!;
+      expect(section.module).toBe("layout.stack");
+      if (section.module === "layout.stack") expect(section.children[0]!.props).toEqual({ text: bmp, level: 2 });
+      const astralDocument = composed(headedSource(type, 2, astral));
+      const astralSection = astralDocument.sections[0]!;
+      expect(astralSection.module).toBe("layout.stack");
+      if (astralSection.module === "layout.stack") expect(astralSection.children[0]!.props).toEqual({ text: astral, level: 2 });
+      expect(readUnoPageDocument(JSON.stringify(astralDocument)).accepted).toBe(true);
+    }
+  });
+
+  it("refuses every malformed heading with the closed reason that matches its cause", () => {
+    const cases: Array<[string, unknown, string]> = [
+      ["a number", 7, "family:unsupported-feature"],
+      ["null", null, "family:unsupported-feature"],
+      ["an object", { text: "Heading" }, "family:unsupported-feature"],
+      ["an empty string", "", "family:target-refused"],
+      ["whitespace only", "   ", "family:target-refused"],
+      ["a leading space", " Heading", "family:target-refused"],
+      ["a trailing space", "Heading ", "family:target-refused"],
+      ["161 code points", "x".repeat(161), "family:target-refused"],
+      ["bold", "**Bold**", "family:unsupported-feature"],
+      ["italic", "*Italic*", "family:unsupported-feature"],
+      ["a backtick", "`code`", "family:unsupported-feature"],
+      ["a link", "[label](https://example.com)", "family:unsupported-feature"],
+      ["an ATX heading", "# Heading", "family:unsupported-feature"],
+    ];
+    for (const type of ["cards", "features"] as const) {
+      for (const [label, heading, reason] of cases) {
+        expectRefusal(envelope({ type, heading, columns: 2, items: [{ title: "One" }] }), reason);
+        expect(label.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("refuses unsafe heading text, an accessor heading and a hostile neighbour without running a getter", () => {
+    for (const type of ["cards", "features"] as const) {
+      expectRefusal(envelope({ type, heading: "<script>alert(1)</script>", columns: 2, items: [{ title: "One" }] }), "family:unsupported-feature");
+      expectRefusal(envelope({ type, heading: "Two\nlines", columns: 2, items: [{ title: "One" }] }), "family:unsupported-feature");
+      expectRefusal(envelope({ type, heading: "Lead \uD800 tail", columns: 2, items: [{ title: "One" }] }), "family:target-refused");
+    }
+    let runs = 0;
+    const hostile: Record<string, unknown> = { type: "cards", columns: 2, items: [{ title: "One" }] };
+    Object.defineProperty(hostile, "heading", { enumerable: true, get() { runs += 1; return "Read me"; } });
+    expectRefusal(envelope(hostile), "family:unsafe-source");
+    expect(runs).toBe(0);
+    expectRefusal(
+      {
+        version: 1,
+        title: "Mixed headed fixture",
+        sections: [{ type: "prose", body: "A plain paragraph." }, hostile],
+      },
+      "family:unsafe-source",
+    );
+    expect(runs).toBe(0);
+  });
+
+  it("still refuses every out-of-subset cards and features donor field, headed or not", () => {
+    for (const type of ["cards", "features"] as const) {
+      const base = { type, heading: "Headed", columns: 2, items: [{ title: "One" }] };
+      expectRefusal(envelope({ ...base, lede: "A lede." }), "family:unsupported-feature");
+      expectRefusal(envelope({ ...base, surface: "muted" }), "family:unsupported-feature");
+      expectRefusal(envelope({ ...base, href: "#next" }), "family:unsupported-feature");
+      expectRefusal(envelope({ ...base, style: "color:red" }), "family:unsupported-feature");
+      expectRefusal(envelope({ ...base, onClick: "run()" }), "family:unsupported-feature");
+      expectRefusal(envelope({ type, heading: "Headed", items: [{ title: "One" }] }), "family:unsupported-feature");
+      expectRefusal(envelope({ ...base, columns: 5 }), "family:target-refused");
+      expectRefusal(
+        envelope({ ...base, items: [{ title: "One", image: { src: "/x.png", alt: "x" } }] }),
+        "family:unsupported-feature",
+      );
+      expectRefusal(envelope({ ...base, items: [{ title: "One", meta: "Meta" }] }), "family:unsupported-feature");
+      expectRefusal(envelope({ ...base, items: [{ title: "One", action: { label: "Go", href: "#go" } }] }), "family:unsupported-feature");
+      expectRefusal(envelope({ ...base, items: [{ title: "One", icon: "star" }] }), "family:unsupported-feature");
     }
   });
 });
