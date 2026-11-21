@@ -300,6 +300,32 @@ const PHASE_C_REQUIRED = Object.freeze([
   "sequenceGetterCalls === 0",
   "family.ledeBeforeList",
   "sequenceBrowserChecks === 2",
+  // `UNO-WO-075 / R01`: the five-family authored plain-text heading and lede — labels plus their executable predicates.
+  'heading: "Synthetic prose heading",',
+  'lede: "Synthetic prose introduction & \\"quoted\\" wording.",',
+  'heading: "Synthetic callout heading",',
+  'lede: "Synthetic callout introduction.",',
+  'heading: "Synthetic list heading",',
+  'lede: "Synthetic list introduction.",',
+  'heading: "Synthetic FAQ heading",',
+  'lede: "Synthetic FAQ introduction.",',
+  'heading: "Synthetic table heading",',
+  'lede: "Synthetic table introduction.",',
+  "FAMILY_TEXT_FIVE_SOURCE ${evidence.id} composes one frozen stack with the authored heading, the authored lede and the unchanged native node",
+  "FAMILY_TEXT_FIVE_SOURCE the five authored-text families add no top-level node and keep the seventeen ids",
+  "FAMILY_TEXT_FIVE_REFUSALS each authored-text probe refuses the whole Page with its documented reason",
+  "FAMILY_TEXT_FIVE_REFUSALS an authored prose heading getter yields family:unsafe-source with zero invocations",
+  "FAMILY_TEXT_FIVE_REFUSALS a whitespace-only table lede refuses the whole Page despite four valid siblings",
+  "FAMILY_TEXT_FIVE_HTTP family-${index}-${type} serves one authored h2 and one lede before its native node",
+  "FAMILY_TEXT_FIVE_HTTP the five families add nine stacks and five headings with no duplicate id, extra main or external destination",
+  "FAMILY_TEXT_FIVE_BROWSER the five authored-text families were measured in real Chromium at both viewports",
+  "textFiveGetterCalls === 0",
+  "textFiveBrowserChecks === 2",
+  "familyAccepted.sections.filter((section) => section.module === \"layout.stack\").length === 9",
+  "family-0-prose-prose",
+  "family-13-table-table",
+  "family-3-faq-accordion",
+  "found.ledeBeforeNative",
 ]);
 
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
@@ -891,11 +917,53 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     }
   });
 
+  it("the audit fails when the five-family authored heading or lede evidence is neutered", () => {
+    const mutations = [
+      // Each authored fixture field removed from the five families.
+      ['heading: "Synthetic prose heading",', ""],
+      ['lede: "Synthetic prose introduction & \\"quoted\\" wording.",', ""],
+      ['heading: "Synthetic callout heading",', ""],
+      ['lede: "Synthetic callout introduction.",', ""],
+      ['heading: "Synthetic list heading",', ""],
+      ['lede: "Synthetic list introduction.",', ""],
+      ['heading: "Synthetic FAQ heading",', ""],
+      ['lede: "Synthetic FAQ introduction.",', ""],
+      ['heading: "Synthetic table heading",', ""],
+      ['lede: "Synthetic table introduction.",', ""],
+      // The shape, refusal, served-order and Chromium comparisons turned unconditional.
+      ["textFiveGetterCalls === 0", "true"],
+      ["textFiveBrowserChecks === 2", "true"],
+      ["found.ledeBeforeNative", "true"],
+      ['familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 9', "true"],
+    ];
+    for (const [token, replacement] of mutations) {
+      const mutated = source.split(token).join(replacement);
+      assert.notEqual(mutated, source, token);
+      assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
+    }
+    for (const label of [
+      "FAMILY_TEXT_FIVE_SOURCE ${evidence.id} composes one frozen stack with the authored heading, the authored lede and the unchanged native node",
+      "FAMILY_TEXT_FIVE_SOURCE the five authored-text families add no top-level node and keep the seventeen ids",
+      "FAMILY_TEXT_FIVE_REFUSALS each authored-text probe refuses the whole Page with its documented reason",
+      "FAMILY_TEXT_FIVE_REFUSALS an authored prose heading getter yields family:unsafe-source with zero invocations",
+      "FAMILY_TEXT_FIVE_REFUSALS a whitespace-only table lede refuses the whole Page despite four valid siblings",
+      "FAMILY_TEXT_FIVE_HTTP family-${index}-${type} serves one authored h2 and one lede before its native node",
+      "FAMILY_TEXT_FIVE_HTTP the five families add nine stacks and five headings with no duplicate id, extra main or external destination",
+      "FAMILY_TEXT_FIVE_BROWSER the five authored-text families were measured in real Chromium at both viewports",
+    ]) {
+      const mutated = source.split(label).join("five-family evidence removed");
+      assert.notEqual(mutated, source, label);
+      assert.ok(audit(mutated).some((entry) => entry.includes(label)), `${label}: ${audit(mutated).join(",")}`);
+    }
+  });
+
   it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {
     assert.deepEqual(audit(source), []);
     // The runner verifies the adapter's contractual top-level ids but never invents a child id or authors a Page node.
+    // `UNO-WO-075 / R01` moves five native nodes under their stack wrappers, so the runner now *names* those
+    // adapter-generated child ids in read-only assertions; it still must never author one as a node object.
     assert.ok(source.includes("const FAMILY_IDS = Object.freeze(["));
-    assert.ok(!/family-3-faq-/u.test(source));
+    assert.ok(!/id:\s*"family-\d+-[a-z]+-[a-z]+"/u.test(source));
     assert.ok(!/id: "family-0-prose", module: "/u.test(source));
     assert.ok(source.includes('"contactForm"'));
     assert.ok(source.includes('mode: "delivery-off"'));

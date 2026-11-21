@@ -585,10 +585,12 @@ function readSectionPlainText(value: PlainValue | undefined, codePointLimit: num
 /**
  * Wrap one already-composed sequence node in the donor's optional authored heading and lede.
  *
- * `UNO-WO-072 / R01`: the donor's `stats` and `steps` families both spread `headingFields`. When neither field is authored
- * the original node is returned untouched, so those inputs stay byte-identical. Otherwise one `layout.stack` takes the
- * unchanged family anchor id and carries, in source order, the authored level-2 heading, the authored plain-text lede and
- * the original node under the documented `${id}-<suffix>` child id. Nothing is synthesized and no other field is added.
+ * `UNO-WO-072 / R01`: the donor's `stats` and `steps` families both spread `headingFields`. `UNO-WO-075 / R01` extends the
+ * same treatment to the five already mapped `prose`, `callout`, `list`, `faq` and `table` families, whose donor schemas
+ * spread the same `headingFields` pair. When neither field is authored the original node is returned untouched, so those
+ * inputs stay byte-identical. Otherwise one `layout.stack` takes the unchanged family anchor id and carries, in source
+ * order, the authored level-2 heading, the authored plain-text lede and the original node under the documented
+ * `${id}-<suffix>` child id. Nothing is synthesized and no other field is added.
  */
 function wrapAuthoredText(
   record: PlainRecord,
@@ -644,20 +646,28 @@ function composeSection(
 
   switch (type) {
     case "prose": {
-      requireExactKeys(record, ["type", "body"], []);
+      // `UNO-WO-075 / R01`: the donor spreads `headingFields` into its prose schema, so the optional plain-text heading
+      // and lede become representable here as bounded authored text. `align`, `surface` and Markdown stay unsupported.
+      requireExactKeys(record, ["type", "body"], ["heading", "lede"]);
       const body = readDonorText(record["body"], true);
-      return { id, module: "content.prose", props: { text: body } };
+      const prose: CandidateSection = { id, module: "content.prose", props: { text: body } };
+      return wrapAuthoredText(record, id, prose, "prose");
     }
     case "callout": {
-      requireExactKeys(record, ["type", "body"], ["tone"]);
+      // The donor callout also spreads `headingFields`; its `align`, `surface` and Markdown forms remain outside this
+      // subset, and the authored heading/lede sit before the native callout notice rather than inside its accent.
+      requireExactKeys(record, ["type", "body"], ["tone", "heading", "lede"]);
       const body = readDonorText(record["body"], true);
       const props: Record<string, unknown> = { variant: "callout", text: body };
       // An absent tone stays absent: the display default belongs to the renderer, not to a manufactured field.
       if (ownsKey(record, "tone")) props["tone"] = record["tone"];
-      return { id, module: "content.prose", props };
+      const callout: CandidateSection = { id, module: "content.prose", props };
+      return wrapAuthoredText(record, id, callout, "callout");
     }
     case "table": {
-      requireExactKeys(record, ["type", "columns", "rows"], ["caption"]);
+      // The donor table also spreads `headingFields`; spans, merged cells, `surface`, unsafe captions and Markdown stay
+      // outside the subset, and the authored heading/lede precede the native table rather than entering its caption.
+      requireExactKeys(record, ["type", "columns", "rows"], ["caption", "heading", "lede"]);
       const columns = record["columns"];
       const rows = record["rows"];
       if (!Array.isArray(columns) || !Array.isArray(rows)) refuseUnsupportedFeature();
@@ -672,10 +682,12 @@ function composeSection(
         if (typeof caption === "string") refuseMarkdown(caption);
         props["caption"] = caption;
       }
-      return { id, module: "content.prose", props };
+      const table: CandidateSection = { id, module: "content.prose", props };
+      return wrapAuthoredText(record, id, table, "table");
     }
     case "list": {
-      requireExactKeys(record, ["type", "items"], ["ordered"]);
+      // The donor list also spreads `headingFields`; item destinations, `surface` and Markdown remain outside the subset.
+      requireExactKeys(record, ["type", "items"], ["ordered", "heading", "lede"]);
       const items = record["items"];
       if (!Array.isArray(items)) refuseUnsupportedFeature();
       const normalized: Record<string, unknown>[] = [];
@@ -696,7 +708,8 @@ function composeSection(
       }
       const props: Record<string, unknown> = { variant: "list", items: normalized };
       if (ownsKey(record, "ordered")) props["ordered"] = record["ordered"];
-      return { id, module: "content.prose", props };
+      const list: CandidateSection = { id, module: "content.prose", props };
+      return wrapAuthoredText(record, id, list, "list");
     }
     case "divider": {
       requireExactKeys(record, ["type"], []);
@@ -776,8 +789,9 @@ function composeSection(
       return { id, module: "content.testimonials", props };
     }
     case "faq": {
-      // The donor FAQ also accepts heading/lede/surface and rich Markdown; this subset composes none of them.
-      requireExactKeys(record, ["type", "items"], []);
+      // The donor FAQ also spreads `headingFields`; `surface`, custom open state, unsafe answers and Markdown stay outside
+      // this subset. The authored heading/lede precede the native disclosure group; answers keep their own ids.
+      requireExactKeys(record, ["type", "items"], ["heading", "lede"]);
       const items = record["items"];
       if (!Array.isArray(items)) refuseUnsupportedFeature();
       // Uno's accordion carries exactly 1..8 positional entries, so the source bound is that same closed bound.
@@ -798,7 +812,8 @@ function composeSection(
           props: { text: readNewFamilyText(entry["answer"]) },
         });
       }
-      return { id, module: "interaction.accordion", props: { items: entries }, children: answers };
+      const accordion: CandidateSection = { id, module: "interaction.accordion", props: { items: entries }, children: answers };
+      return wrapAuthoredText(record, id, accordion, "accordion");
     }
     case "columns": {
       requireExactKeys(record, ["type", "items"], ["ratio"]);

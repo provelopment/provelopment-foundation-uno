@@ -343,8 +343,10 @@ describe("composeUnoFoundationSubset — envelope, family and feature refusal", 
   });
 
   it("refuses an out-of-subset field on a supported family", () => {
-    expectRefusal(envelope({ type: "prose", body: "A", heading: "H" }), "family:unsupported-feature");
-    expectRefusal(envelope({ type: "prose", body: "A", lede: "L" }), "family:unsupported-feature");
+    // `UNO-WO-075 / R01` makes `heading`/`lede` representable on `prose`, `callout`, `list`, `faq` and `table`, so this
+    // pre-existing case now proves the refusal with the donor fields that stay outside the subset on `prose`.
+    expectRefusal(envelope({ type: "prose", body: "A", align: "center" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "prose", body: "A", surface: "muted" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "callout", body: "A", align: "start" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "callout", body: "A", surface: "muted" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], links: [] }), "family:unsupported-feature");
@@ -1058,8 +1060,10 @@ describe("composeUnoFoundationSubset — faq and columns React markup", () => {
 describe("composeUnoFoundationSubset — faq refusal", () => {
   it("refuses faq fields, item states and Markdown outside the bounded subset", () => {
     expectRefusal(envelope({ type: "faq" }), "family:unsupported-feature");
+    // `UNO-WO-075 / R01` accepts the optional `heading`/`lede` on `faq`, so the remaining out-of-subset keys prove the
+    // refusal here while the accepted pair is covered by the five-family authored-text cases.
     expectRefusal(
-      envelope({ type: "faq", items: [{ question: "Q", answer: "A" }], heading: "H" }),
+      envelope({ type: "faq", items: [{ question: "Q", answer: "A" }], align: "center" }),
       "family:unsupported-feature",
     );
     expectRefusal(
@@ -1067,7 +1071,7 @@ describe("composeUnoFoundationSubset — faq refusal", () => {
       "family:unsupported-feature",
     );
     expectRefusal(
-      envelope({ type: "faq", items: [{ question: "Q", answer: "A" }], lede: "L" }),
+      envelope({ type: "faq", items: [{ question: "Q", answer: "A" }], eyebrow: "L" }),
       "family:unsupported-feature",
     );
     for (const extra of ["href", "open", "icon"]) {
@@ -4350,9 +4354,10 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     for (const extra of [{ status: "current" }, { dateLabel: "March" }, { icon: "star" }, { href: "#family-0-steps" }]) {
       expectRefusal(envelope({ type: "steps", items: [{ title: "Draft", ...extra }] }), "family:unsupported-feature");
     }
-    // The two new optional keys stay family-specific; neighbouring families still refuse them.
+    // The two new optional keys stay family-specific; neighbouring families still refuse them. `faq` accepted them from
+    // `UNO-WO-075 / R01` onward, so a still-unmapped neighbour (`divider`) carries this assertion.
     expectRefusal(envelope({ type: "quote", body: "A quote.", heading: "X" }), "family:unsupported-feature");
-    expectRefusal(envelope({ type: "faq", items: [{ question: "Q", answer: "A" }], lede: "L" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "divider", lede: "L" }), "family:unsupported-feature");
   });
 
   it("renders the authored heading and lede before the existing stats list and steps list", () => {
@@ -4392,5 +4397,340 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/stats[^.\n]*full semantic parity/u);
     expect(ledger).not.toMatch(/steps[^.\n]*full semantic parity/u);
+  });
+});
+
+describe("composeUnoFoundationSubset — prose, callout, list, faq and table authored heading and lede", () => {
+  /** The nine pre-WO-075 section baselines, captured from the committed output before this change. */
+  const PRE_WO075_PROSE =
+    '{"id":"family-0-prose","module":"content.prose","props":{"text":"A plain paragraph."}}';
+  const PRE_WO075_CALLOUT =
+    '{"id":"family-0-callout","module":"content.prose","props":{"variant":"callout","text":"A bounded note."}}';
+  const PRE_WO075_CALLOUTTONE =
+    '{"id":"family-0-callout","module":"content.prose","props":{"variant":"callout","text":"A bounded note.","tone":"warning"}}';
+  const PRE_WO075_LIST =
+    '{"id":"family-0-list","module":"content.prose","props":{"variant":"list","items":[{"label":"First"},{"label":"Second","detail":"More detail."}]}}';
+  const PRE_WO075_LISTORDERED =
+    '{"id":"family-0-list","module":"content.prose","props":{"variant":"list","items":[{"label":"First"},{"label":"Second","detail":"More detail."}],"ordered":true}}';
+  const PRE_WO075_FAQONE =
+    '{"id":"family-0-faq","module":"interaction.accordion","props":{"items":[{"sectionId":"family-0-faq-answer-0","label":"Is it bounded?"}]},"children":[{"id":"family-0-faq-answer-0","module":"content.prose","props":{"text":"Yes."}}]}';
+  const PRE_WO075_FAQTWQ =
+    '{"id":"family-0-faq","module":"interaction.accordion","props":{"items":[{"sectionId":"family-0-faq-answer-0","label":"Is it bounded?"},{"sectionId":"family-0-faq-answer-1","label":"Is it plain?"}]},"children":[{"id":"family-0-faq-answer-0","module":"content.prose","props":{"text":"Yes."}},{"id":"family-0-faq-answer-1","module":"content.prose","props":{"text":"Also yes."}}]}';
+  const PRE_WO075_TABLE =
+    '{"id":"family-0-table","module":"content.prose","props":{"variant":"table","columns":["Name","Count"],"rows":[["A","1"],["B","2"]]}}';
+  const PRE_WO075_TABLECAPTION =
+    '{"id":"family-0-table","module":"content.prose","props":{"variant":"table","columns":["Name","Count"],"rows":[["A","1"],["B","2"]],"caption":"Values"}}';
+
+  const LIST_ITEMS: readonly unknown[] = ["First", { label: "Second", detail: "More detail." }];
+  const TABLE_COLUMNS = ["Name", "Count"];
+  const TABLE_ROWS = [["A", "1"], ["B", "2"]];
+  const FAQ_ONE = [{ question: "Is it bounded?", answer: "Yes." }];
+  const FAQ_TWO = [...FAQ_ONE, { question: "Is it plain?", answer: "Also yes." }];
+
+  type FiveType = "prose" | "callout" | "list" | "faq" | "table";
+  const FIVE_TYPES: readonly FiveType[] = ["prose", "callout", "list", "faq", "table"];
+
+  /** The documented original-child suffix of each of the five wrapped families. */
+  const CHILD_SUFFIX: Record<FiveType, string> = {
+    prose: "prose",
+    callout: "callout",
+    list: "list",
+    faq: "accordion",
+    table: "table",
+  };
+
+
+  /** The unchanged native node of each family, as one donor section without any authored text field. */
+  function nativeSection(type: FiveType, variant?: string): Record<string, unknown> {
+    if (type === "prose") return { type: "prose", body: "A plain paragraph." };
+    if (type === "callout") {
+      return { type: "callout", body: "A bounded note.", ...(variant === "tone" ? { tone: "warning" } : {}) };
+    }
+    if (type === "list") return { type: "list", items: LIST_ITEMS, ...(variant === "ordered" ? { ordered: true } : {}) };
+    if (type === "faq") return { type: "faq", items: variant === "two" ? FAQ_TWO : FAQ_ONE };
+    return {
+      type: "table",
+      columns: TABLE_COLUMNS,
+      rows: TABLE_ROWS,
+      ...(variant === "caption" ? { caption: "Values" } : {}),
+    };
+  }
+
+  /** One single-family source carrying exactly the caller-chosen fields. */
+  function fivePage(type: FiveType, fields: Record<string, unknown>, variant?: string): Record<string, unknown> {
+    return envelope({ ...nativeSection(type, variant), ...fields });
+  }
+
+  /** The original one-node child a wrapper must carry unchanged apart from its documented id. */
+  function originalChild(type: FiveType, variant?: string): Record<string, unknown> {
+    const baseline =
+      type === "prose"
+        ? PRE_WO075_PROSE
+        : type === "callout"
+          ? variant === "tone"
+            ? PRE_WO075_CALLOUTTONE
+            : PRE_WO075_CALLOUT
+          : type === "list"
+            ? variant === "ordered"
+              ? PRE_WO075_LISTORDERED
+              : PRE_WO075_LIST
+            : type === "faq"
+              ? variant === "two"
+                ? PRE_WO075_FAQTWQ
+                : PRE_WO075_FAQONE
+              : variant === "caption"
+                ? PRE_WO075_TABLECAPTION
+                : PRE_WO075_TABLE;
+    return JSON.parse(baseline) as Record<string, unknown>;
+  }
+
+  it("keeps all nine pre-WO-075 baselines byte-identical when neither text field is authored", () => {
+    expect(JSON.stringify(composed(fivePage("prose", {})).sections[0])).toBe(PRE_WO075_PROSE);
+    expect(JSON.stringify(composed(fivePage("callout", {})).sections[0])).toBe(PRE_WO075_CALLOUT);
+    expect(JSON.stringify(composed(fivePage("callout", {}, "tone")).sections[0])).toBe(PRE_WO075_CALLOUTTONE);
+    expect(JSON.stringify(composed(fivePage("list", {})).sections[0])).toBe(PRE_WO075_LIST);
+    expect(JSON.stringify(composed(fivePage("list", {}, "ordered")).sections[0])).toBe(PRE_WO075_LISTORDERED);
+    expect(JSON.stringify(composed(fivePage("faq", {})).sections[0])).toBe(PRE_WO075_FAQONE);
+    expect(JSON.stringify(composed(fivePage("faq", {}, "two")).sections[0])).toBe(PRE_WO075_FAQTWQ);
+    expect(JSON.stringify(composed(fivePage("table", {})).sections[0])).toBe(PRE_WO075_TABLE);
+    expect(JSON.stringify(composed(fivePage("table", {}, "caption")).sections[0])).toBe(PRE_WO075_TABLECAPTION);
+  });
+
+
+  it("composes a heading-only wrapper that carries the original child unchanged apart from its documented id", () => {
+    for (const type of FIVE_TYPES) {
+      const variant =
+        type === "callout" ? "tone" : type === "list" ? "ordered" : type === "faq" ? "two" : type === "table" ? "caption" : undefined;
+      const document = composed(fivePage(type, { heading: "Synthetic section" }, variant));
+      const section = document.sections[0]!;
+      expect(section.id).toBe(`family-0-${type}`);
+      expect(section.module).toBe("layout.stack");
+      expect(JSON.stringify(section.props)).toBe("{}");
+      if (section.module !== "layout.stack") continue;
+      expect(section.children).toHaveLength(2);
+      const [heading, child] = section.children;
+      expect(heading!.id).toBe(`family-0-${type}-heading`);
+      expect(heading!.module).toBe("content.heading");
+      expect(heading!.props).toEqual({ text: "Synthetic section", level: 2 });
+      expect(child!.id).toBe(`family-0-${type}-${CHILD_SUFFIX[type]}`);
+      const expected = originalChild(type, variant);
+      expected["id"] = `family-0-${type}-${CHILD_SUFFIX[type]}`;
+      expect(JSON.stringify(child)).toBe(JSON.stringify(expected));
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+    }
+  });
+
+  it("composes a lede-only wrapper without inventing a heading", () => {
+    for (const type of FIVE_TYPES) {
+      const document = composed(fivePage(type, { lede: "A plain authored lede." }));
+      const section = document.sections[0]!;
+      if (section.module !== "layout.stack") continue;
+      expect(section.children).toHaveLength(2);
+      const [lede, child] = section.children;
+      expect(lede!.id).toBe(`family-0-${type}-lede`);
+      expect(lede!.module).toBe("content.prose");
+      expect(lede!.props).toEqual({ text: "A plain authored lede." });
+      expect(section.children.some((node) => node.module === "content.heading")).toBe(false);
+      expect(child!.id).toBe(`family-0-${type}-${CHILD_SUFFIX[type]}`);
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+    }
+  });
+
+  it("composes heading plus lede as three ordered children before the original native node", () => {
+    for (const type of FIVE_TYPES) {
+      const source = fivePage(type, { heading: "Synthetic section", lede: "A plain authored lede." });
+      const before = JSON.stringify(source);
+      const document = composed(source);
+      expect(JSON.stringify(source)).toBe(before);
+      const section = document.sections[0]!;
+      if (section.module !== "layout.stack") continue;
+      expect(section.children.map((node) => node.id)).toEqual([
+        `family-0-${type}-heading`,
+        `family-0-${type}-lede`,
+        `family-0-${type}-${CHILD_SUFFIX[type]}`,
+      ]);
+      expect(section.children[0]!.module).toBe("content.heading");
+      expect(section.children[1]!.module).toBe("content.prose");
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+      expect(readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown).accepted).toBe(true);
+    }
+  });
+
+
+  it("keeps authored ids and source order when a headed family is mixed with the divider in either order", () => {
+    const divider = { type: "divider" };
+    for (const sections of [
+      [divider, { type: "prose", heading: "Notes", lede: "Plain words.", body: "A plain paragraph." }],
+      [{ type: "table", lede: "Tabulated here.", columns: TABLE_COLUMNS, rows: TABLE_ROWS }, divider],
+    ] as const) {
+      const document = composed({ version: 1, title: "Mixed five-family fixture", sections });
+      expect(document.sections.map((section) => section.id)).toEqual(
+        sections.map((section, index) => `family-${index}-${section.type}`),
+      );
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+    }
+  });
+
+  it("accepts the documented code-point bounds for both fields on all five families", () => {
+    const heading160 = "h".repeat(160);
+    const astralHeading = "\u{1F4CA}".repeat(160);
+    const lede4000 = "l".repeat(4000);
+    const astralLede = "\u{1F680}".repeat(4000);
+    for (const type of FIVE_TYPES) {
+      for (const heading of [heading160, astralHeading, "Grüße — 日本語 ✓"]) {
+        const document = composed(fivePage(type, { heading }));
+        expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+      }
+      for (const lede of [lede4000, astralLede, "Sätze mit & \"Anführungszeichen\" bleiben Text."]) {
+        const document = composed(fivePage(type, { lede }));
+        expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+      }
+    }
+  });
+
+  it("does not mutate the caller source and keeps the authored text outside the native node", () => {
+    for (const type of FIVE_TYPES) {
+      const source = fivePage(type, { heading: "Synthetic section", lede: "A plain authored lede." });
+      const snapshot = JSON.stringify(source);
+      const outcome = composeUnoFoundationSubset(source);
+      expect(outcome.status).toBe("composed");
+      expect(JSON.stringify(source)).toBe(snapshot);
+      const section = (JSON.parse(snapshot) as { sections: Record<string, unknown>[] }).sections[0]!;
+      // The caller's own authored fields survive untouched: nothing is trimmed, rewritten or deleted in place.
+      expect(Object.keys(section)).toContain("heading");
+      expect(Object.keys(section)).toContain("lede");
+      expect(section["heading"]).toBe("Synthetic section");
+      expect(section["lede"]).toBe("A plain authored lede.");
+      // The native node stays inside the wrapper without gaining either authored field.
+      if (outcome.status === "composed") {
+        const wrapper = outcome.document.sections[0]!;
+        if (wrapper.module === "layout.stack") {
+          const native = JSON.stringify(wrapper.children.at(-1));
+          expect(native).not.toContain("heading");
+          expect(native).not.toContain("lede");
+        }
+      }
+    }
+  });
+
+
+  it("refuses invalid heading and lede text on every family and on both fields", () => {
+    const cases: readonly (readonly [unknown, string])[] = [
+      [null, "family:unsupported-feature"],
+      [42, "family:unsupported-feature"],
+      [true, "family:unsupported-feature"],
+      [["Text"], "family:unsupported-feature"],
+      [{ text: "Text" }, "family:unsupported-feature"],
+      ["", "family:target-refused"],
+      ["   ", "family:target-refused"],
+      [" Padded", "family:target-refused"],
+      ["Padded ", "family:target-refused"],
+      ["**Bold**", "family:unsupported-feature"],
+      ["_Italic_", "family:unsupported-feature"],
+      ["~~Gone~~", "family:unsupported-feature"],
+      ["`code`", "family:unsupported-feature"],
+      ["[label](https://example.com)", "family:unsupported-feature"],
+      ["![alt](https://example.com/i.png)", "family:unsupported-feature"],
+      ["# Heading", "family:unsupported-feature"],
+      ["- entry", "family:unsupported-feature"],
+      ["> quote", "family:unsupported-feature"],
+      ["a < b", "family:unsupported-feature"],
+      ["<script>alert(1)</script>", "family:unsupported-feature"],
+      ["Two\nlines", "family:unsupported-feature"],
+      ["Carriage\rreturn", "family:unsupported-feature"],
+      ["Tabbed\ttext", "family:unsupported-feature"],
+      ["Nul\u0000text", "family:unsupported-feature"],
+      ["Lead \uD800 tail", "family:target-refused"],
+    ];
+    for (const type of FIVE_TYPES) {
+      for (const [value, reason] of cases) {
+        expectRefusal(fivePage(type, { heading: value }), reason);
+        expectRefusal(fivePage(type, { lede: value }), reason);
+      }
+      expectRefusal(fivePage(type, { heading: "h".repeat(161) }), "family:target-refused");
+      expectRefusal(fivePage(type, { lede: "l".repeat(4001) }), "family:target-refused");
+    }
+  });
+
+  it("refuses hostile text sources without executing a getter and never returns a partial Page", () => {
+    for (const type of FIVE_TYPES) {
+      for (const field of ["heading", "lede"] as const) {
+        let runs = 0;
+        const hostile: Record<string, unknown> = nativeSection(type);
+        Object.defineProperty(hostile, field, {
+          enumerable: true,
+          get() {
+            runs += 1;
+            return "Read me";
+          },
+        });
+        expectRefusal(envelope(hostile), "family:unsafe-source");
+        expect(runs).toBe(0);
+        // A valid neighbour cannot rescue the hostile family, and no refusal exposes an own `document` key.
+        const refused = composeUnoFoundationSubset({
+          version: 1,
+          title: "Hostile five-family fixture",
+          sections: [{ type: "prose", heading: "Valid", body: "A plain paragraph." }, hostile],
+        });
+        expect(refused.status).toBe("refused");
+        expect(Object.prototype.hasOwnProperty.call(refused, "document")).toBe(false);
+        expect(runs).toBe(0);
+      }
+    }
+  });
+
+  it("preserves the earlier native refusals and does not widen neighbouring families", () => {
+    for (const type of FIVE_TYPES) {
+      expectRefusal(fivePage(type, { align: "center" }), "family:unsupported-feature");
+      expectRefusal(fivePage(type, { surface: "muted" }), "family:unsupported-feature");
+      expectRefusal(fivePage(type, { eyebrow: "X" }), "family:unsupported-feature");
+      expectRefusal(fivePage(type, { heading: "Valid", markdown: "# no" }), "family:unsupported-feature");
+    }
+    expectRefusal(envelope({ type: "list", items: [{ label: "Linked", href: "https://example.com" }] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], align: "center" }), "family:unsupported-feature");
+    // The two new optional keys stay family-specific: unmapped neighbouring families still refuse them.
+    expectRefusal(envelope({ type: "divider", heading: "X" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "quote", body: "A quote.", lede: "L" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "hero", lede: "A hero.", heading: "X" }), "family:unsupported-feature");
+  });
+
+
+  it("renders the authored heading and lede before each family's unchanged native markup", () => {
+    const native: Record<FiveType, string> = {
+      prose: '<p class="uno-json-prose" id="family-0-prose-prose">A plain paragraph.</p>',
+      callout: '<section class="uno-json-callout" data-uno-tone="warning" id="family-0-callout-callout">',
+      list: '<ul class="uno-json-list" id="family-0-list-list">',
+      faq: '<div class="uno-json-accordion" id="family-0-faq-accordion">',
+      table: '<div class="uno-json-table-scroll" id="family-0-table-table" tabindex="0">',
+    };
+    for (const type of FIVE_TYPES) {
+      const html = render(
+        composed(fivePage(type, { heading: "Synthetic section", lede: "A lede & \"quoted\" text." }, type === "callout" ? "tone" : undefined)),
+      );
+      const start = html.indexOf(`id="family-0-${type}"`);
+      expect(start).toBeGreaterThan(-1);
+      const region = html.slice(start - 80);
+      const heading = `<h2 class="uno-json-heading" id="family-0-${type}-heading">Synthetic section</h2>`;
+      const lede = `<p class="uno-json-prose" id="family-0-${type}-lede">A lede &amp; &quot;quoted&quot; text.</p>`;
+      expect(region).toContain(heading);
+      expect(region).toContain(lede);
+      expect(region).toContain(native[type]);
+      expect(region.indexOf(heading)).toBeLessThan(region.indexOf(lede));
+      expect(region.indexOf(lede)).toBeLessThan(region.indexOf(native[type]));
+      for (const forbidden of ["<h1", "<h3", "<script", "<iframe", "<form", "<button", "<a ", "<img", "onclick"]) {
+        expect(region).not.toContain(forbidden);
+      }
+    }
+  });
+
+  it("keeps the five-family subset recorded in the ledger without claiming further parity", () => {
+    const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
+    expect(ledger.split("ADAPT (bounded plain-text heading/lede)").length - 1).toBe(5);
+    expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
+    expect(ledger).toContain("one of seventeen fully parity-evidenced candidates");
+    expect(ledger).not.toContain("2/17");
+    expect(ledger).not.toContain("6/17");
+    expect(ledger).not.toMatch(/prose[^.\n]*full semantic parity/u);
+    expect(ledger).not.toMatch(/table[^.\n]*full semantic parity/u);
   });
 });

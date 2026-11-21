@@ -364,11 +364,32 @@ function familySource() {
     version: 1,
     title: "Bounded family composition proof",
     sections: [
-      { type: "prose", body: "This Page came from a bounded donor subset." },
-      { type: "callout", body: "A synthetic warning for the publication proof.", tone: "warning" },
-      { type: "list", ordered: true, items: ["Prepare", "Publish"] },
+      // `UNO-WO-075 / R01`: the five already mapped families at indices 0, 1, 2, 3 and 13 gain only their donor
+      // `heading` and `lede` as synthetic authored plain text. Nothing else in those sections changes.
+      {
+        type: "prose",
+        heading: "Synthetic prose heading",
+        lede: "Synthetic prose introduction & \"quoted\" wording.",
+        body: "This Page came from a bounded donor subset.",
+      },
+      {
+        type: "callout",
+        heading: "Synthetic callout heading",
+        lede: "Synthetic callout introduction.",
+        body: "A synthetic warning for the publication proof.",
+        tone: "warning",
+      },
+      {
+        type: "list",
+        heading: "Synthetic list heading",
+        lede: "Synthetic list introduction.",
+        ordered: true,
+        items: ["Prepare", "Publish"],
+      },
       {
         type: "faq",
+        heading: "Synthetic FAQ heading",
+        lede: "Synthetic FAQ introduction.",
         items: [{ question: "Can this contact notice send anything?", answer: "No. Delivery is off." }],
       },
       { type: "media", image: { src: FAMILY_DONOR_SOURCE, alt: "Synthetic blue image plate" } },
@@ -431,6 +452,9 @@ function familySource() {
       // `UNO-WO-068 / R03`: appended after the unchanged thirteen; still donor-shaped input to the real adapter.
       {
         type: "table",
+        // `UNO-WO-075 / R01`: the authored heading and lede are the only source change at index 13.
+        heading: "Synthetic table heading",
+        lede: "Synthetic table introduction.",
         columns: ["Phase", "Count"],
         rows: [["First", "1"], ["Second", "2"]],
         caption: "Synthetic table",
@@ -1064,7 +1088,58 @@ async function main() {
       `${String(sequenceGetterOutcome.status === "refused" ? sequenceGetterOutcome.reason : sequenceGetterOutcome.status)} calls=${sequenceGetterCalls}`,
     );
 
-    // A hostile accessor on an appended item must be classified, never executed: zero invocations and no partial Page.
+    // `UNO-WO-075 / R01`: ten further whole-Page refusals across the five newly authored-text families, plus one
+    // zero-invocation accessor probe and one valid-sibling probe. Each probe mutates exactly one authored text field.
+    const textFiveProbes = [
+      ["prose heading Markdown emphasis", "family:unsupported-feature", (s) => { s.sections[0].heading = "**Bold** heading"; }],
+      ["prose lede markup", "family:unsupported-feature", (s) => { s.sections[0].lede = "<b>bold</b>"; }],
+      ["callout heading blank", "family:target-refused", (s) => { s.sections[1].heading = ""; }],
+      ["callout lede padded", "family:target-refused", (s) => { s.sections[1].lede = " Padded lede"; }],
+      ["list heading oversize", "family:target-refused", (s) => { s.sections[2].heading = "x".repeat(161); }],
+      ["list lede wrong type", "family:unsupported-feature", (s) => { s.sections[2].lede = 7; }],
+      ["faq heading unpaired surrogate", "family:target-refused", (s) => { s.sections[3].heading = "Lead \uD800 tail"; }],
+      ["faq lede Markdown link", "family:unsupported-feature", (s) => { s.sections[3].lede = "[label](https://example.test)"; }],
+      ["table heading Markdown code", "family:unsupported-feature", (s) => { s.sections[13].heading = "`code` heading"; }],
+      ["table lede oversize", "family:target-refused", (s) => { s.sections[13].lede = "y".repeat(4001); }],
+    ].map(([expectedLabel, expected, mutate]) => {
+      const source = familySource();
+      mutate(source);
+      const outcome = composeUnoFoundationSubset(source, familyBindings());
+      return {
+        label: expectedLabel,
+        expected,
+        actual: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+        partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+      };
+    });
+    check(
+      "FAMILY_TEXT_FIVE_REFUSALS each authored-text probe refuses the whole Page with its documented reason",
+      textFiveProbes.every((probe) => probe.actual === probe.expected && probe.partial === false),
+      JSON.stringify(textFiveProbes),
+    );
+    const textFiveGetterSource = familySource();
+    let textFiveGetterCalls = 0;
+    Object.defineProperty(textFiveGetterSource.sections[0], "heading", {
+      enumerable: true,
+      get() { textFiveGetterCalls += 1; return "Read me"; },
+    });
+    const textFiveGetterOutcome = composeUnoFoundationSubset(textFiveGetterSource, familyBindings());
+    check(
+      "FAMILY_TEXT_FIVE_REFUSALS an authored prose heading getter yields family:unsafe-source with zero invocations",
+      textFiveGetterOutcome.status === "refused" && textFiveGetterOutcome.reason === "family:unsafe-source"
+        && textFiveGetterCalls === 0 && !Object.prototype.hasOwnProperty.call(textFiveGetterOutcome, "document"),
+      `${String(textFiveGetterOutcome.status === "refused" ? textFiveGetterOutcome.reason : textFiveGetterOutcome.status)} calls=${textFiveGetterCalls}`,
+    );
+    const textFiveSiblingSource = familySource();
+    textFiveSiblingSource.sections[13].lede = "   ";
+    const textFiveSiblingOutcome = composeUnoFoundationSubset(textFiveSiblingSource, familyBindings());
+    check(
+      "FAMILY_TEXT_FIVE_REFUSALS a whitespace-only table lede refuses the whole Page despite four valid siblings",
+      textFiveSiblingOutcome.status === "refused" && textFiveSiblingOutcome.reason === "family:target-refused"
+        && !Object.prototype.hasOwnProperty.call(textFiveSiblingOutcome, "document"),
+      String(textFiveSiblingOutcome.status === "refused" ? textFiveSiblingOutcome.reason : textFiveSiblingOutcome.status),
+    );
+
     const getterSource = familySource();
     let getterCalls = 0;
     Object.defineProperty(getterSource.sections[16].items[0], "title", {
@@ -1295,7 +1370,8 @@ async function main() {
       check(
         "FAMILY_LEDE_SOURCE the ledes add no node outside the two families and keep the seventeen top-level ids",
         JSON.stringify(ledeIds) === JSON.stringify(FAMILY_IDS)
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 4
+          // `UNO-WO-075 / R01` wraps five further families, so the fixture now holds nine top-level stacks.
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 9
           && familyAccepted.sections[8]?.id === "family-8-divider"
           && JSON.stringify(familyAccepted.sections[8]?.props) === JSON.stringify({ variant: "divider" }),
         `${ledeIds.length}/${ledeIds.join(",")}`,
@@ -1361,7 +1437,7 @@ async function main() {
       check(
         "FAMILY_STATS_STEPS_SOURCE the authored-text families keep the seventeen ids and no other family changes",
         JSON.stringify(familyAccepted.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS)
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 4
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 9
           && familyAccepted.sections[7]?.module === "content.actions"
           && familyAccepted.sections[8]?.id === "family-8-divider"
           && familyAccepted.sections[12]?.module === "content.testimonials",
@@ -1379,6 +1455,68 @@ async function main() {
           && familyReparsed.accepted === true,
         recomposedSequence.status === "composed" ? `${familyJsonBytes.length}B` : String(recomposedSequence.reason),
       );
+    // `UNO-WO-075 / R01`: the five newly authored-text families as composed, one scoped check per family plus a
+    // whole-Page summary. The native child is compared against the adapter's own output for the same source with the two
+    // authored fields removed, so "the original node is unchanged apart from its documented id" is measured, not asserted.
+    {
+      const TEXT_FIVE = [
+        [0, "prose", "prose"],
+        [1, "callout", "callout"],
+        [2, "list", "list"],
+        [3, "faq", "accordion"],
+        [13, "table", "table"],
+      ];
+      const textFiveEvidence = TEXT_FIVE.map(([index, type, suffix]) => {
+        const id = `family-${index}-${type}`;
+        const source = familySource();
+        const section = familyAccepted.sections[index];
+        const headingText = source.sections[index].heading;
+        const ledeText = source.sections[index].lede;
+        const nativeOnly = familySource();
+        delete nativeOnly.sections[index].heading;
+        delete nativeOnly.sections[index].lede;
+        const nativeOutcome = composeUnoFoundationSubset(nativeOnly, familyBindings());
+        const nativeChild = nativeOutcome.status === "composed" ? nativeOutcome.document.sections[index] : null;
+        const expected = nativeChild === null ? null : JSON.parse(JSON.stringify(nativeChild));
+        if (expected !== null) expected.id = `${id}-${suffix}`;
+        const shapeOk = section?.module === "layout.stack"
+          && section.id === id
+          && JSON.stringify(section.props) === "{}"
+          && (section.children ?? []).length === 3
+          && section.children[0]?.module === "content.heading"
+          && section.children[0]?.id === `${id}-heading`
+          && JSON.stringify(section.children[0]?.props) === JSON.stringify({ text: headingText, level: 2 })
+          && section.children[1]?.module === "content.prose"
+          && section.children[1]?.id === `${id}-lede`
+          && JSON.stringify(section.children[1]?.props) === JSON.stringify({ text: ledeText })
+          && expected !== null
+          && JSON.stringify(section.children[2]) === JSON.stringify(expected)
+          && Object.isFrozen(section)
+          && Object.isFrozen(section.children)
+          && Object.isFrozen(section.children[0]?.props)
+          && Object.isFrozen(section.children[1]?.props)
+          && Object.isFrozen(section.children[2]?.props);
+        return {
+          id,
+          ok: shapeOk,
+          detail: shapeOk ? `${id} ok` : `${id} ${JSON.stringify(section?.children?.map((child) => child.id))}`,
+        };
+      });
+      for (const evidence of textFiveEvidence) {
+        check(
+          `FAMILY_TEXT_FIVE_SOURCE ${evidence.id} composes one frozen stack with the authored heading, the authored lede and the unchanged native node`,
+          evidence.ok,
+          evidence.detail,
+        );
+      }
+      check(
+        "FAMILY_TEXT_FIVE_SOURCE the five authored-text families add no top-level node and keep the seventeen ids",
+        JSON.stringify(familyAccepted.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS)
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 9
+          && textFiveEvidence.every((evidence) => evidence.ok),
+        `${familyAccepted.sections.filter((section) => section.module === "layout.stack").length} stacks`,
+      );
+    }
     }
     const { planUnoServingPage: planFamily } = await import("../src/config/uno-serving.ts");
     const familyServing = await planFamily("/en-001/wo066-family-composition");
@@ -1530,11 +1668,12 @@ async function main() {
     );
     check(
       "FAMILY_HTTP=200 prose and warning callout are rendered",
-      familyHtml.includes('<p class="uno-json-prose" id="family-0-prose">This Page came from a bounded donor subset.</p>')
-        && familyHtml.includes('<section class="uno-json-callout" data-uno-tone="warning" id="family-1-callout">')
+      // `UNO-WO-075 / R01` moves each native node under its stack wrapper and suffixes its id; the wrapper keeps the anchor.
+      familyHtml.includes('<p class="uno-json-prose" id="family-0-prose-prose">This Page came from a bounded donor subset.</p>')
+        && familyHtml.includes('<section class="uno-json-callout" data-uno-tone="warning" id="family-1-callout-callout">')
         && familyHtml.includes("A synthetic warning for the publication proof."),
     );
-    const listStart = familyHtml.indexOf('<ol class="uno-json-list" id="family-2-list">');
+    const listStart = familyHtml.indexOf('<ol class="uno-json-list" id="family-2-list-list">');
     const listMarkup = listStart < 0 ? "" : familyHtml.slice(listStart, familyHtml.indexOf("</ol>", listStart));
     check(
       "FAMILY_HTTP=200 the ordered list carries exactly the two authored entries",
@@ -1543,7 +1682,7 @@ async function main() {
     );
     check(
       "FAMILY_HTTP=200 the FAQ renders as a native disclosure with the authored question",
-      familyHtml.includes('<div class="uno-json-accordion" id="family-3-faq">')
+      familyHtml.includes('<div class="uno-json-accordion" id="family-3-faq-accordion">')
         && familyHtml.includes("<details") && familyHtml.includes("<summary")
         && familyHtml.includes("Can this contact notice send anything?"),
     );
@@ -1577,6 +1716,9 @@ async function main() {
           familyHtml.lastIndexOf('<div class="uno-json-stack" data-uno-gap="normal"', nextAt),
           familyHtml.lastIndexOf('<div class="uno-json-grid"', nextAt),
           familyHtml.lastIndexOf("<section", nextAt),
+          // `UNO-WO-075 / R01`: the five wrapped families can now sit directly before a `media` neighbour, whose root is
+          // one `<figure>` rather than a `<section>`, so that opening tag also bounds the region.
+          familyHtml.lastIndexOf("<figure", nextAt),
         );
         return nextOpen <= at ? "" : familyHtml.slice(wrapperOpen, nextOpen);
       }
@@ -1633,7 +1775,7 @@ async function main() {
     // `UNO-WO-068 / R03`: the last four families. The table nests no container, so its own close tag bounds it; the two
     // grids nest cells and stacks, so each is bounded by the next top-level id and its direct-child counts are checked
     // only on the classes that belong to that grid (exact child structure is proved by the scoped Chromium assertions).
-    const tableRegionStart = familyHtml.indexOf('<div class="uno-json-table-scroll" id="family-13-table" tabindex="0">');
+    const tableRegionStart = familyHtml.indexOf('<div class="uno-json-table-scroll" id="family-13-table-table" tabindex="0">');
     const tableRegionEnd = tableRegionStart < 0 ? -1 : familyHtml.indexOf("</table></div>", tableRegionStart);
     const tableRegion = tableRegionStart < 0 || tableRegionEnd < 0
       ? ""
@@ -1807,6 +1949,53 @@ async function main() {
         `stats=${familyRegionOf("family-10-stats").length} steps=${familyRegionOf("family-11-steps").length}`,
       );
     }
+    // `UNO-WO-075 / R01`: the five authored-text families exactly as served, one scoped check each plus a whole-Page one.
+    {
+      const servedFive = [
+        [0, "prose", "Synthetic prose heading", "Synthetic prose introduction &amp; &quot;quoted&quot; wording.",
+          '<p class="uno-json-prose" id="family-0-prose-prose">'],
+        [1, "callout", "Synthetic callout heading", "Synthetic callout introduction.",
+          '<section class="uno-json-callout" data-uno-tone="warning" id="family-1-callout-callout">'],
+        [2, "list", "Synthetic list heading", "Synthetic list introduction.",
+          '<ol class="uno-json-list" id="family-2-list-list">'],
+        [3, "faq", "Synthetic FAQ heading", "Synthetic FAQ introduction.",
+          '<div class="uno-json-accordion" id="family-3-faq-accordion">'],
+        [13, "table", "Synthetic table heading", "Synthetic table introduction.",
+          '<div class="uno-json-table-scroll" id="family-13-table-table" tabindex="0">'],
+      ];
+      const servedFiveOk = (index, type, headingText, ledeText, nativeOpen) => {
+        const id = `family-${index}-${type}`;
+        const region = familyRegionOf(id);
+        return region.startsWith(`<div class="uno-json-stack" data-uno-gap="normal" id="${id}">`)
+          && (region.match(new RegExp(`id="${id}-heading"`, "gu")) ?? []).length === 1
+          && (region.match(new RegExp(`id="${id}-lede"`, "gu")) ?? []).length === 1
+          && region.includes(`<h2 class="uno-json-heading" id="${id}-heading">${headingText}</h2>`)
+          && region.includes(`<p class="uno-json-prose" id="${id}-lede">${ledeText}</p>`)
+          && region.indexOf(`${id}-heading`) < region.indexOf(`${id}-lede`)
+          && region.indexOf(`${id}-lede`) < region.indexOf(nativeOpen)
+          && region.includes(nativeOpen)
+          && (region.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
+          && !/<main\b|<h1\b|<h3\b|<script\b|<iframe\b|<form\b|<button\b|<input\b|<a\b/iu.test(region);
+      };
+      for (const [index, type, headingText, ledeText, nativeOpen] of servedFive) {
+        check(
+          `FAMILY_TEXT_FIVE_HTTP family-${index}-${type} serves one authored h2 and one lede before its native node`,
+          servedFiveOk(index, type, headingText, ledeText, nativeOpen),
+          familyRegionOf(`family-${index}-${type}`).slice(0, 160),
+        );
+      }
+      check(
+        "FAMILY_TEXT_FIVE_HTTP the five families add nine stacks and five headings with no duplicate id, extra main or external destination",
+        (familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length === 9
+          && (familyHtml.match(/<h2 class="uno-json-heading" id="family-(?:0-prose|1-callout|2-list|3-faq|13-table)-heading"/gu) ?? []).length === 5
+          && (familyHtml.match(/<p class="uno-json-prose" id="family-(?:0-prose|1-callout|2-list|3-faq|13-table)-lede"/gu) ?? []).length === 5
+          && servedFive.every(([index, type, headingText, ledeText, nativeOpen]) => servedFiveOk(index, type, headingText, ledeText, nativeOpen))
+          && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
+          && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
+          && !familyHtml.includes(FAMILY_DONOR_SOURCE),
+        `stacks=${(familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length}`,
+      );
+    }
     {
       const lastFourRegions = [tableRegion, columnsRegion, cardsRegion, featuresRegion];
       check(
@@ -1815,7 +2004,7 @@ async function main() {
           && lastFourRegions.every((region) => !/<main\b|<h1\b|<script\b|<iframe\b|<form\b|<input\b|<textarea\b|<button\b/iu.test(region))
           && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
           && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
-          && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 6
+          && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 11
           && (familyHtml.match(/<h3[\s>]/giu) ?? []).length === 4
           && !familyHtml.includes(FAMILY_DONOR_SOURCE)
           && !familyHtml.includes("formRef"),
@@ -2294,6 +2483,17 @@ async function consentPhase(base) {
       }
       return check(`FAMILY_STATS_STEPS_BROWSER ${label}`, ok, detail);
     };
+    // `UNO-WO-075 / R01`: the five-family authored-text evidence is counted separately and still gates `FAMILY_BROWSER=PASS`.
+    let textFiveBrowserOk = true;
+    let textFiveBrowserChecks = 0;
+    const textFiveCheck = (label, ok, detail = "") => {
+      textFiveBrowserChecks += 1;
+      if (!ok) {
+        textFiveBrowserOk = false;
+        familyOk = false;
+      }
+      return check(`FAMILY_TEXT_FIVE_BROWSER ${label}`, ok, detail);
+    };
     // `UNO-WO-069 / R01`: the divider evidence is counted and gated separately, so a deleted or neutered divider check
     // both fails the runner and suppresses the overall parity label.
     let dividerOk = true;
@@ -2313,8 +2513,10 @@ async function consentPhase(base) {
         const tops = [...document.querySelectorAll('[id^="family-"]')]
           .filter((element) => element.parentElement?.closest('[id^="family-"]') === null)
           .map((element) => element.id);
-        const prose = document.querySelector("#family-0-prose");
-        const callout = document.querySelector("#family-1-callout");
+        // `UNO-WO-075 / R01`: the native nodes moved under their stack wrappers, so these probes address the suffixed ids
+        // and keep asserting the unchanged native presentation.
+        const prose = document.querySelector("#family-0-prose-prose");
+        const callout = document.querySelector("#family-1-callout-callout");
         const galleryImages = [...document.querySelectorAll("#family-5-gallery img")];
         const contact = document.querySelector(".uno-json-contact");
         return {
@@ -2326,7 +2528,7 @@ async function consentPhase(base) {
           proseVisible: prose === null ? "" : getComputedStyle(prose).visibility,
           calloutText: (callout?.textContent ?? "").trim(),
           calloutTone: callout?.getAttribute("data-uno-tone") ?? "",
-          listItems: [...document.querySelectorAll("#family-2-list li")].map((item) => item.textContent?.trim() ?? ""),
+          listItems: [...document.querySelectorAll("#family-2-list-list li")].map((item) => item.textContent?.trim() ?? ""),
           gallerySources: galleryImages.map((image) => image.getAttribute("src") ?? ""),
           galleryAlts: galleryImages.map((image) => image.getAttribute("alt") ?? ""),
           galleryDecoded: galleryImages.map((image) => image.naturalWidth),
@@ -2449,7 +2651,7 @@ async function consentPhase(base) {
             };
           })(),
           table: (() => {
-            const region = document.querySelector("#family-13-table");
+            const region = document.querySelector("#family-13-table-table");
             const wrapper = region?.firstElementChild ?? null;
             return {
               isScroll: region?.classList.contains("uno-json-table-scroll") ?? false,
@@ -2563,7 +2765,7 @@ async function consentPhase(base) {
             };
           })(),
           tableFocus: (() => {
-            const region = document.querySelector("#family-13-table");
+            const region = document.querySelector("#family-13-table-table");
             region?.focus();
             return document.activeElement === region;
           })(),
@@ -2792,8 +2994,63 @@ async function consentPhase(base) {
           && seen.mains === 1 && seen.h1s === 1 && seen.overflow === 0,
         `${seen.tops.length}/${new Set(seen.tops).size} mains=${seen.mains} h1=${seen.h1s} overflow=${seen.overflow}`);
 
-      const familySummary = tab.locator("#family-3-faq summary").first();
-      const familyDetails = tab.locator("#family-3-faq details").first();
+      // `UNO-WO-075 / R01`: the five authored-text families as this browser actually lays them out at this viewport.
+      const textFiveSeen = await tab.evaluate(() => {
+        const ids = ["family-0-prose", "family-1-callout", "family-2-list", "family-3-faq", "family-13-table"];
+        return ids.map((id) => {
+          const root = document.getElementById(id);
+          const heading = root?.querySelector(":scope > h2.uno-json-heading") ?? null;
+          const lede = root?.querySelector(":scope > p.uno-json-prose") ?? null;
+          const native = root?.lastElementChild ?? null;
+          const headingBox = heading?.getBoundingClientRect() ?? null;
+          const ledeBox = lede?.getBoundingClientRect() ?? null;
+          return {
+            id,
+            isStack: root?.classList.contains("uno-json-stack") ?? false,
+            headingText: heading?.textContent ?? "",
+            headingVisible: headingBox !== null && headingBox.height > 0 && headingBox.width > 0,
+            ledeText: lede?.textContent ?? "",
+            ledeVisible: ledeBox !== null && ledeBox.height > 0 && ledeBox.width > 0,
+            headingBeforeLede: heading !== null && lede !== null
+              && (heading.compareDocumentPosition(lede) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            ledeBeforeNative: lede !== null && native !== null && native !== lede
+              && (lede.compareDocumentPosition(native) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            nativeId: native?.id ?? "",
+            nativeTag: native?.tagName ?? "",
+            h2Count: root?.querySelectorAll("h2").length ?? -1,
+            controls: root?.querySelectorAll("a, button, input, select, textarea, iframe").length ?? -1,
+          };
+        });
+      });
+      const expectedFive = [
+        ["family-0-prose", "Synthetic prose heading", 'Synthetic prose introduction & "quoted" wording.', "family-0-prose-prose", "P"],
+        ["family-1-callout", "Synthetic callout heading", "Synthetic callout introduction.", "family-1-callout-callout", "SECTION"],
+        ["family-2-list", "Synthetic list heading", "Synthetic list introduction.", "family-2-list-list", "OL"],
+        ["family-3-faq", "Synthetic FAQ heading", "Synthetic FAQ introduction.", "family-3-faq-accordion", "DIV"],
+        ["family-13-table", "Synthetic table heading", "Synthetic table introduction.", "family-13-table-table", "DIV"],
+      ];
+      textFiveCheck(`${width}px the five authored-text families show a visible heading and lede before their native node`,
+        textFiveSeen.length === 5
+          && expectedFive.every(([id, headingText, ledeText, nativeId, nativeTag]) => {
+            const found = textFiveSeen.find((entry) => entry.id === id);
+            return found !== undefined
+              && found.isStack
+              && found.headingText === headingText
+              && found.headingVisible
+              && found.ledeText === ledeText
+              && found.ledeVisible
+              && found.headingBeforeLede
+              && found.ledeBeforeNative
+              && found.nativeId === nativeId
+              && found.nativeTag === nativeTag
+              && found.h2Count === 1
+              && (id === "family-3-faq" || found.controls === 0);
+          })
+          && seen.overflow === 0,
+        JSON.stringify(textFiveSeen.map((entry) => `${entry.id}:${entry.nativeId}:${entry.h2Count}:${entry.controls}`)));
+
+      const familySummary = tab.locator("#family-3-faq-accordion summary").first();
+      const familyDetails = tab.locator("#family-3-faq-accordion details").first();
       await familySummary.focus();
       familyCheck(`${width}px the FAQ summary takes keyboard focus`,
         await familySummary.evaluate((element) => document.activeElement === element));
@@ -2923,8 +3180,14 @@ async function consentPhase(base) {
       `checks=${sequenceBrowserChecks}`,
     );
     check(
+      "FAMILY_TEXT_FIVE_BROWSER the five authored-text families were measured in real Chromium at both viewports",
+      textFiveBrowserOk && textFiveBrowserChecks === 2,
+      `checks=${textFiveBrowserChecks}`,
+    );
+    check(
       "FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px",
-      familyOk && ledeBrowserOk && ledeBrowserChecks === 2 && sequenceBrowserOk && sequenceBrowserChecks === 2,
+      familyOk && ledeBrowserOk && ledeBrowserChecks === 2 && sequenceBrowserOk && sequenceBrowserChecks === 2
+        && textFiveBrowserOk && textFiveBrowserChecks === 2,
     );
     // `UNO-WO-069 / R01`: the divider parity gate. It depends on every executed divider check (three per light viewport
     // and three per dark/reduced-motion viewport) AND on the surrounding family gates, so no single label can stand
