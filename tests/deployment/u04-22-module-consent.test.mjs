@@ -165,7 +165,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "composeUnoFoundationSubset(probeSource, familyBindings())",
   "FAMILY_HERO_HTTP the hero region carries the authored alignment, surface and text in order",
   "FAMILY_STATS_HTTP the stats region is one definition list with two authored pairs in order",
-  "FAMILY_STEPS_HTTP the steps region is one ordered list of two authored items with no invented status",
+  "FAMILY_STEPS_HTTP the steps region is one authored heading, one lede and one ordered list of two items",
   "FAMILY_QUOTE_HTTP the quote region is one figure, blockquote and caption with separate attribution and role",
   "${width}px hero shows the authored eyebrow, lede and support with no action control",
   "${width}px stats show two authored pairs with one detail on the first item",
@@ -280,6 +280,26 @@ const PHASE_C_REQUIRED = Object.freeze([
   "family.ledeBeforeGrid",
   "family.ledeVisible",
   "ledeBrowserChecks === 2",
+  // `UNO-WO-072 / R01`: the authored stats/steps heading and lede — labels plus their executable predicates.
+  'heading: "Synthetic numbers",',
+  'lede: "Synthetic numbers summarise the sample.",',
+  'heading: "Synthetic sequence",',
+  'lede: "Synthetic steps keep the authored order.",',
+  "FAMILY_STATS_STEPS_SOURCE stats compose one authored heading and lede before the unchanged stat list",
+  "FAMILY_STATS_STEPS_SOURCE steps compose the same ordered text before the unchanged timeline node",
+  "FAMILY_STATS_STEPS_SOURCE the authored-text families keep the seventeen ids and no other family changes",
+  "FAMILY_STATS_STEPS_SOURCE the sequence JSON matches the installed buffer and the caller source is unmutated",
+  "FAMILY_STATS_STEPS_REFUSALS each sequence probe refuses the whole Page with its documented reason",
+  "FAMILY_STATS_STEPS_REFUSALS an authored steps heading getter yields family:unsafe-source with zero invocations",
+  "FAMILY_STATS_STEPS_HTTP each sequence family serves one heading and one lede before its unchanged list",
+  "FAMILY_STATS_STEPS_BROWSER the sequence headings and ledes were measured in real Chromium at both viewports",
+  "${width}px each sequence family shows its authored heading and one visible lede before its list",
+  'section.children[0]?.id === `family-${index}-${type}-heading`',
+  'JSON.stringify(section.children[1]?.props) === JSON.stringify({ text: expectedLede })',
+  "JSON.stringify(section.children[2]) === JSON.stringify(expectedChild)",
+  "sequenceGetterCalls === 0",
+  "family.ledeBeforeList",
+  "sequenceBrowserChecks === 2",
 ]);
 
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
@@ -531,7 +551,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     const shapes = [
       [
         source.replace(
-          "FAMILY_STEPS_HTTP the steps region is one ordered list of two authored items with no invented status",
+          "FAMILY_STEPS_HTTP the steps region is one authored heading, one lede and one ordered list of two items",
           "steps region unchecked",
         ),
         "FAMILY_STEPS_HTTP",
@@ -816,6 +836,41 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       "FAMILY_LEDE_BROWSER the authored ledes were measured in real Chromium at both viewports",
     ]) {
       const mutated = source.split(label).join("lede evidence removed");
+      assert.notEqual(mutated, source, label);
+      assert.ok(audit(mutated).some((entry) => entry.includes(label)), `${label}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit fails when the authored stats or steps evidence is neutered", () => {
+    const mutations = [
+      // The fixture source loses each authored field.
+      ['heading: "Synthetic numbers",', ""],
+      ['lede: "Synthetic numbers summarise the sample.",', ""],
+      ['heading: "Synthetic sequence",', ""],
+      ['lede: "Synthetic steps keep the authored order.",', ""],
+      // The composed shape comparisons turned unconditional.
+      ["section.children[0]?.id === `family-${index}-${type}-heading`", "true"],
+      ["JSON.stringify(section.children[1]?.props) === JSON.stringify({ text: expectedLede })", "true"],
+      ["JSON.stringify(section.children[2]) === JSON.stringify(expectedChild)", "true"],
+      // The refusal probe's zero-getter assertion removed.
+      ["sequenceGetterCalls === 0", "true"],
+      // The served order and the Chromium lede-order predicates neutralized.
+      ["ledeAt < listAt", "true"],
+      ["family.ledeBeforeList", "true"],
+      ["sequenceBrowserChecks === 2", "true"],
+    ];
+    for (const [token, replacement] of mutations) {
+      const mutated = source.split(token).join(replacement);
+      assert.notEqual(mutated, source, token);
+      assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
+    }
+    for (const label of [
+      "FAMILY_STATS_STEPS_SOURCE stats compose one authored heading and lede before the unchanged stat list",
+      "FAMILY_STATS_STEPS_REFUSALS each sequence probe refuses the whole Page with its documented reason",
+      "FAMILY_STATS_STEPS_HTTP each sequence family serves one heading and one lede before its unchanged list",
+      "FAMILY_STATS_STEPS_BROWSER the sequence headings and ledes were measured in real Chromium at both viewports",
+    ]) {
+      const mutated = source.split(label).join("sequence evidence removed");
       assert.notEqual(mutated, source, label);
       assert.ok(audit(mutated).some((entry) => entry.includes(label)), `${label}: ${audit(mutated).join(",")}`);
     }

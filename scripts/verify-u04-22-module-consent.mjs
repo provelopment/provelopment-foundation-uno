@@ -400,6 +400,9 @@ function familySource() {
       },
       {
         type: "stats",
+        // `UNO-WO-072 / R01`: the authored heading and lede are the only source change at index 10.
+        heading: "Synthetic numbers",
+        lede: "Synthetic numbers summarise the sample.",
         items: [
           { value: "13", label: "Sampled sections", detail: "Fixture only" },
           { value: "4", label: "New examples" },
@@ -407,6 +410,10 @@ function familySource() {
       },
       {
         type: "steps",
+        // `UNO-WO-072 / R01`: the authored heading and lede are the only source change at index 11; `surface` and the
+        // item sequence stay exactly as before.
+        heading: "Synthetic sequence",
+        lede: "Synthetic steps keep the authored order.",
         surface: "muted",
         items: [
           { title: "Draft", body: "Prepare the fixture source." },
@@ -1016,6 +1023,47 @@ async function main() {
       `${String(ledeGetterOutcome.status === "refused" ? ledeGetterOutcome.reason : ledeGetterOutcome.status)} calls=${ledeGetterCalls}`,
     );
 
+    // `UNO-WO-072 / R01`: eight further whole-Page refusals over the two newly authored-text sequence families, plus a
+    // zero-invocation accessor probe. Each probe mutates exactly one authored text field.
+    const sequenceProbes = [
+      ["stats heading Markdown emphasis", "family:unsupported-feature", (s) => { s.sections[10].heading = "**Bold** heading"; }],
+      ["stats lede Markdown link", "family:unsupported-feature", (s) => { s.sections[10].lede = "[label](https://example.test)"; }],
+      ["stats heading markup", "family:unsupported-feature", (s) => { s.sections[10].heading = "<b>bold</b>"; }],
+      ["stats lede wrong type", "family:unsupported-feature", (s) => { s.sections[10].lede = 7; }],
+      ["steps heading blank", "family:target-refused", (s) => { s.sections[11].heading = ""; }],
+      ["steps lede padded", "family:target-refused", (s) => { s.sections[11].lede = " Padded lede"; }],
+      ["steps heading oversize", "family:target-refused", (s) => { s.sections[11].heading = "x".repeat(161); }],
+      ["steps lede unpaired surrogate", "family:target-refused", (s) => { s.sections[11].lede = "Lead \uD800 tail"; }],
+    ].map(([expectedLabel, expected, mutate]) => {
+      const sequenceSource = familySource();
+      mutate(sequenceSource);
+      const outcome = composeUnoFoundationSubset(sequenceSource, familyBindings());
+      return {
+        label: expectedLabel,
+        expected,
+        actual: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+        partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+      };
+    });
+    check(
+      "FAMILY_STATS_STEPS_REFUSALS each sequence probe refuses the whole Page with its documented reason",
+      sequenceProbes.every((probe) => probe.actual === probe.expected && probe.partial === false),
+      JSON.stringify(sequenceProbes),
+    );
+    const sequenceGetterSource = familySource();
+    let sequenceGetterCalls = 0;
+    Object.defineProperty(sequenceGetterSource.sections[11], "heading", {
+      enumerable: true,
+      get() { sequenceGetterCalls += 1; return "Read me"; },
+    });
+    const sequenceGetterOutcome = composeUnoFoundationSubset(sequenceGetterSource, familyBindings());
+    check(
+      "FAMILY_STATS_STEPS_REFUSALS an authored steps heading getter yields family:unsafe-source with zero invocations",
+      sequenceGetterOutcome.status === "refused" && sequenceGetterOutcome.reason === "family:unsafe-source"
+        && sequenceGetterCalls === 0 && !Object.prototype.hasOwnProperty.call(sequenceGetterOutcome, "document"),
+      `${String(sequenceGetterOutcome.status === "refused" ? sequenceGetterOutcome.reason : sequenceGetterOutcome.status)} calls=${sequenceGetterCalls}`,
+    );
+
     // A hostile accessor on an appended item must be classified, never executed: zero invocations and no partial Page.
     const getterSource = familySource();
     let getterCalls = 0;
@@ -1247,7 +1295,7 @@ async function main() {
       check(
         "FAMILY_LEDE_SOURCE the ledes add no node outside the two families and keep the seventeen top-level ids",
         JSON.stringify(ledeIds) === JSON.stringify(FAMILY_IDS)
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 2
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 4
           && familyAccepted.sections[8]?.id === "family-8-divider"
           && JSON.stringify(familyAccepted.sections[8]?.props) === JSON.stringify({ variant: "divider" }),
         `${ledeIds.length}/${ledeIds.join(",")}`,
@@ -1264,6 +1312,72 @@ async function main() {
           && JSON.parse(familyJsonBytes.toString("utf8")).sections.length === 17
           && familyReparsed.accepted === true,
         recomposed.status === "composed" ? `${familyJsonBytes.length}B` : String(recomposed.reason),
+      );
+    }
+    // `UNO-WO-072 / R01`: the authored heading and lede on the two bounded sequence families.
+    {
+      const sequenceEvidence = (index, type, childSuffix, expectedHeading, expectedLede, expectedChildModule) => {
+        const section = familyAccepted.sections[index];
+        const original = type === "stats"
+          ? { items: [{ value: "13", label: "Sampled sections", detail: "Fixture only" }, { value: "4", label: "New examples" }] }
+          : {
+              items: [{ title: "Draft", description: "Prepare the fixture source." }, { title: "Review" }],
+              surface: "muted",
+            };
+        const expectedChild = { id: `family-${index}-${type}-${childSuffix}`, module: expectedChildModule, props: original };
+        const shapeOk = section !== undefined
+          && section.module === "layout.stack"
+          && section.id === `family-${index}-${type}`
+          && JSON.stringify(section.props) === "{}"
+          && (section.children ?? []).length === 3
+          && section.children[0]?.module === "content.heading"
+          && section.children[0]?.id === `family-${index}-${type}-heading`
+          && JSON.stringify(section.children[0]?.props) === JSON.stringify({ text: expectedHeading, level: 2 })
+          && section.children[1]?.module === "content.prose"
+          && section.children[1]?.id === `family-${index}-${type}-lede`
+          && JSON.stringify(section.children[1]?.props) === JSON.stringify({ text: expectedLede })
+          && JSON.stringify(section.children[2]) === JSON.stringify(expectedChild);
+        return {
+          ok: shapeOk && Object.isFrozen(section) && Object.isFrozen(section.children),
+          detail: shapeOk ? `${section.id} ok` : `${String(section?.id)} ${JSON.stringify(section?.children?.map((child) => child.id))}`,
+        };
+      };
+      const statsEvidence = sequenceEvidence(
+        10, "stats", "stats", "Synthetic numbers", "Synthetic numbers summarise the sample.", "content.stats",
+      );
+      const stepsEvidence = sequenceEvidence(
+        11, "steps", "timeline", "Synthetic sequence", "Synthetic steps keep the authored order.", "content.timeline",
+      );
+      check(
+        "FAMILY_STATS_STEPS_SOURCE stats compose one authored heading and lede before the unchanged stat list",
+        statsEvidence.ok,
+        statsEvidence.detail,
+      );
+      check(
+        "FAMILY_STATS_STEPS_SOURCE steps compose the same ordered text before the unchanged timeline node",
+        stepsEvidence.ok,
+        stepsEvidence.detail,
+      );
+      check(
+        "FAMILY_STATS_STEPS_SOURCE the authored-text families keep the seventeen ids and no other family changes",
+        JSON.stringify(familyAccepted.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS)
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 4
+          && familyAccepted.sections[7]?.module === "content.actions"
+          && familyAccepted.sections[8]?.id === "family-8-divider"
+          && familyAccepted.sections[12]?.module === "content.testimonials",
+        `${familyAccepted.sections.filter((section) => section.module === "layout.stack").length} stacks`,
+      );
+      const sequenceSource = familySource();
+      const sequenceSnapshot = JSON.stringify(sequenceSource);
+      const recomposedSequence = composeUnoFoundationSubset(sequenceSource, familyBindings());
+      check(
+        "FAMILY_STATS_STEPS_SOURCE the sequence JSON matches the installed buffer and the caller source is unmutated",
+        recomposedSequence.status === "composed"
+          && JSON.stringify(recomposedSequence.document) === JSON.stringify(familyAccepted)
+          && JSON.stringify(sequenceSource) === sequenceSnapshot
+          && familyJsonBytes.toString("utf8") === `${JSON.stringify(familyAccepted, null, 2)}\n`
+          && familyReparsed.accepted === true,
+        recomposedSequence.status === "composed" ? `${familyJsonBytes.length}B` : String(recomposedSequence.reason),
       );
     }
     const { planUnoServingPage: planFamily } = await import("../src/config/uno-serving.ts");
@@ -1447,18 +1561,38 @@ async function main() {
         && familyHtml.includes('<a class="uno-json-action" href="#family-6-contactform">Contact notice</a>'),
     );
     // `UNO-WO-067 / R01`: each appended family is inspected only inside its own top-level region, so an older module can
-    // never satisfy a new claim. These four sections nest no further `<section>`, so their own close tag ends the region.
+    // never satisfy a new claim. `UNO-WO-072 / R01` adds one case: an authored-text family is a `layout.stack` wrapper, so
+    // that region starts at the wrapper and ends at the next top-level family anchor instead of an inner `</section>`.
     const familyRegionOf = (id) => {
       const at = familyHtml.indexOf(`id="${id}"`);
-      const start = at < 0 ? -1 : familyHtml.lastIndexOf("<section", at);
-      const end = at < 0 ? -1 : familyHtml.indexOf("</section>", at);
-      return start < 0 || end < 0 ? "" : familyHtml.slice(start, end);
+      if (at < 0) return "";
+      const wrapperOpen = familyHtml.lastIndexOf('<div class="uno-json-stack" data-uno-gap="normal"', at);
+      const sectionOpen = familyHtml.lastIndexOf("<section", at);
+      if (wrapperOpen >= 0 && wrapperOpen > sectionOpen) {
+        const index = FAMILY_IDS.indexOf(id);
+        const nextId = index >= 0 && index + 1 < FAMILY_IDS.length ? FAMILY_IDS[index + 1] : null;
+        const nextAt = nextId === null ? -1 : familyHtml.indexOf(`id="${nextId}"`);
+        if (nextAt < 0) return "";
+        const nextOpen = Math.max(
+          familyHtml.lastIndexOf('<div class="uno-json-stack" data-uno-gap="normal"', nextAt),
+          familyHtml.lastIndexOf('<div class="uno-json-grid"', nextAt),
+          familyHtml.lastIndexOf("<section", nextAt),
+        );
+        return nextOpen <= at ? "" : familyHtml.slice(wrapperOpen, nextOpen);
+      }
+      const end = sectionOpen < 0 ? -1 : familyHtml.indexOf("</section>", at);
+      return sectionOpen < 0 || end < 0 ? "" : familyHtml.slice(sectionOpen, end);
     };
     check(
-      "FAMILY_STEPS_HTTP the steps region is one ordered list of two authored items with no invented status",
+      "FAMILY_STEPS_HTTP the steps region is one authored heading, one lede and one ordered list of two items",
       (() => {
         const stepsRegion = familyRegionOf("family-11-steps");
-        return stepsRegion.startsWith('<section class="uno-json-timeline" data-uno-surface="muted" id="family-11-steps">')
+        return stepsRegion.startsWith('<div class="uno-json-stack" data-uno-gap="normal" id="family-11-steps">')
+          && stepsRegion.includes('<h2 class="uno-json-heading" id="family-11-steps-heading">Synthetic sequence</h2>')
+          && stepsRegion.includes('<p class="uno-json-prose" id="family-11-steps-lede">Synthetic steps keep the authored order.</p>')
+          && stepsRegion.indexOf("family-11-steps-heading") < stepsRegion.indexOf("family-11-steps-lede")
+          && stepsRegion.indexOf("family-11-steps-lede") < stepsRegion.indexOf("family-11-steps-timeline")
+          && stepsRegion.includes('<section class="uno-json-timeline" data-uno-surface="muted" id="family-11-steps-timeline">')
           && stepsRegion.includes('<ol class="uno-json-timeline-list">')
           && (stepsRegion.match(/<li class="uno-json-timeline-item"[^>]*>/gu) ?? []).length === 2
           && stepsRegion.includes('<p class="uno-json-timeline-title">Draft</p>')
@@ -1466,7 +1600,8 @@ async function main() {
           && stepsRegion.indexOf(">Draft</p>") < stepsRegion.indexOf(">Review</p>")
           && (stepsRegion.match(/<p class="uno-json-timeline-description">/gu) ?? []).length === 1
           && stepsRegion.includes('<p class="uno-json-timeline-description">Prepare the fixture source.</p>')
-          && !/data-uno-status|aria-current|uno-json-timeline-date|uno-json-timeline-heading|<h[1-6]\b|<h3/iu.test(stepsRegion);
+          && (stepsRegion.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
+          && !/data-uno-status|aria-current|uno-json-timeline-date|uno-json-timeline-heading|<h1\b|<h3/iu.test(stepsRegion);
       })(),
       familyRegionOf("family-11-steps").slice(0, 200),
     );
@@ -1631,6 +1766,47 @@ async function main() {
         `cards=${cardsRegion.length} features=${featuresRegion.length}`,
       );
     }
+    // `UNO-WO-072 / R01`: the two authored-text sequence families exactly as served, in one scoped check each.
+    {
+      const sequenceServedOk = (id, headingText, ledeText, innerId, innerOpen, listOpen) => {
+        const region = familyRegionOf(id);
+        return region.startsWith(`<div class="uno-json-stack" data-uno-gap="normal" id="${id}">`)
+          && (region.match(new RegExp(`id="${id}-heading"`, "gu")) ?? []).length === 1
+          && (region.match(new RegExp(`id="${id}-lede"`, "gu")) ?? []).length === 1
+          && region.includes(`<h2 class="uno-json-heading" id="${id}-heading">${headingText}</h2>`)
+          && region.includes(`<p class="uno-json-prose" id="${id}-lede">${ledeText}</p>`)
+          && region.indexOf(`${id}-heading`) < region.indexOf(`${id}-lede`)
+          && region.indexOf(`${id}-lede`) < region.indexOf(innerId)
+          && region.includes(innerOpen)
+          && region.includes(listOpen)
+          && (region.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
+          && !/<main\b|<h1\b|<h3\b|<script\b|<a\b|<iframe\b|<form\b|<button\b|<input\b/iu.test(region);
+      };
+      check(
+        "FAMILY_STATS_STEPS_HTTP each sequence family serves one heading and one lede before its unchanged list",
+        sequenceServedOk(
+          "family-10-stats",
+          "Synthetic numbers",
+          "Synthetic numbers summarise the sample.",
+          "family-10-stats-stats",
+          '<section class="uno-json-stats" data-uno-surface="plain" id="family-10-stats-stats">',
+          '<dl class="uno-json-stats-list">',
+        )
+          && sequenceServedOk(
+            "family-11-steps",
+            "Synthetic sequence",
+            "Synthetic steps keep the authored order.",
+            "family-11-steps-timeline",
+            '<section class="uno-json-timeline" data-uno-surface="muted" id="family-11-steps-timeline">',
+            '<ol class="uno-json-timeline-list">',
+          )
+          && (familyHtml.match(/<p class="uno-json-prose" id="family-1[01]-(?:stats|steps)-lede"/gu) ?? []).length === 2
+          && (familyHtml.match(/<h2 class="uno-json-heading" id="family-1[01]-(?:stats|steps)-heading"/gu) ?? []).length === 2
+          && new Set([...familyHtml.matchAll(/id="(family-\d+-[a-z]+)"/gu)].map((match) => match[1])).size
+            === (familyHtml.match(/id="family-\d+-[a-z]+"/gu) ?? []).length,
+        `stats=${familyRegionOf("family-10-stats").length} steps=${familyRegionOf("family-11-steps").length}`,
+      );
+    }
     {
       const lastFourRegions = [tableRegion, columnsRegion, cardsRegion, featuresRegion];
       check(
@@ -1639,7 +1815,7 @@ async function main() {
           && lastFourRegions.every((region) => !/<main\b|<h1\b|<script\b|<iframe\b|<form\b|<input\b|<textarea\b|<button\b/iu.test(region))
           && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
           && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
-          && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 4
+          && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 6
           && (familyHtml.match(/<h3[\s>]/giu) ?? []).length === 4
           && !familyHtml.includes(FAMILY_DONOR_SOURCE)
           && !familyHtml.includes("formRef"),
@@ -1706,10 +1882,16 @@ async function main() {
       heroRegion.slice(0, 160),
     );
     const statsRegion = familyRegionOf("family-10-stats");
+    const statsInner = statsRegion.slice(statsRegion.indexOf('<section class="uno-json-stats"'));
     const statsDetailAt = statsRegion.indexOf('<span class="uno-json-stat-detail">Fixture only</span>');
     check(
       "FAMILY_STATS_HTTP the stats region is one definition list with two authored pairs in order",
-      statsRegion.includes('class="uno-json-stats"') && statsRegion.includes('<dl class="uno-json-stats-list">')
+      statsRegion.includes('<div class="uno-json-stack" data-uno-gap="normal" id="family-10-stats">')
+        && statsRegion.includes('<h2 class="uno-json-heading" id="family-10-stats-heading">Synthetic numbers</h2>')
+        && statsRegion.includes('<p class="uno-json-prose" id="family-10-stats-lede">Synthetic numbers summarise the sample.</p>')
+        && statsRegion.indexOf("family-10-stats-heading") < statsRegion.indexOf("family-10-stats-lede")
+        && statsRegion.indexOf("family-10-stats-lede") < statsRegion.indexOf("family-10-stats-stats")
+        && statsInner.includes('class="uno-json-stats"') && statsInner.includes('<dl class="uno-json-stats-list">')
         && (statsRegion.match(/<dt class="uno-json-stat-label">/gu) ?? []).length === 2
         && (statsRegion.match(/<dd class="uno-json-stat-value">/gu) ?? []).length === 2
         && statsRegion.includes(">Sampled sections</dt>") && statsRegion.includes('>13<span class="uno-json-stat-detail">')
@@ -1718,11 +1900,13 @@ async function main() {
       statsRegion.slice(0, 200),
     );
     check(
-      "FAMILY_STATS_HTTP exactly one detail span, attached to the first item, with no invented heading or currency",
+      "FAMILY_STATS_HTTP exactly one detail span, attached to the first item, with no invented stat heading or currency",
       statsDetailAt > 0
         && statsDetailAt < statsRegion.indexOf('<dt class="uno-json-stat-label">New examples</dt>')
         && (statsRegion.match(/uno-json-stat-detail/gu) ?? []).length === 1
-        && !/uno-json-stats-heading|<h[1-6]\b|[$€£]|aria-labelledby/iu.test(statsRegion),
+        && !/uno-json-stats-heading|aria-labelledby|[$€£]/iu.test(statsInner)
+        && (statsRegion.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
+        && !/<h1\b|<h3/iu.test(statsRegion),
       statsRegion.slice(0, 200),
     );
     check(
@@ -2099,6 +2283,17 @@ async function consentPhase(base) {
       }
       return check(`FAMILY_LEDE_BROWSER ${label}`, ok, detail);
     };
+    // `UNO-WO-072 / R01`: the sequence-family evidence is counted separately and still gates `FAMILY_BROWSER=PASS`.
+    let sequenceBrowserOk = true;
+    let sequenceBrowserChecks = 0;
+    const sequenceCheck = (label, ok, detail = "") => {
+      sequenceBrowserChecks += 1;
+      if (!ok) {
+        sequenceBrowserOk = false;
+        familyOk = false;
+      }
+      return check(`FAMILY_STATS_STEPS_BROWSER ${label}`, ok, detail);
+    };
     // `UNO-WO-069 / R01`: the divider evidence is counted and gated separately, so a deleted or neutered divider check
     // both fails the runner and suppresses the overall parity label.
     let dividerOk = true;
@@ -2207,17 +2402,34 @@ async function consentPhase(base) {
           })(),
           stats: (() => {
             const region = document.querySelector("#family-10-stats");
+            const authored = region?.querySelector("#family-10-stats-heading") ?? null;
+            const lede = region?.querySelector("#family-10-stats-lede") ?? null;
+            const ledeRect = lede?.getBoundingClientRect();
+            const list = region?.querySelector(".uno-json-stats-list") ?? null;
             return {
               dts: [...(region?.querySelectorAll("dt") ?? [])].map((node) => node.textContent ?? ""),
               dds: [...(region?.querySelectorAll("dd") ?? [])].map((node) => node.textContent ?? ""),
               details: region?.querySelectorAll(".uno-json-stat-detail").length ?? -1,
               firstItemDetail: region?.querySelector(".uno-json-stat .uno-json-stat-detail")?.textContent ?? "",
               heading: region?.querySelectorAll("h1, h2, h3, h4, h5, h6").length ?? -1,
+              headingTag: authored?.tagName ?? "",
+              headingText: authored?.textContent ?? "",
+              ledeTag: lede?.tagName ?? "",
+              ledeText: lede?.textContent ?? "",
+              ledeVisible: ledeRect !== undefined && ledeRect.height > 0 && ledeRect.width > 0,
+              ledeAfterHeading: authored !== null && lede !== null
+                && (authored.compareDocumentPosition(lede) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+              ledeBeforeList: list !== null && lede !== null
+                && (lede.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
             };
           })(),
           steps: (() => {
             const region = document.querySelector("#family-11-steps");
             const items = [...(region?.querySelectorAll("li.uno-json-timeline-item") ?? [])];
+            const authored = region?.querySelector("#family-11-steps-heading") ?? null;
+            const lede = region?.querySelector("#family-11-steps-lede") ?? null;
+            const ledeRect = lede?.getBoundingClientRect();
+            const list = region?.querySelector(".uno-json-timeline-list") ?? null;
             return {
               items: items.length,
               titles: items.map((item) => item.querySelector(".uno-json-timeline-title")?.textContent ?? ""),
@@ -2225,6 +2437,15 @@ async function consentPhase(base) {
               ariaCurrent: items.filter((item) => item.hasAttribute("aria-current")).length,
               statuses: items.filter((item) => item.hasAttribute("data-uno-status")).length,
               dates: region?.querySelectorAll(".uno-json-timeline-date").length ?? -1,
+              headingTag: authored?.tagName ?? "",
+              headingText: authored?.textContent ?? "",
+              ledeTag: lede?.tagName ?? "",
+              ledeText: lede?.textContent ?? "",
+              ledeVisible: ledeRect !== undefined && ledeRect.height > 0 && ledeRect.width > 0,
+              ledeAfterHeading: authored !== null && lede !== null
+                && (authored.compareDocumentPosition(lede) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+              ledeBeforeList: list !== null && lede !== null
+                && (lede.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
             };
           })(),
           table: (() => {
@@ -2403,12 +2624,31 @@ async function consentPhase(base) {
         seen.stats.dts.length === 2 && seen.stats.dds.length === 2
           && seen.stats.dts[0] === "Sampled sections" && seen.stats.dts[1] === "New examples"
           && seen.stats.dds[0].replace("Fixture only", "") === "13" && seen.stats.dds[1] === "4"
-          && seen.stats.details === 1 && seen.stats.firstItemDetail === "Fixture only" && seen.stats.heading === 0,
+          && seen.stats.details === 1 && seen.stats.firstItemDetail === "Fixture only" && seen.stats.heading === 1,
         JSON.stringify(seen.stats));
       familyCheck(`${width}px steps show two ordered titles and one description with no invented status`,
         seen.steps.items === 2 && seen.steps.titles[0] === "Draft" && seen.steps.titles[1] === "Review"
           && seen.steps.descriptions === 1 && seen.steps.ariaCurrent === 0 && seen.steps.statuses === 0 && seen.steps.dates === 0,
         JSON.stringify(seen.steps));
+      // `UNO-WO-072 / R01`: the authored heading and lede as the browser lays them out at this viewport.
+      sequenceCheck(`${width}px each sequence family shows its authored heading and one visible lede before its list`,
+        [seen.stats, seen.steps].every((family) =>
+          family.headingTag === "H2"
+          && family.headingText.length > 0
+          && family.ledeTag === "P"
+          && family.ledeVisible
+          && family.ledeAfterHeading
+          && family.ledeBeforeList)
+          && seen.stats.headingText === "Synthetic numbers"
+          && seen.stats.ledeText === "Synthetic numbers summarise the sample."
+          && seen.steps.headingText === "Synthetic sequence"
+          && seen.steps.ledeText === "Synthetic steps keep the authored order."
+          && seen.mains === 1 && seen.h1s === 1 && seen.overflow === 0,
+        JSON.stringify({
+          stats: [seen.stats.headingTag, seen.stats.ledeTag, seen.stats.ledeAfterHeading, seen.stats.ledeBeforeList],
+          steps: [seen.steps.headingTag, seen.steps.ledeTag, seen.steps.ledeAfterHeading, seen.steps.ledeBeforeList],
+          overflow: seen.overflow,
+        }));
       familyCheck(`${width}px quote shows one figure, blockquote and caption with separate attribution and role`,
         seen.quote.figures === 1 && seen.quote.quotes.length === 1
           && seen.quote.quotes[0] === "The fixture does not establish full parity."
@@ -2677,7 +2917,15 @@ async function consentPhase(base) {
       ledeBrowserOk && ledeBrowserChecks === 2,
       `checks=${ledeBrowserChecks}`,
     );
-    check("FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px", familyOk && ledeBrowserOk && ledeBrowserChecks === 2);
+    check(
+      "FAMILY_STATS_STEPS_BROWSER the sequence headings and ledes were measured in real Chromium at both viewports",
+      sequenceBrowserOk && sequenceBrowserChecks === 2,
+      `checks=${sequenceBrowserChecks}`,
+    );
+    check(
+      "FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px",
+      familyOk && ledeBrowserOk && ledeBrowserChecks === 2 && sequenceBrowserOk && sequenceBrowserChecks === 2,
+    );
     // `UNO-WO-069 / R01`: the divider parity gate. It depends on every executed divider check (three per light viewport
     // and three per dark/reduced-motion viewport) AND on the surrounding family gates, so no single label can stand
     // in for the evidence.

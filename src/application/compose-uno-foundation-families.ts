@@ -583,6 +583,38 @@ function readSectionPlainText(value: PlainValue | undefined, codePointLimit: num
 }
 
 /**
+ * Wrap one already-composed sequence node in the donor's optional authored heading and lede.
+ *
+ * `UNO-WO-072 / R01`: the donor's `stats` and `steps` families both spread `headingFields`. When neither field is authored
+ * the original node is returned untouched, so those inputs stay byte-identical. Otherwise one `layout.stack` takes the
+ * unchanged family anchor id and carries, in source order, the authored level-2 heading, the authored plain-text lede and
+ * the original node under the documented `${id}-<suffix>` child id. Nothing is synthesized and no other field is added.
+ */
+function wrapAuthoredText(
+  record: PlainRecord,
+  id: string,
+  child: CandidateSection,
+  childSuffix: string,
+): CandidateSection {
+  const headingAuthored = ownsKey(record, "heading");
+  const ledeAuthored = ownsKey(record, "lede");
+  if (!headingAuthored && !ledeAuthored) return child;
+  const wrapped: CandidateSection[] = [];
+  if (headingAuthored) {
+    wrapped.push({
+      id: `${id}-heading`,
+      module: "content.heading",
+      props: { text: readSectionHeading(record["heading"]), level: 2 },
+    });
+  }
+  if (ledeAuthored) {
+    wrapped.push({ id: `${id}-lede`, module: "content.prose", props: { text: readSectionLede(record["lede"]) } });
+  }
+  wrapped.push({ ...child, id: `${id}-${childSuffix}` });
+  return { id, module: "layout.stack", props: {}, children: wrapped };
+}
+
+/**
  * Map one donor section to exactly one Uno `content.prose` node.
  *
  * The donor family is decided by the closed `type` literal. An unsupported family refuses the whole source and is
@@ -685,7 +717,9 @@ function composeSection(
       return { id, module: "content.hero", props };
     }
     case "stats": {
-      requireExactKeys(record, ["type", "items"], []);
+      // `UNO-WO-072 / R01`: the donor spreads `headingFields` into `statsSectionSchema`, so both the optional plain-text
+      // heading and the optional plain-text lede become representable here. `surface` stays unsupported for `stats`.
+      requireExactKeys(record, ["type", "items"], ["heading", "lede"]);
       const items = record["items"];
       if (!Array.isArray(items)) refuseUnsupportedFeature();
       const output: Record<string, unknown>[] = [];
@@ -701,11 +735,13 @@ function composeSection(
         if (ownsKey(entry, "detail")) item["detail"] = readDonorText(entry["detail"], true);
         output.push(item);
       }
-      return { id, module: "content.stats", props: { items: output } };
+      const stats: CandidateSection = { id, module: "content.stats", props: { items: output } };
+      return wrapAuthoredText(record, id, stats, "stats");
     }
     case "steps": {
-      // Donor `steps` may carry `heading`/`lede`; this subset composes the sequence only, never a section heading.
-      requireExactKeys(record, ["type", "items"], ["surface"]);
+      // The donor `steps` family also spreads `headingFields`. `UNO-WO-072 / R01` adds its optional plain-text heading and
+      // lede; the item sequence, `surface` literal and every lifecycle gap stay exactly as before.
+      requireExactKeys(record, ["type", "items"], ["surface", "heading", "lede"]);
       const items = record["items"];
       if (!Array.isArray(items)) refuseUnsupportedFeature();
       const output: Record<string, unknown>[] = [];
@@ -721,7 +757,8 @@ function composeSection(
       }
       const props: Record<string, unknown> = { items: output };
       if (ownsKey(record, "surface")) props["surface"] = record["surface"];
-      return { id, module: "content.timeline", props };
+      const timeline: CandidateSection = { id, module: "content.timeline", props };
+      return wrapAuthoredText(record, id, timeline, "timeline");
     }
     case "quote": {
       requireExactKeys(record, ["type", "body"], ["attribution", "role", "align", "surface"]);

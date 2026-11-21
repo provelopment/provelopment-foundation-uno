@@ -674,7 +674,8 @@ describe("composeUnoFoundationSubset — hero and stats refusal", () => {
   });
 
   it("refuses stats fields, links and Markdown outside the bounded subset", () => {
-    expectRefusal(envelope({ type: "stats", items: [], heading: "H" }), "family:unsupported-feature");
+    // `UNO-WO-072 / R01` accepts the donor's optional authored `heading`/`lede` here, so they are no longer extra keys;
+    // their own strictness, refusal reasons and byte-compatible absence are proved in the dedicated sequence section.
     expectRefusal(envelope({ type: "stats", items: [{ value: "1", label: "X", href: "/x" }] }), "family:unsupported-feature");
     expectRefusal(
       envelope({ type: "stats", items: [{ value: "1", label: "X", detail: "[x](https://example.org)" }] }),
@@ -826,8 +827,7 @@ describe("composeUnoFoundationSubset — quote refusal", () => {
 
 describe("composeUnoFoundationSubset — steps refusal", () => {
   it("refuses steps fields, item states and Markdown outside the bounded subset", () => {
-    expectRefusal(envelope({ type: "steps", items: [{ title: "A" }], heading: "H" }), "family:unsupported-feature");
-    expectRefusal(envelope({ type: "steps", items: [{ title: "A" }], lede: "L" }), "family:unsupported-feature");
+    // `UNO-WO-072 / R01` accepts `heading`/`lede` on `steps`; the remaining donor fields stay out of this subset.
     for (const extra of ["href", "status", "dateLabel"]) {
       expectRefusal(
         envelope({ type: "steps", items: [{ title: "A", [extra]: "X" }] }),
@@ -4107,5 +4107,290 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
     expect(ledger).not.toMatch(/features[^.\n]*full semantic parity/u);
+  });
+});
+
+/**
+ * `UNO-WO-072 / R01`: the donor's optional authored heading and lede for the two bounded sequence families.
+ *
+ * The donor spreads `headingFields` into `statsSectionSchema` and `stepsSectionSchema`, so both accept an optional
+ * `heading` and a Markdown-capable `lede`. This subset accepts one literal plain-text value for each and renders it with
+ * the existing heading and prose modules; no input without those fields changes its JSON.
+ */
+describe("composeUnoFoundationSubset — stats and steps authored heading and lede", () => {
+  /** The four pre-WO-072 section baselines, captured from the committed output before this change. */
+  const PRE_WO072_STATS =
+    '{"id":"family-0-stats","module":"content.stats","props":{"items":[{"value":"13","label":"Sampled sections","detail":"Fixture only"},{"value":"4","label":"New examples"}]}}';
+  const PRE_WO072_STEPS =
+    '{"id":"family-0-steps","module":"content.timeline","props":{"items":[{"title":"Draft","description":"Prepare the fixture source."},{"title":"Review"}]}}';
+  const PRE_WO072_STEPSSURFACE =
+    '{"id":"family-0-steps","module":"content.timeline","props":{"items":[{"title":"Draft","description":"Prepare the fixture source."},{"title":"Review"}],"surface":"muted"}}';
+  const PRE_WO072_STEPSBORDERED =
+    '{"id":"family-0-steps","module":"content.timeline","props":{"items":[{"title":"Draft","description":"Prepare the fixture source."},{"title":"Review"}],"surface":"bordered"}}';
+
+  const statsItems = [
+    { value: "13", label: "Sampled sections", detail: "Fixture only" },
+    { value: "4", label: "New examples" },
+  ];
+  const stepItems = [
+    { title: "Draft", body: "Prepare the fixture source." },
+    { title: "Review" },
+  ];
+
+  /** One stats/steps source carrying exactly the caller-chosen fields. */
+  function sequencePage(type: "stats" | "steps", fields: Record<string, unknown>): Record<string, unknown> {
+    return {
+      version: 1,
+      title: "Sequence fixture",
+      sections: [{ type, items: type === "stats" ? statsItems : stepItems, ...fields }],
+    };
+  }
+
+  /** The original one-node child that a wrapper must carry unchanged apart from its documented id. */
+  function originalChildNode(type: "stats" | "steps", surface?: string): Record<string, unknown> {
+    return JSON.parse(type === "stats"
+      ? PRE_WO072_STATS
+      : surface === "muted"
+        ? PRE_WO072_STEPSSURFACE
+        : surface === "bordered"
+          ? PRE_WO072_STEPSBORDERED
+          : PRE_WO072_STEPS) as Record<string, unknown>;
+  }
+
+  it("keeps all four pre-WO-072 baselines byte-identical when no text field is authored", () => {
+    expect(JSON.stringify(composed(sequencePage("stats", {})).sections[0])).toBe(PRE_WO072_STATS);
+    expect(JSON.stringify(composed(sequencePage("steps", {})).sections[0])).toBe(PRE_WO072_STEPS);
+    expect(JSON.stringify(composed(sequencePage("steps", { surface: "muted" })).sections[0])).toBe(PRE_WO072_STEPSSURFACE);
+    expect(JSON.stringify(composed(sequencePage("steps", { surface: "bordered" })).sections[0])).toBe(PRE_WO072_STEPSBORDERED);
+  });
+
+
+  it("composes a heading-only wrapper that carries the original child unchanged apart from its documented id", () => {
+    for (const type of ["stats", "steps"] as const) {
+      const surface = type === "steps" ? "muted" : undefined;
+      const document = composed(sequencePage(type, { heading: "Synthetic sequence", ...(surface === undefined ? {} : { surface }) }));
+      const section = document.sections[0]!;
+      expect(section.id).toBe(`family-0-${type}`);
+      expect(section.module).toBe("layout.stack");
+      expect(JSON.stringify(section.props)).toBe("{}");
+      if (section.module !== "layout.stack") continue;
+      expect(section.children).toHaveLength(2);
+      const [heading, child] = section.children;
+      expect(heading!.id).toBe(`family-0-${type}-heading`);
+      expect(heading!.module).toBe("content.heading");
+      expect(heading!.props).toEqual({ text: "Synthetic sequence", level: 2 });
+      const expected = originalChildNode(type, surface);
+      expected["id"] = `family-0-${type}-${type === "stats" ? "stats" : "timeline"}`;
+      expect(JSON.stringify(child)).toBe(JSON.stringify(expected));
+      expect(Object.isFrozen(section)).toBe(true);
+      expect(Object.isFrozen(section.children)).toBe(true);
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+    }
+  });
+
+  it("composes a lede-only wrapper with no invented heading", () => {
+    for (const type of ["stats", "steps"] as const) {
+      const document = composed(sequencePage(type, { lede: "A plain authored lede." }));
+      const section = document.sections[0]!;
+      expect(section.id).toBe(`family-0-${type}`);
+      expect(section.module).toBe("layout.stack");
+      if (section.module !== "layout.stack") continue;
+      expect(section.children).toHaveLength(2);
+      const [lede, child] = section.children;
+      expect(lede!.id).toBe(`family-0-${type}-lede`);
+      expect(lede!.module).toBe("content.prose");
+      expect(lede!.props).toEqual({ text: "A plain authored lede." });
+      const expected = originalChildNode(type);
+      expected["id"] = `family-0-${type}-${type === "stats" ? "stats" : "timeline"}`;
+      expect(JSON.stringify(child)).toBe(JSON.stringify(expected));
+      expect(section.children.some((node) => node.module === "content.heading")).toBe(false);
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+    }
+  });
+
+  it("composes heading plus lede as three ordered children before the original sequence node", () => {
+    for (const type of ["stats", "steps"] as const) {
+      const source = sequencePage(type, { heading: "Synthetic sequence", lede: "A plain authored lede." });
+      const before = JSON.stringify(source);
+      const document = composed(source);
+      expect(JSON.stringify(source)).toBe(before);
+      const section = document.sections[0]!;
+      if (section.module !== "layout.stack") continue;
+      expect(section.children.map((node) => node.id)).toEqual([
+        `family-0-${type}-heading`,
+        `family-0-${type}-lede`,
+        `family-0-${type}-${type === "stats" ? "stats" : "timeline"}`,
+      ]);
+      expect(section.children[0]!.props).toEqual({ text: "Synthetic sequence", level: 2 });
+      expect(section.children[1]!.props).toEqual({ text: "A plain authored lede." });
+      const asObject = readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown);
+      expect(asObject.accepted).toBe(true);
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+      expect(JSON.stringify(document)).toBe(JSON.stringify(JSON.parse(JSON.stringify(document)) as unknown));
+    }
+  });
+
+  it("keeps authored order and ids when a headed sequence is mixed with the divider in either order", () => {
+    const divider = { type: "divider" };
+    for (const sections of [
+      [divider, { type: "stats", heading: "Numbers", lede: "Counted here.", items: statsItems }],
+      [{ type: "steps", lede: "Sequenced here.", items: stepItems }, divider],
+    ] as const) {
+      const document = composed({ version: 1, title: "Mixed sequence", sections });
+      expect(document.sections.map((section) => section.id)).toEqual(
+        sections.map((section, index) => `family-${index}-${section.type}`),
+      );
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+    }
+  });
+
+
+  it("accepts the documented code-point bounds for both fields on both families", () => {
+    const heading160 = "h".repeat(160);
+    const astralHeading = "\u{1F4CA}".repeat(160);
+    const lede4000 = "l".repeat(4000);
+    const astralLede = "\u{1F680}".repeat(4000);
+    for (const type of ["stats", "steps"] as const) {
+      for (const heading of [heading160, astralHeading, "Grüße — 日本語 ✓"]) {
+        const document = composed(sequencePage(type, { heading }));
+        const section = document.sections[0]!;
+        if (section.module === "layout.stack") expect(section.children[0]!.props).toEqual({ text: heading, level: 2 });
+        expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+      }
+      for (const lede of [lede4000, astralLede, "Sätze mit & \"Anführungszeichen\" bleiben Text."]) {
+        const document = composed(sequencePage(type, { lede }));
+        const section = document.sections[0]!;
+        if (section.module === "layout.stack") expect(section.children[0]!.props).toEqual({ text: lede });
+        expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+      }
+      expectRefusal(sequencePage(type, { heading: `${heading160}h` }), "family:target-refused");
+      expectRefusal(sequencePage(type, { heading: `${astralHeading}\u{1F4CA}` }), "family:target-refused");
+      expectRefusal(sequencePage(type, { lede: `${lede4000}l` }), "family:target-refused");
+      expectRefusal(sequencePage(type, { lede: `${astralLede}\u{1F680}` }), "family:target-refused");
+    }
+  });
+
+  it("refuses every malformed text field with the closed reason that matches its cause", () => {
+    const cases: Array<[unknown, string]> = [
+      [7, "family:unsupported-feature"],
+      [null, "family:unsupported-feature"],
+      [["Text"], "family:unsupported-feature"],
+      [{ text: "Text" }, "family:unsupported-feature"],
+      [true, "family:unsupported-feature"],
+      ["", "family:target-refused"],
+      ["   ", "family:target-refused"],
+      [" Padded", "family:target-refused"],
+      ["Padded ", "family:target-refused"],
+      ["**Bold**", "family:unsupported-feature"],
+      ["_Italic_", "family:unsupported-feature"],
+      ["`code`", "family:unsupported-feature"],
+      ["[label](https://example.com)", "family:unsupported-feature"],
+      ["![alt](https://example.com/i.png)", "family:unsupported-feature"],
+      ["# Heading", "family:unsupported-feature"],
+      ["- entry", "family:unsupported-feature"],
+      ["> quote", "family:unsupported-feature"],
+      ["a < b", "family:unsupported-feature"],
+      ["<script>alert(1)</script>", "family:unsupported-feature"],
+      ["Two\nlines", "family:unsupported-feature"],
+      ["Carriage\rreturn", "family:unsupported-feature"],
+      ["Tabbed\ttext", "family:unsupported-feature"],
+      ["Nul\u0000text", "family:unsupported-feature"],
+      ["Lead \uD800 tail", "family:target-refused"],
+    ];
+    for (const type of ["stats", "steps"] as const) {
+      for (const field of ["heading", "lede"] as const) {
+        for (const [value, reason] of cases) {
+          expectRefusal(sequencePage(type, { [field]: value }), reason);
+        }
+      }
+    }
+  });
+
+
+  it("refuses hostile text sources without executing a getter and never returns a partial Page", () => {
+    for (const type of ["stats", "steps"] as const) {
+      for (const field of ["heading", "lede"] as const) {
+        let runs = 0;
+        const hostile: Record<string, unknown> = { type, items: type === "stats" ? statsItems : stepItems };
+        Object.defineProperty(hostile, field, { enumerable: true, get() { runs += 1; return "Read me"; } });
+        expectRefusal(envelope(hostile), "family:unsafe-source");
+        expect(runs).toBe(0);
+        expectRefusal(
+          { version: 1, title: "Hostile sequence fixture", sections: [{ type: "prose", body: "A plain paragraph." }, hostile] },
+          "family:unsafe-source",
+        );
+        expect(runs).toBe(0);
+        // A valid sibling cannot rescue the hostile family, and no refusal exposes an own `document` key.
+        const refused = composeUnoFoundationSubset({
+          version: 1,
+          title: "Hostile sequence fixture",
+          sections: [{ type, heading: "Valid", items: type === "stats" ? statsItems : stepItems }, hostile],
+        });
+        expect(refused.status).toBe("refused");
+        expect(Object.prototype.hasOwnProperty.call(refused, "document")).toBe(false);
+        expect(runs).toBe(0);
+      }
+    }
+  });
+
+  it("preserves the older stats and steps refusals and does not widen neighbouring families", () => {
+    for (const type of ["stats", "steps"] as const) {
+      expectRefusal(sequencePage(type, { eyebrow: "X" }), "family:unsupported-feature");
+      expectRefusal(sequencePage(type, { align: "center" }), "family:unsupported-feature");
+    }
+    // `surface` stays unsupported for `stats` while remaining an accepted closed literal for `steps`.
+    expectRefusal(sequencePage("stats", { surface: "muted" }), "family:unsupported-feature");
+    expect(composed(sequencePage("steps", { surface: "bordered" })).sections[0]!.props).toEqual(
+      { items: [{ title: "Draft", description: "Prepare the fixture source." }, { title: "Review" }], surface: "bordered" },
+    );
+    expectRefusal(
+      envelope({ type: "stats", items: [{ value: "1", label: "One", href: "https://example.test" }] }),
+      "family:unsupported-feature",
+    );
+    for (const extra of [{ status: "current" }, { dateLabel: "March" }, { icon: "star" }, { href: "#family-0-steps" }]) {
+      expectRefusal(envelope({ type: "steps", items: [{ title: "Draft", ...extra }] }), "family:unsupported-feature");
+    }
+    // The two new optional keys stay family-specific; neighbouring families still refuse them.
+    expectRefusal(envelope({ type: "quote", body: "A quote.", heading: "X" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "faq", items: [{ question: "Q", answer: "A" }], lede: "L" }), "family:unsupported-feature");
+  });
+
+  it("renders the authored heading and lede before the existing stats list and steps list", () => {
+    const statsHtml = render(composed(sequencePage("stats", { heading: "Synthetic numbers", lede: 'Plans & "prices" stay plain' })));
+    const statsStart = statsHtml.indexOf('id="family-0-stats"');
+    const statsRegion = statsHtml.slice(statsStart - 60);
+    expect(statsRegion).toContain('<h2 class="uno-json-heading" id="family-0-stats-heading">Synthetic numbers</h2>');
+    expect(statsRegion).toContain('<p class="uno-json-prose" id="family-0-stats-lede">Plans &amp; &quot;prices&quot; stay plain</p>');
+    expect(statsRegion).toContain('<dl class="uno-json-stats-list"');
+    expect(statsRegion).toContain(">Sampled sections</dt>");
+    expect(statsRegion).toContain(">13<");
+    expect(statsRegion.indexOf("family-0-stats-heading")).toBeLessThan(statsRegion.indexOf("family-0-stats-lede"));
+    expect(statsRegion.indexOf("family-0-stats-lede")).toBeLessThan(statsRegion.indexOf("family-0-stats-stats"));
+    for (const forbidden of ["<h1", "<h3", "<ol", "<script", "<iframe", "<form", "<button", "<a ", "<img", "onclick"]) {
+      expect(statsRegion).not.toContain(forbidden);
+    }
+
+    const stepsHtml = render(composed(sequencePage("steps", { heading: "Synthetic sequence", lede: "A plain authored lede." })));
+    const stepsStart = stepsHtml.indexOf('id="family-0-steps"');
+    const stepsRegion = stepsHtml.slice(stepsStart - 60);
+    expect(stepsRegion).toContain('<h2 class="uno-json-heading" id="family-0-steps-heading">Synthetic sequence</h2>');
+    expect(stepsRegion).toContain('<p class="uno-json-prose" id="family-0-steps-lede">A plain authored lede.</p>');
+    expect(stepsRegion).toContain('<ol class="uno-json-timeline-list"');
+    expect(stepsRegion.indexOf("family-0-steps-heading")).toBeLessThan(stepsRegion.indexOf("family-0-steps-lede"));
+    expect(stepsRegion.indexOf("family-0-steps-lede")).toBeLessThan(stepsRegion.indexOf("family-0-steps-timeline"));
+    for (const forbidden of ["<h1", "<h3", "<dl", "<script", "<iframe", "<form", "<button", "<a ", "<img", "onclick"]) {
+      expect(stepsRegion).not.toContain(forbidden);
+    }
+  });
+
+  it("keeps the stats and steps subset recorded in the ledger without claiming further parity", () => {
+    const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
+    expect(ledger.split("ADAPT (bounded authored plain-text heading/lede)").length - 1).toBe(2);
+    expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
+    expect(ledger).toContain("one of seventeen fully parity-evidenced candidates");
+    expect(ledger).not.toContain("2/17");
+    expect(ledger).not.toContain("3/17");
+    expect(ledger).not.toMatch(/stats[^.\n]*full semantic parity/u);
+    expect(ledger).not.toMatch(/steps[^.\n]*full semantic parity/u);
   });
 });
