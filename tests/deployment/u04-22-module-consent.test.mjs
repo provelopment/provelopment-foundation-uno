@@ -128,7 +128,7 @@ const PINNED = Object.freeze([
 const PHASE_C_REQUIRED = Object.freeze([
   'await import("../src/application/compose-uno-foundation-families.ts")',
   "composeUnoFoundationSubset(familySource(), familyBindings())",
-  "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the thirteen-section source once",
+  "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the seventeen-section source once",
   "FAMILY_COMPOSE_ACCEPTED exact source-index ids and no extra section",
   "FAMILY_COMPOSE_ACCEPTED the accepted document is deeply frozen",
   "FAMILY_DOCUMENT_REACCEPTED the real reader reaccepts the same bytes with equal values",
@@ -145,7 +145,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_SERVING_SERVED the trusted serving planner serves the composed Page",
   "FAMILY_SERVING_SERVED one JSON Page and exactly three owned image occurrences in document order",
   "FAMILY_HTTP=200 the composed Page answers HTTP 200",
-  "FAMILY_HTTP=200 the Page renders the thirteen authored section ids in document order",
+  "FAMILY_HTTP=200 the Page renders the seventeen authored section ids in document order",
   "FAMILY_CONTACT_OFF_HTTP the contact subtree carries no form, control, handler or destination",
   "FAMILY_CONTACT_OFF_HTTP neither the donor identity nor the acknowledgement appears anywhere in the HTML",
   "FAMILY_MEDIA=3/3 three distinct locators serve the one Page-owned plate with GET and HEAD",
@@ -175,6 +175,36 @@ const PHASE_C_REQUIRED = Object.freeze([
   "${width}px the contact action stays in the same document and reaches its target",
   "${width}px Enter opens the FAQ disclosure",
   "the fixture source ${path} is removed",
+  // `UNO-WO-068 / R03`: both ingress-depth corrections, the header projection evidence, the last four families,
+  // their eight whole-Page refusals, the hostile-accessor proof and the seventeen-root evidence.
+  "FAMILY_HEADER_ACCEPTED the composed buffer projects one accepted authored header before installation",
+  "FAMILY_HEADER_ACCEPTED the loaded text projects the same accepted header with no extra authority",
+  'await import("../src/core/efs/uno-page-header.ts")',
+  'projectUnoSelectedPageHeader({\n      kind: "json",\n      text: familyJsonBytes.toString("utf8")',
+  'type: "table",',
+  'type: "columns",',
+  'type: "cards",',
+  'type: "features",',
+  '  "family-13-table",',
+  '  "family-14-columns",',
+  '  "family-15-cards",',
+  '  "family-16-features",',
+  "FAMILY_LAST_FOUR_REFUSALS each last-four probe refuses the whole Page with its documented reason",
+  "FAMILY_LAST_FOUR_REFUSALS an authored getter yields family:unsafe-source with zero invocations",
+  'Object.defineProperty(getterSource.sections[16].items[0], "title"',
+  "getterCalls === 0",
+  "const cells = [...(region?.children ?? [])];",
+  "family:unsafe-source",
+  "FAMILY_TABLE_HTTP the table region is one scroll wrapper with a genuine captioned two-column table",
+  "FAMILY_COLUMNS_HTTP the columns region is an authored plain two-column grid of two tight stacks",
+  "FAMILY_CARDS_HTTP the cards region is a native two-column list grid with one body only",
+  "FAMILY_FEATURES_HTTP the features region is a separate native three-column list grid with one body",
+  "FAMILY_SEVENTEEN_HTTP the last four regions add no second main, h1, script, frame or form control",
+  "${width}px table shows a captioned two-column table and its wrapper takes focus",
+  "${width}px columns show two authored tight stacks with one paragraph and one native list",
+  "${width}px cards show a native two-column list grid with exactly one authored body",
+  "${width}px features show a separate native three-column list grid with one authored body",
+  "${width}px the composed Page carries seventeen unique top-level sections with no nested inflation",
 ]);
 
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
@@ -489,6 +519,93 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       audit(unprobed).some((entry) => entry.includes("composeUnoFoundationSubset(probeSource, familyBindings())")),
       audit(unprobed).join(","),
     );
+  });
+
+  // `UNO-WO-068 / R03` §7: independent mutations over the last four families, both ingress-depth corrections and the
+  // seventeen-root evidence. Each one deletes or mislabels a real executed gate and must change the audit.
+  it("the audit genuinely fails when a last-four source shape or its id is removed", () => {
+    for (const [token, replacement] of [
+      ['type: "table",', 'type: "tableRemoved",'],
+      ['type: "columns",', 'type: "columnsRemoved",'],
+      ['type: "cards",', 'type: "cardsRemoved",'],
+      ['type: "features",', 'type: "featuresRemoved",'],
+      ['  "family-13-table",', '  "family-13-tableRenamed",'],
+      ['  "family-14-columns",', '  "family-14-columnsRenamed",'],
+      ['  "family-15-cards",', '  "family-15-cardsRenamed",'],
+      ['  "family-16-features",', '  "family-16-featuresRenamed",'],
+    ]) {
+      const mutated = source.replace(token, replacement);
+      assert.notEqual(mutated, source, token);
+      assert.ok(audit(mutated).some((entry) => entry.includes(token)), `${token}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit genuinely fails when the header projection evidence disappears", () => {
+    for (const contract of [
+      "FAMILY_HEADER_ACCEPTED the composed buffer projects one accepted authored header before installation",
+      "FAMILY_HEADER_ACCEPTED the loaded text projects the same accepted header with no extra authority",
+    ]) {
+      const mutated = source.replace(contract, "FAMILY_HEADER_ACCEPTED recorded");
+      assert.notEqual(mutated, source, contract);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+    // Removing the projector import entirely must also fail, because the header could then never be projected.
+    const noImport = source.replace('await import("../src/core/efs/uno-page-header.ts")', 'await import("../src/core/page-document.ts")');
+    assert.notEqual(noImport, source);
+    assert.ok(audit(noImport).some((entry) => entry.includes("uno-page-header.ts")), audit(noImport).join(","));
+  });
+
+  it("the audit genuinely fails when a last-four HTTP or seventeen-root check is deleted", () => {
+    for (const contract of [
+      "FAMILY_TABLE_HTTP the table region is one scroll wrapper with a genuine captioned two-column table",
+      "FAMILY_COLUMNS_HTTP the columns region is an authored plain two-column grid of two tight stacks",
+      "FAMILY_CARDS_HTTP the cards region is a native two-column list grid with one body only",
+      "FAMILY_FEATURES_HTTP the features region is a separate native three-column list grid with one body",
+      "FAMILY_SEVENTEEN_HTTP the last four regions add no second main, h1, script, frame or form control",
+    ]) {
+      const mutated = source.replace(contract, "FAMILY_UNVERIFIED recorded");
+      assert.notEqual(mutated, source, contract);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  it("the audit genuinely fails when a last-four browser region or its direct-child count is removed", () => {
+    for (const contract of [
+      "${width}px table shows a captioned two-column table and its wrapper takes focus",
+      "${width}px columns show two authored tight stacks with one paragraph and one native list",
+      "${width}px cards show a native two-column list grid with exactly one authored body",
+      "${width}px features show a separate native three-column list grid with one authored body",
+      "${width}px the composed Page carries seventeen unique top-level sections with no nested inflation",
+    ]) {
+      const mutated = source.replace(contract, "${width}px region unverified");
+      assert.notEqual(mutated, source, contract);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+    // The direct-child proof itself must survive: a region read from `children` cannot be replaced by a query sweep.
+    const swept = source.replace("const cells = [...(region?.children ?? [])];", "const cells = [...document.querySelectorAll(\"li\")];");
+    assert.notEqual(swept, source);
+    assert.ok(audit(swept).some((entry) => entry.includes("region?.children")), audit(swept).join(","));
+  });
+
+  it("the audit genuinely fails when the last-four refusal or getter-zero proof is removed", () => {
+    const noProbe = source.replace(
+      "FAMILY_LAST_FOUR_REFUSALS each last-four probe refuses the whole Page with its documented reason",
+      "FAMILY_LAST_FOUR_REFUSALS recorded",
+    );
+    assert.notEqual(noProbe, source);
+    assert.ok(audit(noProbe).some((entry) => entry.includes("FAMILY_LAST_FOUR_REFUSALS each last-four probe")));
+    const noGetter = source.replace(
+      "FAMILY_LAST_FOUR_REFUSALS an authored getter yields family:unsafe-source with zero invocations",
+      "FAMILY_LAST_FOUR_REFUSALS getter recorded",
+    );
+    assert.notEqual(noGetter, source);
+    assert.ok(audit(noGetter).some((entry) => entry.includes("FAMILY_LAST_FOUR_REFUSALS an authored getter")));
+    const countedGetter = source.replace(
+      "getterOutcome.status === \"refused\" && getterOutcome.reason === \"family:unsafe-source\"\n        && getterCalls === 0",
+      "getterOutcome.status === \"refused\"",
+    );
+    assert.notEqual(countedGetter, source);
+    assert.ok(audit(countedGetter).some((entry) => entry.includes("getterCalls === 0")), audit(countedGetter).join(","));
   });
 
   it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {

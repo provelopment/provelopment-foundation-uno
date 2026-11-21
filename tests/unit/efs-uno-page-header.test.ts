@@ -276,7 +276,7 @@ describe("JSON authority and hostile JSON", () => {
     expect(result.title).toBe("T");
   });
 
-  it("refuses prototype-polluting keys and excessive nesting", () => {
+  it("refuses prototype-polluting keys", () => {
     expectRefusal(
       projectUnoSelectedPageHeader({ kind: "json", text: '{"title":"T","__proto__":{"x":1}}', routePath: "home" }),
       "header:json-pollution",
@@ -285,11 +285,13 @@ describe("JSON authority and hostile JSON", () => {
       projectUnoSelectedPageHeader({ kind: "json", text: '{"title":"T","a":{"constructor":1}}', routePath: "home" }),
       "header:json-pollution",
     );
-    let nested = '{"leaf":1}';
-    for (let level = 0; level < 12; level += 1) nested = `{"a":${nested}}`;
+  });
+
+  it("refuses an excessive node count", () => {
+    const wide = `[${Array.from({ length: UNO_PAGE_HEADER_LIMITS.jsonNodes }, () => "1").join(",")}]`;
     expectRefusal(
-      projectUnoSelectedPageHeader({ kind: "json", text: `{"title":"T","modules":${nested}}`, routePath: "home" }),
-      "header:json-depth",
+      projectUnoSelectedPageHeader({ kind: "json", text: `{"title":"T","modules":${wide}}`, routePath: "home" }),
+      "header:json-width",
     );
   });
 
@@ -304,6 +306,100 @@ describe("JSON authority and hostile JSON", () => {
     for (const forbidden of ['"published"', '"modules"', '"host"', '"assets"', '"public":']) {
       expect(serialised.includes(forbidden)).toBe(false);
     }
+  });
+});
+
+/**
+ * `UNO-WO-068 / R03`: the published JSON depth contract.
+ *
+ * `UNO_PAGE_HEADER_LIMITS.jsonDepth` now matches the Page-document ceiling, so these cases state the exact
+ * depth contract instead of the stale twelve-wrapper guess. Every fixture is depth-checked by the same
+ * zero-root-depth walk the projector uses, so a case can never claim a depth it does not exercise.
+ */
+describe("bounded JSON depth contract", () => {
+  const ROUTE = "wo066-family-composition";
+
+  /** Depth of a parsed JSON value, counting the root container as `0` — the projector's own convention. */
+  function depthOf(value: unknown, depth = 0): number {
+    if (Array.isArray(value)) {
+      return value.reduce<number>((max, item) => Math.max(max, depthOf(item, depth + 1)), depth);
+    }
+    if (typeof value === "object" && value !== null) {
+      return Object.keys(value as Record<string, unknown>).reduce<number>(
+        (max, key) => Math.max(max, depthOf((value as Record<string, unknown>)[key], depth + 1)),
+        depth,
+      );
+    }
+    return depth;
+  }
+
+  /** One authoritative header whose `modules` payload ends exactly at `levels` of JSON depth. */
+  function headerAtDepth(levels: number, leaf = "1"): string {
+    // The first wrapper object sits at depth 1 under the root, so `levels - 1` wrappers put the leaf value at `levels`.
+    let payload = leaf;
+    for (let wrapper = 1; wrapper < levels; wrapper += 1) payload = `{"a":${payload}}`;
+    return `{"title":"Bounded family proof","description":"A synthetic fixture Page header.","visibility":"public","modules":${payload}}`;
+  }
+
+  it("accepts every published depth with an intact authoritative header", () => {
+    for (const levels of [8, 10, 12, 16]) {
+      const text = headerAtDepth(levels);
+      expect(depthOf(JSON.parse(text))).toBe(levels);
+      const result = projectUnoSelectedPageHeader({ kind: "json", text, routePath: ROUTE });
+      expect(result.accepted).toBe(true);
+      if (!result.accepted) continue;
+      expect(Object.keys(result).sort()).toEqual(["accepted", "description", "kind", "title", "visibility"]);
+      expect(result.kind).toBe("json");
+      expect(result.title).toBe("Bounded family proof");
+      expect(result.description).toBe("A synthetic fixture Page header.");
+      expect(result.visibility).toBe("public");
+      expect(JSON.stringify(result)).not.toContain("published");
+    }
+  });
+
+  it("refuses one level beyond the published depth with no partial header", () => {
+    const text = headerAtDepth(17);
+    expect(depthOf(JSON.parse(text))).toBe(17);
+    const result = projectUnoSelectedPageHeader({ kind: "json", text, routePath: ROUTE });
+    expect(result.accepted).toBe(false);
+    expect(result).toStrictEqual({ accepted: false, reason: "header:json-depth" });
+    expect(UNO_PAGE_HEADER_REFUSAL_REASONS).toContain("header:json-depth");
+  });
+
+  it("still refuses polluting keys at an admitted depth", () => {
+    for (const leaf of ['{"constructor":{"x":1}}', '{"__proto__":{"x":1}}']) {
+      expectRefusal(
+        projectUnoSelectedPageHeader({ kind: "json", text: headerAtDepth(10, leaf), routePath: ROUTE }),
+        "header:json-pollution",
+      );
+    }
+  });
+
+  it("still refuses an excessive node count at an admitted depth", () => {
+    const wide = `[${Array.from({ length: UNO_PAGE_HEADER_LIMITS.jsonNodes }, () => "1").join(",")}]`;
+    const text = headerAtDepth(10, wide);
+    expect(depthOf(JSON.parse(text))).toBe(11);
+    expectRefusal(projectUnoSelectedPageHeader({ kind: "json", text, routePath: ROUTE }), "header:json-width");
+  });
+
+  it("still refuses a repeated authority key when a deep payload is present", () => {
+    for (const duplicate of [
+      '"title":"Bounded family proof","title":"Second title"',
+      '"title":"Bounded family proof","description":"First.","description":"Second."',
+      '"title":"Bounded family proof","visibility":"public","visibility":"unlisted"',
+    ]) {
+      let payload = '{"leaf":1}';
+      for (let level = 1; level < 10; level += 1) payload = `{"a":${payload}}`;
+      const text = `{${duplicate},"modules":${payload}}`;
+      expectRefusal(projectUnoSelectedPageHeader({ kind: "json", text, routePath: ROUTE }), "header:json-duplicate-key");
+    }
+  });
+
+  it("keeps the rest of the published header limits unchanged", () => {
+    expect(UNO_PAGE_HEADER_LIMITS.sourceBytes).toBe(64 * 1024);
+    expect(UNO_PAGE_HEADER_LIMITS.jsonNodes).toBe(4096);
+    expect(UNO_PAGE_HEADER_LIMITS.titleCodePoints).toBe(160);
+    expect(UNO_PAGE_HEADER_LIMITS.descriptionCodePoints).toBe(320);
   });
 });
 

@@ -58,13 +58,21 @@ import {
   type UnoRouteRefusal,
 } from "../../core/efs/uno-route-address";
 
-/** Declared read bounds. A limit is a refusal boundary, never a truncation. */
+/**
+ * Declared read bounds. A limit is a refusal boundary, never a truncation.
+ *
+ * `jsonDepth` matches the published Uno Page document contract
+ * (`UNO_PAGE_DOCUMENT_LIMITS.jsonDepth: 16`). The two bounds must not disagree: a composed Page the document
+ * reader accepts would otherwise be refused here as `content:json-depth`, which is a loader-versus-contract
+ * mismatch and not a security boundary. Every other bound, the recursive walk itself and its `depth >` refusal
+ * condition are unchanged, so depth 17, prototype pollution, excessive width and oversize sources still refuse.
+ */
 export const UNO_SOURCE_LIMITS = Object.freeze({
   manifestBytes: 128 * 1024,
   configBytes: 8 * 1024,
   contentBytes: 64 * 1024,
   declarationPathLength: 240,
-  jsonDepth: 8,
+  jsonDepth: 16,
   jsonKeysPerObject: 512,
   jsonNodes: 4096,
 });

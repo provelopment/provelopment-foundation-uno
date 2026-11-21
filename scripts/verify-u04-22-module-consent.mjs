@@ -421,6 +421,37 @@ function familySource() {
         align: "center",
         surface: "bordered",
       },
+      // `UNO-WO-068 / R03`: appended after the unchanged thirteen; still donor-shaped input to the real adapter.
+      {
+        type: "table",
+        columns: ["Phase", "Count"],
+        rows: [["First", "1"], ["Second", "2"]],
+        caption: "Synthetic table",
+      },
+      {
+        type: "columns",
+        ratio: "start-wide",
+        items: [
+          { title: "Left column", body: "The left text." },
+          { title: "Right column", items: ["Check one", "Check two"] },
+        ],
+      },
+      {
+        type: "cards",
+        columns: 2,
+        items: [
+          { title: "Card one", body: "First card body." },
+          { title: "Card two" },
+        ],
+      },
+      {
+        type: "features",
+        columns: 3,
+        items: [
+          { title: "Feature one", body: "First feature body." },
+          { title: "Feature two" },
+        ],
+      },
     ],
   };
 }
@@ -451,6 +482,10 @@ const FAMILY_IDS = Object.freeze([
   "family-10-stats",
   "family-11-steps",
   "family-12-quote",
+  "family-13-table",
+  "family-14-columns",
+  "family-15-cards",
+  "family-16-features",
 ]);
 
 /** Recursively frozen: an accepted Page must not be rewritten after composition. */
@@ -786,10 +821,11 @@ async function main() {
   // The adapter is imported unchanged and invoked exactly once. Its one accepted, frozen document is serialized to a
   // single UTF-8 buffer that is then the only authority for installation, loading, serving and HTTP.
   const { composeUnoFoundationSubset } = await import("../src/application/compose-uno-foundation-families.ts");
+  const { projectUnoSelectedPageHeader } = await import("../src/core/efs/uno-page-header.ts");
   const familyComposed = composeUnoFoundationSubset(familySource(), familyBindings());
   const familyAccepted = familyComposed.status === "composed" ? familyComposed.document : null;
   check(
-    "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the thirteen-section source once",
+    "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the seventeen-section source once",
     familyAccepted !== null,
     familyComposed.status === "composed" ? "" : String(familyComposed.reason),
   );
@@ -797,7 +833,7 @@ async function main() {
   const familyIds = familyAccepted.sections.map((node) => node.id);
   check(
     "FAMILY_COMPOSE_ACCEPTED exact source-index ids and no extra section",
-    familyIds.length === 13 && familyIds.every((id, index) => id === FAMILY_IDS[index]),
+    familyIds.length === 17 && familyIds.every((id, index) => id === FAMILY_IDS[index]),
     familyIds.join(","),
   );
   check(
@@ -812,6 +848,26 @@ async function main() {
     familyReparsed.accepted === true && JSON.stringify(familyReparsed.document) === JSON.stringify(familyAccepted),
     familyReparsed.accepted ? "" : String(familyReparsed.reason),
   );
+  {
+    // `UNO-WO-068 / R03` §2B: the same serialized buffer must project an accepted header BEFORE installation, so a
+    // loader-versus-header depth disagreement is diagnosed here rather than surfacing later as a serving refusal.
+    const header = projectUnoSelectedPageHeader({
+      kind: "json",
+      text: familyJsonBytes.toString("utf8"),
+      routePath: "wo066-family-composition",
+    });
+    const headerKeys = header.accepted ? Object.keys(header).sort() : [];
+    check(
+      "FAMILY_HEADER_ACCEPTED the composed buffer projects one accepted authored header before installation",
+      header.accepted === true
+        && header.kind === "json"
+        && header.title === familyAccepted.title
+        && header.visibility === "public"
+        && headerKeys.every((key) => ["accepted", "description", "kind", "title", "visibility"].includes(key))
+        && !JSON.stringify(header).includes("published"),
+      header.accepted ? headerKeys.join(",") : String(header.reason),
+    );
+  }
   {
     const serialized = familyJsonBytes.toString("utf8");
     const leaked = ["contactForms", "wo066-contact", "delivery-off", "formRef", "recipient", "webhook", "provider", FAMILY_DONOR_SOURCE]
@@ -884,6 +940,48 @@ async function main() {
       familyProbes.every((probe) => probe.actual === probe.expected && probe.partial === false),
       JSON.stringify(familyProbes),
     );
+
+    // `UNO-WO-068 / R03`: eight further whole-Page refusals over the last four families, each from a fresh source.
+    const lastFourProbes = [
+      ["table link authority", "family:unsupported-feature", (s) => { s.sections[13].links = []; }],
+      ["ragged table row", "family:target-refused", (s) => { s.sections[13].rows[1] = ["Only one cell"]; }],
+      ["column body plus list", "family:unsupported-feature", (s) => { s.sections[14].items[0].items = ["Conflicting list"]; }],
+      ["blank column title", "family:target-refused", (s) => { s.sections[14].items[0].title = ""; }],
+      ["card media", "family:unsupported-feature", (s) => { s.sections[15].items[0].image = { src: "/assets/extra.png" }; }],
+      ["card column count", "family:target-refused", (s) => { s.sections[15].columns = 5; }],
+      ["feature icon", "family:unsupported-feature", (s) => { s.sections[16].items[0].icon = "star"; }],
+      ["empty feature body", "family:target-refused", (s) => { s.sections[16].items[0].body = ""; }],
+    ].map(([expectedLabel, expected, mutate]) => {
+      const lastFourSource = familySource();
+      mutate(lastFourSource);
+      const outcome = composeUnoFoundationSubset(lastFourSource, familyBindings());
+      return {
+        label: expectedLabel,
+        expected,
+        actual: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+        partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+      };
+    });
+    check(
+      "FAMILY_LAST_FOUR_REFUSALS each last-four probe refuses the whole Page with its documented reason",
+      lastFourProbes.every((probe) => probe.actual === probe.expected && probe.partial === false),
+      JSON.stringify(lastFourProbes),
+    );
+
+    // A hostile accessor on an appended item must be classified, never executed: zero invocations and no partial Page.
+    const getterSource = familySource();
+    let getterCalls = 0;
+    Object.defineProperty(getterSource.sections[16].items[0], "title", {
+      enumerable: true,
+      get() { getterCalls += 1; return "Feature one"; },
+    });
+    const getterOutcome = composeUnoFoundationSubset(getterSource, familyBindings());
+    check(
+      "FAMILY_LAST_FOUR_REFUSALS an authored getter yields family:unsafe-source with zero invocations",
+      getterOutcome.status === "refused" && getterOutcome.reason === "family:unsafe-source"
+        && getterCalls === 0 && !Object.prototype.hasOwnProperty.call(getterOutcome, "document"),
+      `${String(getterOutcome.status === "refused" ? getterOutcome.reason : getterOutcome.status)} calls=${getterCalls}`,
+    );
   }
 
   const plan = fixturePlan(allModulesJsonBytes, badJsonBytes, familyJsonBytes);
@@ -932,6 +1030,21 @@ async function main() {
       "FAMILY_LOAD_PARITY the confined loader accepts and returns the installed bytes",
       loadedFamily.accepted === true && Buffer.from(loadedFamily.text ?? "", "utf8").equals(familyJsonBytes),
       loadedFamily.accepted ? "" : String(loadedFamily.reason),
+    );
+    // `UNO-WO-068 / R03` §2B(c): the header is projected from the LOADED text, not a cached buffer, and must agree.
+    const loadedFamilyText = loadedFamily.accepted ? loadedFamily.text : "";
+    const loadedHeader = projectUnoSelectedPageHeader({
+      kind: "json",
+      text: loadedFamilyText,
+      routePath: "wo066-family-composition",
+    });
+    check(
+      "FAMILY_HEADER_ACCEPTED the loaded text projects the same accepted header with no extra authority",
+      loadedHeader.accepted === true
+        && loadedHeader.title === familyAccepted.title
+        && loadedHeader.visibility === "public"
+        && Object.keys(loadedHeader).every((key) => ["accepted", "description", "kind", "title", "visibility"].includes(key)),
+      loadedHeader.accepted ? Object.keys(loadedHeader).sort().join(",") : String(loadedHeader.reason),
     );
     const { planUnoServingPage: planFamily } = await import("../src/config/uno-serving.ts");
     const familyServing = await planFamily("/en-001/wo066-family-composition");
@@ -1065,7 +1178,7 @@ async function main() {
     check("FAMILY_HTTP=200 the composed Page answers HTTP 200", familyHtmlResponse.status === 200, String(familyHtmlResponse.status));
     const positions = FAMILY_IDS.map((id) => familyHtml.indexOf(`id="${id}"`));
     check(
-      "FAMILY_HTTP=200 the Page renders the thirteen authored section ids in document order",
+      "FAMILY_HTTP=200 the Page renders the seventeen authored section ids in document order",
       positions.every((position) => position >= 0)
         && positions.every((position, index) => index === 0 || position > positions[index - 1])
         && FAMILY_IDS.every((id) => familyHtml.split(`id="${id}"`).length - 1 === 1),
@@ -1160,6 +1273,89 @@ async function main() {
           && appendedRegions.every((region) => !/<main\b|<h1\b|<script\b|<iframe\b/iu.test(region))
           && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
           && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1,
+      );
+    }
+    // `UNO-WO-068 / R03`: the last four families. The table nests no container, so its own close tag bounds it; the two
+    // grids nest cells and stacks, so each is bounded by the next top-level id and its direct-child counts are checked
+    // only on the classes that belong to that grid (exact child structure is proved by the scoped Chromium assertions).
+    const tableRegionStart = familyHtml.indexOf('<div class="uno-json-table-scroll" id="family-13-table" tabindex="0">');
+    const tableRegionEnd = tableRegionStart < 0 ? -1 : familyHtml.indexOf("</table></div>", tableRegionStart);
+    const tableRegion = tableRegionStart < 0 || tableRegionEnd < 0
+      ? ""
+      : familyHtml.slice(tableRegionStart, tableRegionEnd + "</table></div>".length);
+    check(
+      "FAMILY_TABLE_HTTP the table region is one scroll wrapper with a genuine captioned two-column table",
+      tableRegion.length > 0
+        && tableRegion.includes('<table class="uno-json-table">')
+        && (tableRegion.match(/<caption>Synthetic table<\/caption>/gu) ?? []).length === 1
+        && (tableRegion.match(/<th scope="col">/gu) ?? []).length === 2
+        && tableRegion.indexOf("<th scope=\"col\">Phase</th>") < tableRegion.indexOf("<th scope=\"col\">Count</th>")
+        && tableRegion.includes("<tbody>")
+        && (tableRegion.match(/<tr>/gu) ?? []).length === 3
+        && (tableRegion.match(/<td>/gu) ?? []).length === 4
+        && tableRegion.indexOf("<td>First</td><td>1</td>") > 0
+        && tableRegion.indexOf("<td>Second</td><td>2</td>") > tableRegion.indexOf("<td>First</td><td>1</td>")
+        && !/<a\b|<img\b|<script\b|<form\b|<button\b/iu.test(tableRegion),
+      tableRegion.slice(0, 200),
+    );
+    const columnsStart = familyHtml.indexOf('id="family-14-columns"');
+    const cardsStart = familyHtml.indexOf('id="family-15-cards"');
+    const featuresStart = familyHtml.indexOf('id="family-16-features"');
+    const columnsRegion = columnsStart < 0 || cardsStart < 0 ? "" : familyHtml.slice(columnsStart, cardsStart);
+    check(
+      "FAMILY_COLUMNS_HTTP the columns region is an authored plain two-column grid of two tight stacks",
+      columnsRegion.length > 0
+        && familyHtml.includes('<div class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="plain" data-uno-ratio="start-wide" id="family-14-columns">')
+        && (columnsRegion.match(/<div class="uno-json-cell"/gu) ?? []).length === 2
+        && (columnsRegion.match(/<div class="uno-json-stack" data-uno-gap="tight"/gu) ?? []).length === 2
+        && (columnsRegion.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 2
+        && columnsRegion.indexOf(">Left column</h2>") > 0
+        && columnsRegion.indexOf(">Left column</h2>") < columnsRegion.indexOf(">Right column</h2>")
+        && columnsRegion.includes(">The left text.</p>")
+        && columnsRegion.includes('<ul class="uno-json-list"')
+        && columnsRegion.indexOf(">Check one</span>") < columnsRegion.indexOf(">Check two</span>")
+        && !/<h3\b|<a\b|<img\b|<button\b|<form\b/iu.test(columnsRegion),
+      columnsRegion.slice(0, 200),
+    );
+    const cardsRegion = cardsStart < 0 || featuresStart < 0 ? "" : familyHtml.slice(cardsStart, featuresStart);
+    check(
+      "FAMILY_CARDS_HTTP the cards region is a native two-column list grid with one body only",
+      cardsRegion.length > 0
+        && familyHtml.includes('<ul class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="list" id="family-15-cards" role="list">')
+        && (cardsRegion.match(/<li class="uno-json-cell"/gu) ?? []).length === 2
+        && (cardsRegion.match(/<div class="uno-json-stack" data-uno-gap="tight"/gu) ?? []).length === 2
+        && cardsRegion.indexOf(">Card one</h2>") > 0
+        && cardsRegion.indexOf(">Card one</h2>") < cardsRegion.indexOf(">Card two</h2>")
+        && (cardsRegion.match(/<p class="uno-json-prose"/gu) ?? []).length === 1
+        && cardsRegion.includes(">First card body.</p>")
+        && !/data-uno-ratio|<article\b|<a\b|<img\b|<button\b|<form\b|icon/iu.test(cardsRegion),
+      cardsRegion.slice(0, 200),
+    );
+    const featuresRegion = featuresStart < 0 ? "" : familyHtml.slice(featuresStart, familyHtml.indexOf("</main>", featuresStart));
+    check(
+      "FAMILY_FEATURES_HTTP the features region is a separate native three-column list grid with one body",
+      featuresRegion.length > 0
+        && familyHtml.includes('<ul class="uno-json-grid" data-uno-columns="3" data-uno-item-semantics="list" id="family-16-features" role="list">')
+        && (featuresRegion.match(/<li class="uno-json-cell"/gu) ?? []).length === 2
+        && featuresRegion.indexOf(">Feature one</h2>") > 0
+        && featuresRegion.indexOf(">Feature one</h2>") < featuresRegion.indexOf(">Feature two</h2>")
+        && (featuresRegion.match(/<p class="uno-json-prose"/gu) ?? []).length === 1
+        && featuresRegion.includes(">First feature body.</p>")
+        && !/data-uno-ratio|<article\b|<a\b|<img\b|<button\b|<form\b|icon/iu.test(featuresRegion),
+      featuresRegion.slice(0, 200),
+    );
+    {
+      const lastFourRegions = [tableRegion, columnsRegion, cardsRegion, featuresRegion];
+      check(
+        "FAMILY_SEVENTEEN_HTTP the last four regions add no second main, h1, script, frame or form control",
+        lastFourRegions.every((region) => region.length > 0)
+          && lastFourRegions.every((region) => !/<main\b|<h1\b|<script\b|<iframe\b|<form\b|<input\b|<textarea\b|<button\b/iu.test(region))
+          && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
+          && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
+          && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 6
+          && !familyHtml.includes(FAMILY_DONOR_SOURCE)
+          && !familyHtml.includes("formRef"),
+        `${lastFourRegions.map((region) => region.length).join("/")} h2=${(familyHtml.match(/<h2[\s>]/giu) ?? []).length}`,
       );
     }
     const contactStart = familyHtml.indexOf('<section class="uno-json-contact" id="family-6-contactform">');
@@ -1639,6 +1835,77 @@ async function consentPhase(base) {
               dates: region?.querySelectorAll(".uno-json-timeline-date").length ?? -1,
             };
           })(),
+          table: (() => {
+            const region = document.querySelector("#family-13-table");
+            const wrapper = region?.firstElementChild ?? null;
+            return {
+              isScroll: region?.classList.contains("uno-json-table-scroll") ?? false,
+              focusable: region?.getAttribute("tabindex") ?? "",
+              wrapperTag: wrapper?.tagName ?? "",
+              wrapperClass: wrapper?.classList.contains("uno-json-table") ?? false,
+              captions: [...(region?.querySelectorAll("table > caption") ?? [])].map((node) => node.textContent ?? ""),
+              headers: [...(region?.querySelectorAll("thead th") ?? [])].map((node) => ({
+                text: node.textContent ?? "", scope: node.getAttribute("scope") ?? "",
+              })),
+              rows: [...(region?.querySelectorAll("tbody tr") ?? [])].map((row) => [...row.querySelectorAll("td")].map((cell) => cell.textContent ?? "")),
+              links: region?.querySelectorAll("a, img, form, button").length ?? -1,
+            };
+          })(),
+          columns: (() => {
+            const region = document.querySelector("#family-14-columns");
+            const cells = [...(region?.children ?? [])];
+            return {
+              isDiv: region?.tagName ?? "",
+              columns: region?.getAttribute("data-uno-columns") ?? "",
+              semantics: region?.getAttribute("data-uno-item-semantics") ?? "",
+              ratio: region?.getAttribute("data-uno-ratio") ?? "",
+              cells: cells.length,
+              cellsAreCells: cells.every((cell) => cell.classList.contains("uno-json-cell")),
+              stacks: cells.map((cell) => cell.firstElementChild?.classList.contains("uno-json-stack") ?? false),
+              headings: [...(region?.querySelectorAll("h2.uno-json-heading") ?? [])].map((node) => node.textContent ?? ""),
+              paragraphs: [...(region?.querySelectorAll("p.uno-json-prose") ?? [])].map((node) => node.textContent ?? ""),
+              listItems: [...(region?.querySelectorAll("ul.uno-json-list > li") ?? [])].map((node) => node.textContent ?? ""),
+              h3: region?.querySelectorAll("h3").length ?? -1,
+              controls: region?.querySelectorAll("a, input, textarea, button, select, iframe").length ?? -1,
+            };
+          })(),
+          cards: (() => {
+            const region = document.querySelector("#family-15-cards");
+            const items = [...(region?.children ?? [])];
+            return {
+              isList: region?.tagName ?? "",
+              columns: region?.getAttribute("data-uno-columns") ?? "",
+              semantics: region?.getAttribute("data-uno-item-semantics") ?? "",
+              ratio: region?.getAttribute("data-uno-ratio") ?? "",
+              items: items.length,
+              itemsAreCells: items.every((item) => item.classList.contains("uno-json-cell")),
+              headings: [...(region?.querySelectorAll("h2.uno-json-heading") ?? [])].map((node) => node.textContent ?? ""),
+              paragraphs: [...(region?.querySelectorAll("p.uno-json-prose") ?? [])].map((node) => node.textContent ?? ""),
+              articles: region?.querySelectorAll("article").length ?? -1,
+              controls: region?.querySelectorAll("a, img, form, button, input").length ?? -1,
+            };
+          })(),
+          features: (() => {
+            const region = document.querySelector("#family-16-features");
+            const items = [...(region?.children ?? [])];
+            return {
+              isList: region?.tagName ?? "",
+              columns: region?.getAttribute("data-uno-columns") ?? "",
+              semantics: region?.getAttribute("data-uno-item-semantics") ?? "",
+              ratio: region?.getAttribute("data-uno-ratio") ?? "",
+              items: items.length,
+              itemsAreCells: items.every((item) => item.classList.contains("uno-json-cell")),
+              headings: [...(region?.querySelectorAll("h2.uno-json-heading") ?? [])].map((node) => node.textContent ?? ""),
+              paragraphs: [...(region?.querySelectorAll("p.uno-json-prose") ?? [])].map((node) => node.textContent ?? ""),
+              articles: region?.querySelectorAll("article").length ?? -1,
+              controls: region?.querySelectorAll("a, img, form, button, input").length ?? -1,
+            };
+          })(),
+          tableFocus: (() => {
+            const region = document.querySelector("#family-13-table");
+            region?.focus();
+            return document.activeElement === region;
+          })(),
           quote: (() => {
             const region = document.querySelector("#family-12-quote");
             return {
@@ -1656,7 +1923,7 @@ async function consentPhase(base) {
           html: document.documentElement.outerHTML,
         };
       });
-      familyCheck(`${width}px thirteen top-level section ids in order`,
+      familyCheck(`${width}px seventeen top-level section ids in order`,
         JSON.stringify(seen.tops) === JSON.stringify(FAMILY_IDS), seen.tops.join(","));
       familyCheck(`${width}px one main and one h1`, seen.mains === 1 && seen.h1s === 1, `${seen.mains}/${seen.h1s}`);
       familyCheck(`${width}px no horizontal document overflow`, seen.overflow <= 2, String(seen.overflow));
@@ -1709,6 +1976,44 @@ async function consentPhase(base) {
           && seen.quote.role === "Reviewer" && seen.quote.align === "center" && seen.quote.surface === "bordered"
           && seen.quote.anchors === 0,
         JSON.stringify(seen.quote));
+      // `UNO-WO-068 / R03`: the last four families, each scoped to its own composed region.
+      familyCheck(`${width}px table shows a captioned two-column table and its wrapper takes focus`,
+        seen.table.isScroll && seen.table.focusable === "0" && seen.tableFocus
+          && seen.table.wrapperTag === "TABLE" && seen.table.wrapperClass
+          && JSON.stringify(seen.table.captions) === JSON.stringify(["Synthetic table"])
+          && JSON.stringify(seen.table.headers) === JSON.stringify([
+            { text: "Phase", scope: "col" }, { text: "Count", scope: "col" },
+          ])
+          && JSON.stringify(seen.table.rows) === JSON.stringify([["First", "1"], ["Second", "2"]])
+          && seen.table.links === 0,
+        JSON.stringify(seen.table));
+      familyCheck(`${width}px columns show two authored tight stacks with one paragraph and one native list`,
+        seen.columns.isDiv === "DIV" && seen.columns.columns === "2" && seen.columns.semantics === "plain"
+          && seen.columns.ratio === "start-wide" && seen.columns.cells === 2 && seen.columns.cellsAreCells
+          && seen.columns.stacks.every(Boolean)
+          && JSON.stringify(seen.columns.headings) === JSON.stringify(["Left column", "Right column"])
+          && JSON.stringify(seen.columns.paragraphs) === JSON.stringify(["The left text."])
+          && JSON.stringify(seen.columns.listItems) === JSON.stringify(["Check one", "Check two"])
+          && seen.columns.h3 === 0 && seen.columns.controls === 0,
+        JSON.stringify(seen.columns));
+      familyCheck(`${width}px cards show a native two-column list grid with exactly one authored body`,
+        seen.cards.isList === "UL" && seen.cards.columns === "2" && seen.cards.semantics === "list"
+          && seen.cards.ratio === "" && seen.cards.items === 2 && seen.cards.itemsAreCells
+          && JSON.stringify(seen.cards.headings) === JSON.stringify(["Card one", "Card two"])
+          && JSON.stringify(seen.cards.paragraphs) === JSON.stringify(["First card body."])
+          && seen.cards.articles === 0 && seen.cards.controls === 0,
+        JSON.stringify(seen.cards));
+      familyCheck(`${width}px features show a separate native three-column list grid with one authored body`,
+        seen.features.isList === "UL" && seen.features.columns === "3" && seen.features.semantics === "list"
+          && seen.features.ratio === "" && seen.features.items === 2 && seen.features.itemsAreCells
+          && JSON.stringify(seen.features.headings) === JSON.stringify(["Feature one", "Feature two"])
+          && JSON.stringify(seen.features.paragraphs) === JSON.stringify(["First feature body."])
+          && seen.features.articles === 0 && seen.features.controls === 0,
+        JSON.stringify(seen.features));
+      familyCheck(`${width}px the composed Page carries seventeen unique top-level sections with no nested inflation`,
+        seen.tops.length === 17 && new Set(seen.tops).size === 17
+          && seen.mains === 1 && seen.h1s === 1 && seen.overflow === 0,
+        `${seen.tops.length}/${new Set(seen.tops).size} mains=${seen.mains} h1=${seen.h1s} overflow=${seen.overflow}`);
 
       const familySummary = tab.locator("#family-3-faq summary").first();
       const familyDetails = tab.locator("#family-3-faq details").first();

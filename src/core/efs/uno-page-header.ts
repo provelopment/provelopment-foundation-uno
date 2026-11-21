@@ -36,12 +36,19 @@ import {
   type PageVisibilityRefusal,
 } from "../page-authoring-policy";
 
-/** The bounded caps this projection enforces. Documented, and applied as refusals, never truncation. */
+/**
+ * The bounded caps this projection enforces. Documented, and applied as refusals, never truncation.
+ *
+ * `jsonDepth` matches the published Uno Page document contract (`UNO_PAGE_DOCUMENT_LIMITS.jsonDepth: 16`).
+ * The header is projected from the same authored JSON the Page reader accepts, so a Page the reader accepts
+ * must not be refused here as `header:json-depth`; depth 17, prototype pollution, the node budget and the
+ * duplicate top-level authority-key scan are unchanged.
+ */
 export const UNO_PAGE_HEADER_LIMITS = Object.freeze({
   sourceBytes: 64 * 1024,
   titleCodePoints: 160,
   descriptionCodePoints: 320,
-  jsonDepth: 8,
+  jsonDepth: 16,
   jsonNodes: 4096,
 });
 

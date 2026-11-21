@@ -277,14 +277,46 @@ describe("JSON content validation", () => {
     expectDiagnosis(root, { kind: "json", path: top }, "invalid", "content:json-pollution");
     const nested = writeSource(root, "proto-nested.json", '{"a":{"constructor":{"x":1}}}');
     expectDiagnosis(root, { kind: "json", path: nested }, "invalid", "content:json-pollution");
+    // `UNO-WO-068 / R03`: a polluting key at a newly admitted depth is still refused as pollution, not as depth.
+    const deep = writeSource(root, "proto-deep.json", nestedSource(10, '{"constructor":{"x":1}}'));
+    expectDiagnosis(root, { kind: "json", path: deep }, "invalid", "content:json-pollution");
   });
 
-  it("refuses excessive nesting depth", () => {
+  /**
+   * Build one ordinary object chain whose innermost value sits at exactly `levels` of JSON depth, so a
+   * boundary test can name the depth it exercises instead of guessing from a repeated literal.
+   */
+  function nestedSource(levels: number, leaf = "1"): string {
+    let text = leaf;
+    for (let wrapper = 1; wrapper < levels; wrapper += 1) text = `{"a":${text}}`;
+    return `{"root":${text}}`;
+  }
+
+  // `UNO-WO-068 / R03`: the authored-JSON depth contract now matches the published Page reader (16), so the
+  // former twelve-level refusal expectation is replaced by real acceptance at every admitted depth.
+  it("accepts every published authored-JSON depth, carrying the original bytes", () => {
     const root = scratchRoot();
-    let nested = '{"leaf":1}';
-    for (let level = 0; level < 12; level += 1) nested = `{"a":${nested}}`;
-    const path = writeSource(root, "deep.json", nested);
+    for (const levels of [8, 10, 12, 16]) {
+      const text = nestedSource(levels);
+      const path = writeSource(root, `depth-${levels}.json`, text);
+      const diagnosis = diagnoseUnoConfinedSource({ repoRoot: root, declaration: { kind: "json", path } });
+      expect(diagnosis.state).toBe("valid");
+      expect(diagnosis.code).toBe("source:valid");
+      const observation = observeUnoConfinedSource({ repoRoot: root, declaration: { kind: "json", path } });
+      expect(observation.state).toBe("valid");
+      if (observation.state !== "valid") return;
+      expect(observation.source.text).toBe(text);
+      expect(JSON.parse(observation.source.text)).toStrictEqual(JSON.parse(text));
+    }
+  });
+
+  it("still refuses one level beyond the published authored-JSON depth", () => {
+    const root = scratchRoot();
+    const path = writeSource(root, "depth-17.json", nestedSource(17));
     expectDiagnosis(root, { kind: "json", path }, "invalid", "content:json-depth");
+    const observation = observeUnoConfinedSource({ repoRoot: root, declaration: { kind: "json", path } });
+    expect(observation.state).toBe("invalid");
+    expect("source" in observation).toBe(false);
   });
 
   it("refuses an excessively wide object", () => {
@@ -295,6 +327,16 @@ describe("JSON content validation", () => {
     }
     const path = writeSource(root, "wide.json", `{${keys.join(",")}}`);
     expectDiagnosis(root, { kind: "json", path }, "invalid", "content:json-width");
+    // The width bound is depth-independent: an over-wide object nested inside the admitted depth still refuses.
+    const nested = writeSource(root, "wide-nested.json", nestedSource(10, `{${keys.join(",")}}`));
+    expectDiagnosis(root, { kind: "json", path: nested }, "invalid", "content:json-width");
+  });
+
+  it("keeps the published authored-JSON limits at their unchanged values", () => {
+    expect(UNO_SOURCE_LIMITS.jsonDepth).toBe(16);
+    expect(UNO_SOURCE_LIMITS.jsonNodes).toBe(4096);
+    expect(UNO_SOURCE_LIMITS.jsonKeysPerObject).toBe(512);
+    expect(UNO_SOURCE_LIMITS.contentBytes).toBe(64 * 1024);
   });
 });
 

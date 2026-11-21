@@ -2356,11 +2356,18 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).not.toContain("zero published family Page acceptance evidence");
     // `UNO-WO-067 / R01`: the same temporary Page now carries thirteen bounded shapes, and exactly four remain without
     // fixture-Page HTTP/browser proof. The stale nine-shape accounting must not survive.
-    expect(ledger).toContain("one temporary thirteen-shape integration slice");
     expect(ledger).toContain("appended `hero`, `stats`, `steps`, `quote`");
-    expect(ledger).toContain("four bounded shapes keep their validator/renderer tests only");
     expect(ledger).not.toContain("one temporary nine-shape integration slice");
     expect(ledger).not.toContain("eight bounded shapes keep their validator/renderer tests only");
+    // `UNO-WO-068 / R03`: all seventeen bounded shapes are now sampled over the one temporary Page, so neither the
+    // thirteen-shape accounting nor the "four without fixture evidence" claim may survive.
+    expect(ledger).toContain("one temporary seventeen-shape integration slice");
+    expect(ledger).toContain("all seventeen bounded shapes sampled over the temporary Page");
+    expect(ledger).toContain("no durable published family Page");
+    expect(ledger).toContain("zero of seventeen full semantic parity");
+    expect(ledger).not.toContain("one temporary thirteen-shape integration slice");
+    expect(ledger).not.toContain("four bounded shapes keep their validator/renderer tests only");
+    expect(ledger).not.toContain("zero bounded shapes lacking temporary Page evidence");
     expect(ledger).toContain("family-<index>-contactform");
     expect(ledger).toContain("Deliberately absent donor design (media and its binding)");
     expect(ledger).toContain("Deliberately absent donor design (gallery)");
