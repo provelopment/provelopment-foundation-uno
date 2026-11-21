@@ -1,131 +1,151 @@
-# Execution Report — UNO-WO-070 / R01
+# Execution Report — UNO-WO-071 / R01
 
-**Status: DELIVERED — `cards` and `features` now accept the donor's optional authored plain-text section heading and,
-only in that mode, the donor's `h2` → `h3` item outline; heading-less output is byte-identical to the pre-change
-composition. This is a bounded two-family capability milestone, not full parity. U04 remains OPEN.**
-**Accounting: 22/22 Uno modules, 4/4 asset zones, 16/16 browser matrix, 17/17 bounded donor mappings, 17/17 temporary
-Page samples, 1/17 fully parity-evidenced families (`divider`, pending Architect acceptance), 16/17 still below full
-parity, U04 proxy 43/59 (73%), no durable published family Page.**
+**Status: DELIVERED — `cards` and `features` now accept the donor's optional authored `lede` as one literal plain-text
+paragraph, composed in source order above the native item list, with every input that has no `lede` unchanged
+byte-for-byte. This is a bounded two-family capability; it earns no family parity credit and closes no stage.**
+**Accounting: 22/22 Uno modules, 4/4 asset zones, 16/16 browser matrix, 17/17 bounded donor mappings, 17/17 sampled
+temporary Page families, 1/17 independently accepted full-parity families (`divider`), 16/17 still below full parity,
+U04 proxy 43/59 = 72.88% (73%), no durable published family Page.**
 
 ## 1. Authority and start state
 
 | Item | Observed |
 | --- | --- |
-| Order | `UNO-WO-070 / R01`, EDITION FINAL — EXECUTE |
-| ACTIVE | `.documents/WIP/workorder-active.md` — **31,574 bytes**, SHA-256 `7d11112c33df54ea938035ddc1e0656ec5eef54f99571fb69c878326b5ffcdd7`, ignored, untracked, unstaged, one of the four WIP slots |
-| Required start | `fcf393a34636c0a76fe23ee587e1dc33b9a6bffb` — matched `HEAD`, local `main`, `origin/main` and `git ls-remote` |
-| Start blobs | A01 `24e30fca…`, A02 `454446b1…`, A03 `5588cd77…`, A04 `a9c2bf83…`, A05 `8254c9b4…`; report start `3326a2a7…` — all matched exactly |
-| Read-only pins | `src/core/page-document.ts` `2d968300…`, `src/components/uno-page-sections.tsx` `cde15a6b…`, `src/app/globals.css` `eafef92c…` — unchanged before and after |
-| Donor pins (read-only) | `provelopment/provelopment-foundation` @ `c05c55ea…`: `LICENSE` `d6456956…` (Apache-2.0), `page-document.ts` `a12d964c…` (`cardsSectionSchema`/`featuresSectionSchema` with `headingFields` and `itemColumnsField`, `headingSchema` trimmed 1..160), `media-sections.tsx` `e3f3a12e…` (`SectionHeading`, `ItemTitle`), `items-sections.tsx` `bc729d6a…`, `section-support.tsx` `19c9bee3…` (`<h2>` section heading, `<h3>` item title) — every blob SHA-1 recomputed locally and equal |
-| Git/hooks | one checkout, 1 worktree, 1 branch `main`, 1 remote `origin`, 0 stashes, clean status, empty index; `core.hooksPath` unset, no active hook file — both commits used the ordinary path, no override |
+| Order | `UNO-WO-071 / R01`, EDITION FINAL — EXECUTE, activated by the Owner's matching message |
+| ACTIVE | `.documents/WIP/workorder-active.md` — **33,386 bytes**, SHA-256 `df630df519672ccc699c0333d0039848ba4ba098061088ed3130ab1bdb52a478`; present only in the private WIP slot, ignored by Git, untracked and unstaged, never staged or published |
+| WIP slot | exactly `plan-roadmap.md`, `plan-next.md`, `plan-outlook.md` plus the ignored active file |
+| Required start | `ffe10d93098927d02f85f8b6aadbaa833db70444` — matched `HEAD`, local `main`, `origin/main` and `git ls-remote`; its parent is the WO-070 product `f8386dde…`, whose parent is `fcf393a…` |
+| Start blobs | A01 `37e7f3a3…`, A02 `7dc438a7…`, A03 `69a23849…`, A04 `9db122d4…`, A05 `7ec0066f…`; report start `a087f86d…` — all matched exactly before any edit |
+| Read-only pins | `src/core/page-document.ts` `2d968300…`, `src/components/uno-page-sections.tsx` `cde15a6b…`, `src/app/globals.css` `eafef92c…`, `src/core/assets/uno-owned-media.ts` `f988a0e5…`, `src/application/plan-uno-page-assets.ts` `6e9265ba…` — unchanged before and after |
+| Git/hooks | Agent-observed: one physical checkout, 1 worktree, 1 branch `main`, 1 remote `origin` = `provelopment/provelopment-foundation-uno`, 0 stashes, clean worktree and empty index; `git config core.hooksPath` unset with no active hook file, so both commits ran through the ordinary hook path with no `-c`, `--no-verify` or `HUSKY=0` |
+| Toolchain | Node 26.x, pnpm 11.6.0, Next 16.4.6, React 19.2.9, Playwright 1.65.1 with the repo-local `PLAYWRIGHT_BROWSERS_PATH=.temp/uno-u03-browsers`; no install, dependency or lockfile change |
 
-## 2. Product commit and path set
+These are Agent assertions from local observation; the Architect's independent verification remains external.
+
+## 2. Product commit and path audit
 
 | Commit | Parent | Contents |
 | --- | --- | --- |
-| **`f8386dde8a087c68db1f69bcf7c5c2d9938a09ca`** `UNO-WO-070 / R01: authored section heading and item outline for cards and features` | `fcf393a…` | exactly five `M`, 748 insertions / 77 deletions |
+| **`733e961f344cab3c8465711a5305465c7b929a64`** `UNO-WO-071 / R01: author plain-text ledes for cards and features` | `ffe10d9…` | exactly five `M`, 624 insertions / 53 deletions |
 
 | File | Committed blob |
 | --- | --- |
-| A01 `src/application/compose-uno-foundation-families.ts` | `37e7f3a3…` |
-| A02 `scripts/verify-u04-22-module-consent.mjs` | `7dc438a7…` |
-| A03 `tests/deployment/u04-22-module-consent.test.mjs` | `69a23849…` |
-| A04 `tests/unit/uno-foundation-families.test.ts` | `9db122d4…` |
-| A05 `.documents/Architecture/u04-family-parity.md` | `7ec0066f…` |
+| A01 `src/application/compose-uno-foundation-families.ts` | `d689ff22…` |
+| A02 `scripts/verify-u04-22-module-consent.mjs` | `5a32f404…` |
+| A03 `tests/deployment/u04-22-module-consent.test.mjs` | `c116453b…` |
+| A04 `tests/unit/uno-foundation-families.test.ts` | `0789aecd…` |
+| A05 `.documents/Architecture/u04-family-parity.md` | `270626d7…` |
 
-No addition, deletion, rename, module, route, provider, declaration, fixture, media, dependency, lockfile or workflow
-change appears in the commit; the only runtime change is inside the two existing `cards`/`features` composer cases and
-one narrow helper.
+No addition, deletion, rename, module, route, provider, schema, renderer, adapter, asset, dependency or workflow change
+appears in the commit; `git diff --check` and `git diff --cached --check` were both silent with exit 0 before the commit.
 
+## 3. Donor evidence and rights
 
-## 3. Headed and heading-less source and DOM proof
+Read-only donor `provelopment/provelopment-foundation` @ `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, blob SHA-1s
+recomputed locally and equal: `LICENSE` `d6456956…` (Apache-2.0), `page-document.ts` `a12d964c…`, `media-sections.tsx`
+`e3f3a12e…`, `items-sections.tsx` `bc729d6a…`, `section-support.tsx` `19c9bee3…`. The donor's `cardsSectionSchema` and
+`featuresSectionSchema` both spread `headingFields`, so `lede` is an optional Markdown-capable field
+(`markdownTextSchema` = trimmed, 1..`PAGE_MAX_TEXT`), and the donor renders it through `SectionHeading`. Uno accepts the
+same concept as **plain text only** and renders one escaped paragraph. No donor TypeScript, CSS, token, asset, text,
+brand or licence file was copied, imported, built or published; the donor tree stayed read-only and outside the checkout.
 
-**Heading-bearing mode** (`{type:"cards"|"features", heading, columns, items}`) composes exactly one top-level node on the
-unchanged anchor `family-N-<type>`: `layout.stack` with props exactly `{}`, whose children are (1)
-`content.heading {text,level:2}` at `family-N-<type>-heading` and (2) `layout.grid {columns,itemSemantics:"list"}` at
-`family-N-<type>-grid`, whose tight item stacks keep `family-N-<type>-item-I` and step their titles to
-`content.heading {level:3}` at `family-N-<type>-item-I-title`, with `content.prose` bodies only where authored. The
-unchanged `readUnoPageDocument` accepts it, including a standalone headed family as the first Page section; an orphaned
-level-3 title without the authored level-2 heading is refused as `document:heading-order`, which is why the heading is
-emitted first inside the same stack. Mixed two-family input in both orders resets the outline correctly.
+## 4. Composition, exact compatibility and DOM
 
-**Heading-less mode** (no `heading` key) returns the previous `layout.grid` root with its original id, level-2 item
-titles, tight stacks and absent optional props. Byte-identity is proved against JSON captured from the committed
-pre-WO-070 composition, not assumed: both the cards and the features section serialize exactly as before.
+**No-lede compatibility is absolute and was proved against captured output, not assumed.** Before any edit, the four
+pre-WO-071 section shapes were composed and serialized from the committed head — heading-less cards, headed-only cards,
+heading-less features, headed-only features — and embedded in A04 as fixtures. With no `lede`, `JSON.stringify` of each
+section still equals its captured string exactly, including ids, props order, item-title levels (2 when unheaded, 3 when
+headed), absent optional props and the original top-level `layout.grid` root for the unheaded forms.
 
-**Rendered DOM**: `<div class="uno-json-stack" data-uno-gap="normal" id="family-15-cards">` with one
-`<h2 class="uno-json-heading" id="family-15-cards-heading">Synthetic cards</h2>` followed by the native
-`<ul class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="list" id="family-15-cards-grid" role="list">`
-of two `<li class="uno-json-cell">` and two `<h3 class="uno-json-heading">` titles; the features family mirrors it with
-three columns. Heading text is escaped (`Plans &amp; &quot;prices&quot;`), bodies stay inert `<p>`, and no `<h1`, `<h4`,
-link, image, script, iframe, button, form, handler or `<article>` appears in either region.
+**`heading+lede`** (both families) is exactly one top-level `layout.stack` on the unchanged anchor `family-N-<type>` with
+props exactly `{}` and three ordered children: `content.heading {text,level:2}` at `${id}-heading`, one
+`content.prose {text}` at `${id}-lede`, then `layout.grid {columns,itemSemantics:"list"}` at `${id}-grid` whose tight item
+stacks keep `${id}-item-I`, level-3 titles and only authored bodies. **`lede-only`** is the same stack with
+`[prose, grid]` — two children, level-2 item titles, no invented heading — accepted standalone as the first Page section
+and in mixed orders with the divider.
 
-## 4. Refusals
+**Rendered DOM**: `<div class="uno-json-stack" data-uno-gap="normal">` → one `<h2 class="uno-json-heading">` → exactly one
+`<p class="uno-json-prose" id="family-N-<type>-lede">` → `<ul class="uno-json-grid" data-uno-item-semantics="list"
+role="list">` with two `<li class="uno-json-cell">` and two `<h3>` titles; lede-only renders the paragraph before the list
+with two `<h2>` item titles and no section heading. Escaping was proved with `Plans &amp; &quot;prices&quot; stay plain`;
+raw `<`, markup, script, iframe, link, image, button, form and handler never appear.
 
-| Heading input | Closed reason |
+## 5. Refusals (executed, closed vocabulary)
+
+| Input | Result |
 | --- | --- |
-| `7`, `null`, `{text:…}` | `family:unsupported-feature` |
-| `""`, whitespace only, `" Heading"`, `"Heading "` | `family:target-refused` |
-| 161 code points | `family:target-refused` |
-| `**bold**`, `*italic*`, backtick, `[label](url)`, `# Heading` | `family:unsupported-feature` |
-| `<script>…</script>`, embedded line break | `family:unsupported-feature` |
-| unpaired surrogate | `family:target-refused` |
-| accessor `heading` | `family:unsafe-source`, zero getter invocations |
+| `lede: 7`, `null`, `["…"]`, `{text:…}`, `true` | `family:unsupported-feature` |
+| `""`, whitespace only, leading/trailing space, 4001 code points, unpaired surrogate | `family:target-refused` |
+| `**bold**`, `*Italic*`, `_Italic_`, `~~strike~~`, backtick, `[label](url)`, `![alt](img)`, `# Heading`, `- entry`, `1. entry`, `> quote` | `family:unsupported-feature` |
+| `<script>…</script>`, `a < b`, embedded newline, tab, NUL | `family:unsupported-feature` |
+| accessor `lede` | `family:unsafe-source`, **zero** getter invocations |
 
-Exactly 160 code points are accepted, including 160 astral characters (counted as code points, not UTF-16 units). Every
-refusal returns no own `document` key. A valid prose neighbour plus a hostile cards/features source refuses the whole
-Page as `family:unsafe-source` with zero reads. Still refused, headed or not: donor `lede`, `surface`, `align`, `ratio`,
-`href`, `route`, `link`, `style`, `onClick`, `visibility`, an omitted `columns`, `columns:5`, item `image`/`meta`/
-`action`/`icon` and non-object items — no refusal was loosened to make a test pass.
+4000 code points are accepted, including 4000 astral characters and `Grüße — 日本語 ✓`. Every refusal returns no own
+`document` key, and a valid sibling section cannot rescue a hostile family. Still refused, lede or not: `surface`, `align`,
+`ratio`, omitted `columns`, `columns:5`, item `image`/`meta`/`action`/`icon`/`href`/`style` and non-object items.
 
-## 5. Preserved parity, gates and privacy
+## 6. Real HTTP and Chromium findings
 
-`DIVIDER_PARITY_SOURCE` ×3, `DIVIDER_PARITY_HTTP` ×2 and `DIVIDER_PARITY_BROWSER` ×12 with `DIVIDER_PARITY=PASS` remain
-green (the divider's 1px theme rule, 1rem margins, 1.5rem root gap, 2.5rem separation, dark/reduced-motion invariants),
-as do `FAMILY_HEADER_ACCEPTED`, `FAMILY_LOAD_PARITY`, `FAMILY_SERVING_SERVED`, `FAMILY_MEDIA=3/3` with real GET/HEAD
-bytes, `FAMILY_CONTACT_OFF_HTTP`, `FAMILY_UNPUBLISHED_404`, `FOUR_ZONE_HTTP=4/4`,
-`NATIVE_VIDEO_HTTP=MP4+WEBM+VTT+POSTER`, sixteen distinct `MATRIX_CASE` and `BROWSER_MATRIX=16/16`. The contact form stays
-delivery-OFF, `formRef` never serializes, no provider, secret or donor path is exposed and no app-owned or donor asset
-becomes a public URL. `FAMILY_SEVENTEEN_HTTP` was rescoped rather than deleted: the served Page now carries exactly four
-`<h2>` (two authored section headings plus the two column titles) and four `<h3>` (the two headed families' item
-titles), measured from the real HTML.
+- `FAMILY_LEDE_SOURCE` (×4): both families compose exactly one lede child in the ordered three-child stack; the ledes add
+  no node outside the two families and keep the seventeen top-level ids; the composed JSON equals the installed buffer;
+  the caller source is unmutated; nodes are deeply frozen.
+- `FAMILY_LEDE_REFUSALS` (×2): eight executed whole-Page probes across both families (Markdown emphasis and link, markup,
+  wrong type, blank, padded, oversize, unpaired surrogate) plus a card-lede getter with `calls=0`.
+- `FAMILY_LEDE_HTTP` (×1) on the real production `GET 200` for `/en-001/wo066-family-composition`: each family serves
+  exactly one lede `<p>` with its own id, after the authored `</h2>` and before the grid id, with one `<h2>`, two `<h3>`,
+  two direct `<li class="uno-json-cell">`, exactly two prose paragraphs, and no second `main`/`h1`, script, anchor,
+  iframe, form, button, image, external destination or donor reference.
+- `FAMILY_LEDE_BROWSER` (×2): at 390 px and 1280 px both ledes are `P` elements with the authored text, visible
+  (`height>0 && width>0`), positioned after the heading and before the grid by real DOM order, with no horizontal
+  overflow and no added control; a third label confirms both viewports executed, and `FAMILY_BROWSER=PASS` now depends on
+  it.
+- Retained: `FAMILY_ITEM_OUTLINE_SOURCE`/`_HTTP`, `DIVIDER_PARITY_SOURCE`/`_HTTP`/`_BROWSER` with `DIVIDER_PARITY=PASS`,
+  `FAMILY_MEDIA=3/3` with real GET/HEAD bytes, `FAMILY_CONTACT_OFF_HTTP`, `FAMILY_UNPUBLISHED_404`,
+  `FOUR_ZONE_HTTP=4/4`, `NATIVE_VIDEO_HTTP=MP4+WEBM+VTT+POSTER`, `FAMILY_SEVENTEEN_HTTP`, sixteen matrix cases and
+  `BROWSER_MATRIX=16/16`; `FAMILY_SEVENTEEN_HTTP` still reads exactly four `<h2>` and four `<h3>` from the served HTML.
+## 7. Local verification (final bytes, stateful suites strictly sequential)
 
-## 6. Local verification
-
-| Gate | Result |
+| Command | Result |
 | --- | --- |
-| `tests/unit/uno-foundation-families.test.ts` | 146 passed |
-| `tests/deployment/u04-22-module-consent.test.mjs` | 40 passed, 0 failed |
-| `pnpm test` (`tests/unit`) | 30 files, 1073 passed |
-| `pnpm test:architecture`, `typecheck`, `lint`, `eslint --max-warnings 0` | 0 |
-| `pnpm test:bootstrap`, governance docs, `verify-governance-docs` | 0 |
-| seven deployment `node --test` suites, Vercel readiness, security exception, Node 26 floor | 0 |
-| `verify-u03-published-http` | 542 passed, 0 failed |
-| `verify-u04-json-slice` | 464 passed, 0 failed |
-| `verify-u04-22-module-consent` | **695 passed, 0 failed**, `FAMILY_ITEM_OUTLINE_SOURCE` ×4, `FAMILY_ITEM_OUTLINE_HTTP` ×1, headed cards/features Chromium checks at 390 and 1280 px |
-| `pnpm build`, `verify-u03-trace --expect committed`, `test:http`, `verify-u03-http` | 0 |
+| `pnpm exec vitest run tests/unit/uno-foundation-families.test.ts` | **157 passed** (146 prior retained + 11 new) |
+| `node --test tests/deployment/u04-22-module-consent.test.mjs` | **41 passed, 0 failed** (40 prior retained) |
+| `pnpm test:architecture` | **46 tests, 46 passed** |
+| `pnpm test` (`tests/unit`) | **30 files, 1084 passed** (prior baseline 1073) |
+| `pnpm typecheck`; `pnpm lint`; `pnpm exec eslint . --max-warnings 0` | 0 |
+| `pnpm test:bootstrap`; `node --test tests/governance-docs.test.mjs`; `node scripts/verify-governance-docs.mjs` | 0 |
+| `node --test` on `node26-security-floor`, `u03-fixture-transaction`, `u03-trace`, `u04-22-module-consent`, `u04-json-slice`, `u04-security-exception`, `uno-brand-copy`, `verify-vercel-readiness` (one file at a time, in that order) | 0 each |
+| `node scripts/verify-vercel-readiness.mjs`; `node scripts/verify-u04-security-exception.mjs` | 0 |
+| `node scripts/verify-u03-published-http.mjs` | **542 passed, 0 failed** |
+| `node scripts/verify-u04-json-slice.mjs` | **464 passed, 0 failed** |
+| `node scripts/verify-u04-22-module-consent.mjs` | **705 passed, 0 failed** |
+| `pnpm build`; `node scripts/verify-u03-trace.mjs --expect committed`; `pnpm test:http`; `node scripts/verify-u03-http.mjs` | 0; **91 passed, 0 failed** |
 
-Stateful suites ran strictly one at a time with the pinned declarations re-hashed after each; every temporary source,
-plate, capsule and generated asset was gone and both declarations were byte-exact on handback. Two authoring iterations
-corrected a stale guard token and a region-slicing assumption inside the authorized five paths before the sole product
-push; no gate was waived, skipped or weakened, and the picomatch advisory remains the pre-existing unwaived exception.
+Failures and corrections inside the authorized five paths before the single product push, all re-run green afterwards:
+the WO-070 refusal lists still treated `lede` as an extra key (updated, since this order accepts it); two ledger guard
+phrases were broken by rewrapped lines and one WO-070 bullet header was displaced by an insert (restored); a TypeScript
+narrowing error in a new test was fixed; the installed-buffer comparison used the compact form instead of the runner's
+pretty-printed bytes (corrected to the exact serialized form); the browser lede assertion initially emitted the generic
+`FAMILY_BROWSER` prefix, so a dedicated `FAMILY_LEDE_BROWSER` counter/label that still gates `FAMILY_BROWSER=PASS` was
+added; two guard mutants replaced only the first of several occurrences, so mutants now replace every occurrence.
+Declarations were re-hashed after each stateful suite and stayed `ba232d46…e3f0` / `4f656c93…9a0c`; no staged file, no
+leftover source/plate/capsule and no listening server remained. The picomatch advisory is pre-existing and **unwaived**,
+not cleared; no new high/critical advisory appeared and no dependency or lockfile changed.
 
-## 7. Hosted CI
+## 8. Hosted CI
 
-`Uno Bootstrap Verify` and `Verify U01 baseline` were verified at the product head
-`f8386dde8a087c68db1f69bcf7c5c2d9938a09ca` (runs `44890619145` and `44890619223`): `verify (ubuntu-24.04)` and
-`verify (windows-2025)` both `success`, no failed, skipped, muted or `continue-on-error` step. The hosted runner log shows
-the new `FAMILY_ITEM_OUTLINE_SOURCE` ×4 and `FAMILY_ITEM_OUTLINE_HTTP` lines plus `BROWSER_MATRIX=16/16` actually
-executing on both operating systems. Git-push-triggered deployments are the only publication side effect; no manual
-deployment, provider setting, domain, secret, merge, tag or release was touched.
+- Product head `733e961f344cab3c8465711a5305465c7b929a64`: `Uno Bootstrap Verify` run `44894876828` and
+  `Verify U01 baseline` run `44894876804` — `verify (ubuntu-24.04)` and `verify (windows-2025)` both **success**, with no
+  skipped, muted or `continue-on-error` step. The hosted log shows the new `FAMILY_LEDE_SOURCE` ×4,
+  `FAMILY_LEDE_REFUSALS` ×2, `FAMILY_LEDE_HTTP` and both `FAMILY_LEDE_BROWSER` viewport lines executing, alongside
+  `BROWSER_MATRIX=16/16`.
+- Report head: recorded in the delivered message after the report-only push and its own two-workflow check.
 
-## 8. Accounting, rights and status
+## 9. Accounting, limitations and status
 
-One family (`divider`) is a locally parity-evidenced candidate awaiting independent Architect acceptance; the other
-sixteen, including the newly headed `cards` and `features`, remain below full parity — donor `lede`/`surface`, the
-omitted-columns default, Markdown bodies, card media/meta/action/borders and feature icons are still absent, and the
-heading-less variants still differ from the donor outline. The fixed proxy is 43/59 (73%); this order adds no parity
-uplift. Donor material was read only as concept/provenance at the pinned commit under Apache-2.0: no donor code, CSS,
-design token, asset, brand or text is copied. The fixture Page is temporary and torn down; no permanent Page, module or
-route exists, and no provider, deployment, release or stage change occurred. **U04 remains OPEN; only the Owner may
-separately approve stage closure.**
+`cards` and `features` remain **bounded**, not parity: the donor `lede` renders Markdown, the donor heading-less item
+titles are `<h3>` where this subset keeps `<h2>`, an omitted donor `columns` still refuses, and donor `surface`, card
+media/meta/actions/borders and feature icons remain absent. One family — `divider` — is the single independently accepted
+full-parity candidate (`UNO-WO-069 / R01`), sixteen families stay below full parity, and the measured stage proxy stays
+**43/59 = 72.88% (73%)**; no parity count rose, no stage proxy rose and there is no durable published family Page. The
+fixture Page remains temporary and was torn down by the existing reversible transaction. **U04 remains OPEN; only the
+Owner may separate stage closure.**
