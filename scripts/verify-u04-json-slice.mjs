@@ -311,7 +311,20 @@ const JSON_DOCUMENTS = Object.freeze({
     sections: [
       { id: "intro", module: "content.heading", props: { text: "Published JSON Home", level: 2 } },
       { id: "body", module: "content.prose", props: { text: "This body is inert plain text from a version-1 document." } },
-      { id: "links", module: "content.actions", props: { items: [{ label: "Back to the heading", targetId: "intro" }] } },
+      {
+        id: "links",
+        module: "content.actions",
+        props: {
+          items: [
+            { label: "Back to the heading", targetId: "intro" },
+            // `UNO-WO-081 / R01`: three synthetic, reserved-domain static links after the unchanged fragment. Uno never
+            // resolves or probes them; they exist only to prove the transport-free action anchors over real HTTP.
+            { label: "Write to the sample inbox", href: "mailto:contact@example.invalid" },
+            { label: "Sample directions", href: "https://maps.example/directions?to=sample" },
+            { label: "Sample availability", href: "https://booking.example/availability" },
+          ],
+        },
+      },
     ],
   },
   homeDe: {
@@ -939,6 +952,61 @@ async function validateFixtureInProcess() {
   const { listUnoServingAddresses, planUnoServingDiscovery } = await import("../src/config/uno-serving.ts");
   const { readUnoPageDocument } = await import("../src/core/page-document.ts");
 
+  // `UNO-WO-081 / R01`: the source-level static-action proof, executed before any build. The fixture document itself is
+  // read back through the strict reader, so a silently dropped or rewritten entry cannot hide behind served HTML.
+  const acceptedHome = readUnoPageDocument(JSON.stringify(JSON_DOCUMENTS.homeEn));
+  check(
+    "U05_STATIC_ACTIONS_SOURCE the fixture document is accepted with one fragment and three literal static links",
+    acceptedHome.accepted === true,
+    acceptedHome.accepted ? "" : String(acceptedHome.reason),
+  );
+  if (acceptedHome.accepted) {
+    const actions = acceptedHome.document.sections.find((node) => node.id === "links");
+    const items = actions?.module === "content.actions" ? actions.props.items : [];
+    check(
+      "U05_STATIC_ACTIONS_SOURCE the accepted entries round-trip as literal fragment, mailto and two HTTPS links",
+      JSON.stringify(items) ===
+        JSON.stringify([
+          { label: "Back to the heading", targetId: "intro" },
+          { label: "Write to the sample inbox", href: "mailto:contact@example.invalid" },
+          { label: "Sample directions", href: "https://maps.example/directions?to=sample" },
+          { label: "Sample availability", href: "https://booking.example/availability" },
+        ]),
+      JSON.stringify(items),
+    );
+    check(
+      "U05_STATIC_ACTIONS_SOURCE the accepted action props are deeply frozen",
+      actions?.module === "content.actions" &&
+        Object.isFrozen(actions.props) &&
+        Object.isFrozen(actions.props.items) &&
+        actions.props.items.every((item) => Object.isFrozen(item)),
+    );
+  }
+  // `U05_STATIC_ACTIONS_REFUSALS`: the closed refusal matrix, on copies of the same fixture document.
+  const refusalProbes = [
+    ["an `http` destination", { label: "Insecure", href: "http://example.invalid/x" }, "document:unsafe-link"],
+    ["a `tel` destination", { label: "Call", href: "tel:+15550100" }, "document:unsafe-link"],
+    ["a script destination", { label: "Run", href: "javascript:alert(1)" }, "document:unsafe-link"],
+    ["a protocol-relative destination", { label: "Sneak", href: "//evil.example/x" }, "document:unsafe-link"],
+    ["an encoded scheme", { label: "Encoded", href: "%6dailto:x@example.invalid" }, "document:unsafe-link"],
+    ["a mixed entry", { label: "Both", targetId: "intro", href: "https://example.invalid/x" }, "document:invalid-props"],
+    ["an empty entry", { label: "Nothing" }, "document:invalid-props"],
+  ].map(([label, entry, expected]) => {
+    const probe = {
+      ...JSON_DOCUMENTS.homeEn,
+      sections: JSON_DOCUMENTS.homeEn.sections.map((section) =>
+        section.id === "links" ? { ...section, props: { items: [entry] } } : section,
+      ),
+    };
+    const outcome = readUnoPageDocument(probe);
+    return { label, expected, actual: outcome.accepted ? "accepted" : outcome.reason };
+  });
+  check(
+    "U05_STATIC_ACTIONS_REFUSALS every refused action refuses the whole fixture Page with its closed reason",
+    refusalProbes.every((probe) => probe.actual === probe.expected),
+    JSON.stringify(refusalProbes.filter((probe) => probe.actual !== probe.expected)),
+  );
+
   const manifest = JSON.parse(readFileSync(resolve(ROOT, MANIFEST), "utf8"));
   const selection = JSON.parse(readFileSync(resolve(ROOT, SELECTION), "utf8"));
   const base = { canonical: TEST_BASE, aliases: [] };
@@ -1077,6 +1145,51 @@ async function assertPublicPage(base, entry) {
   check(`${entry.pathname} declares the exact canonical URL`, body.includes(`<link rel="canonical" href="${entry.canonical}"/>`));
   check(`${entry.pathname} declares the exact og:url`, body.includes(`<meta property="og:url" content="${entry.canonical}"/>`));
   check(`${entry.pathname} renders no second main landmark`, countOf(body, /<main[\s>]/gu) === 1);
+  // `UNO-WO-081 / R01`: the three static action anchors as actually served on the fixture Home. Each assertion is
+  // confined to the `#links` list, so an unrelated anchor can never satisfy it.
+  if (entry.pathname === "/en-001") {
+    const listStart = body.indexOf('<ul class="uno-json-actions" id="links">');
+    const listEnd = listStart < 0 ? -1 : body.indexOf("</ul>", listStart);
+    const list = listStart < 0 || listEnd < 0 ? "" : body.slice(listStart, listEnd);
+    const anchors = [...list.matchAll(/<a class="uno-json-action"([^>]*)>([^<]*)<\/a>/gu)].map((match) => ({
+      attributes: match[1],
+      label: match[2],
+    }));
+    check(
+      "U05_STATIC_ACTIONS_HTTP the fixture Home serves one fragment and three static action anchors in authored order",
+      anchors.length === 4 &&
+        anchors[0].attributes.includes('href="#intro"') &&
+        anchors[0].label === "Back to the heading" &&
+        anchors[1].attributes.includes('href="mailto:contact@example.invalid"') &&
+        anchors[1].label === "Write to the sample inbox" &&
+        anchors[2].attributes.includes('href="https://maps.example/directions?to=sample"') &&
+        anchors[2].label === "Sample directions" &&
+        anchors[3].attributes.includes('href="https://booking.example/availability"') &&
+        anchors[3].label === "Sample availability",
+      JSON.stringify(anchors.map((anchor) => anchor.label)),
+    );
+    check(
+      "U05_STATIC_ACTIONS_HTTP both HTTPS anchors carry noopener and no-referrer and no anchor opens a new tab",
+      anchors.length === 4 &&
+        anchors[2].attributes.includes('rel="noopener noreferrer"') &&
+        /referrerPolicy="no-referrer"|referrerpolicy="no-referrer"/u.test(anchors[2].attributes) &&
+        anchors[3].attributes.includes('rel="noopener noreferrer"') &&
+        /referrerPolicy="no-referrer"|referrerpolicy="no-referrer"/u.test(anchors[3].attributes) &&
+        !anchors[1].attributes.includes("rel=") &&
+        anchors.every((anchor) => !anchor.attributes.includes("target=")),
+      JSON.stringify(anchors.map((anchor) => anchor.attributes)),
+    );
+    check(
+      "U05_STATIC_ACTIONS_HTTP the served Home keeps one main and one h1 and exposes no form, prefetch or remote script",
+      countOf(body, /<main[\s>]/gu) === 1 &&
+        countOf(body, /<h1[\s>]/gu) === 1 &&
+        !body.includes("<form") &&
+        !body.includes("prefetch") &&
+        countOf(body, /<script[^>]+src="https?:/gu) === 0,
+    );
+  }
+
+
 
   if (entry.pathname.endsWith("/programmes/components")) {
     const german = entry.locale === "de-DE";
@@ -1758,6 +1871,77 @@ async function assertInBrowser(base) {
       `${dark.transition} vs ${normalTransition}`,
     );
 
+    // `UNO-WO-081 / R01`: the fixture Home's three static actions measured in the real DOM. The anchors are inspected,
+    // focused and never activated: no click, no navigation, no destination probe.
+    const externalBeforeStatic = external.length;
+    const staticNavigation = await page.goto(`${base}/en-001`, { waitUntil: "load" });
+    const staticActions = await page.evaluate(() => {
+      const list = document.querySelector("#links.uno-json-actions");
+      const anchors = [...(list?.querySelectorAll("a.uno-json-action") ?? [])];
+      return {
+        count: anchors.length,
+        hrefs: anchors.map((anchor) => anchor.getAttribute("href")),
+        labels: anchors.map((anchor) => anchor.textContent),
+        rels: anchors.map((anchor) => anchor.getAttribute("rel")),
+        referrers: anchors.map((anchor) => anchor.getAttribute("referrerpolicy")),
+        targets: anchors.map((anchor) => anchor.getAttribute("target")),
+        prefetch: anchors.filter((anchor) => anchor.hasAttribute("ping")).length,
+        scripts: document.querySelectorAll("script[src^='http']").length,
+        forms: document.querySelectorAll("form, button, input").length,
+        h1: document.querySelectorAll("h1").length,
+        main: document.querySelectorAll("main").length,
+      };
+    });
+    const staticFocused = await page.evaluate(() => {
+      const anchors = [...document.querySelectorAll("#links.uno-json-actions a.uno-json-action")];
+      const target = anchors[1] ?? null;
+      if (target === null) return null;
+      target.focus();
+      return document.activeElement === target ? target.getAttribute("href") : null;
+    });
+    check(
+      "U05_STATIC_ACTIONS_BROWSER the fixture Home exposes one fragment and three static anchors in authored order",
+      staticNavigation !== null &&
+        staticNavigation.status() === 200 &&
+        staticActions.count === 4 &&
+        staticActions.hrefs[0] === "#intro" &&
+        staticActions.hrefs[1] === "mailto:contact@example.invalid" &&
+        staticActions.hrefs[2] === "https://maps.example/directions?to=sample" &&
+        staticActions.hrefs[3] === "https://booking.example/availability" &&
+        staticActions.labels.join("|") ===
+          "Back to the heading|Write to the sample inbox|Sample directions|Sample availability",
+      JSON.stringify(staticActions.hrefs),
+    );
+    check(
+      "U05_STATIC_ACTIONS_BROWSER the HTTPS anchors resolve their noopener and no-referrer policies and no anchor opens a new tab",
+      staticActions.rels[2] === "noopener noreferrer" &&
+        staticActions.rels[3] === "noopener noreferrer" &&
+        staticActions.referrers[2] === "no-referrer" &&
+        staticActions.referrers[3] === "no-referrer" &&
+        staticActions.rels[1] === null &&
+        staticActions.targets.every((value) => value === null),
+      JSON.stringify({ rels: staticActions.rels, referrers: staticActions.referrers }),
+    );
+    check(
+      "U05_STATIC_ACTIONS_BROWSER the mailto anchor takes keyboard focus without any delivery state being invented",
+      staticFocused === "mailto:contact@example.invalid",
+      String(staticFocused),
+    );
+    check(
+      "U05_STATIC_ACTIONS_BROWSER the static-action visit kept one main, one h1 and no script, form or ping surface",
+      staticActions.h1 === 1 &&
+        staticActions.main === 1 &&
+        staticActions.scripts === 0 &&
+        staticActions.forms === 0 &&
+        staticActions.prefetch === 0,
+      JSON.stringify({ scripts: staticActions.scripts, forms: staticActions.forms, prefetch: staticActions.prefetch }),
+    );
+    check(
+      "U05_STATIC_ACTIONS_BROWSER the static-action visit made no request outside loopback",
+      external.length === externalBeforeStatic,
+      external.slice(externalBeforeStatic, externalBeforeStatic + 3).join(" | "),
+    );
+
     check("the Page logs no console error", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
     check("the Page throws no uncaught error", pageErrors.length === 0, pageErrors.slice(0, 2).join(" | "));
     check("the Page makes no external request", external.length === 0, external.slice(0, 3).join(" | "));
@@ -1898,6 +2082,17 @@ async function main() {
         : "  FAIL  restoration could not be proven; the recovery copies are preserved and the run must STOP\n",
     );
     if (restored) passes.push("restoration");
+    // `UNO-WO-081 / R01`: restoration is proven for the static-action fixture too — the two declarations are byte-exact,
+    // no temporary JSON source survives, and no reserved example destination leaked into a committed Page.
+    check(
+      "U05_STATIC_ACTIONS_RESTORE the declarations, committed Pages and temporary sources were restored with no static-link residue",
+      restored &&
+        sha256Of(MANIFEST) === PINNED_DECLARATIONS.get(MANIFEST) &&
+        sha256Of(SELECTION) === PINNED_DECLARATIONS.get(SELECTION) &&
+        !existsSync(resolve(ROOT, `${CONTENT}/wo035-home.en-001.json`)) &&
+        !readFileSync(resolve(ROOT, `${CONTENT}/home.en-001.json`), "utf8").includes("example.invalid") &&
+        !readFileSync(resolve(ROOT, `${CONTENT}/components.en-001.json`), "utf8").includes("example.invalid"),
+    );
   }
 }
 

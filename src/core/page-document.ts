@@ -38,6 +38,7 @@
 import { readUnoOwnedAssetRef, type UnoOwnedAssetRef, type UnoOwnedMediaPurpose } from "./assets/uno-owned-media";
 import { isUnoVideoProvider, readUnoVideoEmbed, type UnoVideoProvider } from "./video/uno-video-embeds";
 import { isCapabilityId } from "./modules/capability-registry";
+import { classifyAuthorDestination } from "./safe-author-url";
 
 /** The only document version this build accepts. An unknown version refuses; it is never upgraded. */
 export const UNO_PAGE_DOCUMENT_VERSION = 1;
@@ -193,9 +194,25 @@ export interface UnoActionItem {
   readonly targetId: string;
 }
 
-/** `content.actions` props: one bounded list of same-document anchors. */
+/**
+ * `UNO-WO-081 / R01`: one authored transport-free outbound action inside a stand-alone `content.actions` list.
+ *
+ * `href` is the original accepted string, classified by the unchanged `classifyAuthorDestination` and admitted only for
+ * the exact `mailto` or `https` categories. It is never rewritten, resolved, prefetched, probed or followed by Uno: the
+ * anchor is ordinary server markup that a Visitor may choose to activate. This is a bounded static-link capability, not
+ * a contact transport, directions engine, booking integration or provider validation.
+ */
+export interface UnoOutboundActionItem {
+  readonly label: string;
+  readonly href: string;
+}
+
+/** One entry of a stand-alone `content.actions` list: a same-document fragment or a static outbound link. */
+export type UnoContentActionEntry = UnoActionItem | UnoOutboundActionItem;
+
+/** `content.actions` props: one bounded list of same-document anchors and static outbound links. */
 export interface UnoContentActionsProps {
-  readonly items: readonly UnoActionItem[];
+  readonly items: readonly UnoContentActionEntry[];
 }
 
 /** The three closed section surfaces. Adopted as *values* from the audited Foundation schema (see the ledger). */
@@ -1002,6 +1019,60 @@ function readActionItems(
   }
   return items;
 }
+/**
+ * `UNO-WO-081 / R01`: one closed stand-alone `content.actions` list that accepts a strictly disjoint union.
+ *
+ * Each entry is exactly `{label,targetId}` — the unchanged same-document fragment, which still registers its target for
+ * the existing target verification — or exactly `{label,href}`, whose destination must be classified by the unchanged
+ * `classifyAuthorDestination` as precisely `mailto` or `https`. A superset, a mixed pair, an empty entry, a wrong
+ * category, an encoded scheme or any other classifier refusal refuses the **whole** Page: no entry is ever dropped, no
+ * `targetId` ever falls through to `href`, and no outbound entry invents a `state.targets` fact.
+ */
+function readContentActions(value: unknown, state: WalkState): UnoContentActionEntry[] {
+  if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
+  if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.actionItems) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const items: UnoContentActionEntry[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) throw new RefusedDocument("document:invalid-props");
+    const item = readPlainData(value[index]);
+    if (item === null) throw new RefusedDocument("document:invalid-props");
+    const isFragment = hasExactlyKeys(item, ["label", "targetId"], []);
+    const isOutbound = hasExactlyKeys(item, ["label", "href"], []);
+    // Exactly one shape, never both and never neither: a mixed or superset entry is a props refusal before any label or
+    // destination is read, so a malformed entry can never be reinterpreted as the other form.
+    if (isFragment === isOutbound) throw new RefusedDocument("document:invalid-props");
+    const label = readBoundedText(
+      item["label"],
+      UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+      "document:invalid-props",
+      false,
+      false,
+    );
+    if (isFragment) {
+      const targetId = item["targetId"];
+      if (typeof targetId !== "string" || !SECTION_ID.test(targetId)) {
+        throw new RefusedDocument("document:unsafe-link");
+      }
+      items.push({ label, targetId });
+      state.targets.push(targetId);
+      continue;
+    }
+    // A destination that is not even a string is a *shape* refusal; only a string can be a link refusal. This keeps
+    // "no destination at all" distinguishable from "a destination Uno refuses to emit".
+    const href = item["href"];
+    if (typeof href !== "string") throw new RefusedDocument("document:invalid-props");
+    const verdict = classifyAuthorDestination(href);
+    if (!verdict.accepted || (verdict.category !== "mailto" && verdict.category !== "https")) {
+      throw new RefusedDocument("document:unsafe-link");
+    }
+    items.push({ label, href: verdict.href });
+  }
+  return items;
+}
+
+
 
 /** The three optional-value helpers that keep `exactOptionalPropertyTypes` honest. */
 function optionalStackProps(gap: unknown): UnoLayoutStackProps {
@@ -1714,7 +1785,8 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
 
   if (moduleName === "content.actions") {
     if (!hasExactlyKeys(props, ["items"], [])) throw new RefusedDocument("document:invalid-props");
-    const items = readActionItems(props["items"], state);
+    // `UNO-WO-081 / R01`: only this stand-alone module reads the disjoint union; `content.hero` keeps `readActionItems`.
+    const items = readContentActions(props["items"], state);
     return { id, module: "content.actions", props: { items } };
   }
 

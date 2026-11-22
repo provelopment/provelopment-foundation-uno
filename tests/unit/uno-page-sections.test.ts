@@ -83,6 +83,69 @@ describe("UnoPageSections — static server markup", () => {
     expect(markup).toContain("Tom &amp; Jerry&#x27;s &quot;first&quot; card.");
     expect(markup).not.toContain("<script");
   });
+  // `UNO-WO-081 / R01`: a stand-alone actions list renders the unchanged fragment anchor byte-identically and each
+  // authored `mailto:`/`https:` entry as an ordinary inert server link with no script, target, prefetch or handler.
+  it("renders authored mailto and HTTPS actions as plain inert links beside the unchanged fragment anchor", () => {
+    const markup = render({
+      version: 1,
+      title: "Static actions",
+      visibility: "public",
+      sections: [
+        { id: "intro", module: "content.heading", props: { text: "Actions", level: 2 } },
+        {
+          id: "static-actions",
+          module: "content.actions",
+          props: {
+            items: [
+              { label: "Back to the heading", targetId: "intro" },
+              { label: "Write to the sample inbox & notes", href: "mailto:contact@example.invalid" },
+              { label: "Sample directions", href: "https://maps.example/directions?to=sample" },
+              { label: "Sample availability", href: "https://booking.example/availability" },
+            ],
+          },
+        },
+      ],
+    });
+    expect(markup).toContain('<ul class="uno-json-actions" id="static-actions">');
+    // The pre-existing fragment entry keeps exactly its old anchor: class, `#` destination and escaped label.
+    expect(markup).toContain('<a class="uno-json-action" href="#intro">Back to the heading</a>');
+    // The mailto link carries the exact authored destination, no new tab and no fabricated delivery state; its label is
+    // React-escaped text, never authored markup.
+    expect(markup).toContain(
+      '<a class="uno-json-action" href="mailto:contact@example.invalid">Write to the sample inbox &amp; notes</a>',
+    );
+    // Both HTTPS links carry `rel` and the referrer policy, on plain anchors.
+    expect(markup).toMatch(
+      /<a class="uno-json-action" href="https:\/\/maps\.example\/directions\?to=sample" rel="noopener noreferrer" referrerPolicy="no-referrer">Sample directions<\/a>/u,
+    );
+    expect(markup).toMatch(
+      /<a class="uno-json-action" href="https:\/\/booking\.example\/availability" rel="noopener noreferrer" referrerPolicy="no-referrer">Sample availability<\/a>/u,
+    );
+    // One list, four items, in authored order.
+    expect((markup.match(/class="uno-json-action-item"/gu) ?? []).length).toBe(4);
+    expect(markup.indexOf("Back to the heading")).toBeLessThan(markup.indexOf("Write to the sample inbox"));
+    expect(markup.indexOf("Write to the sample inbox")).toBeLessThan(markup.indexOf("Sample directions"));
+    expect(markup.indexOf("Sample directions")).toBeLessThan(markup.indexOf("Sample availability"));
+    // Inert markup only: no script, handler, new tab, prefetch, form, status or client island.
+    for (const forbidden of [
+      "<script",
+      "onclick",
+      'target="_blank"',
+      "prefetch",
+      "<form",
+      "<button",
+      "<input",
+      "delivery",
+      "window.",
+      "fetch(",
+    ]) {
+      expect(markup.includes(forbidden)).toBe(false);
+    }
+    expect(markup).not.toContain("<h1");
+    expect(markup).not.toContain("<main");
+  });
+
+
 
   it("never emits a second h1, a main landmark, or any client marker", () => {
     const markup = render(twoCardDocument());

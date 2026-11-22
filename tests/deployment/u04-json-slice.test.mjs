@@ -149,6 +149,45 @@ function holdsAddedModuleEvidence038(source) {
   return ADDED_MODULE_EVIDENCE_038.every((marker) => source.includes(marker));
 }
 
+/**
+ * `UNO-WO-081 / R01`: the five static-action labels and the executable predicates behind them.
+ *
+ * Each marker is a literal from the runner — not a badge. Removing a label, deleting the served-anchor assertion,
+ * replacing a predicate with `true`, or dropping the restoration residue check must falsify this predicate.
+ */
+const STATIC_ACTION_EVIDENCE = Object.freeze([
+  "U05_STATIC_ACTIONS_SOURCE the fixture document is accepted with one fragment and three literal static links",
+  "U05_STATIC_ACTIONS_SOURCE the accepted entries round-trip as literal fragment, mailto and two HTTPS links",
+  "U05_STATIC_ACTIONS_SOURCE the accepted action props are deeply frozen",
+  "U05_STATIC_ACTIONS_REFUSALS every refused action refuses the whole fixture Page with its closed reason",
+  "U05_STATIC_ACTIONS_HTTP the fixture Home serves one fragment and three static action anchors in authored order",
+  "U05_STATIC_ACTIONS_HTTP both HTTPS anchors carry noopener and no-referrer and no anchor opens a new tab",
+  "U05_STATIC_ACTIONS_HTTP the served Home keeps one main and one h1 and exposes no form, prefetch or remote script",
+  "U05_STATIC_ACTIONS_BROWSER the fixture Home exposes one fragment and three static anchors in authored order",
+  "U05_STATIC_ACTIONS_BROWSER the HTTPS anchors resolve their noopener and no-referrer policies and no anchor opens a new tab",
+  "U05_STATIC_ACTIONS_BROWSER the mailto anchor takes keyboard focus without any delivery state being invented",
+  "U05_STATIC_ACTIONS_BROWSER the static-action visit kept one main, one h1 and no script, form or ping surface",
+  "U05_STATIC_ACTIONS_BROWSER the static-action visit made no request outside loopback",
+  "U05_STATIC_ACTIONS_RESTORE the declarations, committed Pages and temporary sources were restored with no static-link residue",
+  // The executed predicates, not their labels: the fixture entries, the refusal matrix and the DOM attribute reads.
+  'href: "mailto:contact@example.invalid"',
+  'href: "https://maps.example/directions?to=sample"',
+  'href: "https://booking.example/availability"',
+  '["an `http` destination", { label: "Insecure", href: "http://example.invalid/x" }, "document:unsafe-link"]',
+  `anchors[2].attributes.includes('rel="noopener noreferrer"')`,
+  'staticActions.referrers[2] === "no-referrer"',
+  'staticFocused === "mailto:contact@example.invalid"',
+  "external.length === externalBeforeStatic",
+  '!readFileSync(resolve(ROOT, `${CONTENT}/home.en-001.json`), "utf8").includes("example.invalid")',
+  "Object.isFrozen(actions.props.items)",
+]);
+
+/** True only while every static-action label and predicate is still present in the gate. */
+function holdsStaticActionEvidence(source) {
+  return STATIC_ACTION_EVIDENCE.every((marker) => source.includes(marker));
+}
+
+
 /** One fresh scratch directory that is not the Uno checkout. */
 function scratchDirectory() {
   const directory = mkdtempSync(join(tmpdir(), "uno-u04-gate-"));
@@ -447,3 +486,55 @@ describe("the U04 JSON-slice gate — the three modules added by UNO-WO-038 / R0
   });
 });
 
+describe("the U04 JSON-slice gate — transport-free static actions (`UNO-WO-081 / R01`)", () => {
+  it("keeps every static-action label and its executable predicate", () => {
+    assert.equal(holdsStaticActionEvidence(SOURCE), true);
+    // The five labels are distinct concerns: source/refusal, HTTP, Chromium and restoration.
+    for (const prefix of [
+      "U05_STATIC_ACTIONS_SOURCE",
+      "U05_STATIC_ACTIONS_REFUSALS",
+      "U05_STATIC_ACTIONS_HTTP",
+      "U05_STATIC_ACTIONS_BROWSER",
+      "U05_STATIC_ACTIONS_RESTORE",
+    ]) {
+      assert.ok(SOURCE.includes(prefix), `missing label family ${prefix}`);
+    }
+    // The fixture keeps its original fragment entry and adds the three reserved example destinations after it.
+    const homeFixture = SOURCE.slice(SOURCE.indexOf("homeEn: {"), SOURCE.indexOf("homeDe: {"));
+    const fragmentAt = homeFixture.indexOf('label: "Back to the heading", targetId: "intro"');
+    assert.ok(fragmentAt > 0, "the original fragment action must survive");
+    assert.ok(homeFixture.indexOf("mailto:contact@example.invalid") > fragmentAt);
+    assert.ok(homeFixture.indexOf("https://maps.example/directions?to=sample") > fragmentAt);
+    assert.ok(homeFixture.indexOf("https://booking.example/availability") > fragmentAt);
+    // No real external host and no provider claim enters the fixture.
+    for (const forbidden of ["@gmail.com", "google.com", "localhost:", "example.com"]) {
+      assert.equal(homeFixture.includes(forbidden), false, `forbidden fixture destination: ${forbidden}`);
+    }
+  });
+
+  it("genuinely fails when a static-action label or predicate is deleted or neutered", () => {
+    for (const marker of [
+      STATIC_ACTION_EVIDENCE[0],
+      STATIC_ACTION_EVIDENCE[1],
+      STATIC_ACTION_EVIDENCE[3],
+      STATIC_ACTION_EVIDENCE[4],
+      STATIC_ACTION_EVIDENCE[7],
+      STATIC_ACTION_EVIDENCE[12],
+    ]) {
+      const deleted = SOURCE.split(marker).join("removed");
+      assert.notEqual(deleted, SOURCE, marker);
+      assert.equal(holdsStaticActionEvidence(deleted), false, `deletion not detected: ${marker.slice(0, 48)}`);
+    }
+    // Replacing a real predicate with a constant true must also fail the guard.
+    for (const [token, replacement] of [
+      ["external.length === externalBeforeStatic", "true"],
+      ['staticFocused === "mailto:contact@example.invalid"', "true"],
+      ["Object.isFrozen(actions.props.items)", "true"],
+      [`anchors[2].attributes.includes('rel="noopener noreferrer"')`, "true"],
+    ]) {
+      const mutated = SOURCE.split(token).join(replacement);
+      assert.notEqual(mutated, SOURCE, token);
+      assert.equal(holdsStaticActionEvidence(mutated), false, `neutralized predicate not detected: ${token}`);
+    }
+  });
+});

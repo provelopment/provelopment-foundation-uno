@@ -289,10 +289,27 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
       return (
         <ul className="uno-json-actions" id={node.id}>
           {node.props.items.map((item, index) => (
-            <li className="uno-json-action-item" key={`${item.targetId}:${index}`}>
-              <a className="uno-json-action" href={`#${item.targetId}`}>
-                {item.label}
-              </a>
+            <li
+              className="uno-json-action-item"
+              key={`${"targetId" in item ? item.targetId : item.href}:${index}`}
+            >
+              {/* `UNO-WO-081 / R01`: a fragment entry keeps its exact previous anchor; an outbound entry is an ordinary
+                  inert server-rendered link. No target, no script, no prefetch, no probe — the Visitor decides. */}
+              {"targetId" in item ? (
+                <a className="uno-json-action" href={`#${item.targetId}`}>
+                  {item.label}
+                </a>
+              ) : (
+                <a
+                  className="uno-json-action"
+                  href={item.href}
+                  {...(/^https:/iu.test(item.href)
+                    ? { rel: "noopener noreferrer", referrerPolicy: "no-referrer" as const }
+                    : {})}
+                >
+                  {item.label}
+                </a>
+              )}
             </li>
           ))}
         </ul>

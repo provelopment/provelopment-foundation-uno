@@ -389,6 +389,193 @@ describe("readUnoPageDocument — per-module props and hostile input", () => {
       "document:invalid-props",
     );
   });
+  // `UNO-WO-081 / R01`: the stand-alone `content.actions` list accepts a strictly disjoint union of the unchanged
+  // same-document fragment and one literal `mailto:`/`https:` outbound link. The classifier is not modified here.
+  it("content.actions: accepts the fragment, mailto and HTTPS forms with exact literal roundtrips", () => {
+    const fragmentOnly = readUnoPageDocument({
+      ...minimal(),
+      sections: [
+        section("intro", "content.prose", { text: "Body." }),
+        section("a", "content.actions", { items: [{ label: "Jump", targetId: "intro" }] }),
+      ],
+    });
+    if (!fragmentOnly.accepted) throw new Error(`fragment refused: ${fragmentOnly.reason}`);
+    expect(JSON.stringify(fragmentOnly)).toContain('{"label":"Jump","targetId":"intro"}');
+
+    const mixed = readUnoPageDocument({
+      ...minimal(),
+      sections: [
+        section("intro", "content.prose", { text: "Body." }),
+        section("a", "content.actions", {
+          items: [
+            { label: "Jump", targetId: "intro" },
+            { label: "Write to the sample inbox", href: "mailto:contact@example.invalid" },
+            { label: "Sample directions", href: "https://maps.example/directions?to=sample" },
+            { label: "Sample availability", href: "https://booking.example/availability" },
+          ],
+        }),
+      ],
+    });
+    expect(mixed.accepted).toBe(true);
+    if (!mixed.accepted) return;
+    const actions = mixed.document.sections[1];
+    expect(actions?.module).toBe("content.actions");
+    if (actions?.module !== "content.actions") return;
+    expect(actions.props.items).toEqual([
+      { label: "Jump", targetId: "intro" },
+      { label: "Write to the sample inbox", href: "mailto:contact@example.invalid" },
+      { label: "Sample directions", href: "https://maps.example/directions?to=sample" },
+      { label: "Sample availability", href: "https://booking.example/availability" },
+    ]);
+    expect(JSON.stringify(actions.props)).toBe(
+      '{"items":[{"label":"Jump","targetId":"intro"},' +
+        '{"label":"Write to the sample inbox","href":"mailto:contact@example.invalid"},' +
+        '{"label":"Sample directions","href":"https://maps.example/directions?to=sample"},' +
+        '{"label":"Sample availability","href":"https://booking.example/availability"}]}',
+    );
+    expect(Object.isFrozen(actions.props)).toBe(true);
+    expect(Object.isFrozen(actions.props.items)).toBe(true);
+
+    // Eight entries is the unchanged cap and may mix both shapes freely, in authored order.
+    const eight = Array.from({ length: 8 }, (_value, index) =>
+      index % 2 === 0
+        ? { label: `Link ${index}`, href: `https://example.invalid/${index}` }
+        : { label: `Jump ${index}`, targetId: "intro" },
+    );
+    const capped = readUnoPageDocument({
+      ...minimal(),
+      sections: [section("intro", "content.prose", { text: "Body." }), section("a", "content.actions", { items: eight })],
+    });
+    expect(capped.accepted).toBe(true);
+  });
+
+
+  it("content.actions: refuses every outbound destination that is not exactly mailto or https", () => {
+    const outbound = (href: unknown, label: unknown = "Go") => ({
+      ...minimal(),
+      sections: [section("a", "content.actions", { items: [{ label, href }] })],
+    });
+    for (const href of [
+      // `http` is a category the unchanged classifier accepts, so only this module's exact-two-category rule refuses it.
+      "http://example.invalid/x",
+      "tel:+15550100",
+      "javascript:alert(1)",
+      "data:text/html,x",
+      "blob:https://example.invalid/x",
+      "//evil.example/x",
+      "/root",
+      "?q=1",
+      "relative",
+      "#frag",
+      "%6dailto:x@example.invalid",
+      "mailto:",
+      "mailto:a@example.invalid\r\nBcc:x@example.invalid",
+      "https://user:pass@example.invalid/",
+      "https://example.invalid/%zz",
+      "https://example.invalid/<x>",
+      "https://example.invalid/x y",
+      "https:///nohost",
+      "",
+      `https://example.invalid/${"a".repeat(2100)}`,
+    ]) {
+      expectRefusal(outbound(href), "document:unsafe-link");
+    }
+    // Only the label and the two exact shapes are accepted: an empty or overlong label, a wrong label type, an own
+    // `undefined`, an extra key and a label-only entry each refuse the whole Page without a partial document.
+    expectRefusal(outbound("https://example.invalid/x", ""), "document:invalid-props");
+    expectRefusal(outbound("https://example.invalid/x", "x".repeat(161)), "document:invalid-props");
+    expectRefusal(outbound("https://example.invalid/x", 7), "document:invalid-props");
+    expectRefusal(outbound(undefined), "document:invalid-props");
+    expectRefusal(
+      {
+        ...minimal(),
+        sections: [section("a", "content.actions", { items: [{ label: "Go", href: "https://example.invalid/x", rel: "noopener" }] })],
+      },
+      "document:invalid-props",
+    );
+    expectRefusal(
+      { ...minimal(), sections: [section("a", "content.actions", { items: [{ label: "Go" }] })] },
+      "document:invalid-props",
+    );
+    // A malformed fragment target never falls through to a supplied `href`, and a dead one stays an unresolved target.
+    expectRefusal(
+      {
+        ...minimal(),
+        sections: [section("a", "content.actions", { items: [{ label: "Go", targetId: 5, href: "https://example.invalid/x" }] })],
+      },
+      "document:invalid-props",
+    );
+    expectRefusal(
+      { ...minimal(), sections: [section("a", "content.actions", { items: [{ label: "Go", targetId: "missing" }] })] },
+      "document:unresolved-target",
+    );
+    // Nine entries exceed the unchanged eight-entry cap.
+    expectRefusal(
+      {
+        ...minimal(),
+        sections: [
+          section("a", "content.actions", {
+            items: Array.from({ length: 9 }, (_value, index) => ({ label: `L${index}`, href: `https://example.invalid/${index}` })),
+          }),
+        ],
+      },
+      "document:invalid-props",
+    );
+  });
+
+
+  it("content.actions: refuses hostile outbound input — accessors, duplicate JSON members and hero outbound forms", () => {
+    let invoked = false;
+    const accessorEntry: Record<string, unknown> = { label: "Go" };
+    Object.defineProperty(accessorEntry, "href", {
+      enumerable: true,
+      get() {
+        invoked = true;
+        return "https://example.invalid/x";
+      },
+    });
+    expectRefusal(
+      { ...minimal(), sections: [section("a", "content.actions", { items: [accessorEntry] })] },
+      "document:input-not-plain",
+    );
+    expect(invoked).toBe(false);
+
+    const duplicated =
+      '{"version":1,"title":"T","sections":[{"id":"a","module":"content.actions","props":{"items":[' +
+      '{"label":"Go","href":"https://example.invalid/x","href":"https://evil.example/y"}]}}]}';
+    expectRefusal(duplicated, "document:json-duplicate-key");
+
+    // A throwing proxy cannot be read as plain data and never yields a partial document.
+    const hostile = new Proxy(
+      { label: "Go", href: "https://example.invalid/x" },
+      {
+        get() {
+          throw new Error("hostile");
+        },
+        getPrototypeOf() {
+          throw new Error("hostile");
+        },
+      },
+    );
+    const hostileResult = readUnoPageDocument({
+      ...minimal(),
+      sections: [section("a", "content.actions", { items: [hostile] })],
+    });
+    expect(hostileResult.accepted).toBe(false);
+
+    // `content.hero` keeps its original fragment-only bound: an outbound action there is a props refusal.
+    expectRefusal(
+      {
+        ...minimal(),
+        sections: [
+          section("hero", "content.hero", { lede: "Lead.", actions: [{ label: "Go", href: "https://example.invalid/x" }] }),
+        ],
+      },
+      "document:invalid-props",
+    );
+  });
+
+
 
   it("refuses cyclic graphs, sparse arrays, class instances, accessors and throwing proxies", () => {
     const cycle: Record<string, unknown> = { id: "loop", module: "layout.stack", props: {} };
