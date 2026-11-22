@@ -486,8 +486,14 @@ const DURABLE_ASSET =
   "deployment/efs/capsule/e_7a3knkx60eacyhca7a0cr1k6e1/foundation/main/wo078-family-plate.png";
 const DURABLE_PLATE_BYTES = 191;
 const DURABLE_PLATE_SHA256 = "25bde641ce447275f7eff9d03859d07062ae34f9e3597eff18cf07bb384eae47";
-/** The starting Git blob of the Components Page *before* this order appended the seventeen families. */
-const DURABLE_PREFIX_BLOB = "f215b094918be97f85b5d9c9a5a6ac16845fec0d";
+/**
+ * `UNO-WO-079 / R01`: the pinned SHA-256 of `JSON.stringify(page.sections.slice(0, 6))` as it was committed *before*
+ * this family work appended the seventeen samples. The value is an independent historical literal (also pinned by the
+ * unit suite in `tests/unit/uno-foundation-families.test.ts`), never re-derived from the Page under test, and it
+ * replaces the earlier `git cat-file` lookup of the predecessor blob `f215b094…` — an object a shallow hosted checkout
+ * need not contain. Provenance only; nothing here reads Git history.
+ */
+const DURABLE_PREFIX_SHA256 = "bbc5416a5b8e2f1f8b419e33bb535de1ef283a9a777764e16562b975c6bd1901";
 const DURABLE_PREFIX_IDS = Object.freeze([
   "components-intro",
   "components-copy",
@@ -924,14 +930,16 @@ async function durableFamilySourcePhase() {
     );
   }
 
-  const starting = spawnSync("git", ["--no-optional-locks", "cat-file", "blob", DURABLE_PREFIX_BLOB], {
-    cwd: ROOT,
-    encoding: "utf8",
-  });
-  const startingPage = starting.status === 0 ? JSON.parse(starting.stdout) : null;
+  // `UNO-WO-079 / R01`: the preservation oracle is the pinned historical digest of the six-section JSON, computed here
+  // from the committed Page with the already imported `createHash`. It never reads Git history, so a shallow checkout
+  // cannot make a legitimate preservation assertion fail, and a changed prefix can never satisfy it.
+  const prefixDigest = createHash("sha256")
+    .update(JSON.stringify(page.sections.slice(0, 6)))
+    .digest("hex");
   check(
     "DURABLE_FAMILY_SOURCE the six original sections still equal the starting committed blob",
-    startingPage !== null && JSON.stringify(page.sections.slice(0, 6)) === JSON.stringify(startingPage.sections),
+    prefixDigest === DURABLE_PREFIX_SHA256,
+    prefixDigest,
   );
 
   const plate = readFileSync(resolve(ROOT, DURABLE_ASSET));
