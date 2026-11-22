@@ -145,10 +145,173 @@ function assertPage(observation, response, page, viewport, record, report) {
 
 
 /**
+ * `DURABLE_FAMILY_BROWSER` — the committed Components Page renders all seventeen bounded family samples in a real DOM,
+ * in order, with native semantics, owned images, keyboard access and no overflow or off-origin request.
+ *
+ * Every assertion is prefixed with the label the host runner requires, so removing or neutering one of them makes the
+ * hosted durable-family proof fail rather than quietly reporting a shorter pass list.
+ */
+async function assertDurableFamily(context, base, pageCase, ids, viewportName, colorScheme, reducedMotion) {
+  const passes = [];
+  const failures = [];
+  const check = (name, condition, detail) => {
+    if (condition) passes.push(name);
+    else failures.push(detail ? `${name} (${detail})` : name);
+  };
+  const label = `${pageCase.pathname} @ ${viewportName} ${colorScheme}${reducedMotion === "reduce" ? " reduced-motion" : ""}`;
+
+  const tab = await context.newPage();
+  const record = watchPage(tab, base);
+  try {
+    await tab.goto(`${base}${pageCase.pathname}`, { waitUntil: "networkidle", timeout: LOAD_TIMEOUT_MS });
+    await tab.waitForSelector("h1", { timeout: ASSERTION_TIMEOUT_MS });
+
+    const observed = await tab.evaluate((expectedIds) => {
+      const presentIds = expectedIds.filter((id) => document.getElementById(id) !== null);
+      const images = [...document.querySelectorAll("img.uno-json-media-image")];
+      const summary = document.querySelector("details summary");
+      return {
+        presentIds,
+        duplicateIds: expectedIds.filter((id) => document.querySelectorAll(`[id="${id}"]`).length !== 1).length,
+        h1Count: document.querySelectorAll("h1").length,
+        mainCount: document.querySelectorAll("main").length,
+        divider: document.querySelectorAll("hr.uno-json-divider").length,
+        quote: document.querySelectorAll("blockquote.uno-json-testimonial-quote").length,
+        tableScopes: document.querySelectorAll("table.uno-json-table th[scope='col']").length,
+        details: document.querySelectorAll("details").length,
+        summaries: document.querySelectorAll("details summary").length,
+        orderedLists: document.querySelectorAll("ol.uno-json-timeline-list").length,
+        lists: document.querySelectorAll("ul.uno-json-list").length,
+        figures: document.querySelectorAll("figure.uno-json-media-item").length,
+        captions: document.querySelectorAll("figcaption.uno-json-media-caption").length,
+        imageCount: images.length,
+        imagesDecoded: images.filter((image) => image.complete && image.naturalWidth > 0).length,
+        imageAlts: images.map((image) => (image.getAttribute("alt") ?? "").trim()).filter((alt) => alt.length > 0).length,
+        imageSources: images.map((image) => new URL(image.src).pathname),
+        offOriginImages: images.filter((image) => new URL(image.src).origin !== new URL(document.baseURI).origin).length,
+        contactNotice: (document.querySelector(".uno-json-contact-status")?.textContent ?? "").trim(),
+        forms: document.querySelectorAll("form, input, textarea, button").length,
+        disclosureClosed: summary === null ? null : summary.parentElement.hasAttribute("open"),
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    }, ids);
+
+    check(`DURABLE_FAMILY_BROWSER ${label} renders one main`, observed.mainCount === 1, String(observed.mainCount));
+    check(`DURABLE_FAMILY_BROWSER ${label} renders one h1`, observed.h1Count === 1, String(observed.h1Count));
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} renders all seventeen family ids in order`,
+      observed.presentIds.length === 17 &&
+        observed.presentIds.every((id, index) => id === ids[index]),
+      String(observed.presentIds.length),
+    );
+    check(`DURABLE_FAMILY_BROWSER ${label} keeps every family id unique`, observed.duplicateIds === 0);
+    check(`DURABLE_FAMILY_BROWSER ${label} renders a native divider`, observed.divider === 1, String(observed.divider));
+    check(`DURABLE_FAMILY_BROWSER ${label} renders a native quotation`, observed.quote === 1, String(observed.quote));
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} renders table column scopes`,
+      observed.tableScopes >= 2,
+      String(observed.tableScopes),
+    );
+    check(`DURABLE_FAMILY_BROWSER ${label} renders native disclosures`, observed.details >= 3, String(observed.details));
+    check(`DURABLE_FAMILY_BROWSER ${label} renders disclosure summaries`, observed.summaries >= 3, String(observed.summaries));
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} renders the ordered timeline list`,
+      observed.orderedLists === 1,
+      String(observed.orderedLists),
+    );
+    check(`DURABLE_FAMILY_BROWSER ${label} renders the authored native lists`, observed.lists >= 2, String(observed.lists));
+    check(`DURABLE_FAMILY_BROWSER ${label} renders gallery figures`, observed.figures === 2, String(observed.figures));
+    check(`DURABLE_FAMILY_BROWSER ${label} renders figure captions`, observed.captions >= 2, String(observed.captions));
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} renders three owned images`,
+      observed.imageCount === 3,
+      String(observed.imageCount),
+    );
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} decodes every owned image`,
+      observed.imagesDecoded === 3 && observed.imageCount === 3,
+      `${observed.imagesDecoded}/${observed.imageCount}`,
+    );
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} gives every image authored alternative text`,
+      observed.imageAlts === 3 && observed.imageCount === 3,
+    );
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} addresses images only by this Page's own locators`,
+      observed.offOriginImages === 0 &&
+        observed.imageSources.length === 3 &&
+        observed.imageSources.every((path) => /^\/uno-media\/en-001\/components\/\d+$/u.test(path)),
+      observed.imageSources.join(","),
+    );
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} shows only the inert delivery-OFF notice`,
+      observed.contactNotice === "Delivery is switched off. Nothing entered here is sent or stored.",
+      observed.contactNotice,
+    );
+    check(`DURABLE_FAMILY_BROWSER ${label} renders no form control`, observed.forms === 0, String(observed.forms));
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} does not overflow horizontally`,
+      observed.overflow <= VIEWPORT_TOLERANCE_PX,
+      `${observed.overflow}px`,
+    );
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} raises no page error`,
+      record.pageErrors.length === 0,
+      record.pageErrors.join("; "),
+    );
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} logs no console error`,
+      record.consoleErrors.length === 0,
+      record.consoleErrors.join("; "),
+    );
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} requests nothing outside loopback`,
+      record.foreignRequests.length === 0,
+      [...new Set(record.foreignRequests)].join(","),
+    );
+
+    // The pre-existing Components disclosure must still answer the keyboard on this Page.
+    if (observed.disclosureClosed !== null) {
+      await tab.evaluate(() => document.querySelector("details summary")?.focus());
+      await tab.keyboard.press("Enter");
+      const opened = await tab.evaluate(() => {
+        const summary = document.querySelector("details summary");
+        return summary !== null && summary.parentElement.hasAttribute("open");
+      });
+      check(
+        `DURABLE_FAMILY_BROWSER ${label} toggles the first disclosure from the keyboard`,
+        observed.disclosureClosed === false && opened === true,
+      );
+    }
+    check(
+      `DURABLE_FAMILY_BROWSER ${label} keeps the disclosure keyboard-focusable`,
+      await tab.evaluate(() => {
+        const summary = document.querySelector("details summary");
+        if (summary === null) return false;
+        summary.focus();
+        return document.activeElement === summary;
+      }),
+    );
+  } catch (error) {
+    failures.push(`DURABLE_FAMILY_BROWSER ${label} loads and renders (${String(error.message ?? error).slice(0, 200)})`);
+  } finally {
+    await tab.close();
+  }
+  return { passes, failures };
+}
+
+/**
  * The single exported entry point. Accepts only the internally generated loopback base and the immutable fixture
  * expectations; returns counted results so the host runner keeps one authoritative tally and its own restoration path.
  */
-export async function verifyUnoU03Browser({ base, pages, refusedPaths, keyboardPage = null }) {
+export async function verifyUnoU03Browser({
+  base,
+  pages,
+  refusedPaths,
+  keyboardPage = null,
+  durableFamilyPage = null,
+  durableFamilyIds = null,
+}) {
   const passes = [];
   const failures = [];
   const check = (name, condition, detail) => {
@@ -389,6 +552,40 @@ export async function verifyUnoU03Browser({ base, pages, refusedPaths, keyboardP
       }
     } finally {
       await keyboardContext.close();
+    }
+
+    // `DURABLE_FAMILY_BROWSER`: the committed Components Page in four real rendering conditions.
+    if (durableFamilyPage !== null && Array.isArray(durableFamilyIds)) {
+      const conditions = [
+        { viewport: { width: 1280, height: 720 }, name: "1280x720", colorScheme: "light", reducedMotion: "no-preference" },
+        { viewport: { width: 390, height: 844 }, name: "390x844", colorScheme: "light", reducedMotion: "no-preference" },
+        { viewport: { width: 1280, height: 720 }, name: "1280x720", colorScheme: "dark", reducedMotion: "no-preference" },
+        { viewport: { width: 390, height: 844 }, name: "390x844", colorScheme: "dark", reducedMotion: "no-preference" },
+        { viewport: { width: 1280, height: 720 }, name: "1280x720", colorScheme: "light", reducedMotion: "reduce" },
+      ];
+      for (const condition of conditions) {
+        const context = await browser.newContext({
+          viewport: condition.viewport,
+          deviceScaleFactor: 1,
+          colorScheme: condition.colorScheme,
+          reducedMotion: condition.reducedMotion,
+        });
+        try {
+          const outcome = await assertDurableFamily(
+            context,
+            base,
+            durableFamilyPage,
+            durableFamilyIds,
+            condition.name,
+            condition.colorScheme,
+            condition.reducedMotion,
+          );
+          passes.push(...outcome.passes);
+          failures.push(...outcome.failures);
+        } finally {
+          await context.close();
+        }
+      }
     }
   } finally {
     await browser.close();

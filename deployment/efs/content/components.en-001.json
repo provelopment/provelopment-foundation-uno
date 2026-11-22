@@ -1,7 +1,7 @@
 {
   "version": 1,
   "title": "Components",
-  "description": "A small sample of the text-only building blocks an authored JSON Page can use.",
+  "description": "A small sample of the text-only building blocks an authored JSON Page can use, followed by seventeen bounded samples of the Foundation family compositions.",
   "visibility": "public",
   "sections": [
     {
@@ -77,6 +77,488 @@
         "text": "This Page demonstrates a selection of modules. It does not claim that every registered module is used here.",
         "tone": "note"
       }
+    },
+    {
+      "id": "family-0-prose",
+      "module": "layout.stack",
+      "props": {},
+      "children": [
+        {
+          "id": "family-0-prose-heading",
+          "module": "content.heading",
+          "props": {
+            "text": "Bounded family samples",
+            "level": 2
+          }
+        },
+        {
+          "id": "family-0-prose-lede",
+          "module": "content.prose",
+          "props": {
+            "text": "These seventeen compositions are appended after the six native sections above."
+          }
+        },
+        {
+          "id": "family-0-prose-prose",
+          "module": "content.prose",
+          "props": {
+            "text": "Every sample on this Page is an original Uno-authored demonstration of one bounded donor family. Each one is plain text with no styling control and no provider."
+          }
+        }
+      ]
+    },
+    {
+      "id": "family-1-callout",
+      "module": "content.prose",
+      "props": {
+        "variant": "callout",
+        "text": "A callout carries authored plain text only. Its accent belongs to the renderer, not to this source.",
+        "tone": "note"
+      }
+    },
+    {
+      "id": "family-2-list",
+      "module": "content.prose",
+      "props": {
+        "variant": "list",
+        "items": [
+          {
+            "label": "Authored order",
+            "detail": "The composed sections keep their source order."
+          },
+          {
+            "label": "One stable identity",
+            "detail": "Each family keeps its generated top-level id."
+          },
+          {
+            "label": "Plain text",
+            "detail": "No Markdown, link or rich text is accepted here."
+          }
+        ],
+        "ordered": true
+      }
+    },
+    {
+      "id": "family-3-faq",
+      "module": "interaction.accordion",
+      "props": {
+        "items": [
+          {
+            "sectionId": "family-3-faq-answer-0",
+            "label": "Does a disclosure need a script?"
+          },
+          {
+            "sectionId": "family-3-faq-answer-1",
+            "label": "Can an answer carry markup?"
+          }
+        ]
+      },
+      "children": [
+        {
+          "id": "family-3-faq-answer-0",
+          "module": "content.prose",
+          "props": {
+            "text": "No. The group uses the platform details and summary elements."
+          }
+        },
+        {
+          "id": "family-3-faq-answer-1",
+          "module": "content.prose",
+          "props": {
+            "text": "No. Answers are authored plain text only."
+          }
+        }
+      ]
+    },
+    {
+      "id": "family-4-media",
+      "module": "media.image",
+      "props": {
+        "asset": {
+          "zone": "page",
+          "path": "wo078-family-plate.png"
+        },
+        "alt": "A flat two-tone sample plate used only as a synthetic owned image",
+        "caption": "One original sample plate, owned by this Page."
+      }
+    },
+    {
+      "id": "family-5-gallery",
+      "module": "media.gallery",
+      "props": {
+        "columns": 3,
+        "items": [
+          {
+            "asset": {
+              "zone": "page",
+              "path": "wo078-family-plate.png"
+            },
+            "alt": "The sample plate shown as the first gallery item",
+            "caption": "First gallery entry."
+          },
+          {
+            "asset": {
+              "zone": "page",
+              "path": "wo078-family-plate.png"
+            },
+            "alt": "The sample plate shown again as the second gallery item"
+          }
+        ]
+      }
+    },
+    {
+      "id": "family-6-contactform",
+      "module": "interaction.contact",
+      "props": {}
+    },
+    {
+      "id": "family-7-actions",
+      "module": "content.actions",
+      "props": {
+        "items": [
+          {
+            "label": "Review the ordered list",
+            "targetId": "family-2-list"
+          },
+          {
+            "label": "Review the sample table",
+            "targetId": "family-13-table"
+          }
+        ]
+      }
+    },
+    {
+      "id": "family-8-divider",
+      "module": "content.prose",
+      "props": {
+        "variant": "divider"
+      }
+    },
+    {
+      "id": "family-9-hero",
+      "module": "content.hero",
+      "props": {
+        "eyebrow": "Sample hero",
+        "lede": "A hero in this subset is one authored plain-text lede with optional supporting text.",
+        "support": "Nothing here is a campaign, a promise or a delivery claim."
+      }
+    },
+    {
+      "id": "family-10-stats",
+      "module": "layout.stack",
+      "props": {},
+      "children": [
+        {
+          "id": "family-10-stats-heading",
+          "module": "content.heading",
+          "props": {
+            "text": "Bounded facts",
+            "level": 2
+          }
+        },
+        {
+          "id": "family-10-stats-lede",
+          "module": "content.prose",
+          "props": {
+            "text": "Three authored facts, each plain text."
+          }
+        },
+        {
+          "id": "family-10-stats-stats",
+          "module": "content.stats",
+          "props": {
+            "items": [
+              {
+                "value": "17",
+                "label": "Bounded families",
+                "detail": "Composed from one source document."
+              },
+              {
+                "value": "1",
+                "label": "Owned sample plate"
+              },
+              {
+                "value": "3",
+                "label": "Declared occurrences"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "family-11-steps",
+      "module": "layout.stack",
+      "props": {},
+      "children": [
+        {
+          "id": "family-11-steps-heading",
+          "module": "content.heading",
+          "props": {
+            "text": "A short sequence",
+            "level": 2
+          }
+        },
+        {
+          "id": "family-11-steps-timeline",
+          "module": "content.timeline",
+          "props": {
+            "items": [
+              {
+                "title": "Author the source",
+                "description": "One version-1 source document holds every family."
+              },
+              {
+                "title": "Compose the document",
+                "description": "The composer validates each family before any Page exists."
+              },
+              {
+                "title": "Read the Page",
+                "description": "The reader validates the assembled document again."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "family-12-quote",
+      "module": "content.testimonials",
+      "props": {
+        "items": [
+          {
+            "quote": "A quotation is authored plain text with an optional attribution and role.",
+            "attribution": "Foundation Uno sample",
+            "role": "Authored sample"
+          }
+        ]
+      }
+    },
+    {
+      "id": "family-13-table",
+      "module": "content.prose",
+      "props": {
+        "variant": "table",
+        "columns": [
+          "Family",
+          "Bounded form"
+        ],
+        "rows": [
+          [
+            "prose",
+            "Plain paragraph"
+          ],
+          [
+            "table",
+            "Header and body cells"
+          ],
+          [
+            "divider",
+            "Native rule"
+          ]
+        ],
+        "caption": "Each family keeps one bounded form"
+      }
+    },
+    {
+      "id": "family-14-columns",
+      "module": "layout.grid",
+      "props": {
+        "columns": 2,
+        "ratio": "start-wide"
+      },
+      "children": [
+        {
+          "id": "family-14-columns-column-0",
+          "module": "layout.stack",
+          "props": {
+            "gap": "tight"
+          },
+          "children": [
+            {
+              "id": "family-14-columns-column-0-title",
+              "module": "content.heading",
+              "props": {
+                "text": "A column with a body",
+                "level": 2
+              }
+            },
+            {
+              "id": "family-14-columns-column-0-body",
+              "module": "content.prose",
+              "props": {
+                "text": "Each column is a title with either a body or a list."
+              }
+            }
+          ]
+        },
+        {
+          "id": "family-14-columns-column-1",
+          "module": "layout.stack",
+          "props": {
+            "gap": "tight"
+          },
+          "children": [
+            {
+              "id": "family-14-columns-column-1-title",
+              "module": "content.heading",
+              "props": {
+                "text": "A column with a list",
+                "level": 2
+              }
+            },
+            {
+              "id": "family-14-columns-column-1-body",
+              "module": "content.prose",
+              "props": {
+                "variant": "list",
+                "items": [
+                  {
+                    "label": "First entry"
+                  },
+                  {
+                    "label": "Second entry"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "family-15-cards",
+      "module": "layout.grid",
+      "props": {
+        "columns": 2,
+        "itemSemantics": "list"
+      },
+      "children": [
+        {
+          "id": "family-15-cards-item-0",
+          "module": "layout.stack",
+          "props": {
+            "gap": "tight"
+          },
+          "children": [
+            {
+              "id": "family-15-cards-item-0-title",
+              "module": "content.heading",
+              "props": {
+                "text": "First card",
+                "level": 2
+              }
+            },
+            {
+              "id": "family-15-cards-item-0-body",
+              "module": "content.prose",
+              "props": {
+                "text": "A card keeps only its authored title and optional body."
+              }
+            }
+          ]
+        },
+        {
+          "id": "family-15-cards-item-1",
+          "module": "layout.stack",
+          "props": {
+            "gap": "tight"
+          },
+          "children": [
+            {
+              "id": "family-15-cards-item-1-title",
+              "module": "content.heading",
+              "props": {
+                "text": "Second card",
+                "level": 2
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "family-16-features",
+      "module": "layout.stack",
+      "props": {},
+      "children": [
+        {
+          "id": "family-16-features-heading",
+          "module": "content.heading",
+          "props": {
+            "text": "Sample feature set",
+            "level": 2
+          }
+        },
+        {
+          "id": "family-16-features-lede",
+          "module": "content.prose",
+          "props": {
+            "text": "Each feature is an authored title only, laid out as a native list grid."
+          }
+        },
+        {
+          "id": "family-16-features-grid",
+          "module": "layout.grid",
+          "props": {
+            "columns": 3,
+            "itemSemantics": "list"
+          },
+          "children": [
+            {
+              "id": "family-16-features-item-0",
+              "module": "layout.stack",
+              "props": {
+                "gap": "tight"
+              },
+              "children": [
+                {
+                  "id": "family-16-features-item-0-title",
+                  "module": "content.heading",
+                  "props": {
+                    "text": "Plain title",
+                    "level": 3
+                  }
+                }
+              ]
+            },
+            {
+              "id": "family-16-features-item-1",
+              "module": "layout.stack",
+              "props": {
+                "gap": "tight"
+              },
+              "children": [
+                {
+                  "id": "family-16-features-item-1-title",
+                  "module": "content.heading",
+                  "props": {
+                    "text": "Native list item",
+                    "level": 3
+                  }
+                }
+              ]
+            },
+            {
+              "id": "family-16-features-item-2",
+              "module": "layout.stack",
+              "props": {
+                "gap": "tight"
+              },
+              "children": [
+                {
+                  "id": "family-16-features-item-2-title",
+                  "module": "content.heading",
+                  "props": {
+                    "text": "No decorative icon",
+                    "level": 3
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

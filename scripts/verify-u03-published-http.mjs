@@ -440,6 +440,8 @@ const STARTER_PATHS = Object.freeze([
   `${CONTENT}/home.en-001.json`,
   `${CONTENT}/about.en-001.md`,
   `${CONTENT}/components.en-001.json`,
+  // `UNO-WO-078 / R01`: the one exact owner-qualified Page asset the durable Components Page declares.
+  "deployment/efs/capsule/e_7a3knkx60eacyhca7a0cr1k6e1/foundation/main/wo078-family-plate.png",
 ]);
 
 /** The three committed starter Pages, proven at the committed head before the reversible fixture replaces them. */
@@ -475,6 +477,47 @@ const COMMITTED_REFUSALS = Object.freeze([
   "/de-001",
   "/en-001/about/extra",
 ]);
+
+/** `UNO-WO-078 / R01`: the durable family source, its migration bindings and the one Page-owned plate. */
+const DURABLE_SOURCE = "tests/fixtures/u04-durable-family-source.json";
+const DURABLE_BINDINGS = "tests/fixtures/u04-durable-family-bindings.json";
+const DURABLE_COMPONENTS = `${CONTENT}/components.en-001.json`;
+const DURABLE_ASSET =
+  "deployment/efs/capsule/e_7a3knkx60eacyhca7a0cr1k6e1/foundation/main/wo078-family-plate.png";
+const DURABLE_PLATE_BYTES = 191;
+const DURABLE_PLATE_SHA256 = "25bde641ce447275f7eff9d03859d07062ae34f9e3597eff18cf07bb384eae47";
+/** The starting Git blob of the Components Page *before* this order appended the seventeen families. */
+const DURABLE_PREFIX_BLOB = "f215b094918be97f85b5d9c9a5a6ac16845fec0d";
+const DURABLE_PREFIX_IDS = Object.freeze([
+  "components-intro",
+  "components-copy",
+  "components-list",
+  "components-stack",
+  "components-faq",
+  "components-callout",
+]);
+const DURABLE_FAMILY_IDS = Object.freeze([
+  "family-0-prose",
+  "family-1-callout",
+  "family-2-list",
+  "family-3-faq",
+  "family-4-media",
+  "family-5-gallery",
+  "family-6-contactform",
+  "family-7-actions",
+  "family-8-divider",
+  "family-9-hero",
+  "family-10-stats",
+  "family-11-steps",
+  "family-12-quote",
+  "family-13-table",
+  "family-14-columns",
+  "family-15-cards",
+  "family-16-features",
+]);
+
+/** Digests captured once, before any stateful runner, so `DURABLE_FAMILY_RESTORE` can prove survival. */
+const durableBaseline = new Map();
 
 /** The two user agents the parity proof compares: an ordinary browser and a crawler-shaped one. */
 const CRAWLER_AGENTS = Object.freeze([
@@ -794,13 +837,393 @@ async function validateFixtureInProcess() {
 
 
 /**
- * Prove the COMMITTED starter head before any fixture replaces it: a real production build of the committed
- * declarations, real loopback HTTP for the three Pages, their canonical/SEO agreement, the sitemap, the refusals and
- * a real Chromium pass. Any failure here stops before the reversible fixture, so a green fixture run can never be
- * mistaken for a green committed starter.
+ * `DURABLE_FAMILY_SOURCE` — recompose the committed durable source with the real composer before any build, and prove
+ * the committed Page is exactly the six original sections plus those seventeen composed nodes.
  */
+async function durableFamilySourcePhase() {
+  const { composeUnoFoundationSubset } = await import(
+    "../src/application/compose-uno-foundation-families.ts"
+  );
+  const { readUnoPageDocument } = await import("../src/core/page-document.ts");
+
+  for (const relativePath of [DURABLE_SOURCE, DURABLE_BINDINGS, DURABLE_COMPONENTS, DURABLE_ASSET]) {
+    check(`DURABLE_FAMILY_SOURCE ${relativePath} exists`, existsSync(resolve(ROOT, relativePath)));
+    durableBaseline.set(relativePath, sha256Of(relativePath));
+  }
+  if (failures.length > 0) return;
+
+  const source = JSON.parse(readFileSync(resolve(ROOT, DURABLE_SOURCE), "utf8"));
+  const bindings = JSON.parse(readFileSync(resolve(ROOT, DURABLE_BINDINGS), "utf8"));
+  const pageRaw = readFileSync(resolve(ROOT, DURABLE_COMPONENTS), "utf8");
+  const page = JSON.parse(pageRaw);
+
+  check(
+    "DURABLE_FAMILY_SOURCE the source declares exactly seventeen family sections",
+    Array.isArray(source.sections) && source.sections.length === 17,
+    String(source.sections?.length),
+  );
+  check(
+    "DURABLE_FAMILY_SOURCE the source families appear in the documented order",
+    Array.isArray(source.sections) &&
+      JSON.stringify(source.sections.map((section) => section.type)) ===
+        JSON.stringify([
+          "prose",
+          "callout",
+          "list",
+          "faq",
+          "media",
+          "gallery",
+          "contactForm",
+          "actions",
+          "divider",
+          "hero",
+          "stats",
+          "steps",
+          "quote",
+          "table",
+          "columns",
+          "cards",
+          "features",
+        ]),
+  );
+
+  const composed = composeUnoFoundationSubset(source, bindings);
+  check(
+    "DURABLE_FAMILY_SOURCE the real composer accepts the source and its bindings",
+    composed.status === "composed",
+    composed.status === "refused" ? composed.reason : "",
+  );
+  if (composed.status !== "composed") return;
+
+  check(
+    "DURABLE_FAMILY_SOURCE the composed document has the seventeen stable family ids",
+    JSON.stringify(composed.document.sections.map((node) => node.id)) === JSON.stringify(DURABLE_FAMILY_IDS),
+  );
+  check("DURABLE_FAMILY_SOURCE the composed document sections are frozen", Object.isFrozen(composed.document.sections));
+
+  const parsed = readUnoPageDocument(pageRaw);
+  check(
+    "DURABLE_FAMILY_SOURCE the committed Components Page is an accepted version-1 document",
+    parsed.accepted,
+    parsed.accepted ? "" : parsed.reason,
+  );
+  if (parsed.accepted) {
+    check(
+      "DURABLE_FAMILY_SOURCE the committed Page has twenty-three top-level sections",
+      parsed.document.sections.length === 23,
+      String(parsed.document.sections.length),
+    );
+    check(
+      "DURABLE_FAMILY_SOURCE the six original section ids are unchanged and come first",
+      JSON.stringify(parsed.document.sections.slice(0, 6).map((node) => node.id)) ===
+        JSON.stringify(DURABLE_PREFIX_IDS),
+    );
+    check(
+      "DURABLE_FAMILY_SOURCE the appended sections are the composer's own output",
+      JSON.stringify(parsed.document.sections.slice(6)) === JSON.stringify(composed.document.sections),
+    );
+  }
+
+  const starting = spawnSync("git", ["--no-optional-locks", "cat-file", "blob", DURABLE_PREFIX_BLOB], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+  const startingPage = starting.status === 0 ? JSON.parse(starting.stdout) : null;
+  check(
+    "DURABLE_FAMILY_SOURCE the six original sections still equal the starting committed blob",
+    startingPage !== null && JSON.stringify(page.sections.slice(0, 6)) === JSON.stringify(startingPage.sections),
+  );
+
+  const plate = readFileSync(resolve(ROOT, DURABLE_ASSET));
+  check(
+    "DURABLE_FAMILY_MEDIA the owned plate is the exact expected PNG byte length",
+    plate.length === DURABLE_PLATE_BYTES,
+    String(plate.length),
+  );
+  check("DURABLE_FAMILY_MEDIA the owned plate digest is exact", sha256Of(DURABLE_ASSET) === DURABLE_PLATE_SHA256);
+  check(
+    "DURABLE_FAMILY_MEDIA the owned plate starts with the PNG signature",
+    [...plate.subarray(0, 8)].map((byte) => byte.toString(16).padStart(2, "0")).join("") === "89504e470d0a1a0a",
+  );
+}
+
+
+
+/**
+ * `DURABLE_FAMILY_REFUSALS` — the composer must still refuse everything outside the bounded subset, with one closed
+ * reason and never a partial document.
+ */
+async function durableFamilyRefusalPhase() {
+  const { composeUnoFoundationSubset } = await import(
+    "../src/application/compose-uno-foundation-families.ts"
+  );
+  const plate = "/assets/wo078-family-plate.png";
+  const refusals = [
+    [
+      "a remote image source",
+      { version: 1, title: "T", sections: [{ type: "media", image: { src: "https://example.com/a.png", alt: "Remote" } }] },
+      undefined,
+      "family:unsupported-feature",
+    ],
+    [
+      "an unbound owned image",
+      { version: 1, title: "T", sections: [{ type: "media", image: { src: plate, alt: "A" } }] },
+      undefined,
+      "family:unsupported-feature",
+    ],
+    [
+      "an owned ref in an unknown zone",
+      { version: 1, title: "T", sections: [{ type: "media", image: { src: plate, alt: "A" } }] },
+      { images: [{ source: plate, owned: { zone: "cdn", path: "wo078-family-plate.png" } }] },
+      "family:target-refused",
+    ],
+    [
+      "a generated-zone ref without integrity",
+      { version: 1, title: "T", sections: [{ type: "media", image: { src: plate, alt: "A" } }] },
+      { images: [{ source: plate, owned: { zone: "generated", path: "wo078-family-plate.png" } }] },
+      "family:target-refused",
+    ],
+    [
+      "a non-OFF contact acknowledgement",
+      { version: 1, title: "T", sections: [{ type: "contactForm", formRef: "wo078-contact" }] },
+      { contactForms: [{ formRef: "wo078-contact", mode: "delivery-on" }] },
+      "family:unsupported-feature",
+    ],
+    [
+      "a contact section with no acknowledgement",
+      { version: 1, title: "T", sections: [{ type: "contactForm", formRef: "wo078-contact" }] },
+      undefined,
+      "family:unsupported-feature",
+    ],
+    [
+      "an eighteenth family outside the subset",
+      { version: 1, title: "T", sections: [{ type: "carousel", items: [] }] },
+      undefined,
+      "family:unsupported-family",
+    ],
+    [
+      "Markdown inside authored prose",
+      { version: 1, title: "T", sections: [{ type: "prose", body: "A **bold** claim" }] },
+      undefined,
+      "family:unsupported-feature",
+    ],
+    [
+      "an external action destination",
+      { version: 1, title: "T", sections: [{ type: "actions", actions: [{ label: "Go", href: "https://example.com" }] }] },
+      undefined,
+      "family:unsupported-feature",
+    ],
+    [
+      "an unsupported extra key",
+      { version: 1, title: "T", sections: [{ type: "prose", body: "Text", align: "center" }] },
+      undefined,
+      "family:unsupported-feature",
+    ],
+  ];
+  for (const [label, input, binder, reason] of refusals) {
+    const outcome = composeUnoFoundationSubset(input, binder);
+    check(
+      `DURABLE_FAMILY_REFUSALS the composer refuses ${label}`,
+      outcome.status === "refused" && outcome.reason === reason,
+      outcome.status === "refused" ? outcome.reason : "composed",
+    );
+    check(
+      `DURABLE_FAMILY_REFUSALS the refusal of ${label} carries no document`,
+      outcome.status === "refused" && !("document" in outcome),
+    );
+  }
+
+  let invoked = false;
+  const hostile = { version: 1, title: "T", sections: [] };
+  Object.defineProperty(hostile, "sections", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return [];
+    },
+  });
+  const hostileOutcome = composeUnoFoundationSubset(hostile);
+  check(
+    "DURABLE_FAMILY_REFUSALS an accessor source refuses as unsafe without running it",
+    hostileOutcome.status === "refused" && hostileOutcome.reason === "family:unsafe-source" && invoked === false,
+  );
+
+  const tooMany = {
+    version: 1,
+    title: "T",
+    sections: Array.from({ length: 33 }, () => ({ type: "divider" })),
+  };
+  const tooManyOutcome = composeUnoFoundationSubset(tooMany);
+  check(
+    "DURABLE_FAMILY_REFUSALS a thirty-three-section source is refused",
+    tooManyOutcome.status === "refused" && tooManyOutcome.reason === "family:unsupported-feature",
+  );
+}
+
+
+/** Count non-overlapping occurrences of a literal in one document. */
+function countOf(haystack, needle) {
+  let count = 0;
+  let index = haystack.indexOf(needle);
+  while (index >= 0) {
+    count += 1;
+    index = haystack.indexOf(needle, index + needle.length);
+  }
+  return count;
+}
+
+/** `DURABLE_FAMILY_HTTP` — the committed Components Page serves all twenty-three sections with native semantics. */
+async function checkDurableFamilyHttp(base) {
+  const response = await request(`${base}/en-001/components`);
+  const raw = response.body;
+  check("DURABLE_FAMILY_HTTP the Components Page answers 200", response.status === 200, `status ${response.status}`);
+  check("DURABLE_FAMILY_HTTP exactly one main is served", (raw.match(/<main\b/giu) ?? []).length === 1);
+  check("DURABLE_FAMILY_HTTP exactly one h1 is served", (raw.match(/<h1\b/giu) ?? []).length === 1);
+
+  const ids = [...DURABLE_PREFIX_IDS, ...DURABLE_FAMILY_IDS];
+  let previous = -1;
+  let ordered = true;
+  let unique = true;
+  for (const id of ids) {
+    const marker = `id="${id}"`;
+    const at = raw.indexOf(marker);
+    if (at < 0 || at <= previous) ordered = false;
+    if (countOf(raw, marker) !== 1) unique = false;
+    if (at >= 0) previous = at;
+  }
+  check("DURABLE_FAMILY_HTTP all twenty-three section ids are served in order", ordered);
+  check("DURABLE_FAMILY_HTTP every served section id is unique", unique);
+
+  const families = [
+    ["a native divider rule", /<hr\b[^>]*class="uno-json-divider"/iu],
+    ["a native blockquote quotation", /<blockquote\b[^>]*class="uno-json-testimonial-quote"/iu],
+    ["a native table", /<table\b[^>]*class="uno-json-table"/iu],
+    ["table header cells with column scope", /<th\b[^>]*scope="col"/iu],
+    ["an ordered timeline list", /<ol\b[^>]*class="uno-json-timeline-list"/iu],
+    ["a native unordered list", /<ul\b[^>]*class="uno-json-list"/iu],
+    ["a native FAQ disclosure", /<details\b/iu],
+    ["a native disclosure summary", /<summary\b/iu],
+    ["a gallery figure", /<figure\b[^>]*class="uno-json-media-item"/iu],
+    ["a figure caption", /<figcaption\b[^>]*class="uno-json-media-caption"/iu],
+    ["a card group", /data-uno-card-id="family-15-cards-item-0"|data-uno-cell-id="family-15-cards-item-0"/iu],
+    ["an authored feature item", /data-uno-cell-id="family-16-features-item-0"/iu],
+  ];
+  for (const [label, pattern] of families) {
+    check(`DURABLE_FAMILY_HTTP the Page renders ${label}`, pattern.test(raw));
+  }
+
+  check(
+    "DURABLE_FAMILY_HTTP the contact family renders only the inert delivery-OFF notice",
+    raw.includes("Delivery is switched off. Nothing entered here is sent or stored."),
+  );
+  for (const [label, pattern] of [
+    ["a form", /<form\b/iu],
+    ["an input control", /<input\b/iu],
+    ["a textarea", /<textarea\b/iu],
+    ["a submit button", /<button\b/iu],
+    ["an iframe", /<iframe\b/iu],
+  ]) {
+    check(`DURABLE_FAMILY_HTTP the Page carries no ${label}`, !pattern.test(raw));
+  }
+
+  const images = raw.match(/<img\b[^>]*class="uno-json-media-image"[^>]*>/giu) ?? [];
+  check("DURABLE_FAMILY_HTTP exactly three owned images are served", images.length === 3, String(images.length));
+  check(
+    "DURABLE_FAMILY_HTTP every owned image is addressed by its own occurrence locator",
+    ["0", "1", "2"].every((index) => raw.includes(`src="/uno-media/en-001/components/${index}"`)),
+  );
+  check(
+    "DURABLE_FAMILY_HTTP every owned image carries authored alternative text",
+    images.every((tag) => /alt="[^"]+"/u.test(tag)),
+  );
+  check(
+    "DURABLE_FAMILY_HTTP the Page advertises no external asset host",
+    !/src="https?:\/\//iu.test(raw) && !/src="\/\//u.test(raw),
+  );
+
+  const about = await request(`${base}/en-001/about`);
+  check("DURABLE_FAMILY_HTTP the About Page still answers 200", about.status === 200, `status ${about.status}`);
+  const sitemap = await request(`${base}/sitemap.xml`);
+  check(
+    "DURABLE_FAMILY_HTTP the sitemap still lists exactly three addresses",
+    (sitemap.body.match(/<loc>[^<]+<\/loc>/gu) ?? []).length === 3,
+  );
+}
+
+
+/** `DURABLE_FAMILY_MEDIA` — real GET/HEAD media plus the denial of every locator this Page does not own. */
+async function checkDurableFamilyMedia(base) {
+  const expected = readFileSync(resolve(ROOT, DURABLE_ASSET));
+  for (const index of [0, 1, 2]) {
+    const response = await fetch(`${base}/uno-media/en-001/components/${index}`, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    const bytes = Buffer.from(await response.arrayBuffer());
+    check(
+      `DURABLE_FAMILY_MEDIA /uno-media/en-001/components/${index} answers 200`,
+      response.status === 200,
+      `status ${response.status}`,
+    );
+    check(
+      `DURABLE_FAMILY_MEDIA occurrence ${index} is served as PNG`,
+      /^image\/png$/iu.test(response.headers.get("content-type") ?? ""),
+      String(response.headers.get("content-type")),
+    );
+    check(
+      `DURABLE_FAMILY_MEDIA occurrence ${index} is the exact owned bytes`,
+      bytes.equals(expected) && createHash("sha256").update(bytes).digest("hex") === DURABLE_PLATE_SHA256,
+    );
+    check(
+      `DURABLE_FAMILY_MEDIA occurrence ${index} declares no-sniff`,
+      (response.headers.get("x-content-type-options") ?? "") === "nosniff",
+    );
+
+    const head = await fetch(`${base}/uno-media/en-001/components/${index}`, {
+      method: "HEAD",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    check(
+      `DURABLE_FAMILY_MEDIA occurrence ${index} HEAD agrees with GET`,
+      head.status === 200 &&
+        head.headers.get("content-type") === response.headers.get("content-type") &&
+        (head.headers.get("x-content-type-options") ?? "") === "nosniff",
+      `status ${head.status}`,
+    );
+  }
+
+  const denied = [
+    "/uno-media/en-001/components/3",
+    "/uno-media/en-001/about/0",
+    "/uno-media/en-001/nope/0",
+    "/uno-media/en-001/components/wo078-family-plate.png",
+    "/uno-media/en-001/components/-1",
+    "/uno-media/en-001/components/00",
+    "/uno-media/en-001/home/0",
+    "/uno-media/de-001/components/0",
+  ];
+  for (const path of denied) {
+    const response = await fetch(`${base}${path}`, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    const body = await response.text();
+    check(
+      `DURABLE_FAMILY_MEDIA ${path} is a real 404`,
+      response.status === 404 && response.headers.get("location") === null && body.length === 0,
+      `status ${response.status}`,
+    );
+  }
+}
+
+
 async function committedStarterPhase(nextBin) {
   process.stdout.write("\nverify-u03-published-http: committed-starter proof before the reversible fixture\n");
+  await durableFamilySourcePhase();
+  await durableFamilyRefusalPhase();
+  if (failures.length > 0) {
+    process.stderr.write("verify-u03-published-http: the durable family source proof failed; no build was attempted.\n");
+    return;
+  }
   rmSync(resolve(ROOT, ".next"), { recursive: true, force: true });
   const build = await runChild([nextBin, "build"], BUILD_TIMEOUT_MS);
   if (!check("the committed starter production build succeeds", build.code === 0, `exit ${build.code}`)) {
@@ -882,17 +1305,27 @@ async function committedStarterPhase(nextBin) {
       await checkRefusal(base, pathname);
     }
 
+    await checkDurableFamilyHttp(base);
+    await checkDurableFamilyMedia(base);
+
     const browserProof = await verifyUnoU03Browser({
       base,
       pages: COMMITTED_PAGES,
       refusedPaths: COMMITTED_REFUSALS,
       keyboardPage: COMMITTED_PAGES[2],
+      durableFamilyPage: COMMITTED_PAGES[2],
+      durableFamilyIds: DURABLE_FAMILY_IDS,
     });
     for (const name of browserProof.passes) check(name, true);
     for (const failure of browserProof.failures) {
       failures.push(failure);
       process.stdout.write(`  FAIL  ${failure}\n`);
     }
+    check(
+      "DURABLE_FAMILY_BROWSER the real browser proof executed its durable family cases",
+      browserProof.passes.some((name) => name.startsWith("DURABLE_FAMILY_BROWSER")) &&
+        !browserProof.failures.some((name) => name.startsWith("DURABLE_FAMILY_BROWSER")),
+    );
     check("the committed starter server stayed up", child.exitCode === null && child.signalCode === null);
   } finally {
     await stopChild(child);
@@ -924,7 +1357,7 @@ function preflight() {
     encoding: "utf8",
   });
   check("nothing is staged before the fixture", staged.stdout.trim() === "", staged.stdout.trim());
-  const deployment = spawnSync("git", ["--no-optional-locks", "status", "--porcelain=v1", "--", "deployment"], {
+  const deployment = spawnSync("git", ["--no-optional-locks", "status", "--porcelain=v1", "--untracked-files=all", "--", "deployment"], {
     cwd: ROOT,
     encoding: "utf8",
   });
@@ -1222,6 +1655,20 @@ async function main() {
         : "  FAIL  restoration could not be proven; the recovery copies are preserved and the run must STOP\n",
     );
     if (restored) passes.push("restoration");
+    if (restored && durableBaseline.size > 0) {
+      for (const [relativePath, digest] of durableBaseline) {
+        check(
+          `DURABLE_FAMILY_RESTORE ${relativePath} is byte-identical after the fixture run`,
+          sha256Of(relativePath) === digest,
+        );
+      }
+    }
+    if (restored) {
+      check(
+        "DURABLE_FAMILY_RESTORE the three-Page graph is unchanged after the fixture run",
+        sha256Of(MANIFEST) === PINNED_DECLARATIONS.get(MANIFEST) && sha256Of(SELECTION) === PINNED_DECLARATIONS.get(SELECTION),
+      );
+    }
   }
 }
 
@@ -1252,7 +1699,7 @@ if (outcome === 0 && declarationsRestored) {
 
   const status = spawnSync(
     "git",
-    ["--no-optional-locks", "status", "--porcelain=v1", "--", "deployment"],
+    ["--no-optional-locks", "status", "--porcelain=v1", "--untracked-files=all", "--", "deployment"],
     { cwd: ROOT, encoding: "utf8" },
   );
   const unexpectedAfter = status.stdout

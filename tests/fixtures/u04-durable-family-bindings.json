@@ -1,0 +1,11 @@
+{
+  "images": [
+    {
+      "source": "/assets/wo078-family-plate.png",
+      "owned": { "zone": "page", "path": "wo078-family-plate.png" }
+    }
+  ],
+  "contactForms": [
+    { "formRef": "wo078-contact", "mode": "delivery-off" }
+  ]
+}

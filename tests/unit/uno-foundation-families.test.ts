@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -2356,8 +2357,10 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).toContain("zero entirely unimplemented");
     // `UNO-WO-066 / R01`: one temporary fixture Page is now proven over production HTTP and Chromium, so the older
     // blanket claim of no family-Page evidence must be gone and replaced by the exact, bounded positive words.
-    expect(ledger).toContain("temporary family-composition fixture verified over production HTTP and Chromium");
-    expect(ledger).toContain("no durable published family Page");
+    expect(ledger).toContain("one **durable** family composition published on the existing committed");
+    expect(ledger).toContain("never a parity uplift");
+    // `UNO-WO-078 / R01`: the durable composition Page now exists, so the older blanket absence claim must be gone.
+    expect(ledger).not.toContain("no durable published family Page");
     expect(ledger).not.toContain("zero published family Page acceptance evidence");
     // `UNO-WO-067 / R01`: the same temporary Page now carries thirteen bounded shapes, and exactly four remain without
     // fixture-Page HTTP/browser proof. The stale nine-shape accounting must not survive.
@@ -2368,7 +2371,9 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     // thirteen-shape accounting nor the "four without fixture evidence" claim may survive.
     expect(ledger).toContain("one temporary seventeen-shape integration slice");
     expect(ledger).toContain("all seventeen bounded shapes sampled over the temporary Page");
-    expect(ledger).toContain("no durable published family Page");
+    // `UNO-WO-078 / R01`: the durable composition exists and is recorded as bounded, never as parity or closure.
+    expect(ledger).toContain("## 7. Durable family Page");
+    expect(ledger).toContain("No parity uplift and no stage closure follow from this");
     expect(ledger).not.toContain("one temporary thirteen-shape integration slice");
     expect(ledger).not.toContain("four bounded shapes keep their validator/renderer tests only");
     expect(ledger).not.toContain("zero bounded shapes lacking temporary Page evidence");
@@ -4732,5 +4737,217 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     expect(ledger).not.toContain("6/17");
     expect(ledger).not.toMatch(/prose[^.\n]*full semantic parity/u);
     expect(ledger).not.toMatch(/table[^.\n]*full semantic parity/u);
+  });
+});
+describe("the committed durable family Page (`UNO-WO-078 / R01`)", () => {
+  const durableSource = JSON.parse(readFileSync("tests/fixtures/u04-durable-family-source.json", "utf8"));
+  const durableBindings = JSON.parse(readFileSync("tests/fixtures/u04-durable-family-bindings.json", "utf8"));
+  const committedPage = JSON.parse(readFileSync("deployment/efs/content/components.en-001.json", "utf8"));
+
+  /** The six native sections exactly as they serialized before this order appended the seventeen families. */
+  const SIX_DIGEST = "bbc5416a5b8e2f1f8b419e33bb535de1ef283a9a777764e16562b975c6bd1901";
+  const FAMILY_IDS = [
+    "family-0-prose",
+    "family-1-callout",
+    "family-2-list",
+    "family-3-faq",
+    "family-4-media",
+    "family-5-gallery",
+    "family-6-contactform",
+    "family-7-actions",
+    "family-8-divider",
+    "family-9-hero",
+    "family-10-stats",
+    "family-11-steps",
+    "family-12-quote",
+    "family-13-table",
+    "family-14-columns",
+    "family-15-cards",
+    "family-16-features",
+  ];
+  const FAMILY_TYPES = [
+    "prose",
+    "callout",
+    "list",
+    "faq",
+    "media",
+    "gallery",
+    "contactForm",
+    "actions",
+    "divider",
+    "hero",
+    "stats",
+    "steps",
+    "quote",
+    "table",
+    "columns",
+    "cards",
+    "features",
+  ];
+  const digestOf = (value: string): string => createHash("sha256").update(value).digest("hex");
+
+  it("reads the inert source and bindings as exactly seventeen families in order", () => {
+    expect(durableSource.version).toBe(1);
+    expect(durableSource.sections).toHaveLength(17);
+    expect(durableSource.sections.map((section: { type: string }) => section.type)).toEqual(FAMILY_TYPES);
+    expect(durableBindings.images).toHaveLength(1);
+    expect(durableBindings.images[0].source).toBe("/assets/wo078-family-plate.png");
+    expect(durableBindings.images[0].owned).toEqual({ zone: "page", path: "wo078-family-plate.png" });
+    expect(durableBindings.contactForms).toEqual([{ formRef: "wo078-contact", mode: "delivery-off" }]);
+  });
+
+  it("composes the source into one deeply frozen document with the seventeen stable ids", () => {
+    const outcome = composeUnoFoundationSubset(durableSource, durableBindings);
+    expect(outcome.status).toBe("composed");
+    if (outcome.status !== "composed") return;
+    expect(outcome.document.sections.map((node) => node.id)).toEqual(FAMILY_IDS);
+    expect(Object.isFrozen(outcome.document)).toBe(true);
+    expect(Object.isFrozen(outcome.document.sections)).toBe(true);
+    for (const node of outcome.document.sections) expect(Object.isFrozen(node)).toBe(true);
+  });
+
+  it("does not mutate the inert source or bindings while composing", () => {
+    const sourceBefore = JSON.stringify(durableSource);
+    const bindingsBefore = JSON.stringify(durableBindings);
+    composeUnoFoundationSubset(durableSource, durableBindings);
+    expect(JSON.stringify(durableSource)).toBe(sourceBefore);
+    expect(JSON.stringify(durableBindings)).toBe(bindingsBefore);
+  });
+
+  it("keeps the committed Page's appended sections byte-identical to the composer output", () => {
+    const outcome = composeUnoFoundationSubset(durableSource, durableBindings);
+    expect(outcome.status).toBe("composed");
+    if (outcome.status !== "composed") return;
+    const committed = readUnoPageDocument(JSON.stringify(committedPage));
+    expect(committed.accepted).toBe(true);
+    if (!committed.accepted) return;
+    expect(committed.document.sections).toHaveLength(23);
+    expect(JSON.stringify(committed.document.sections.slice(6))).toBe(JSON.stringify(outcome.document.sections));
+    expect(committed.document.sections.slice(6).map((node) => node.id)).toEqual(FAMILY_IDS);
+  });
+
+  it("keeps the six original sections value-identical to the starting committed blob", () => {
+    expect(committedPage.sections).toHaveLength(23);
+    expect(digestOf(JSON.stringify(committedPage.sections.slice(0, 6)))).toBe(SIX_DIGEST);
+    expect(committedPage.sections.slice(0, 6).map((section: { id: string }) => section.id)).toEqual([
+      "components-intro",
+      "components-copy",
+      "components-list",
+      "components-stack",
+      "components-faq",
+      "components-callout",
+    ]);
+  });
+
+  it("binds every owned image to the one Page-owned plate and nothing else", () => {
+    const outcome = composeUnoFoundationSubset(durableSource, durableBindings);
+    expect(outcome.status).toBe("composed");
+    if (outcome.status !== "composed") return;
+    const media = outcome.document.sections.find((node) => node.id === "family-4-media");
+    const gallery = outcome.document.sections.find((node) => node.id === "family-5-gallery");
+    expect(media?.module).toBe("media.image");
+    expect(gallery?.module).toBe("media.gallery");
+    if (media?.module === "media.image") {
+      expect(media.props.asset).toEqual({ zone: "page", path: "wo078-family-plate.png" });
+    }
+    if (gallery?.module === "media.gallery") {
+      for (const item of gallery.props.items) {
+        expect(item.asset).toEqual({ zone: "page", path: "wo078-family-plate.png" });
+      }
+    }
+  });
+
+  it("refuses a wrong or absent contact acknowledgement without a partial document", () => {
+    const section = { type: "contactForm", formRef: "wo078-contact" };
+    expect(
+      composeUnoFoundationSubset(envelope(section), {
+        contactForms: [{ formRef: "wo078-contact", mode: "delivery-on" }],
+      }),
+    ).toEqual({ status: "refused", reason: "family:unsupported-feature" });
+    expect(composeUnoFoundationSubset(envelope(section))).toEqual({
+      status: "refused",
+      reason: "family:unsupported-feature",
+    });
+    expect(
+      composeUnoFoundationSubset(envelope(section), {
+        contactForms: [{ formRef: "another-form", mode: "delivery-off" }],
+      }),
+    ).toEqual({ status: "refused", reason: "family:unsupported-feature" });
+  });
+
+  it("refuses a false, misowned or missing image binding", () => {
+    const media = { type: "media", image: { src: "/assets/wo078-family-plate.png", alt: "A plate" } };
+    expect(composeUnoFoundationSubset(envelope(media))).toEqual({
+      status: "refused",
+      reason: "family:unsupported-feature",
+    });
+    expect(
+      composeUnoFoundationSubset(envelope(media), {
+        images: [{ source: "/assets/other.png", owned: { zone: "page", path: "wo078-family-plate.png" } }],
+      }),
+    ).toEqual({ status: "refused", reason: "family:unsupported-feature" });
+    expect(
+      composeUnoFoundationSubset(envelope(media), {
+        images: [{ source: "/assets/wo078-family-plate.png", owned: { zone: "cdn", path: "wo078-family-plate.png" } }],
+      }),
+    ).toEqual({ status: "refused", reason: "family:target-refused" });
+    expect(
+      composeUnoFoundationSubset(envelope(media), {
+        images: [{ source: "/assets/wo078-family-plate.png", owned: { zone: "generated", path: "plate.png" } }],
+      }),
+    ).toEqual({ status: "refused", reason: "family:target-refused" });
+  });
+
+  it("refuses a hostile source and an outside family without publishing anything", () => {
+    let invoked = false;
+    const hostile: Record<string, unknown> = { version: 1, title: "T", sections: [] };
+    Object.defineProperty(hostile, "sections", {
+      enumerable: true,
+      get() {
+        invoked = true;
+        return [];
+      },
+    });
+    expect(composeUnoFoundationSubset(hostile)).toEqual({ status: "refused", reason: "family:unsafe-source" });
+    expect(invoked).toBe(false);
+    expect(composeUnoFoundationSubset(envelope({ type: "carousel", items: [] }))).toEqual({
+      status: "refused",
+      reason: "family:unsupported-family",
+    });
+    const refused = composeUnoFoundationSubset(envelope({ type: "prose", body: "A **bold** claim" }));
+    expect(refused.status).toBe("refused");
+    expect("document" in refused).toBe(false);
+  });
+
+  it("renders the composed suffix with native semantics and no interactive or external surface", () => {
+    const outcome = composeUnoFoundationSubset(durableSource, durableBindings);
+    expect(outcome.status).toBe("composed");
+    if (outcome.status !== "composed") return;
+    const image = (src: string) => ({ src, type: "image/png", width: 64, height: 40 });
+    const media: UnoPageMedia = new Map([
+      ["family-4-media", { image: image("/uno-media/en-001/components/0") }],
+      [
+        "family-5-gallery",
+        { items: [image("/uno-media/en-001/components/1"), image("/uno-media/en-001/components/2")] },
+      ],
+    ]);
+    const html = renderToStaticMarkup(createElement(UnoPageSections, { document: outcome.document, media }));
+    for (const marker of [
+      'class="uno-json-divider"',
+      'class="uno-json-testimonial-quote"',
+      'class="uno-json-table"',
+      'scope="col"',
+      "<details",
+      "<summary",
+      'class="uno-json-timeline-list"',
+      'class="uno-json-media-image"',
+      "Delivery is switched off.",
+    ]) {
+      expect(html).toContain(marker);
+    }
+    for (const forbidden of ["<form", "<input", "<textarea", "<button", "<iframe", "<script"]) {
+      expect(html).not.toContain(forbidden);
+    }
+    expect(html).not.toMatch(/src="https?:\/\//u);
   });
 });

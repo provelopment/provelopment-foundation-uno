@@ -16,6 +16,16 @@ deployment, an independent Installation or donor-family parity credit, and it cl
 | `about` | `["about"]` (serves `/en-001/about`) | Markdown | `deployment/efs/content/about.en-001.md` |
 | `components` | `["components"]` (serves `/en-001/components`) | JSON | `deployment/efs/content/components.en-001.json` |
 
+The Components Page carries **twenty-three** top-level sections: its six original native sections
+(`components-intro`, `components-copy`, `components-list`, `components-stack`, `components-faq`,
+`components-callout`) unchanged and first, followed by seventeen bounded Foundation family samples
+(`family-0-prose` … `family-16-features`) composed by the unchanged `composeUnoFoundationSubset` from the test-only
+source and bindings in `tests/fixtures/`. Those samples are bounded compositions, not full donor parity; three of them
+address one original Page-owned PNG
+(`deployment/efs/capsule/e_7a3knkx60eacyhca7a0cr1k6e1/foundation/main/wo078-family-plate.png`, 191 bytes, SHA-256
+`25bde641ce447275f7eff9d03859d07062ae34f9e3597eff18cf07bb384eae47`) through `/uno-media/en-001/components/{0,1,2}`.
+Evidence and limits are recorded in `.documents/Architecture/u04-family-parity.md` section 7.
+
 ## Selection and reserved canonical
 
 `deployment/uno.config.json` keeps `version: 1`, the Entity/selected-Site fields and the language preferences, and adds
@@ -66,7 +76,8 @@ licence waiver was added.
 ## What remains open
 
 - **U04:** 16 of 17 bounded donor families remain below full parity (1/17 fully evidenced, `divider`); the proxy
-  remains 43/59. The neutral Components Page is a starter sample, not a donor-family Page.
+  remains 43/59. The Components Page now carries one durable bounded composition of those seventeen sample shapes, which
+  is starter evidence and not a donor-parity Page.
 - **U05:** safe actions and provider gating are out of scope.
 - **U06:** two independent installs, clean-room/upgrade/rollback proof and Owner closure are still required; this run
   provides committed starter and publication evidence only.

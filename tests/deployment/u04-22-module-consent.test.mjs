@@ -969,3 +969,102 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     assert.ok(source.includes('mode: "delivery-off"'));
   });
 });
+
+
+/**
+ * `UNO-WO-078 / R01` — the hosted durable-family proof must stay connected to real predicates.
+ *
+ * `verify-u03-published-http.mjs` is the CI-enforced acceptance path for `DURABLE_FAMILY_*`, and
+ * `verify-u03-browser.mjs` supplies its Chromium label. This guard reads both sources and requires each label to
+ * appear next to the executable predicate behind it, so a future edit cannot keep a label while deleting its check.
+ */
+describe("the hosted durable-family labels are connected to real predicates", () => {
+  const publishedSource = readFileSync(resolve(ROOT, "scripts/verify-u03-published-http.mjs"), "utf8");
+  const browserSource = readFileSync(resolve(ROOT, "scripts/verify-u03-browser.mjs"), "utf8");
+
+  const DURABLE_REQUIRED = Object.freeze([
+    "DURABLE_FAMILY_SOURCE the real composer accepts the source and its bindings",
+    "DURABLE_FAMILY_SOURCE the committed Page has twenty-three top-level sections",
+    "parsed.document.sections.length === 23",
+    "DURABLE_FAMILY_SOURCE the appended sections are the composer's own output",
+    "JSON.stringify(parsed.document.sections.slice(6)) === JSON.stringify(composed.document.sections)",
+    "DURABLE_FAMILY_SOURCE the six original sections still equal the starting committed blob",
+    "DURABLE_FAMILY_REFUSALS the composer refuses ${label}",
+    'outcome.status === "refused" && outcome.reason === reason',
+    "DURABLE_FAMILY_REFUSALS an accessor source refuses as unsafe without running it",
+    'hostileOutcome.reason === "family:unsafe-source" && invoked === false',
+    "DURABLE_FAMILY_HTTP all twenty-three section ids are served in order",
+    "DURABLE_FAMILY_HTTP the contact family renders only the inert delivery-OFF notice",
+    "DURABLE_FAMILY_HTTP exactly three owned images are served",
+    "DURABLE_FAMILY_MEDIA occurrence ${index} is the exact owned bytes",
+    'createHash("sha256").update(bytes).digest("hex") === DURABLE_PLATE_SHA256',
+    "DURABLE_FAMILY_MEDIA ${path} is a real 404",
+    'response.status === 404 && response.headers.get("location") === null && body.length === 0',
+    "DURABLE_FAMILY_BROWSER the real browser proof executed its durable family cases",
+    'browserProof.passes.some((name) => name.startsWith("DURABLE_FAMILY_BROWSER"))',
+    "DURABLE_FAMILY_RESTORE ${relativePath} is byte-identical after the fixture run",
+    "DURABLE_FAMILY_RESTORE the three-Page graph is unchanged after the fixture run",
+    "durableFamilyPage: COMMITTED_PAGES[2]",
+    "durableFamilyIds: DURABLE_FAMILY_IDS",
+  ]);
+
+  const DURABLE_BROWSER_REQUIRED = Object.freeze([
+    "DURABLE_FAMILY_BROWSER ${label} renders all seventeen family ids in order",
+    "DURABLE_FAMILY_BROWSER ${label} keeps every family id unique",
+    "DURABLE_FAMILY_BROWSER ${label} renders a native divider",
+    "DURABLE_FAMILY_BROWSER ${label} renders a native quotation",
+    "DURABLE_FAMILY_BROWSER ${label} renders table column scopes",
+    "DURABLE_FAMILY_BROWSER ${label} renders native disclosures",
+    "DURABLE_FAMILY_BROWSER ${label} decodes every owned image",
+    "DURABLE_FAMILY_BROWSER ${label} gives every image authored alternative text",
+    "DURABLE_FAMILY_BROWSER ${label} shows only the inert delivery-OFF notice",
+    "DURABLE_FAMILY_BROWSER ${label} does not overflow horizontally",
+    "DURABLE_FAMILY_BROWSER ${label} requests nothing outside loopback",
+    "DURABLE_FAMILY_BROWSER ${label} toggles the first disclosure from the keyboard",
+    "observed.imageCount === 3",
+    "observed.imagesDecoded === 3",
+    "observed.forms === 0",
+    "observed.offOriginImages === 0",
+    "record.foreignRequests.length === 0",
+  ]);
+
+  const durableAudit = (text, required) => required.filter((token) => !text.includes(token));
+
+  it("keeps every durable label and predicate in the hosted runner and its browser helper", () => {
+    assert.deepEqual(durableAudit(publishedSource, DURABLE_REQUIRED), []);
+    assert.deepEqual(durableAudit(browserSource, DURABLE_BROWSER_REQUIRED), []);
+  });
+
+  it("fails the audit when any hosted durable label or predicate is removed", () => {
+    for (const token of DURABLE_REQUIRED) {
+      const mutated = publishedSource.split(token).join("DURABLE_REMOVED");
+      assert.notEqual(mutated, publishedSource, token);
+      assert.ok(durableAudit(mutated, DURABLE_REQUIRED).includes(token), token);
+    }
+    for (const token of DURABLE_BROWSER_REQUIRED) {
+      const mutated = browserSource.split(token).join("DURABLE_REMOVED");
+      assert.notEqual(mutated, browserSource, token);
+      assert.ok(durableAudit(mutated, DURABLE_BROWSER_REQUIRED).includes(token), token);
+    }
+  });
+
+  it("fails the audit when a durable predicate is neutered rather than deleted", () => {
+    for (const [token, replacement] of [
+      ["parsed.document.sections.length === 23", "parsed.document.sections.length > 0"],
+      ['outcome.status === "refused" && outcome.reason === reason', "outcome.status !== undefined"],
+      ['createHash("sha256").update(bytes).digest("hex") === DURABLE_PLATE_SHA256', "true"],
+      ['response.status === 404 && response.headers.get("location") === null && body.length === 0', "true"],
+      ['browserProof.passes.some((name) => name.startsWith("DURABLE_FAMILY_BROWSER"))', "true"],
+      ["observed.imageCount === 3", "observed.imageCount > 0"],
+      ["observed.forms === 0", "observed.forms >= 0"],
+      ["record.foreignRequests.length === 0", "record.foreignRequests.length >= 0"],
+    ]) {
+      const inPublished = publishedSource.includes(token);
+      const target = inPublished ? publishedSource : browserSource;
+      const mutated = target.split(token).join(replacement);
+      assert.notEqual(mutated, target, token);
+      const required = inPublished ? DURABLE_REQUIRED : DURABLE_BROWSER_REQUIRED;
+      assert.ok(durableAudit(mutated, required).includes(token), token);
+    }
+  });
+});

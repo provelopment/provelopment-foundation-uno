@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "title": "Foundation family samples",
+  "sections": [
+    {
+      "type": "prose",
+      "body": "Every sample on this Page is an original Uno-authored demonstration of one bounded donor family. Each one is plain text with no styling control and no provider.",
+      "heading": "Bounded family samples",
+      "lede": "These seventeen compositions are appended after the six native sections above."
+    },
+    {
+      "type": "callout",
+      "tone": "note",
+      "body": "A callout carries authored plain text only. Its accent belongs to the renderer, not to this source."
+    },
+    {
+      "type": "list",
+      "ordered": true,
+      "items": [
+        { "label": "Authored order", "detail": "The composed sections keep their source order." },
+        { "label": "One stable identity", "detail": "Each family keeps its generated top-level id." },
+        { "label": "Plain text", "detail": "No Markdown, link or rich text is accepted here." }
+      ]
+    },
+    {
+      "type": "faq",
+      "items": [
+        {
+          "question": "Does a disclosure need a script?",
+          "answer": "No. The group uses the platform details and summary elements."
+        },
+        {
+          "question": "Can an answer carry markup?",
+          "answer": "No. Answers are authored plain text only."
+        }
+      ]
+    },
+    {
+      "type": "media",
+      "image": {
+        "src": "/assets/wo078-family-plate.png",
+        "alt": "A flat two-tone sample plate used only as a synthetic owned image"
+      },
+      "caption": "One original sample plate, owned by this Page."
+    },
+    {
+      "type": "gallery",
+      "columns": 3,
+      "items": [
+        {
+          "image": {
+            "src": "/assets/wo078-family-plate.png",
+            "alt": "The sample plate shown as the first gallery item"
+          },
+          "caption": "First gallery entry."
+        },
+        {
+          "image": {
+            "src": "/assets/wo078-family-plate.png",
+            "alt": "The sample plate shown again as the second gallery item"
+          }
+        }
+      ]
+    },
+    {
+      "type": "contactForm",
+      "formRef": "wo078-contact"
+    },
+    {
+      "type": "actions",
+      "actions": [
+        { "label": "Review the ordered list", "href": "#family-2-list" },
+        { "label": "Review the sample table", "href": "#family-13-table" }
+      ]
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "hero",
+      "eyebrow": "Sample hero",
+      "lede": "A hero in this subset is one authored plain-text lede with optional supporting text.",
+      "support": "Nothing here is a campaign, a promise or a delivery claim."
+    },
+    {
+      "type": "stats",
+      "heading": "Bounded facts",
+      "lede": "Three authored facts, each plain text.",
+      "items": [
+        { "value": "17", "label": "Bounded families", "detail": "Composed from one source document." },
+        { "value": "1", "label": "Owned sample plate" },
+        { "value": "3", "label": "Declared occurrences" }
+      ]
+    },
+    {
+      "type": "steps",
+      "heading": "A short sequence",
+      "items": [
+        { "title": "Author the source", "body": "One version-1 source document holds every family." },
+        { "title": "Compose the document", "body": "The composer validates each family before any Page exists." },
+        { "title": "Read the Page", "body": "The reader validates the assembled document again." }
+      ]
+    },
+    {
+      "type": "quote",
+      "body": "A quotation is authored plain text with an optional attribution and role.",
+      "attribution": "Foundation Uno sample",
+      "role": "Authored sample"
+    },
+    {
+      "type": "table",
+      "caption": "Each family keeps one bounded form",
+      "columns": ["Family", "Bounded form"],
+      "rows": [
+        ["prose", "Plain paragraph"],
+        ["table", "Header and body cells"],
+        ["divider", "Native rule"]
+      ]
+    },
+    {
+      "type": "columns",
+      "ratio": "start-wide",
+      "items": [
+        { "title": "A column with a body", "body": "Each column is a title with either a body or a list." },
+        { "title": "A column with a list", "items": ["First entry", "Second entry"] }
+      ]
+    },
+    {
+      "type": "cards",
+      "columns": 2,
+      "items": [
+        { "title": "First card", "body": "A card keeps only its authored title and optional body." },
+        { "title": "Second card" }
+      ]
+    },
+    {
+      "type": "features",
+      "columns": 3,
+      "heading": "Sample feature set",
+      "lede": "Each feature is an authored title only, laid out as a native list grid.",
+      "items": [
+        { "title": "Plain title" },
+        { "title": "Native list item" },
+        { "title": "No decorative icon" }
+      ]
+    }
+  ]
+}

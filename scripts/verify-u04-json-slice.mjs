@@ -64,6 +64,8 @@ const STARTER_PATHS = Object.freeze([
   `${CONTENT}/home.en-001.json`,
   `${CONTENT}/about.en-001.md`,
   `${CONTENT}/components.en-001.json`,
+  // `UNO-WO-078 / R01`: the one exact owner-qualified Page asset the committed Components Page declares.
+  "deployment/efs/capsule/e_7a3knkx60eacyhca7a0cr1k6e1/foundation/main/wo078-family-plate.png",
 ]);
 
 /** The twenty-one synthetic sources: created only if absent, removed again in the same `finally`. */
@@ -851,7 +853,7 @@ function preflight() {
     encoding: "utf8",
   });
   check("nothing is staged before the fixture", staged.stdout.trim() === "", staged.stdout.trim());
-  const deployment = spawnSync("git", ["--no-optional-locks", "status", "--porcelain=v1", "--", "deployment"], {
+  const deployment = spawnSync("git", ["--no-optional-locks", "status", "--porcelain=v1", "--untracked-files=all", "--", "deployment"], {
     cwd: ROOT,
     encoding: "utf8",
   });
@@ -1964,7 +1966,7 @@ if (outcome === 0 && declarationsRestored) {
   const u03 = await runChild([resolve(ROOT, "scripts/verify-u03-http.mjs")], BUILD_TIMEOUT_MS);
   check("the original U03 fail-closed gate still passes", u03.code === 0, `exit ${u03.code}`);
 
-  const status = spawnSync("git", ["--no-optional-locks", "status", "--porcelain=v1", "--", "deployment"], {
+  const status = spawnSync("git", ["--no-optional-locks", "status", "--porcelain=v1", "--untracked-files=all", "--", "deployment"], {
     cwd: ROOT,
     encoding: "utf8",
   });

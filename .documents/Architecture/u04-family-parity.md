@@ -6,9 +6,9 @@ document — `prose`, `callout`, `table`, `list`, `divider`, `hero`, `stats`, `s
 provenance and rights ledger, not a parity record: **seventeen bounded source mappings; zero entirely unimplemented donor
 families; one of seventeen fully parity-evidenced candidates (`divider`), sixteen still bounded/non-parity (with the
 bounded authored-heading and plain-text-lede modes for `cards`/`features`, and the bounded plain-text heading/lede modes for
-`stats`/`steps`, which add no parity credit); one temporary
-family-composition fixture verified over production HTTP and
-Chromium; no durable published family Page.** U04 remains OPEN.
+`stats`/`steps`, which add no parity credit); one **durable** family composition published on the existing committed
+Components Page under `UNO-WO-078 / R01`**, verified over real production HTTP and Chromium and still a bounded
+composition, never a parity uplift.** U04 remains OPEN.
 That one `divider` candidate was independently accepted under `UNO-WO-069 / R01` and is not Owner closure.
 
 ## 1. Provenance and licence
@@ -343,8 +343,7 @@ ingress JSON-depth bounds that disagreed with the frozen Page-document contract 
   media, meta, actions or icons even when they now carry an authored section heading. This is **one temporary seventeen-shape integration slice** with
   all seventeen bounded shapes sampled over the temporary Page; sixteen of the seventeen remain bounded and non-parity,
   and the single `divider` candidate above is locally evidenced only — headed `cards`/`features` raise no full-parity
-  count to two- or three-seventeenths. There is **no durable published family Page**, no
-  deployment and no owner Site decision.
+  count beyond that one. The **durable** evidence added by `UNO-WO-078 / R01` is recorded in section 7 below.
 
 ## 6. Remaining obligations
 
@@ -359,8 +358,56 @@ other hero, stats, steps, quote, FAQ, columns, cards, features and actions optio
 outline, the donor `steps`, `faq` and `columns` heading outlines, donor card borders/media/meta/actions and feature icons, the donor decorative
 media form, media headings/lede/position/surface, the donor native gallery list wrapper with its optional
 heading/lede/surface and implicit column default, remote image sources and Markdown captions, the donor per-render
-contact seam and every authored form/delivery semantic, a durable composition Page and family-Page
-browser proof beyond the one temporary fixture in section 5. Any
+contact seam and every authored form/delivery semantic, and full-parity browser proof of those donor semantics (the
+durable bounded composition Page of section 7 now exists, but it evidences the bounded subset only). Any
 future order must add those explicitly; this ledger authorises no new module ID, no new schema
 variant and no publication
 authority.
+
+## 7. Durable family Page (`UNO-WO-078 / R01`)
+
+The committed Components Page (`deployment/efs/content/components.en-001.json`, Page `components`, route
+`["components"]`, `/en-001/components`, `publication:"published"`, JSON `visibility:"public"`) keeps its **six native
+sections value-identical and first** (`components-intro`, `components-copy`, `components-list`, `components-stack`,
+`components-faq`, `components-callout`) and appends **exactly seventeen** bounded family compositions in the ledger
+order: `family-0-prose` through `family-16-features`. The appended nodes are the literal output of the unchanged
+`composeUnoFoundationSubset`, not a hand-mapped proxy: `tests/fixtures/u04-durable-family-source.json` is an original
+test-only donor-shaped v1 source, `tests/fixtures/u04-durable-family-bindings.json` is its separate migration binding,
+and the committed Page's appended suffix equals the composer's `document.sections` byte for byte (proved in the unit
+suite, in the hosted runner before any fixture, and again in the hosted CI).
+
+Evidence, all from the committed head:
+
+* **Source and bindings.** The composer accepts the seventeen-family source with one image binding
+  (`/assets/wo078-family-plate.png` → `{zone:"page",path:"wo078-family-plate.png"}`) and one contact acknowledgement
+  (`{formRef:"wo078-contact",mode:"delivery-off"}`); the accepted document is one deeply frozen v1 Page and the source
+  and bindings are never mutated.
+* **Owned asset.** One original, deterministic 64×40 RGB PNG (`wo078-family-plate.png`, 191 bytes, SHA-256
+  `25bde641ce447275f7eff9d03859d07062ae34f9e3597eff18cf07bb384eae47`) is created exclusively inside this Page's own
+  `capsule/<entity>/<facet>/<site>` zone — no brand, text, font or third-party pixel. It backs the three declared
+  occurrences (the `media` sample and the two `gallery` items) through `/uno-media/en-001/components/{0,1,2}`.
+* **Real HTTP.** The three locators answer `200 image/png` with the exact bytes, `nosniff` and matching `HEAD`;
+  `/uno-media/en-001/components/3`, another Page's locator, an unknown Page, a guessed storage filename, `-1`, `00`, the
+  reserved `home` alias and a foreign locale are real `404`s with no body and no redirect.
+* **Rendered semantics.** One `main`, one `h1`, twenty-three unique section ids in order, a native `<hr>`,
+  `<blockquote>`, `<table>` with `scope="col"` headers, `<details>`/`<summary>` disclosures, a native ordered timeline
+  list and unordered list, gallery `<figure>`/`<figcaption>`, three owned `<img>` elements with authored `alt`, and the
+  inert "Delivery is switched off" notice with **no** form, input, textarea, button or iframe.
+* **Chromium.** The same Page is measured in real Chromium at 390 and 1280 CSS pixels, light and dark, and under
+  `prefers-reduced-motion: reduce`: seventeen family ids in order, native semantics present, every image decoded with
+  alternative text and addressed only by this Page's own locators, no form control, no horizontal overflow, no console
+  or page error, no off-origin request, and the pre-existing disclosure toggled from the keyboard.
+* **Refusals.** Rich Markdown, remote or unbound images, unknown/generated zones, non-OFF or absent contact
+  acknowledgement, an eighteenth family, external action destinations, unsupported keys, an accessor source and an
+  over-count source each refuse the whole document with one closed reason and no partial Page.
+* **Trace and restoration.** The bounded build trace ships the three declared sources and nothing from `.documents/`,
+  `.temp/`, `tests/`, `scripts/` or the parent workspace; the committed Page and the owned plate remain byte-identical
+  after every reversible fixture runner.
+
+**No parity uplift and no stage closure follow from this.** It is one durable bounded composition of sixteen
+still-incomplete families plus the single `divider` candidate: the donor Markdown, links, rich forms, card
+media/meta/actions, feature icons, decorative media, gallery list wrapper, heading outlines and delivery semantics
+listed in section 6 remain absent. The accounting is unchanged at **22/22** module IDs, **4/4** asset zones,
+**16/16** browser matrix, **17/17** bounded mappings, **1/17** accepted full parity (`divider`) and **43/59 =
+72.88%** proxy. The reserved `.example` canonical is illustrative sample data, not a domain, deployment or ownership
+claim, and U04 remains OPEN.
