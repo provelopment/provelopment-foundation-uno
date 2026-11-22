@@ -358,12 +358,8 @@ describe("composeUnoFoundationSubset — envelope, family and feature refusal", 
   });
 
   it("refuses an out-of-subset field on a supported family", () => {
-    // `UNO-WO-075 / R01` makes `heading`/`lede` representable on `prose`, `callout`, `list`, `faq` and `table`, so this
-    // pre-existing case now proves the refusal with the donor fields that stay outside the subset on `prose`.
-    expectRefusal(envelope({ type: "prose", body: "A", align: "center" }), "family:unsupported-feature");
-    expectRefusal(envelope({ type: "prose", body: "A", surface: "muted" }), "family:unsupported-feature");
-    expectRefusal(envelope({ type: "callout", body: "A", align: "start" }), "family:unsupported-feature");
-    expectRefusal(envelope({ type: "callout", body: "A", surface: "muted" }), "family:unsupported-feature");
+    // `UNO-WO-084 / R01` makes `align`, `surface` and Markdown representable on `prose` and `callout`, so this case now
+    // proves the refusal with the donor fields that stay outside the subset.
     expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], links: [] }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "list", items: ["A"], visibility: "public" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "divider", html: "<b>" }), "family:unsupported-feature");
@@ -372,6 +368,8 @@ describe("composeUnoFoundationSubset — envelope, family and feature refusal", 
     expectRefusal(envelope({ type: "prose", body: "A", link: "/en" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "prose", body: "A", style: "color:red" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "prose", body: "A", onClick: "go()" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "callout", body: "A", style: "color:red" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "callout", body: "A", href: "/x" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "list", items: [{ label: "A", href: "/x" }] }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "list", items: [{ label: "A", destination: "/x" }] }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "list", items: ["A"], extra: true }), "family:unsupported-feature");
@@ -419,15 +417,18 @@ describe("composeUnoFoundationSubset — malformed accepted fields and Markdown 
     expectRefusal(envelope({ type: "list", items: ["A"], ordered: 1 }), "family:target-refused");
   });
 
-  it("refuses Markdown instead of emitting its punctuation as faithful prose", () => {
-    expectRefusal(envelope({ type: "prose", body: "This is **bold** text." }), "family:unsupported-feature");
-    expectRefusal(
-      envelope({ type: "prose", body: "See [link](https://example.org) here." }),
-      "family:unsupported-feature",
-    );
-    expectRefusal(envelope({ type: "prose", body: "Run `command` now." }), "family:unsupported-feature");
-    expectRefusal(envelope({ type: "prose", body: "# Heading\nBody text." }), "family:unsupported-feature");
-    expectRefusal(envelope({ type: "callout", body: "A **note** here." }), "family:unsupported-feature");
+  it("renders accepted Markdown on prose and callout while refusing it elsewhere", () => {
+    const proseMarkdown = render(composed(envelope({ type: "prose", body: "This is **bold** and `code`." })));
+    expect(proseMarkdown).toContain('<strong class="uno-family-md-strong">bold</strong>');
+    expect(proseMarkdown).toContain('<code class="uno-family-md-code">code</code>');
+    const linkMarkdown = render(composed(envelope({ type: "prose", body: "See [link](https://example.org) here." })));
+    expect(linkMarkdown).toContain('href="https://example.org"');
+    const headingMarkdown = render(composed(envelope({ type: "prose", body: "## Section\n\nBody text." })));
+    expect(headingMarkdown).toContain('<h2 class="uno-family-md-heading">Section</h2>');
+    const calloutMarkdown = render(composed(envelope({ type: "callout", body: "A **note** here." })));
+    expect(calloutMarkdown).toContain("uno-json-callout");
+    expect(calloutMarkdown).toContain('<strong class="uno-family-md-strong">note</strong>');
+    // Families without a Markdown contract still refuse its punctuation rather than printing it as faithful text.
     expectRefusal(envelope({ type: "list", items: ["**bold label**"] }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "list", items: [{ label: "A", detail: "`code`" }] }), "family:unsupported-feature");
     expectRefusal(
@@ -435,6 +436,10 @@ describe("composeUnoFoundationSubset — malformed accepted fields and Markdown 
       "family:unsupported-feature",
     );
     expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], caption: "`c`" }), "family:unsupported-feature");
+    // A construct Uno cannot render safely refuses the whole source instead of degrading to apparent text.
+    expectRefusal(envelope({ type: "prose", body: "![alt](https://example.org/a.png)" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "prose", body: "See [x](javascript:alert(1))" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "callout", body: "Text <b>markup</b>" }), "family:target-refused");
   });
 
   it("refuses a legacy Uno Page source rather than misreading it as donor input", () => {
@@ -2435,11 +2440,11 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/FAMILY_PARITY=17\/17/u);
     expect(ledger).toContain("ADAPT (divider semantic parity candidate)");
-    expect(ledger).toContain("one of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("three of seventeen fully parity-evidenced candidates");
     // `UNO-WO-071 / R01` normalizes the divider wording to its already independently accepted status.
     expect(ledger).toContain("independently accepted under `UNO-WO-069 / R01`");
     expect(ledger).not.toContain("awaiting independent Architect acceptance");
-    expect(ledger).toContain("sixteen still bounded");
+    expect(ledger).toContain("fourteen still bounded");
     // `UNO-WO-070 / R01`: the two grid families gained a bounded authored-heading mode, which must never be recorded as
     // full parity, a second/third accepted family or a closed stage.
     expect(ledger).toContain("ADAPT (bounded grid plus authored section heading and plain-text lede)");
@@ -4162,7 +4167,7 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
     expect(ledger).toContain("lede-only");
     expect(ledger).toContain("no-lede");
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("one of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("three of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
@@ -4469,7 +4474,7 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
     expect(ledger.split("ADAPT (bounded authored plain-text heading/lede)").length - 1).toBe(2);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("one of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("three of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/stats[^.\n]*full semantic parity/u);
@@ -4506,6 +4511,9 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
 
   type FiveType = "prose" | "callout" | "list" | "faq" | "table";
   const FIVE_TYPES: readonly FiveType[] = ["prose", "callout", "list", "faq", "table"];
+  // `UNO-WO-084 / R01`: an authored callout heading/lede now belongs inside the notice rather than in an outer stack,
+  // so the wrapper assertions below cover the four families that still compose one.
+  const WRAPPED_TYPES: readonly FiveType[] = FIVE_TYPES.filter((type) => type !== "callout");
 
   /** The documented original-child suffix of each of the five wrapped families. */
   const CHILD_SUFFIX: Record<FiveType, string> = {
@@ -4582,7 +4590,7 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
 
 
   it("composes a heading-only wrapper that carries the original child unchanged apart from its documented id", () => {
-    for (const type of FIVE_TYPES) {
+    for (const type of WRAPPED_TYPES) {
       const variant =
         type === "callout" ? "tone" : type === "list" ? "ordered" : type === "faq" ? "two" : type === "table" ? "caption" : undefined;
       const document = composed(fivePage(type, { heading: "Synthetic section" }, variant));
@@ -4605,7 +4613,7 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
   });
 
   it("composes a lede-only wrapper without inventing a heading", () => {
-    for (const type of FIVE_TYPES) {
+    for (const type of WRAPPED_TYPES) {
       const document = composed(fivePage(type, { lede: "A plain authored lede." }));
       const section = document.sections[0]!;
       if (section.module !== "layout.stack") continue;
@@ -4621,7 +4629,7 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
   });
 
   it("composes heading plus lede as three ordered children before the original native node", () => {
-    for (const type of FIVE_TYPES) {
+    for (const type of WRAPPED_TYPES) {
       const source = fivePage(type, { heading: "Synthetic section", lede: "A plain authored lede." });
       const before = JSON.stringify(source);
       const document = composed(source);
@@ -4640,6 +4648,24 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     }
   });
 
+
+  it("keeps an authored callout heading and lede inside the notice", () => {
+    const document = composed(
+      fivePage("callout", { heading: "Synthetic section", lede: "A plain authored lede." }, "tone"),
+    );
+    const section = document.sections[0]!;
+    expect(section.id).toBe("family-0-callout");
+    expect(section.module).toBe("content.prose");
+    if (section.module !== "content.prose") return;
+    expect(section.props).toMatchObject({
+      variant: "callout",
+      text: "A bounded note.",
+      tone: "warning",
+      heading: "Synthetic section",
+      lede: "A plain authored lede.",
+    });
+    expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+  });
 
   it("keeps authored ids and source order when a headed family is mixed with the divider in either order", () => {
     const divider = { type: "divider" };
@@ -4729,6 +4755,23 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     for (const type of FIVE_TYPES) {
       for (const [value, reason] of cases) {
         expectRefusal(fivePage(type, { heading: value }), reason);
+        if (type === "prose" || type === "callout") {
+          // `UNO-WO-084 / R01`: a `prose`/`callout` lede is Markdown-capable. Non-text, blank, padded, oversized,
+          // surrogate-bearing and unsafe-Markdown values still refuse; every other value is an accepted Markdown lede.
+          const refusesAsLede =
+            typeof value !== "string" ||
+            value.trim().length === 0 ||
+            value.trim() !== value ||
+            /!\[/u.test(value) ||
+            /<[a-zA-Z/!?]/u.test(value) ||
+            /(?:^|\n)#{1}[ \t]/u.test(value) ||
+            /\u0000/u.test(value) ||
+            /[\uD800-\uDFFF]/u.test(value);
+          if (!refusesAsLede) {
+            expect(composeUnoFoundationSubset(fivePage(type, { lede: value })).status).toBe("composed");
+            continue;
+          }
+        }
         expectRefusal(fivePage(type, { lede: value }), reason);
       }
       expectRefusal(fivePage(type, { heading: "h".repeat(161) }), "family:target-refused");
@@ -4765,11 +4808,17 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
 
   it("preserves the earlier native refusals and does not widen neighbouring families", () => {
     for (const type of FIVE_TYPES) {
-      expectRefusal(fivePage(type, { align: "center" }), "family:unsupported-feature");
-      expectRefusal(fivePage(type, { surface: "muted" }), "family:unsupported-feature");
+      // `UNO-WO-084 / R01` widens only `prose` and `callout`; the other three still refuse the closed presentation fields.
+      if (type !== "prose" && type !== "callout") {
+        expectRefusal(fivePage(type, { align: "center" }), "family:unsupported-feature");
+        expectRefusal(fivePage(type, { surface: "muted" }), "family:unsupported-feature");
+      }
       expectRefusal(fivePage(type, { eyebrow: "X" }), "family:unsupported-feature");
       expectRefusal(fivePage(type, { heading: "Valid", markdown: "# no" }), "family:unsupported-feature");
     }
+    // The newly accepted presentation fields stay closed: an unlisted value is still refused by the Uno reader.
+    expectRefusal(envelope({ type: "prose", body: "A", align: "right" }), "family:target-refused");
+    expectRefusal(envelope({ type: "prose", body: "A", surface: "shadow" }), "family:target-refused");
     expectRefusal(envelope({ type: "list", items: [{ label: "Linked", href: "https://example.com" }] }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], align: "center" }), "family:unsupported-feature");
     // The two new optional keys stay family-specific: unmapped neighbouring families still refuse them.
@@ -4787,7 +4836,7 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
       faq: '<div class="uno-json-accordion" id="family-0-faq-accordion">',
       table: '<div class="uno-json-table-scroll" id="family-0-table-table" tabindex="0">',
     };
-    for (const type of FIVE_TYPES) {
+    for (const type of WRAPPED_TYPES) {
       const html = render(
         composed(fivePage(type, { heading: "Synthetic section", lede: "A lede & \"quoted\" text." }, type === "callout" ? "tone" : undefined)),
       );
@@ -4809,13 +4858,31 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
         expect(region).not.toContain(forbidden);
       }
     }
+    // `UNO-WO-084 / R01`: the callout keeps its accent and carries the authored heading and lede inside it, in order.
+    const calloutHtml = render(
+      composed(fivePage("callout", { heading: "Synthetic section", lede: "A lede & \"quoted\" text." }, "tone")),
+    );
+    const calloutStart = calloutHtml.indexOf('id="family-0-callout"');
+    expect(calloutStart).toBeGreaterThan(-1);
+    const calloutRegion = calloutHtml.slice(calloutStart - 80);
+    expect(calloutRegion).toContain('data-uno-tone="warning"');
+    expect(calloutRegion).toContain('<h2 class="uno-json-prose-heading">Synthetic section</h2>');
+    expect(calloutRegion).toContain('<p class="uno-json-prose-lede">A lede &amp; &quot;quoted&quot; text.</p>');
+    expect(calloutRegion.indexOf("Synthetic section")).toBeLessThan(calloutRegion.indexOf("A lede"));
+    expect(calloutRegion).not.toContain("<script");
+    expect(calloutRegion).not.toContain("<form");
   });
 
   it("keeps the five-family subset recorded in the ledger without claiming further parity", () => {
     const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
-    expect(ledger.split("ADAPT (bounded plain-text heading/lede)").length - 1).toBe(5);
+    // `UNO-WO-084 / R01` (A1): prose and callout are credited parity candidates now, so only three bounded families keep the
+    // earlier treatment.
+    expect(ledger.split("ADAPT (bounded plain-text heading/lede)").length - 1).toBe(3);
+    expect(ledger.split("PARITY (A1, UNO-WO-084 / R01)").length - 1).toBe(2);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("one of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("three of seventeen fully parity-evidenced candidates");
+    expect(ledger).not.toContain("sixteen still bounded");
+    expect(ledger).toContain("fourteen still bounded");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("6/17");
     expect(ledger).not.toMatch(/prose[^.\n]*full semantic parity/u);
@@ -4997,7 +5064,15 @@ describe("the committed durable family Page (`UNO-WO-078 / R01`)", () => {
       status: "refused",
       reason: "family:unsupported-family",
     });
-    const refused = composeUnoFoundationSubset(envelope({ type: "prose", body: "A **bold** claim" }));
+    // `UNO-WO-084 / R01`: `prose`/`callout` Markdown is now composed rather than refused; unsafe constructs still refuse.
+    const markdownProse = composeUnoFoundationSubset(envelope({ type: "prose", body: "A **bold** claim" }));
+    expect(markdownProse.status).toBe("composed");
+    if (markdownProse.status === "composed") {
+      const proseNode = markdownProse.document.sections[0]!;
+      expect(proseNode.module).toBe("content.prose");
+      expect(proseNode.id).not.toContain("undefined");
+    }
+    const refused = composeUnoFoundationSubset(envelope({ type: "prose", body: "A ![img](https://example.org/i.png) claim" }));
     expect(refused.status).toBe("refused");
     expect("document" in refused).toBe(false);
   });

@@ -71,7 +71,7 @@
  * runtime code,
  * package, image or trademark is imported. See `.documents/Architecture/u04-family-parity.md`.
  */
-import { readUnoPageDocument, type UnoPageDocument } from "../core/page-document";
+import { readUnoFamilyMarkdown, readUnoPageDocument, type UnoPageDocument } from "../core/page-document";
 import {
   readUnoOwnedAssetRef,
   readUnoOwnedMediaPath,
@@ -533,6 +533,52 @@ function readNewFamilyText(value: PlainValue | undefined): string {
   return text;
 }
 
+/** Markdown constructs a donor field may author; their presence switches the composed node to the accepted Markdown form. */
+const FAMILY_MARKDOWN_PATTERN =
+  /(?:\*\*|`|\[[^\]\n]*\]\([^)\n]*\)|(?:^|\n)[ \t]{0,3}(?:#{1,6}[ \t]|[-*+][ \t]|\d{1,9}[.)][ \t]|>)|_[^_\n]+_|~~[^~\n]+~~|\*[^*\n]+\*|<|\n|\r|\t)/u;
+
+/** True when one donor field actually authors Markdown, rather than text that merely contains punctuation. */
+function hasFamilyMarkdown(text: string): boolean {
+  return FAMILY_MARKDOWN_PATTERN.test(text);
+}
+
+/**
+ * Read one donor Markdown-capable **body** field for the `prose` and `callout` families.
+ *
+ * Refusal reasons keep this family's previous vocabulary: a non-string is an unsupported feature, an empty body is the
+ * target's own refusal, an over-length body is the target's own refusal, and a construct the shared Markdown reader
+ * refuses is an unsupported feature. Nothing is trimmed, normalised or printed as apparently faithful plain text.
+ */
+function readFamilyBody(value: PlainValue | undefined, codePointLimit: number): string {
+  if (typeof value !== "string") refuseUnsupportedFeature();
+  if (value.trim().length === 0) refuseTarget();
+  if (codePointLength(value) > codePointLimit) refuseTarget();
+  // A tag-like `<` opener keeps this family's original target refusal; a bare `<` stays inert authored text.
+  if (/<[a-zA-Z/!?]/u.test(value)) refuseTarget();
+  if (!readUnoFamilyMarkdown(value).ok) refuseUnsupportedFeature();
+  return value;
+}
+
+/** Read one donor Markdown-capable **lede** field, keeping the documented unpadded and bounded plain-text rules. */
+function readFamilyLede(value: PlainValue | undefined): string {
+  if (typeof value !== "string") refuseUnsupportedFeature();
+  if (value.length === 0) refuseTarget();
+  if (value.trim() !== value) refuseTarget();
+  if (codePointLength(value) > 4000) refuseTarget();
+  for (let index = 0; index < value.length; index += 1) {
+    const unit = value.charCodeAt(index);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) refuseTarget();
+      index += 1;
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+      refuseTarget();
+    }
+  }
+  if (!readUnoFamilyMarkdown(value).ok) refuseUnsupportedFeature();
+  return value;
+}
+
 /**
  * Read one authored section heading of the two bounded grid families.
  *
@@ -646,23 +692,55 @@ function composeSection(
 
   switch (type) {
     case "prose": {
-      // `UNO-WO-075 / R01`: the donor spreads `headingFields` into its prose schema, so the optional plain-text heading
-      // and lede become representable here as bounded authored text. `align`, `surface` and Markdown stay unsupported.
-      requireExactKeys(record, ["type", "body"], ["heading", "lede"]);
-      const body = readDonorText(record["body"], true);
-      const prose: CandidateSection = { id, module: "content.prose", props: { text: body } };
-      return wrapAuthoredText(record, id, prose, "prose");
+      // `UNO-WO-084 / R01`: the donor spreads `headingFields` and Markdown-capable `lede`/`body`, plus closed `align` and
+      // `surface`. When any of them is authored the composed node carries them; otherwise the original plain node stays.
+      requireExactKeys(record, ["type", "body"], ["heading", "lede", "align", "surface"]);
+      const body = readFamilyBody(record["body"], 4000);
+      const headingAuthored = ownsKey(record, "heading");
+      const ledeAuthored = ownsKey(record, "lede");
+      const lede = ledeAuthored ? readFamilyLede(record["lede"]) : undefined;
+      const ledeMarkdown = lede !== undefined && hasFamilyMarkdown(lede);
+      // A heading/lede pair alone keeps the previously committed outline stack byte-identically; `align`, `surface` and
+      // Markdown need one node so the presentation and the rendered blocks belong to the family itself.
+      const rich =
+        ownsKey(record, "align") || ownsKey(record, "surface") || hasFamilyMarkdown(body) || ledeMarkdown;
+      if (!rich) {
+        const prose: CandidateSection = { id, module: "content.prose", props: { text: body } };
+        return wrapAuthoredText(record, id, prose, "prose");
+      }
+      const props: Record<string, unknown> = { text: body, markdown: true };
+      if (headingAuthored) props["heading"] = readSectionHeading(record["heading"]);
+      if (lede !== undefined) props["lede"] = lede;
+      if (ownsKey(record, "align")) props["align"] = record["align"];
+      if (ownsKey(record, "surface")) props["surface"] = record["surface"];
+      return { id, module: "content.prose", props };
     }
     case "callout": {
-      // The donor callout also spreads `headingFields`; its `align`, `surface` and Markdown forms remain outside this
-      // subset, and the authored heading/lede sit before the native callout notice rather than inside its accent.
-      requireExactKeys(record, ["type", "body"], ["tone", "heading", "lede"]);
-      const body = readDonorText(record["body"], true);
+      // The donor callout spreads the same fields; its heading and lede belong *inside* the accent, so any authored pair
+      // is composed into the notice itself rather than the previous heading/lede/notice stack.
+      requireExactKeys(record, ["type", "body"], ["tone", "heading", "lede", "align", "surface"]);
+      const body = readFamilyBody(record["body"], 4000);
+      const headingAuthored = ownsKey(record, "heading");
+      const ledeAuthored = ownsKey(record, "lede");
+      const lede = ledeAuthored ? readFamilyLede(record["lede"]) : undefined;
       const props: Record<string, unknown> = { variant: "callout", text: body };
       // An absent tone stays absent: the display default belongs to the renderer, not to a manufactured field.
       if (ownsKey(record, "tone")) props["tone"] = record["tone"];
-      const callout: CandidateSection = { id, module: "content.prose", props };
-      return wrapAuthoredText(record, id, callout, "callout");
+      const ledeMarkdown = lede !== undefined && hasFamilyMarkdown(lede);
+      const rich =
+        headingAuthored ||
+        ledeAuthored ||
+        ownsKey(record, "align") ||
+        ownsKey(record, "surface") ||
+        hasFamilyMarkdown(body) ||
+        ledeMarkdown;
+      if (!rich) return { id, module: "content.prose", props };
+      if (hasFamilyMarkdown(body) || ledeMarkdown) props["markdown"] = true;
+      if (headingAuthored) props["heading"] = readSectionHeading(record["heading"]);
+      if (lede !== undefined) props["lede"] = lede;
+      if (ownsKey(record, "align")) props["align"] = record["align"];
+      if (ownsKey(record, "surface")) props["surface"] = record["surface"];
+      return { id, module: "content.prose", props };
     }
     case "table": {
       // The donor table also spreads `headingFields`; spans, merged cells, `surface`, unsafe captions and Markdown stay

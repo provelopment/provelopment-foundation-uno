@@ -28,8 +28,9 @@
 import Image from "next/image";
 
 import type { UnoPageMedia, UnoResolvedImage, UnoSectionMedia } from "../core/assets/uno-owned-media";
-import { readUnoPageDocument, isUnoExternalVideoProps, type UnoPageDocument, type UnoSectionNode } from "../core/page-document";
+import { readUnoFamilyMarkdown, readUnoPageDocument, isUnoExternalVideoProps, type UnoContentProseBody, type UnoPageDocument, type UnoSectionNode } from "../core/page-document";
 import { readUnoVideoEmbed } from "../core/video/uno-video-embeds";
+import { UnoFamilyMarkdown } from "./uno-family-markdown";
 import { UnoCarouselIsland, UnoExternalVideoIsland, UnoModalIsland, UnoTabsIsland } from "./uno-interaction-island";
 
 /** The exact intrinsic heading element for each authored level; `h1` is deliberately absent. */
@@ -112,7 +113,49 @@ function MediaItemFigure({
 }
 
 /** Render one validated section node, or nothing when the node is somehow not renderable. */
+/** True when a prose body carries any donor-rich field; otherwise the original plain-text element is kept byte-exact. */
+function isRichProseBody(body: UnoContentProseBody): boolean {
+  return body.heading !== undefined || body.lede !== undefined || body.markdown === true;
+}
+
+/**
+ * Render one rich `content.prose`/`callout` body in authored order: heading, lede, then body.
+ *
+ * A Markdown field is rendered from the accepted AST; a plain field stays one escaped paragraph. A field that does not
+ * parse yields nothing rather than a partial or best-effort render, so a visitor never receives half a sentence.
+ */
+function ProseBodyContent({ body }: { readonly body: UnoContentProseBody }) {
+  const lede = body.lede;
+  const ledeParsed = body.markdown === true && lede !== undefined ? readUnoFamilyMarkdown(lede) : null;
+  const textParsed = body.markdown === true ? readUnoFamilyMarkdown(body.text) : null;
+  return (
+    <>
+      {body.heading === undefined ? null : <h2 className="uno-json-prose-heading">{body.heading}</h2>}
+      {lede === undefined ? null : ledeParsed !== null && ledeParsed.ok ? (
+        <UnoFamilyMarkdown blocks={ledeParsed.blocks} className="uno-json-prose-lede" />
+      ) : (
+        <p className="uno-json-prose-lede">{lede}</p>
+      )}
+      {textParsed !== null && textParsed.ok ? (
+        <UnoFamilyMarkdown blocks={textParsed.blocks} className="uno-json-prose-text" />
+      ) : (
+        <p className="uno-json-prose-text">{body.text}</p>
+      )}
+    </>
+  );
+}
+
+/** The closed optional presentation attributes, emitted only when the authored field is present. */
+function prosePresentation(body: UnoContentProseBody): Record<string, string> {
+  return {
+    ...(body.align === undefined ? {} : { "data-uno-align": body.align }),
+    ...(body.surface === undefined ? {} : { "data-uno-surface": body.surface }),
+  };
+}
+
 function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly media: UnoPageMedia | undefined }) {
+
+
   switch (node.module) {
     case "layout.stack": {
       const gap = node.props.gap ?? "normal";
@@ -273,9 +316,22 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
         );
       }
       if (prose.variant === "callout") {
+        // The donor's heading and lede sit inside the accent; when nothing rich is authored the original notice is kept.
         return (
-          <section className="uno-json-callout" data-uno-tone={prose.tone ?? "note"} id={node.id}>
-            <p>{prose.text}</p>
+          <section
+            className="uno-json-callout"
+            data-uno-tone={prose.tone ?? "note"}
+            id={node.id}
+            {...prosePresentation(prose)}
+          >
+            {isRichProseBody(prose) ? <ProseBodyContent body={prose} /> : <p>{prose.text}</p>}
+          </section>
+        );
+      }
+      if (isRichProseBody(prose)) {
+        return (
+          <section className="uno-json-prose" id={node.id} {...prosePresentation(prose)}>
+            <ProseBodyContent body={prose} />
           </section>
         );
       }

@@ -304,7 +304,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "sequenceBrowserChecks === 2",
   // `UNO-WO-075 / R01`: the five-family authored plain-text heading and lede — labels plus their executable predicates.
   'heading: "Synthetic prose heading",',
-  'lede: "Synthetic prose introduction & \\"quoted\\" wording.",',
+  'lede: "Synthetic prose introduction & \\"quoted\\" wording, with *emphasis*.",',
   'heading: "Synthetic callout heading",',
   'lede: "Synthetic callout introduction.",',
   'heading: "Synthetic list heading",',
@@ -314,20 +314,36 @@ const PHASE_C_REQUIRED = Object.freeze([
   'heading: "Synthetic table heading",',
   'lede: "Synthetic table introduction.",',
   "FAMILY_TEXT_FIVE_SOURCE ${evidence.id} composes one frozen stack with the authored heading, the authored lede and the unchanged native node",
-  "FAMILY_TEXT_FIVE_SOURCE the five authored-text families add no top-level node and keep the seventeen ids",
+  "FAMILY_TEXT_FIVE_SOURCE the three remaining authored-text families add no top-level node and keep the seventeen ids",
   "FAMILY_TEXT_FIVE_REFUSALS each authored-text probe refuses the whole Page with its documented reason",
   "FAMILY_TEXT_FIVE_REFUSALS an authored prose heading getter yields family:unsafe-source with zero invocations",
   "FAMILY_TEXT_FIVE_REFUSALS a whitespace-only table lede refuses the whole Page despite four valid siblings",
   "FAMILY_TEXT_FIVE_HTTP family-${index}-${type} serves one authored h2 and one lede before its native node",
-  "FAMILY_TEXT_FIVE_HTTP the five families add nine stacks and five headings with no duplicate id, extra main or external destination",
+  "FAMILY_TEXT_FIVE_HTTP the three remaining authored-text families add seven stacks and three headings with no duplicate id, extra main or external destination",
   "FAMILY_TEXT_FIVE_BROWSER the five authored-text families were measured in real Chromium at both viewports",
   "textFiveGetterCalls === 0",
   "textFiveBrowserChecks === 2",
-  "familyAccepted.sections.filter((section) => section.module === \"layout.stack\").length === 9",
-  "family-0-prose-prose",
+  "familyAccepted.sections.filter((section) => section.module === \"layout.stack\").length === 7",
+  'id="family-0-prose" data-uno-align="center"',
   "family-13-table-table",
   "family-3-faq-accordion",
   "found.ledeBeforeNative",
+  // `UNO-WO-084 / R01` (checkpoint A1): prose + callout rich parity — labels plus their executable predicates. Each
+  // fragment must exist literally in the runner, so deleting a probe or neutering a predicate fails this guard.
+  "A1_SOURCE the composed family-0-prose carries the authored heading, Markdown lede/body, align and surface",
+  "A1_SOURCE the composed family-1-callout keeps its tone and carries an inside heading and Markdown body",
+  "A1_READER the real reader re-reads both rich family nodes from the serialized buffer",
+  "A1_RENDERER both rich family nodes carry exactly the closed renderer contract",
+  "A1_REFUSAL raw markup, an image and a script scheme each refuse the whole source",
+  "A1_HTTP the served family-0-prose keeps its authored heading, Markdown lede and body, align and surface",
+  "A1_HTTP the served family-1-callout keeps its accent, tone and inside heading and lede",
+  "A1_BROWSER=PASS prose passed twenty real-Chromium checks at 390px and 1280px in light and dark",
+  "A1_BROWSER=PASS callout passed twelve real-Chromium checks at 390px and 1280px in light and dark",
+  "U04_CLOSURE_ORACLE the cumulative oracle accepts the A1 row from the executed evidence",
+  "a1ProseBrowserChecks === 20",
+  "a1CalloutBrowserChecks === 12",
+  "a1Evidence.prose.refusal = unsafeMarkup.status === \"refused\" && unsafeScheme.status === \"refused\"",
+  "closure.ok === true && familyOk && dividerOk",
   // `UNO-WO-080 / R01`: the three donor level-3 outlines — labels plus their executable predicates.
   "FAMILY_OUTLINE_THREE_SOURCE steps, faq and columns compose the documented level-3 item outline and refuse an authored level",
   "FAMILY_OUTLINE_THREE_HTTP the served Page puts the step titles, FAQ questions and column titles in level-3 headings of their own regions",
@@ -972,7 +988,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     const mutations = [
       // Each authored fixture field removed from the five families.
       ['heading: "Synthetic prose heading",', ""],
-      ['lede: "Synthetic prose introduction & \\"quoted\\" wording.",', ""],
+      ['lede: "Synthetic prose introduction & \\"quoted\\" wording, with *emphasis*.",', ""],
       ['heading: "Synthetic callout heading",', ""],
       ['lede: "Synthetic callout introduction.",', ""],
       ['heading: "Synthetic list heading",', ""],
@@ -985,7 +1001,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ["textFiveGetterCalls === 0", "true"],
       ["textFiveBrowserChecks === 2", "true"],
       ["found.ledeBeforeNative", "true"],
-      ['familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 9', "true"],
+      ['familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7', "true"],
     ];
     for (const [token, replacement] of mutations) {
       const mutated = source.split(token).join(replacement);
@@ -994,12 +1010,12 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     }
     for (const label of [
       "FAMILY_TEXT_FIVE_SOURCE ${evidence.id} composes one frozen stack with the authored heading, the authored lede and the unchanged native node",
-      "FAMILY_TEXT_FIVE_SOURCE the five authored-text families add no top-level node and keep the seventeen ids",
+      "FAMILY_TEXT_FIVE_SOURCE the three remaining authored-text families add no top-level node and keep the seventeen ids",
       "FAMILY_TEXT_FIVE_REFUSALS each authored-text probe refuses the whole Page with its documented reason",
       "FAMILY_TEXT_FIVE_REFUSALS an authored prose heading getter yields family:unsafe-source with zero invocations",
       "FAMILY_TEXT_FIVE_REFUSALS a whitespace-only table lede refuses the whole Page despite four valid siblings",
       "FAMILY_TEXT_FIVE_HTTP family-${index}-${type} serves one authored h2 and one lede before its native node",
-      "FAMILY_TEXT_FIVE_HTTP the five families add nine stacks and five headings with no duplicate id, extra main or external destination",
+      "FAMILY_TEXT_FIVE_HTTP the three remaining authored-text families add seven stacks and three headings with no duplicate id, extra main or external destination",
       "FAMILY_TEXT_FIVE_BROWSER the five authored-text families were measured in real Chromium at both viewports",
     ]) {
       const mutated = source.split(label).join("five-family evidence removed");

@@ -171,14 +171,31 @@ export interface UnoProseListItem {
 }
 
 /**
+ * One bounded `content.prose` body: plain authored text, or — when `markdown` is the literal `true` — donor-authored
+ * Markdown that `readUnoFamilyMarkdown` has already accepted.
+ */
+export interface UnoContentProseBody {
+  readonly text: string;
+  readonly heading?: string;
+  readonly lede?: string;
+  readonly align?: UnoSectionAlign;
+  readonly surface?: UnoSectionSurface;
+  readonly markdown?: true;
+}
+
+/**
  * `content.prose` props: the original inert plain text, or exactly one of four closed presentation variants.
  *
- * The legacy shape carries no `variant` key at all. Every variant is disjoint, bounded and rendered as React text;
- * none of them introduces links, HTML, Markdown or any other authoring authority.
+ * The legacy shape carries no `variant` key at all. Every variant is disjoint, bounded and rendered as React text or as
+ * the accepted Markdown AST; none of them introduces raw HTML, a script, an asset or any authoring authority beyond the
+ * classified `https`/`mailto` links Markdown already admits.
  */
 export type UnoContentProseProps =
-  | { readonly text: string; readonly variant?: never }
-  | { readonly variant: "callout"; readonly text: string; readonly tone?: UnoProseCalloutTone }
+  | ({ readonly variant?: never } & UnoContentProseBody)
+  | ({
+      readonly variant: "callout";
+      readonly tone?: UnoProseCalloutTone;
+    } & UnoContentProseBody)
   | { readonly variant: "list"; readonly items: readonly UnoProseListItem[]; readonly ordered?: boolean }
   | {
       readonly variant: "table";
@@ -187,6 +204,7 @@ export type UnoContentProseProps =
       readonly caption?: string;
     }
   | { readonly variant: "divider" };
+
 
 /** One same-document action: a label and the exact `#<section-id>` destination it names. */
 export interface UnoActionItem {
@@ -1128,6 +1146,72 @@ function optionalProseText(value: unknown, maxCodePoints: number): string | unde
   return readBoundedText(value, maxCodePoints, "document:invalid-props", false, false);
 }
 
+/** The closed optional section alignment adopted from the audited Foundation schema. */
+function optionalProseAlign(value: unknown): UnoSectionAlign | undefined {
+  if (value === undefined) return undefined;
+  if (value === "start" || value === "center") return value;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/** The closed optional section surface adopted from the audited Foundation schema. */
+function optionalProseSurface(value: unknown): UnoSectionSurface | undefined {
+  if (value === undefined) return undefined;
+  if (value === "plain" || value === "muted" || value === "bordered") return value;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/** `markdown` is the literal `true` or absent; a declared `false` is a crossed shape and is refused. */
+function optionalProseMarkdown(value: unknown): true | undefined {
+  if (value === undefined) return undefined;
+  if (value === true) return true;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/**
+ * One Markdown field, validated by the shared bounded reader.
+ *
+ * The plain-text reader still runs first, so control characters, markup and encoded schemes are refused by the same rules
+ * as every other authored field. A field the Markdown reader refuses (raw HTML, an image, an unsafe destination, an
+ * unbalanced construct or a cap) refuses the document rather than yielding a partial render.
+ */
+function requireFamilyMarkdown(value: unknown, codePointLimit: number): string {
+  const text = readBoundedText(value, codePointLimit, "document:invalid-props", false, true);
+  if (!readUnoFamilyMarkdown(text).ok) throw new RefusedDocument("document:invalid-props");
+  return text;
+}
+
+/** Read the shared body fields of the legacy and `callout` shapes, preserving exact optional absence. */
+function readProseBody(props: DataRecord): UnoContentProseBody {
+  const markdown = optionalProseMarkdown(props["markdown"]);
+  const text =
+    markdown === true
+      ? requireFamilyMarkdown(props["text"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
+      : readBoundedText(
+          props["text"],
+          UNO_PAGE_DOCUMENT_LIMITS.textCodePoints,
+          "document:invalid-props",
+          false,
+          true,
+        );
+  const heading = optionalProseText(props["heading"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints);
+  const lede =
+    props["lede"] === undefined
+      ? undefined
+      : markdown === true
+        ? requireFamilyMarkdown(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
+        : optionalProseText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints);
+  const align = optionalProseAlign(props["align"]);
+  const surface = optionalProseSurface(props["surface"]);
+  return {
+    text,
+    ...(heading === undefined ? {} : { heading }),
+    ...(lede === undefined ? {} : { lede }),
+    ...(align === undefined ? {} : { align }),
+    ...(surface === undefined ? {} : { surface }),
+    ...(markdown === undefined ? {} : { markdown }),
+  };
+}
+
 /**
  * Read `content.prose` props as the legacy text form or exactly one of the four closed presentation variants.
  *
@@ -1137,15 +1221,10 @@ function optionalProseText(value: unknown, maxCodePoints: number): string | unde
  */
 function readProseProps(props: DataRecord): UnoContentProseProps {
   if (!Object.prototype.hasOwnProperty.call(props, "variant")) {
-    if (!hasExactlyKeys(props, ["text"], [])) throw new RefusedDocument("document:invalid-props");
-    const text = readBoundedText(
-      props["text"],
-      UNO_PAGE_DOCUMENT_LIMITS.textCodePoints,
-      "document:invalid-props",
-      false,
-      true,
-    );
-    return { text };
+    if (!hasExactlyKeys(props, ["text"], ["heading", "lede", "align", "surface", "markdown"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    return readProseBody(props);
   }
 
   const variant = props["variant"];
@@ -1156,16 +1235,18 @@ function readProseProps(props: DataRecord): UnoContentProseProps {
   }
 
   if (variant === "callout") {
-    if (!hasExactlyKeys(props, ["variant", "text"], ["tone"])) throw new RefusedDocument("document:invalid-props");
-    const text = readBoundedText(
-      props["text"],
-      UNO_PAGE_DOCUMENT_LIMITS.textCodePoints,
-      "document:invalid-props",
-      false,
-      true,
-    );
+    if (
+      !hasExactlyKeys(
+        props,
+        ["variant", "text"],
+        ["tone", "heading", "lede", "align", "surface", "markdown"],
+      )
+    ) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const body = readProseBody(props);
     const tone = optionalProseTone(props["tone"]);
-    return tone === undefined ? { variant: "callout", text } : { variant: "callout", text, tone };
+    return tone === undefined ? { variant: "callout", ...body } : { variant: "callout", ...body, tone };
   }
 
   if (variant === "list") return readProseList(props);
@@ -2316,4 +2397,344 @@ export function readUnoPageDocument(
 
 
 
+
+
+/**
+ * Foundation Uno — bounded, allowlisted Markdown for authored Foundation family fields (`UNO-WO-083 / R01`, Wave A, U04).
+ *
+ * WHAT THIS IS. One pure translation from an authored Markdown string into a small, closed, presentation-ready AST that a
+ * React renderer can walk without ever interpreting authored text as markup. It exists because the donor families author
+ * real Markdown — emphasis, code, lists and classified links — and the accepted Uno plain-text subset could not represent
+ * that without flattening it.
+ *
+ * WHAT IT REFUSES, AND WHY BY NAME. Raw HTML, images, attribute-bearing markup, an unbalanced or malformed construct, a
+ * document beyond the declared caps, and any link destination that the unchanged `classifyAuthorDestination` does not
+ * admit as `mailto` or `https` are all refused with one closed reason. A partial parse is never returned: the caller
+ * either renders the whole accepted AST or refuses the whole field, so a half-read sentence cannot reach a visitor.
+ *
+ * WHAT IT IS NOT. No dependency, no `dangerouslySetInnerHTML`, no sanitiser regex over HTML (nothing is ever treated as
+ * HTML), no I/O, no locale, no publication, no link resolution, no fetch and no publisher authority. A classified `href`
+ * is *syntax only*: whether a Visitor may reach it is the caller's business, and this module neither proves ownership nor
+ * reachability.
+ */
+
+/** Declared bounds. Limits, never defaults: exceeding one refuses the field instead of truncating it. */
+export const UNO_FAMILY_MARKDOWN_LIMITS = Object.freeze({
+  blocks: 256,
+  blockChars: 4000,
+  inlineNodes: 768,
+  nesting: 2,
+  linkLabelChars: 200,
+  codeChars: 2000,
+  listItems: 24,
+});
+
+/** One inline fragment: inert text, one approved emphasis, one code span, or one classified link. */
+export type UnoFamilyInline =
+  | { readonly kind: "text"; readonly text: string }
+  | { readonly kind: "strong"; readonly children: readonly UnoFamilyInline[] }
+  | { readonly kind: "em"; readonly children: readonly UnoFamilyInline[] }
+  | { readonly kind: "code"; readonly text: string }
+  | {
+      readonly kind: "link";
+      readonly href: string;
+      readonly category: "mailto" | "https";
+      readonly children: readonly UnoFamilyInline[];
+    };
+
+/** One block: a paragraph, an in-field heading, a native list or a fenced code block. */
+export type UnoFamilyBlock =
+  | { readonly kind: "paragraph"; readonly children: readonly UnoFamilyInline[] }
+  | { readonly kind: "heading"; readonly level: 2 | 3 | 4 | 5 | 6; readonly children: readonly UnoFamilyInline[] }
+  | { readonly kind: "list"; readonly ordered: boolean; readonly items: readonly (readonly UnoFamilyInline[])[] }
+  | { readonly kind: "code"; readonly language: string; readonly text: string };
+
+/** The closed refusal vocabulary. Every failure a caller can receive is one of these literals. */
+export type UnoFamilyMarkdownRefusal =
+  | "markdown:not-a-string"
+  | "markdown:empty"
+  | "markdown:too-large"
+  | "markdown:unsupported-html"
+  | "markdown:unbalanced"
+  | "markdown:malformed-link"
+  | "markdown:unsafe-destination";
+
+/** The whole field, or nothing at all. */
+export type UnoFamilyMarkdownResult =
+  | { readonly ok: true; readonly blocks: readonly UnoFamilyBlock[] }
+  | { readonly ok: false; readonly reason: UnoFamilyMarkdownRefusal };
+
+/** A tag-like `<` opener: the only angle-bracket form that could ever look like markup; a bare `<` is inert text. */
+const MARKUP_OPENER_PATTERN = /<[a-zA-Z/!?]/u;
+
+/** Count Unicode code points, so an astral character costs one unit like the donor's own bound does. */
+function codePointCount(text: string): number {
+  let count = 0;
+  for (const character of text) {
+    if (character.length > 0) count += 1;
+  }
+  return count;
+}
+
+/** A fence language this subset will label. An identifier-shaped hint only. */
+const FENCE_LANGUAGE_PATTERN = /^[A-Za-z0-9+#._-]*$/u;
+
+/** Controls other than newline and tab are refused: they can corrupt a terminal, a log or a header. */
+const CONTROL_PATTERN = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/u;
+
+/** A heading line. A level-one heading is refused because the Page title is the single `h1`. */
+const HEADING_PATTERN = /^(#{1,6})[ \t]+(.+)$/u;
+
+/** A bullet or ordered list item. */
+const BULLET_PATTERN = /^[-*+][ \t]+(.+)$/u;
+const ORDERED_PATTERN = /^\d{1,9}[.)][ \t]+(.+)$/u;
+
+function frozen<T extends object>(value: T): T {
+  return Object.freeze(value);
+}
+
+
+
+/**
+ * Parse one inline run. Returns `null` for every refusal so the block parser can fail the whole field.
+ *
+ * Precedence is deliberate and small: an escape is literal, a code span is literal, a link is classified, `**` is strong,
+ * `*` is emphasis, and anything else is text. There is no HTML pass at all, so there is no sanitiser to bypass.
+ */
+function parseInline(
+  source: string,
+  depth: number,
+  budget: { nodes: number },
+): readonly UnoFamilyInline[] | null {
+  if (depth > UNO_FAMILY_MARKDOWN_LIMITS.nesting) return null;
+  const nodes: UnoFamilyInline[] = [];
+  let text = "";
+  let index = 0;
+
+  const pushText = (): void => {
+    if (text.length === 0) return;
+    nodes.push(frozen({ kind: "text" as const, text }));
+    budget.nodes += 1;
+    text = "";
+  };
+
+  while (index < source.length) {
+    const character = source[index] ?? "";
+
+    if ((character === "!" && source[index + 1] === "[") || (character === "<" && MARKUP_OPENER_PATTERN.test(source.slice(index, index + 2)))) {
+      return null; // raw HTML or an image: refused before anything is emitted
+    }
+
+    if (character === "\\") {
+      const escaped = source[index + 1];
+      if (escaped === undefined) return null;
+      text += escaped;
+      index += 2;
+      continue;
+    }
+
+    if (character === "`") {
+      const close = source.indexOf("`", index + 1);
+      if (close === -1) return null;
+      const code = source.slice(index + 1, close);
+      if (code.length === 0 || code.length > UNO_FAMILY_MARKDOWN_LIMITS.codeChars) return null;
+      if (code.includes("\n")) return null;
+      pushText();
+      nodes.push(frozen({ kind: "code" as const, text: code }));
+      budget.nodes += 1;
+      index = close + 1;
+      continue;
+    }
+
+    if (character === "[") {
+      if (source[index + 1] === "[") return null; // reference-style links are outside the subset
+      const labelEnd = source.indexOf("](", index + 1);
+      if (labelEnd === -1) return null;
+      const close = source.indexOf(")", labelEnd + 2);
+      if (close === -1) return null;
+      const label = source.slice(index + 1, labelEnd);
+      const destination = source.slice(labelEnd + 2, close);
+      if (label.length === 0 || label.length > UNO_FAMILY_MARKDOWN_LIMITS.linkLabelChars) return null;
+      if (label.includes("[") || label.includes("]")) return null;
+      if (destination.includes("(") || destination.includes(")")) return null;
+      const children = parseInline(label, depth + 1, budget);
+      if (children === null) return null;
+      const verdict = classifyAuthorDestination(destination);
+      if (!verdict.accepted) return null;
+      if (verdict.category !== "mailto" && verdict.category !== "https") return null;
+      pushText();
+      nodes.push(
+        frozen({ kind: "link" as const, href: verdict.href, category: verdict.category, children }),
+      );
+      budget.nodes += 1;
+      index = close + 1;
+      continue;
+    }
+
+    if (character === "_") {
+      // Donor Markdown emphasis: an underscore pair, but never inside a word (`some_name_here` stays literal text).
+      const strong = source[index + 1] === "_";
+      const marker = strong ? "__" : "_";
+      const before = index === 0 ? "" : (source[index - 1] ?? "");
+      const boundaryBefore = before === "" || !/[\p{L}\p{N}]/u.test(before);
+      if (boundaryBefore) {
+        const close = source.indexOf(marker, index + marker.length);
+        if (close !== -1) {
+          const inner = source.slice(index + marker.length, close);
+          const after = source[close + marker.length] ?? "";
+          const boundaryAfter = after === "" || !/[\p{L}\p{N}]/u.test(after);
+          if (inner.length > 0 && boundaryAfter) {
+            const children = parseInline(inner, depth + 1, budget);
+            if (children !== null) {
+              pushText();
+              nodes.push(frozen({ kind: strong ? ("strong" as const) : ("em" as const), children }));
+              budget.nodes += 1;
+              index = close + marker.length;
+              continue;
+            }
+            return null;
+          }
+        }
+      }
+      text += character;
+      index += 1;
+      continue;
+    }
+
+    if (character === "*") {
+      const strong = source[index + 1] === "*";
+      const marker = strong ? "**" : "*";
+      const close = source.indexOf(marker, index + marker.length);
+      if (close === -1) return null;
+      const inner = source.slice(index + marker.length, close);
+      if (inner.length === 0) return null;
+      const children = parseInline(inner, depth + 1, budget);
+      if (children === null) return null;
+      pushText();
+      nodes.push(frozen({ kind: strong ? ("strong" as const) : ("em" as const), children }));
+      budget.nodes += 1;
+      index = close + marker.length;
+      continue;
+    }
+
+    text += character;
+    index += 1;
+    if (budget.nodes > UNO_FAMILY_MARKDOWN_LIMITS.inlineNodes) return null;
+  }
+
+  pushText();
+  if (budget.nodes > UNO_FAMILY_MARKDOWN_LIMITS.inlineNodes) return null;
+  return Object.freeze(nodes);
+}
+/**
+ * Read one authored family Markdown field.
+ *
+ * The whole value is accepted or refused as a unit. Line endings are normalised first so one source parses identically on
+ * every host, and a level-one heading is refused because the Page title is the only `h1`.
+ */
+export function readUnoFamilyMarkdown(source: unknown): UnoFamilyMarkdownResult {
+  if (typeof source !== "string") return { ok: false, reason: "markdown:not-a-string" };
+  if (source.length === 0) return { ok: false, reason: "markdown:empty" };
+  if (codePointCount(source) > UNO_FAMILY_MARKDOWN_LIMITS.blockChars) return { ok: false, reason: "markdown:too-large" };
+  const normalised = source.replace(/\r\n/gu, "\n").replace(/\r/gu, "\n");
+  if (CONTROL_PATTERN.test(normalised)) return { ok: false, reason: "markdown:unsupported-html" };
+  if (normalised.includes("![") || MARKUP_OPENER_PATTERN.test(normalised)) {
+    return { ok: false, reason: "markdown:unsupported-html" };
+  }
+
+  const lines = normalised.split("\n");
+  const blocks: UnoFamilyBlock[] = [];
+  const budget = { nodes: 0 };
+  let paragraph: string[] = [];
+  let index = 0;
+
+  const flushParagraph = (): boolean => {
+    if (paragraph.length === 0) return true;
+    const joined = paragraph.join(" ").trim();
+    paragraph = [];
+    if (joined.length === 0) return true;
+    const children = parseInline(joined, 1, budget);
+    if (children === null || children.length === 0) return false;
+    blocks.push(frozen({ kind: "paragraph" as const, children }));
+    return true;
+  };
+
+  while (index < lines.length) {
+    const line = (lines[index] ?? "").trim();
+    if (line.length === 0) {
+      if (!flushParagraph()) return { ok: false, reason: "markdown:unbalanced" };
+      index += 1;
+      continue;
+    }
+
+    if (line.startsWith("```")) {
+      if (!flushParagraph()) return { ok: false, reason: "markdown:unbalanced" };
+      const language = line.slice(3).trim();
+      if (language.length > 20 || !FENCE_LANGUAGE_PATTERN.test(language)) {
+        return { ok: false, reason: "markdown:malformed-link" };
+      }
+      const code: string[] = [];
+      let closed = false;
+      index += 1;
+      while (index < lines.length) {
+        const inner = lines[index] ?? "";
+        if (inner.trim().startsWith("```")) {
+          closed = true;
+          index += 1;
+          break;
+        }
+        code.push(inner);
+        index += 1;
+      }
+      if (!closed) return { ok: false, reason: "markdown:unbalanced" };
+      const text = code.join("\n");
+      if (codePointCount(text) > UNO_FAMILY_MARKDOWN_LIMITS.codeChars) return { ok: false, reason: "markdown:too-large" };
+      blocks.push(frozen({ kind: "code" as const, language, text }));
+      continue;
+    }
+
+    const heading = HEADING_PATTERN.exec(line);
+    if (heading !== null) {
+      if (!flushParagraph()) return { ok: false, reason: "markdown:unbalanced" };
+      const level = (heading[1] ?? "").length;
+      if (level < 2 || level > 6) return { ok: false, reason: "markdown:unbalanced" };
+      const children = parseInline((heading[2] ?? "").trim(), 1, budget);
+      if (children === null || children.length === 0) return { ok: false, reason: "markdown:unbalanced" };
+      blocks.push(frozen({ kind: "heading" as const, level: level as 2 | 3 | 4 | 5 | 6, children }));
+      index += 1;
+      continue;
+    }
+
+    const bullet = BULLET_PATTERN.exec(line);
+    const ordered = ORDERED_PATTERN.exec(line);
+    if (bullet !== null || ordered !== null) {
+      if (!flushParagraph()) return { ok: false, reason: "markdown:unbalanced" };
+      const isOrdered = ordered !== null;
+      const items: (readonly UnoFamilyInline[])[] = [];
+      while (index < lines.length) {
+        const candidate = (lines[index] ?? "").trim();
+        const match = isOrdered ? ORDERED_PATTERN.exec(candidate) : BULLET_PATTERN.exec(candidate);
+        if (match === null) break;
+        const children = parseInline((match[1] ?? "").trim(), 1, budget);
+        if (children === null || children.length === 0) return { ok: false, reason: "markdown:unbalanced" };
+        items.push(children);
+        index += 1;
+        if (items.length > UNO_FAMILY_MARKDOWN_LIMITS.listItems) {
+          return { ok: false, reason: "markdown:too-large" };
+        }
+      }
+      blocks.push(frozen({ kind: "list" as const, ordered: isOrdered, items: Object.freeze(items) }));
+      continue;
+    }
+
+    paragraph.push(line);
+    index += 1;
+  }
+
+  if (!flushParagraph()) return { ok: false, reason: "markdown:unbalanced" };
+  if (blocks.length === 0 || blocks.length > UNO_FAMILY_MARKDOWN_LIMITS.blocks) {
+    return { ok: false, reason: "markdown:too-large" };
+  }
+  return { ok: true, blocks: Object.freeze(blocks) };
+}
 

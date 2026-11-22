@@ -1043,12 +1043,58 @@ describe("content.prose variants and grid list — static semantic markup", () =
     expect(html).not.toContain("data-uno-tone");
   });
 
-  it("renders a callout as a plain section with an explicit tone and no alert role", () => {
+  it("renders a plain callout section with an explicit tone and no alert role", () => {
     const html = variantHtml({ variant: "callout", text: "Careful & slow", tone: "warning" });
     expect(html).toContain('<section class="uno-json-callout" data-uno-tone="warning" id="variant">');
     expect(html).toContain("<p>Careful &amp; slow</p>");
     expect(html).not.toContain('role="alert"');
     expect(variantHtml({ variant: "callout", text: "Default" })).toContain('data-uno-tone="note"');
+  });
+
+  it("renders the rich prose body with an authored h2, lede and Markdown blocks", () => {
+    const html = variantHtml({
+      text: "A **strong** body with `code`.",
+      heading: "Authored heading",
+      lede: "A *lede* line.",
+      markdown: true,
+      align: "center",
+      surface: "muted",
+    });
+    expect(html).toContain('<section class="uno-json-prose" id="variant"');
+    expect(html).toContain('data-uno-align="center"');
+    expect(html).toContain('data-uno-surface="muted"');
+    expect(html).toContain('<h2 class="uno-json-prose-heading">Authored heading</h2>');
+    expect(html).toContain('<em class="uno-family-md-em">lede</em>');
+    expect(html).toContain('<strong class="uno-family-md-strong">strong</strong>');
+    expect(html).toContain('<code class="uno-family-md-code">code</code>');
+    expect(html).not.toContain("dangerouslySetInnerHTML");
+    expect(html).not.toContain("<h1");
+  });
+
+  it("renders the callout heading and lede inside the accent and keeps the tone", () => {
+    const html = variantHtml({
+      variant: "callout",
+      text: "Body text.",
+      tone: "info",
+      heading: "Inside heading",
+      lede: "Inside lede.",
+      markdown: true,
+    });
+    expect(html).toContain('<section class="uno-json-callout" data-uno-tone="info" id="variant">');
+    expect(html).toContain('<h2 class="uno-json-prose-heading">Inside heading</h2>');
+    expect(html).toContain("Inside lede.");
+    const headingAt = html.indexOf("Inside heading");
+    const bodyAt = html.indexOf("Body text.");
+    expect(headingAt).toBeGreaterThan(-1);
+    expect(bodyAt).toBeGreaterThan(headingAt);
+    expect(html).not.toContain('role="alert"');
+  });
+
+  it("renders a classified Markdown link as an inert anchor with the exact accepted destination", () => {
+    const html = variantHtml({ text: "See [the map](https://maps.example/directions) today.", markdown: true });
+    expect(html).toContain('<a class="uno-family-md-link" href="https://maps.example/directions" rel="noopener noreferrer">');
+    expect(html).toContain("the map");
+    expect(html).not.toContain("target=");
   });
 
   it("renders ordered and unordered lists as real lists in authored order", () => {

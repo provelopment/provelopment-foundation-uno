@@ -1894,6 +1894,72 @@ describe("content.prose variants and layout.grid list/ratio — accepted shapes"
     });
   });
 
+  it("accepts the rich prose and callout body: heading, Markdown lede, align and surface", () => {
+    expect(
+      acceptedProps({
+        text: "A **strong** body.",
+        heading: "Authored heading",
+        lede: "A *marked* lede.",
+        markdown: true,
+        align: "center",
+        surface: "muted",
+      }),
+    ).toEqual({
+      text: "A **strong** body.",
+      heading: "Authored heading",
+      lede: "A *marked* lede.",
+      markdown: true,
+      align: "center",
+      surface: "muted",
+    });
+    expect(
+      acceptedProps({
+        variant: "callout",
+        text: "Body.",
+        tone: "info",
+        heading: "Inside",
+        lede: "Inside lede.",
+        markdown: true,
+        align: "start",
+        surface: "bordered",
+      }),
+    ).toEqual({
+      variant: "callout",
+      text: "Body.",
+      tone: "info",
+      heading: "Inside",
+      lede: "Inside lede.",
+      markdown: true,
+      align: "start",
+      surface: "bordered",
+    });
+  });
+
+  it("refuses an unparseable Markdown field, a declared false and any unlisted presentation value", () => {
+    const reason = (props: Record<string, unknown>): string => {
+      const result = readUnoPageDocument(prosePage(props));
+      expect(result.accepted).toBe(false);
+      if (result.accepted) throw new Error("expected a refusal");
+      return result.reason;
+    };
+    expect(reason({ text: "Text <b>markup</b>", markdown: true })).toBe("document:unsafe-text");
+    expect(reason({ text: "An ![image](https://example.invalid/i.png)", markdown: true })).toBe(
+      "document:invalid-props",
+    );
+    expect(reason({ text: "Text", markdown: false })).toBe("document:invalid-props");
+    expect(reason({ text: "Text", markdown: "true" })).toBe("document:invalid-props");
+    expect(reason({ text: "Text", align: "right" })).toBe("document:invalid-props");
+    expect(reason({ text: "Text", surface: "shadow" })).toBe("document:invalid-props");
+    expect(reason({ text: "Text", heading: "" })).toBe("document:invalid-props");
+    expect(reason({ text: "Text", href: "/elsewhere" })).toBe("document:invalid-props");
+    expect(reason({ variant: "callout", text: "Text", style: "color:red" })).toBe("document:invalid-props");
+  });
+
+  it("keeps the plain path byte-identical when no rich field is authored", () => {
+    expect(Object.keys(acceptedProps({ text: "Plain" }))).toEqual(["text"]);
+    expect(Object.keys(acceptedProps({ variant: "callout", text: "Plain" }))).toEqual(["variant", "text"]);
+  });
+
   it("accepts ordered and unordered list variants with optional details", () => {
     expect(
       acceptedProps({ variant: "list", items: [{ label: "One" }, { label: "Two", detail: "Second detail" }] }),

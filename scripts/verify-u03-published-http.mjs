@@ -1010,8 +1010,10 @@ async function durableFamilyRefusalPhase() {
       "family:unsupported-family",
     ],
     [
-      "Markdown inside authored prose",
-      { version: 1, title: "T", sections: [{ type: "prose", body: "A **bold** claim" }] },
+      // `UNO-WO-084 / R01` (A1): `prose`/`callout` now accept authored Markdown, so the durable refusal case uses a
+      // construct Uno still refuses — an image — instead of emphasis.
+      "an image inside authored prose",
+      { version: 1, title: "T", sections: [{ type: "prose", body: "An ![x](https://example.com/i.png) claim" }] },
       undefined,
       "family:unsupported-feature",
     ],
@@ -1023,7 +1025,7 @@ async function durableFamilyRefusalPhase() {
     ],
     [
       "an unsupported extra key",
-      { version: 1, title: "T", sections: [{ type: "prose", body: "Text", align: "center" }] },
+      { version: 1, title: "T", sections: [{ type: "prose", body: "Text", style: "color:red" }] },
       undefined,
       "family:unsupported-feature",
     ],

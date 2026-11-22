@@ -27,6 +27,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { deflateSync } from "node:zlib";
 
 import { prepareUnoU03FixtureTransaction } from "./uno-u03-fixture-transaction.mjs";
+import { evaluateU04FamilyClosure } from "./verify-u04-family-closure.mjs";
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
@@ -127,6 +128,13 @@ const SOURCES = Object.freeze([
   `${CONTENT}/wo053-bad-generated.en-001.json`,
   `${CONTENT}/wo066-family-composition.en-001.json`,
 ]);
+
+// `UNO-WO-084 / R01` (checkpoint A1): where each newly proven family's executed evidence is recorded. Every flag starts
+// false and is only set by a check that actually ran, so a deleted probe can never leave a passing label behind.
+const a1Evidence = {
+  prose: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
+  callout: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
+};
 
 const failures = [];
 const passes = [];
@@ -364,20 +372,25 @@ function familySource() {
     version: 1,
     title: "Bounded family composition proof",
     sections: [
-      // `UNO-WO-075 / R01`: the five already mapped families at indices 0, 1, 2, 3 and 13 gain only their donor
-      // `heading` and `lede` as synthetic authored plain text. Nothing else in those sections changes.
+      // `UNO-WO-084 / R01` (checkpoint A1): indices 0 and 1 now author the donor's full surface for these two families —
+      // a real Markdown lede/body, the closed `align`/`surface` pair, and a callout whose heading and lede sit inside its
+      // accent. Indices 2, 3 and 13 keep the earlier bounded heading/lede treatment.
       {
         type: "prose",
         heading: "Synthetic prose heading",
-        lede: "Synthetic prose introduction & \"quoted\" wording.",
-        body: "This Page came from a bounded donor subset.",
+        lede: "Synthetic prose introduction & \"quoted\" wording, with *emphasis*.",
+        body: "The body carries **strong** emphasis, `inline code` and a [safe link](https://example.org/notes).",
+        align: "center",
+        surface: "muted",
       },
       {
         type: "callout",
         heading: "Synthetic callout heading",
         lede: "Synthetic callout introduction.",
-        body: "A synthetic warning for the publication proof.",
+        body: "A synthetic warning for the publication proof, with a **bounded** body.",
         tone: "warning",
+        align: "start",
+        surface: "bordered",
       },
       {
         type: "list",
@@ -914,7 +927,9 @@ async function main() {
     check(
       "FAMILY_SOURCE_NOT_SERIALIZED the Page carries the real Uno modules and the owned ref, not a donor path",
       serialized.includes('"interaction.contact"') && serialized.includes('"media.gallery"')
-        && serialized.includes(`"path": "${FAMILY_PLATE}"`) && !/https?:/u.test(serialized),
+        && serialized.includes(`"path": "${FAMILY_PLATE}"`)
+        // `UNO-WO-084 / R01`: authored Markdown may carry a classified `https` link, but no asset field may be remote.
+        && !/"url":\s*"?https?:/u.test(serialized),
     );
     const refusals = [
       ["without bindings", undefined],
@@ -1299,6 +1314,80 @@ async function main() {
         reDivider === undefined ? "missing" : reDivider.id,
       );
     }
+    // `UNO-WO-084 / R01` (checkpoint A1): source, reader, renderer-contract and refusal evidence for prose + callout.
+    {
+      const richProse = familyAccepted.sections[0];
+      const richCallout = familyAccepted.sections[1];
+      a1Evidence.prose.source = richProse !== undefined
+        && richProse.id === "family-0-prose"
+        && richProse.module === "content.prose"
+        && richProse.props.markdown === true
+        && richProse.props.heading === "Synthetic prose heading"
+        && richProse.props.align === "center"
+        && richProse.props.surface === "muted"
+        && typeof richProse.props.lede === "string"
+        && richProse.props.lede.includes("*emphasis*")
+        && typeof richProse.props.text === "string"
+        && richProse.props.text.includes("**strong**");
+      check(
+        "A1_SOURCE the composed family-0-prose carries the authored heading, Markdown lede/body, align and surface",
+        a1Evidence.prose.source,
+        richProse === undefined ? "missing" : `${richProse.id}/${JSON.stringify(richProse.props)}`,
+      );
+      a1Evidence.callout.source = richCallout !== undefined
+        && richCallout.id === "family-1-callout"
+        && richCallout.module === "content.prose"
+        && richCallout.props.variant === "callout"
+        && richCallout.props.tone === "warning"
+        && richCallout.props.heading === "Synthetic callout heading"
+        && richCallout.props.markdown === true
+        && richCallout.props.align === "start"
+        && richCallout.props.surface === "bordered"
+        && typeof richCallout.props.text === "string"
+        && richCallout.props.text.includes("**bounded**");
+      check(
+        "A1_SOURCE the composed family-1-callout keeps its tone and carries an inside heading and Markdown body",
+        a1Evidence.callout.source,
+        richCallout === undefined ? "missing" : `${richCallout.id}/${JSON.stringify(richCallout.props)}`,
+      );
+      // The real reader re-reads both nodes from the serialized bytes: the document, not the composer's memory, is proof.
+      const reread = familyReparsed.accepted === true ? familyReparsed.document.sections : [];
+      a1Evidence.prose.reader = a1Evidence.prose.source
+        && JSON.stringify(reread[0]?.props) === JSON.stringify(richProse?.props);
+      a1Evidence.callout.reader = a1Evidence.callout.source
+        && JSON.stringify(reread[1]?.props) === JSON.stringify(richCallout?.props);
+      check("A1_READER the real reader re-reads both rich family nodes from the serialized buffer",
+        a1Evidence.prose.reader && a1Evidence.callout.reader,
+        `prose=${a1Evidence.prose.reader} callout=${a1Evidence.callout.reader}`);
+      // The renderer contract: exactly the closed props the rich renderer consumes — no surrogate role, tone or attribute.
+      const closedProse = Object.keys(richProse?.props ?? {}).sort().join(",");
+      const closedCallout = Object.keys(richCallout?.props ?? {}).sort().join(",");
+      a1Evidence.prose.renderer = closedProse === "align,heading,lede,markdown,surface,text";
+      a1Evidence.callout.renderer = closedCallout === "align,heading,lede,markdown,surface,text,tone,variant";
+      check("A1_RENDERER both rich family nodes carry exactly the closed renderer contract",
+        a1Evidence.prose.renderer && a1Evidence.callout.renderer,
+        `${closedProse} | ${closedCallout}`);
+      // Refusal: a construct Uno cannot render safely refuses the whole source, never printing apparent text.
+      const unsafeMarkup = composeUnoFoundationSubset(
+        { version: 1, title: "Unsafe markup fixture", sections: [{ type: "prose", body: "Text <b>markup</b>" }] },
+        familyBindings(),
+      );
+      const unsafeImage = composeUnoFoundationSubset(
+        { version: 1, title: "Unsafe image fixture", sections: [{ type: "callout", body: "An ![x](https://example.org/i.png)" }] },
+        familyBindings(),
+      );
+      const unsafeScheme = composeUnoFoundationSubset(
+        { version: 1, title: "Unsafe scheme fixture", sections: [{ type: "prose", body: "See [x](javascript:alert(1))" }] },
+        familyBindings(),
+      );
+      a1Evidence.prose.refusal = unsafeMarkup.status === "refused" && unsafeScheme.status === "refused";
+      a1Evidence.callout.refusal = unsafeImage.status === "refused";
+      check(
+        "A1_REFUSAL raw markup, an image and a script scheme each refuse the whole source",
+        a1Evidence.prose.refusal && a1Evidence.callout.refusal,
+        `${unsafeMarkup.status}/${unsafeImage.status}/${unsafeScheme.status}`,
+      );
+    }
     // `UNO-WO-070 / R01`: the two headed grid families on the composed document itself.
     {
       const outline = (index, type, headingText, columns) => {
@@ -1419,7 +1508,7 @@ async function main() {
         "FAMILY_LEDE_SOURCE the ledes add no node outside the two families and keep the seventeen top-level ids",
         JSON.stringify(ledeIds) === JSON.stringify(FAMILY_IDS)
           // `UNO-WO-075 / R01` wraps five further families, so the fixture now holds nine top-level stacks.
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 9
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7
           && familyAccepted.sections[8]?.id === "family-8-divider"
           && JSON.stringify(familyAccepted.sections[8]?.props) === JSON.stringify({ variant: "divider" }),
         `${ledeIds.length}/${ledeIds.join(",")}`,
@@ -1487,7 +1576,7 @@ async function main() {
       check(
         "FAMILY_STATS_STEPS_SOURCE the authored-text families keep the seventeen ids and no other family changes",
         JSON.stringify(familyAccepted.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS)
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 9
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7
           && familyAccepted.sections[7]?.module === "content.actions"
           && familyAccepted.sections[8]?.id === "family-8-divider"
           && familyAccepted.sections[12]?.module === "content.testimonials",
@@ -1510,8 +1599,6 @@ async function main() {
     // authored fields removed, so "the original node is unchanged apart from its documented id" is measured, not asserted.
     {
       const TEXT_FIVE = [
-        [0, "prose", "prose"],
-        [1, "callout", "callout"],
         [2, "list", "list"],
         [3, "faq", "accordion"],
         [13, "table", "table"],
@@ -1560,9 +1647,9 @@ async function main() {
         );
       }
       check(
-        "FAMILY_TEXT_FIVE_SOURCE the five authored-text families add no top-level node and keep the seventeen ids",
+        "FAMILY_TEXT_FIVE_SOURCE the three remaining authored-text families add no top-level node and keep the seventeen ids",
         JSON.stringify(familyAccepted.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS)
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 9
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7
           && textFiveEvidence.every((evidence) => evidence.ok),
         `${familyAccepted.sections.filter((section) => section.module === "layout.stack").length} stacks`,
       );
@@ -1717,11 +1804,23 @@ async function main() {
       `${(familyHtml.match(/<main[\s>]/giu) ?? []).length}/${(familyHtml.match(/<h1[\s>]/giu) ?? []).length}`,
     );
     check(
-      "FAMILY_HTTP=200 prose and warning callout are rendered",
-      // `UNO-WO-075 / R01` moves each native node under its stack wrapper and suffixes its id; the wrapper keeps the anchor.
-      familyHtml.includes('<p class="uno-json-prose" id="family-0-prose-prose">This Page came from a bounded donor subset.</p>')
-        && familyHtml.includes('<section class="uno-json-callout" data-uno-tone="warning" id="family-1-callout-callout">')
-        && familyHtml.includes("A synthetic warning for the publication proof."),
+      "FAMILY_HTTP=200 prose and warning callout render their authored Markdown inside the family",
+      // `UNO-WO-084 / R01`: both families now render one rich node — an authored h2, a Markdown lede and body, and a callout
+      // whose accent wraps its own heading and lede instead of an outer stack.
+      familyHtml.includes(
+        '<section class="uno-json-prose" id="family-0-prose" data-uno-align="center" data-uno-surface="muted">',
+      )
+        && familyHtml.includes('<h2 class="uno-json-prose-heading">Synthetic prose heading</h2>')
+        && familyHtml.includes('<strong class="uno-family-md-strong">strong</strong>')
+        && familyHtml.includes('<code class="uno-family-md-code">inline code</code>')
+        && familyHtml.includes(
+          '<a class="uno-family-md-link" href="https://example.org/notes" rel="noopener noreferrer">safe link</a>',
+        )
+        && familyHtml.includes(
+          '<section class="uno-json-callout" data-uno-tone="warning" id="family-1-callout" data-uno-align="start" data-uno-surface="bordered">',
+        )
+        && familyHtml.includes('<h2 class="uno-json-prose-heading">Synthetic callout heading</h2>')
+        && familyHtml.includes('<strong class="uno-family-md-strong">bounded</strong>'),
     );
     const listStart = familyHtml.indexOf('<ol class="uno-json-list" id="family-2-list-list">');
     const listMarkup = listStart < 0 ? "" : familyHtml.slice(listStart, familyHtml.indexOf("</ol>", listStart));
@@ -2012,10 +2111,6 @@ async function main() {
     // `UNO-WO-075 / R01`: the five authored-text families exactly as served, one scoped check each plus a whole-Page one.
     {
       const servedFive = [
-        [0, "prose", "Synthetic prose heading", "Synthetic prose introduction &amp; &quot;quoted&quot; wording.",
-          '<p class="uno-json-prose" id="family-0-prose-prose">'],
-        [1, "callout", "Synthetic callout heading", "Synthetic callout introduction.",
-          '<section class="uno-json-callout" data-uno-tone="warning" id="family-1-callout-callout">'],
         [2, "list", "Synthetic list heading", "Synthetic list introduction.",
           '<ol class="uno-json-list" id="family-2-list-list">'],
         [3, "faq", "Synthetic FAQ heading", "Synthetic FAQ introduction.",
@@ -2047,15 +2142,48 @@ async function main() {
         );
       }
       check(
-        "FAMILY_TEXT_FIVE_HTTP the five families add nine stacks and five headings with no duplicate id, extra main or external destination",
-        (familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length === 9
-          && (familyHtml.match(/<h2 class="uno-json-heading" id="family-(?:0-prose|1-callout|2-list|3-faq|13-table)-heading"/gu) ?? []).length === 5
-          && (familyHtml.match(/<p class="uno-json-prose" id="family-(?:0-prose|1-callout|2-list|3-faq|13-table)-lede"/gu) ?? []).length === 5
+        "FAMILY_TEXT_FIVE_HTTP the three remaining authored-text families add seven stacks and three headings with no duplicate id, extra main or external destination",
+        (familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length === 7
+          && (familyHtml.match(/<h2 class="uno-json-heading" id="family-(?:2-list|3-faq|13-table)-heading"/gu) ?? []).length === 3
+          && (familyHtml.match(/<p class="uno-json-prose" id="family-(?:2-list|3-faq|13-table)-lede"/gu) ?? []).length === 3
           && servedFive.every(([index, type, headingText, ledeText, nativeOpen]) => servedFiveOk(index, type, headingText, ledeText, nativeOpen))
           && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
           && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
           && !familyHtml.includes(FAMILY_DONOR_SOURCE),
         `stacks=${(familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length}`,
+      );
+      // `UNO-WO-084 / R01` (A1): the two rich families exactly as served, and only once each.
+      const proseServed = familyRegionOf("family-0-prose");
+      const calloutServed = familyRegionOf("family-1-callout");
+      a1Evidence.prose.http = proseServed.startsWith(
+        '<section class="uno-json-prose" id="family-0-prose" data-uno-align="center" data-uno-surface="muted">',
+      )
+        && proseServed.includes('<h2 class="uno-json-prose-heading">Synthetic prose heading</h2>')
+        && proseServed.includes('<div class="uno-family-md uno-json-prose-lede">')
+        && proseServed.includes('<em class="uno-family-md-em">emphasis</em>')
+        && proseServed.includes('<div class="uno-family-md uno-json-prose-text">')
+        && proseServed.includes('<strong class="uno-family-md-strong">strong</strong>')
+        && proseServed.includes('<code class="uno-family-md-code">inline code</code>')
+        && proseServed.includes('<a class="uno-family-md-link" href="https://example.org/notes" rel="noopener noreferrer">safe link</a>')
+        && !/<script\b|javascript:|data:|target=|onclick/iu.test(proseServed);
+      a1Evidence.callout.http = calloutServed.startsWith(
+        '<section class="uno-json-callout" data-uno-tone="warning" id="family-1-callout" data-uno-align="start" data-uno-surface="bordered">',
+      )
+        && calloutServed.includes('<h2 class="uno-json-prose-heading">Synthetic callout heading</h2>')
+        && calloutServed.includes('<div class="uno-family-md uno-json-prose-lede">')
+        && calloutServed.includes("Synthetic callout introduction.")
+        && calloutServed.includes('<strong class="uno-family-md-strong">bounded</strong>')
+        && calloutServed.indexOf("Synthetic callout heading") < calloutServed.indexOf("bounded")
+        && calloutServed.includes('role="alert"') === false;
+      check(
+        "A1_HTTP the served family-0-prose keeps its authored heading, Markdown lede and body, align and surface",
+        a1Evidence.prose.http,
+        proseServed.slice(0, 200),
+      );
+      check(
+        "A1_HTTP the served family-1-callout keeps its accent, tone and inside heading and lede",
+        a1Evidence.callout.http,
+        calloutServed.slice(0, 200),
       );
     }
     {
@@ -2339,6 +2467,8 @@ async function main() {
 
 /** Everything that needs a real browser: zero pre-consent network, then one activation per provider and input mode. */
 async function consentPhase(base) {
+  const { UNO_RENDERABLE_MODULES } = await import("../src/core/page-document.ts");
+  const { UNO_OWNED_MEDIA_ZONES } = await import("../src/core/assets/uno-owned-media.ts");
   const { UNO_VIDEO_EMBED_ORIGINS, unoVideoProviderLabel } = await import("../src/core/video/uno-video-embeds.ts");
   const { chromium } = await import("playwright");
   browser = await chromium.launch();
@@ -2621,10 +2751,9 @@ async function consentPhase(base) {
         const tops = [...document.querySelectorAll('[id^="family-"]')]
           .filter((element) => element.parentElement?.closest('[id^="family-"]') === null)
           .map((element) => element.id);
-        // `UNO-WO-075 / R01`: the native nodes moved under their stack wrappers, so these probes address the suffixed ids
-        // and keep asserting the unchanged native presentation.
-        const prose = document.querySelector("#family-0-prose-prose");
-        const callout = document.querySelector("#family-1-callout-callout");
+        // `UNO-WO-084 / R01`: both families render as one rich node, so the probes address the family anchor itself.
+        const prose = document.querySelector("#family-0-prose");
+        const callout = document.querySelector("#family-1-callout");
         const galleryImages = [...document.querySelectorAll("#family-5-gallery img")];
         const contact = document.querySelector(".uno-json-contact");
         return {
@@ -3105,7 +3234,7 @@ async function consentPhase(base) {
 
       // `UNO-WO-075 / R01`: the five authored-text families as this browser actually lays them out at this viewport.
       const textFiveSeen = await tab.evaluate(() => {
-        const ids = ["family-0-prose", "family-1-callout", "family-2-list", "family-3-faq", "family-13-table"];
+        const ids = ["family-2-list", "family-3-faq", "family-13-table"];
         return ids.map((id) => {
           const root = document.getElementById(id);
           const heading = root?.querySelector(":scope > h2.uno-json-heading") ?? null;
@@ -3132,14 +3261,12 @@ async function consentPhase(base) {
         });
       });
       const expectedFive = [
-        ["family-0-prose", "Synthetic prose heading", 'Synthetic prose introduction & "quoted" wording.', "family-0-prose-prose", "P"],
-        ["family-1-callout", "Synthetic callout heading", "Synthetic callout introduction.", "family-1-callout-callout", "SECTION"],
         ["family-2-list", "Synthetic list heading", "Synthetic list introduction.", "family-2-list-list", "OL"],
         ["family-3-faq", "Synthetic FAQ heading", "Synthetic FAQ introduction.", "family-3-faq-accordion", "DIV"],
         ["family-13-table", "Synthetic table heading", "Synthetic table introduction.", "family-13-table-table", "DIV"],
       ];
-      textFiveCheck(`${width}px the five authored-text families show a visible heading and lede before their native node`,
-        textFiveSeen.length === 5
+      textFiveCheck(`${width}px the three remaining authored-text families show a visible heading and lede before their native node`,
+        textFiveSeen.length === 3
           && expectedFive.every(([id, headingText, ledeText, nativeId, nativeTag]) => {
             const found = textFiveSeen.find((entry) => entry.id === id);
             return found !== undefined
@@ -3382,6 +3509,158 @@ async function consentPhase(base) {
       dividerOk === true && familyOk === true && dividerChecks === 12,
       `checks=${dividerChecks} dividerOk=${dividerOk} familyOk=${familyOk}`,
     );
+
+    // --- `UNO-WO-084 / R01` checkpoint A1: prose + callout in real Chromium at both viewports ----------------------
+    // Every flag is set only by a probe that actually ran; a deleted probe leaves the evidence false and suppresses the
+    // parity label, so the served-HTML proof alone can never stand in for the browser proof.
+    let a1ProseBrowserOk = true;
+    let a1ProseBrowserChecks = 0;
+    let a1CalloutBrowserOk = true;
+    let a1CalloutBrowserChecks = 0;
+    const a1ProseCheck = (label, ok, detail = "") => {
+      a1ProseBrowserChecks += 1;
+      if (!ok) a1ProseBrowserOk = false;
+      return check(`A1_BROWSER_PROSE ${label}`, ok, detail);
+    };
+    const a1CalloutCheck = (label, ok, detail = "") => {
+      a1CalloutBrowserChecks += 1;
+      if (!ok) a1CalloutBrowserOk = false;
+      return check(`A1_BROWSER_CALLOUT ${label}`, ok, detail);
+    };
+    for (const width of [390, 1280]) {
+      for (const scheme of ["light", "dark"]) {
+        requests.length = 0;
+        await tab.setViewportSize({ width, height: 900 });
+        await tab.emulateMedia({ colorScheme: scheme, reducedMotion: scheme === "dark" ? "reduce" : "no-preference" });
+        await tab.goto(FAMILY_URL, { waitUntil: "load" });
+        await delay(300);
+        const rich = await tab.evaluate(() => {
+          const prose = document.getElementById("family-0-prose");
+          const callout = document.getElementById("family-1-callout");
+          const box = (node) => {
+            const rect = node?.getBoundingClientRect() ?? null;
+            return rect !== null && rect.width > 0 && rect.height > 0;
+          };
+          const heading = prose?.querySelector("h2.uno-json-prose-heading") ?? null;
+          const lede = prose?.querySelector(".uno-json-prose-lede") ?? null;
+          const link = prose?.querySelector("a.uno-family-md-link") ?? null;
+          const insideHeading = callout?.querySelector("h2.uno-json-prose-heading") ?? null;
+          return {
+            scheme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
+            reduced: matchMedia("(prefers-reduced-motion: reduce)").matches,
+            proseFound: prose !== null,
+            proseBox: box(prose),
+            surface: prose?.getAttribute("data-uno-surface") ?? "",
+            align: prose?.getAttribute("data-uno-align") ?? "",
+            headingText: heading?.textContent ?? "",
+            headingBox: box(heading),
+            ledeText: lede?.textContent ?? "",
+            ledeBox: box(lede),
+            strong: prose?.querySelector("strong.uno-family-md-strong")?.textContent ?? "",
+            code: prose?.querySelector("code.uno-family-md-code")?.textContent ?? "",
+            linkHref: link?.getAttribute("href") ?? "",
+            linkRel: link?.getAttribute("rel") ?? "",
+            linkBox: box(link),
+            headingBeforeLede: heading !== null && lede !== null
+              && (heading.compareDocumentPosition(lede) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            calloutFound: callout !== null,
+            calloutBox: box(callout),
+            tone: callout?.getAttribute("data-uno-tone") ?? "",
+            insideHeadingText: insideHeading?.textContent ?? "",
+            insideHeadingBox: box(insideHeading),
+            calloutStrong: callout?.querySelector("strong.uno-family-md-strong")?.textContent ?? "",
+            alert: callout?.getAttribute("role") ?? "",
+            overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+            controls: document.querySelectorAll("#family-0-prose form, #family-0-prose input, #family-0-prose button").length,
+          };
+        });
+        const focused = await tab.evaluate(() => {
+          const link = document.querySelector("#family-0-prose a.uno-family-md-link");
+          if (link === null) return "";
+          link.focus();
+          return document.activeElement === link ? link.getAttribute("href") ?? "" : "";
+        });
+        const externalRequest = requests.some((entry) => String(entry).includes("example.org"));
+        a1ProseCheck(`${scheme} ${width}px the rich prose renders its authored h2, lede and surface`,
+          rich.proseFound && rich.proseBox && rich.headingText === "Synthetic prose heading" && rich.headingBox
+            && rich.ledeText.startsWith("Synthetic prose introduction") && rich.ledeBox
+            && rich.headingBeforeLede && rich.align === "center" && rich.surface === "muted",
+          JSON.stringify({ heading: rich.headingText, align: rich.align, surface: rich.surface }));
+        a1ProseCheck(`${scheme} ${width}px the Markdown emphasis, code span and link are real elements`,
+          rich.strong === "strong" && rich.code === "inline code"
+            && rich.linkHref === "https://example.org/notes" && rich.linkRel === "noopener noreferrer" && rich.linkBox,
+          JSON.stringify({ strong: rich.strong, href: rich.linkHref, rel: rich.linkRel }));
+        a1ProseCheck(`${scheme} ${width}px the classified link is focusable and keeps its exact destination`,
+          focused === "https://example.org/notes", focused);
+        a1ProseCheck(`${scheme} ${width}px the prose adds no form control and no horizontal overflow`,
+          rich.controls === 0 && rich.overflow === 0, `controls=${rich.controls} overflow=${rich.overflow}`);
+        a1ProseCheck(`${scheme} ${width}px the prose makes no request to the authored destination`,
+          externalRequest === false, `external=${externalRequest}`);
+
+        a1CalloutCheck(`${scheme} ${width}px the callout renders its accent, tone and inside heading`,
+          rich.calloutFound && rich.calloutBox && rich.tone === "warning"
+            && rich.insideHeadingText === "Synthetic callout heading" && rich.insideHeadingBox
+            && rich.calloutStrong === "bounded",
+          JSON.stringify({ tone: rich.tone, heading: rich.insideHeadingText, strong: rich.calloutStrong }));
+        a1CalloutCheck(`${scheme} ${width}px the callout keeps no surrogate alert role and no overflow`,
+          rich.alert === "" && rich.overflow === 0, `role=${rich.alert} overflow=${rich.overflow}`);
+        a1CalloutCheck(`${scheme} ${width}px the colour scheme and motion preference were really applied`,
+          rich.scheme === scheme && (scheme === "light" ? rich.reduced === false : rich.reduced === true),
+          JSON.stringify({ scheme: rich.scheme, reduced: rich.reduced }));
+      }
+    }
+    await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
+    a1Evidence.prose.browser = a1ProseBrowserOk && a1ProseBrowserChecks === 20;
+    a1Evidence.callout.browser = a1CalloutBrowserOk && a1CalloutBrowserChecks === 12;
+    check(
+      "A1_BROWSER=PASS prose passed twenty real-Chromium checks at 390px and 1280px in light and dark",
+      a1Evidence.prose.browser,
+      `checks=${a1ProseBrowserChecks} ok=${a1ProseBrowserOk}`,
+    );
+    check(
+      "A1_BROWSER=PASS callout passed twelve real-Chromium checks at 390px and 1280px in light and dark",
+      a1Evidence.callout.browser,
+      `checks=${a1CalloutBrowserChecks} ok=${a1CalloutBrowserOk}`,
+    );
+    // The cumulative oracle reads only the evidence gathered above; it prints exactly the A1 row, never a fuller one.
+    const closure = evaluateU04FamilyClosure({
+      families: {
+        divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
+        prose: a1Evidence.prose,
+        callout: a1Evidence.callout,
+      },
+      modules: UNO_RENDERABLE_MODULES.length,
+      zones: UNO_OWNED_MEDIA_ZONES.length,
+      browserMatrix: matrixCases.length,
+      checkpoint: "A1",
+    });
+    check(
+      "U04_CLOSURE_ORACLE the cumulative oracle accepts the A1 row from the executed evidence",
+      closure.ok === true && familyOk && dividerOk,
+      closure.ok ? `${closure.parity}/17 ${closure.proxy}/59` : String(closure.reason),
+    );
+    if (closure.ok) {
+      // Every printed label is re-derived from the oracle's own credit set, so a label cannot appear without its reason.
+      const creditedNames = new Set(closure.credited.map((family) => `PARITY_${family.toUpperCase()}`));
+      const pendingNames = new Set(closure.pending.map((family) => `PARITY_${family.toUpperCase()}`));
+      for (const label of closure.labels) {
+        const equals = label.lastIndexOf("=");
+        const name = label.slice(0, equals);
+        const value = label.slice(equals + 1);
+        const honest = creditedNames.has(name)
+          ? value === "PASS"
+          : pendingNames.has(name)
+            ? value === "PENDING"
+            : name === "U04_PARITY"
+              ? value === `${closure.parity}/17`
+              : name === "U04_PROXY"
+                ? value === `${closure.proxy}/59`
+                : value === `${UNO_RENDERABLE_MODULES.length}/${UNO_RENDERABLE_MODULES.length}`
+                  || value === `${UNO_OWNED_MEDIA_ZONES.length}/${UNO_OWNED_MEDIA_ZONES.length}`
+                  || value === `${matrixCases.length}/${matrixCases.length}`;
+        check(`U04_LABEL ${label}`, honest);
+      }
+    }
   }
 
   check("the Page logged no console error", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
