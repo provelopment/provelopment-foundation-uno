@@ -151,7 +151,8 @@
             "sectionId": "family-3-faq-answer-1",
             "label": "Can an answer carry markup?"
           }
-        ]
+        ],
+        "summaryHeadingLevel": 3
       },
       "children": [
         {
@@ -316,7 +317,8 @@
                 "title": "Read the Page",
                 "description": "The reader validates the assembled document again."
               }
-            ]
+            ],
+            "itemHeadingLevel": 3
           }
         }
       ]
@@ -380,7 +382,7 @@
               "module": "content.heading",
               "props": {
                 "text": "A column with a body",
-                "level": 2
+                "level": 3
               }
             },
             {
@@ -404,7 +406,7 @@
               "module": "content.heading",
               "props": {
                 "text": "A column with a list",
-                "level": 2
+                "level": 3
               }
             },
             {

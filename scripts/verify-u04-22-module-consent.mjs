@@ -973,6 +973,54 @@ async function main() {
         partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
       };
     });
+    // `UNO-WO-080 / R01`: the three donor heading outlines as composed, plus the closed refusal of any donor field that
+    // would try to author its own heading level. The composed document itself is read back so this is not a string claim.
+    {
+      const composedFamily = familyAccepted;
+      const stepsNode = composedFamily?.sections.find((node) => node.id === "family-11-steps");
+      const stepsTimeline =
+        stepsNode?.module === "layout.stack"
+          ? stepsNode.children.find((child) => child.module === "content.timeline")
+          : stepsNode;
+      const faqNode = composedFamily?.sections.find((node) => node.id === "family-3-faq");
+      const faqAccordion =
+        faqNode?.module === "layout.stack"
+          ? faqNode.children.find((child) => child.module === "interaction.accordion")
+          : faqNode;
+      const columnsNode = composedFamily?.sections.find((node) => node.id === "family-14-columns");
+      const columnTitles =
+        columnsNode?.module === "layout.grid"
+          ? columnsNode.children.map((column) =>
+              column.module === "layout.stack"
+                ? column.children.find((child) => child.module === "content.heading")
+                : undefined,
+            )
+          : [];
+      const authoredLevelProbe = familySource();
+      authoredLevelProbe.sections[14].level = 3;
+      const authoredLevelOutcome = composeUnoFoundationSubset(authoredLevelProbe, familyBindings());
+      check(
+        "FAMILY_OUTLINE_THREE_SOURCE steps, faq and columns compose the documented level-3 item outline and refuse an authored level",
+        stepsTimeline?.module === "content.timeline"
+          && stepsTimeline.props.itemHeadingLevel === 3
+          && stepsTimeline.props.items.length === 2
+          && faqAccordion?.module === "interaction.accordion"
+          && faqAccordion.props.summaryHeadingLevel === 3
+          && faqAccordion.children.length === 1
+          && columnTitles.length === 2
+          && columnTitles.every((title) => title?.module === "content.heading" && title.props.level === 3)
+          && authoredLevelOutcome.status === "refused"
+          && authoredLevelOutcome.reason === "family:unsupported-feature"
+          && Object.prototype.hasOwnProperty.call(authoredLevelOutcome, "document") === false,
+        JSON.stringify({
+          steps: stepsTimeline?.module === "content.timeline" ? stepsTimeline.props.itemHeadingLevel : null,
+          faq: faqAccordion?.module === "interaction.accordion" ? faqAccordion.props.summaryHeadingLevel : null,
+          columns: columnTitles.map((title) => (title?.module === "content.heading" ? title.props.level : null)),
+          authoredLevel: authoredLevelOutcome.status === "refused" ? authoredLevelOutcome.reason : authoredLevelOutcome.status,
+        }),
+      );
+    }
+
     check(
       "FAMILY_FOUR_REFUSALS each appended-family probe refuses the whole Page with its documented reason",
       familyProbes.every((probe) => probe.actual === probe.expected && probe.partial === false),
@@ -1399,6 +1447,8 @@ async function main() {
           : {
               items: [{ title: "Draft", description: "Prepare the fixture source." }, { title: "Review" }],
               surface: "muted",
+              // `UNO-WO-080 / R01`: the steps child keeps its documented level-3 item outline switch.
+              itemHeadingLevel: 3,
             };
         const expectedChild = { id: `family-${index}-${type}-${childSuffix}`, module: expectedChildModule, props: original };
         const shapeOk = section !== undefined
@@ -1684,7 +1734,11 @@ async function main() {
       "FAMILY_HTTP=200 the FAQ renders as a native disclosure with the authored question",
       familyHtml.includes('<div class="uno-json-accordion" id="family-3-faq-accordion">')
         && familyHtml.includes("<details") && familyHtml.includes("<summary")
-        && familyHtml.includes("Can this contact notice send anything?"),
+        && familyHtml.includes("Can this contact notice send anything?")
+        // `UNO-WO-080 / R01`: the donor's FAQ questions are level-3 headings inside their own native summaries.
+        && familyHtml.includes(
+          '<summary class="uno-json-disclosure-summary"><h3>Can this contact notice send anything?</h3></summary>',
+        ),
     );
     const galleryStart = familyHtml.indexOf('<div class="uno-json-gallery" data-uno-columns="2" id="family-5-gallery">');
     const galleryMarkup = galleryStart < 0 ? "" : familyHtml.slice(galleryStart, familyHtml.indexOf("</div>", galleryStart));
@@ -1737,13 +1791,16 @@ async function main() {
           && stepsRegion.includes('<section class="uno-json-timeline" data-uno-surface="muted" id="family-11-steps-timeline">')
           && stepsRegion.includes('<ol class="uno-json-timeline-list">')
           && (stepsRegion.match(/<li class="uno-json-timeline-item"[^>]*>/gu) ?? []).length === 2
-          && stepsRegion.includes('<p class="uno-json-timeline-title">Draft</p>')
-          && stepsRegion.includes('<p class="uno-json-timeline-title">Review</p>')
-          && stepsRegion.indexOf(">Draft</p>") < stepsRegion.indexOf(">Review</p>")
+          // `UNO-WO-080 / R01`: the donor's step titles are level-3 headings inside their own list items.
+          && stepsRegion.includes('<h3 class="uno-json-timeline-title">Draft</h3>')
+          && stepsRegion.includes('<h3 class="uno-json-timeline-title">Review</h3>')
+          && (stepsRegion.match(/<h3 class="uno-json-timeline-title">/gu) ?? []).length === 2
+          && !stepsRegion.includes('<p class="uno-json-timeline-title">')
+          && stepsRegion.indexOf(">Draft</h3>") < stepsRegion.indexOf(">Review</h3>")
           && (stepsRegion.match(/<p class="uno-json-timeline-description">/gu) ?? []).length === 1
           && stepsRegion.includes('<p class="uno-json-timeline-description">Prepare the fixture source.</p>')
           && (stepsRegion.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
-          && !/data-uno-status|aria-current|uno-json-timeline-date|uno-json-timeline-heading|<h1\b|<h3/iu.test(stepsRegion);
+          && !/data-uno-status|aria-current|uno-json-timeline-date|uno-json-timeline-heading|<h1\b|<h4\b/iu.test(stepsRegion);
       })(),
       familyRegionOf("family-11-steps").slice(0, 200),
     );
@@ -1807,13 +1864,14 @@ async function main() {
         && familyHtml.includes('<div class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="plain" data-uno-ratio="start-wide" id="family-14-columns">')
         && (columnsRegion.match(/<div class="uno-json-cell"/gu) ?? []).length === 2
         && (columnsRegion.match(/<div class="uno-json-stack" data-uno-gap="tight"/gu) ?? []).length === 2
-        && (columnsRegion.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 2
-        && columnsRegion.indexOf(">Left column</h2>") > 0
-        && columnsRegion.indexOf(">Left column</h2>") < columnsRegion.indexOf(">Right column</h2>")
+        // `UNO-WO-080 / R01`: the donor's column titles are level-3 headings beneath the authored section heading.
+        && (columnsRegion.match(/<h3 class="uno-json-heading"/gu) ?? []).length === 2
+        && columnsRegion.indexOf(">Left column</h3>") > 0
+        && columnsRegion.indexOf(">Left column</h3>") < columnsRegion.indexOf(">Right column</h3>")
         && columnsRegion.includes(">The left text.</p>")
         && columnsRegion.includes('<ul class="uno-json-list"')
         && columnsRegion.indexOf(">Check one</span>") < columnsRegion.indexOf(">Check two</span>")
-        && !/<h3\b|<a\b|<img\b|<button\b|<form\b/iu.test(columnsRegion),
+        && !/<h2\b|<h4\b|<a\b|<img\b|<button\b|<form\b/iu.test(columnsRegion),
       columnsRegion.slice(0, 200),
     );
     const cardsRegion = cardsOpen < 0 || featuresOpen < 0 ? "" : familyHtml.slice(cardsOpen, featuresOpen);
@@ -1922,7 +1980,9 @@ async function main() {
           && region.includes(innerOpen)
           && region.includes(listOpen)
           && (region.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
-          && !/<main\b|<h1\b|<h3\b|<script\b|<a\b|<iframe\b|<form\b|<button\b|<input\b/iu.test(region);
+          // `UNO-WO-080 / R01`: the steps timeline's own item titles are level-3 headings; the stats family has none.
+          && (region.match(/<h3[\s>]/giu) ?? []).length === (innerId.endsWith("-timeline") ? 2 : 0)
+          && !/<main\b|<h1\b|<h4\b|<script\b|<a\b|<iframe\b|<form\b|<button\b|<input\b/iu.test(region);
       };
       check(
         "FAMILY_STATS_STEPS_HTTP each sequence family serves one heading and one lede before its unchanged list",
@@ -1975,7 +2035,9 @@ async function main() {
           && region.indexOf(`${id}-lede`) < region.indexOf(nativeOpen)
           && region.includes(nativeOpen)
           && (region.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
-          && !/<main\b|<h1\b|<h3\b|<script\b|<iframe\b|<form\b|<button\b|<input\b|<a\b/iu.test(region);
+          // `UNO-WO-080 / R01`: the fixture FAQ authors one question, so one level-3 heading; the other four carry none.
+          && (region.match(/<h3[\s>]/giu) ?? []).length === (type === "faq" ? 1 : 0)
+          && !/<main\b|<h1\b|<h4\b|<script\b|<iframe\b|<form\b|<button\b|<input\b|<a\b/iu.test(region);
       };
       for (const [index, type, headingText, ledeText, nativeOpen] of servedFive) {
         check(
@@ -2004,11 +2066,45 @@ async function main() {
           && lastFourRegions.every((region) => !/<main\b|<h1\b|<script\b|<iframe\b|<form\b|<input\b|<textarea\b|<button\b/iu.test(region))
           && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
           && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
-          && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 11
-          && (familyHtml.match(/<h3[\s>]/giu) ?? []).length === 4
+          // `UNO-WO-080 / R01`: the fixture FAQ authors one question, so its own level-3 heading is expected once — the
+          // two former column `h2`s and the two step titles are now `h3` as well, giving nine `h2` and nine `h3`.
+          && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 9
+          && (familyHtml.match(/<h3[\s>]/giu) ?? []).length === 9
           && !familyHtml.includes(FAMILY_DONOR_SOURCE)
           && !familyHtml.includes("formRef"),
         `${lastFourRegions.map((region) => region.length).join("/")} h2=${(familyHtml.match(/<h2[\s>]/giu) ?? []).length} h3=${(familyHtml.match(/<h3[\s>]/giu) ?? []).length}`,
+      );
+    }
+    // `UNO-WO-080 / R01`: the three composed donor outlines as actually served — heading ownership, not a count alone.
+    {
+      const stepsServed = familyRegionOf("family-11-steps");
+      const faqServed = familyHtml.slice(
+        familyHtml.indexOf('id="family-3-faq-accordion"'),
+        familyHtml.indexOf('id="family-2-list"') > familyHtml.indexOf('id="family-3-faq-accordion"')
+          ? familyHtml.indexOf('id="family-4-media"')
+          : -1,
+      );
+      const columnsServed = columnsRegion;
+      const stepsOwnedByListItems =
+        (stepsServed.match(/<li class="uno-json-timeline-item"[^>]*>(?:(?!<\/li>)[\s\S])*?<h3 class="uno-json-timeline-title">/gu) ?? [])
+          .length === 2;
+      const faqOwnedBySummaries =
+        (faqServed.match(/<summary class="uno-json-disclosure-summary"><h3>[^<]+<\/h3><\/summary>/gu) ?? []).length === 1
+        && faqServed.includes("<h3>Can this contact notice send anything?</h3>");
+      const columnsOwnedByCells =
+        (columnsServed.match(/<div class="uno-json-cell"[^>]*>\s*<div class="uno-json-stack"[^>]*>\s*<h3 class="uno-json-heading"[^>]*>/gu) ?? [])
+          .length === 2;
+      check(
+        "FAMILY_OUTLINE_THREE_HTTP the served Page puts the step titles, FAQ questions and column titles in level-3 headings of their own regions",
+        stepsOwnedByListItems
+          && faqOwnedBySummaries
+          && columnsOwnedByCells
+          && stepsServed.indexOf(">Draft</h3>") < stepsServed.indexOf(">Review</h3>")
+          && columnsServed.indexOf(">Left column</h3>") < columnsServed.indexOf(">Right column</h3>")
+          && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
+          && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
+          && !/<h4\b|role="heading"|aria-level/iu.test(familyHtml),
+        JSON.stringify({ stepsOwnedByListItems, faqOwnedBySummaries, columnsOwnedByCells }),
       );
     }
     // `UNO-WO-069 / R01`: the divider as served. The donor authors `{type:"divider"}` and renders one native `<hr>`;
@@ -2494,6 +2590,18 @@ async function consentPhase(base) {
       }
       return check(`FAMILY_TEXT_FIVE_BROWSER ${label}`, ok, detail);
     };
+    // `UNO-WO-080 / R01`: the three donor heading outlines are counted and gated separately, so a deleted or neutered
+    // outline check both fails the runner and withholds the overall family label.
+    let outlineBrowserOk = true;
+    let outlineBrowserChecks = 0;
+    const outlineCheck = (label, ok, detail = "") => {
+      outlineBrowserChecks += 1;
+      if (!ok) {
+        outlineBrowserOk = false;
+        familyOk = false;
+      }
+      return check(`FAMILY_OUTLINE_THREE_BROWSER ${label}`, ok, detail);
+    };
     // `UNO-WO-069 / R01`: the divider evidence is counted and gated separately, so a deleted or neutered divider check
     // both fails the runner and suppresses the overall parity label.
     let dividerOk = true;
@@ -2677,7 +2785,8 @@ async function consentPhase(base) {
               cells: cells.length,
               cellsAreCells: cells.every((cell) => cell.classList.contains("uno-json-cell")),
               stacks: cells.map((cell) => cell.firstElementChild?.classList.contains("uno-json-stack") ?? false),
-              headings: [...(region?.querySelectorAll("h2.uno-json-heading") ?? [])].map((node) => node.textContent ?? ""),
+              // `UNO-WO-080 / R01`: the two column titles are level-3 headings of their own columns, and there are no others.
+        headings: [...(region?.querySelectorAll("h3.uno-json-heading") ?? [])].map((node) => node.textContent ?? ""),
               paragraphs: [...(region?.querySelectorAll("p.uno-json-prose") ?? [])].map((node) => node.textContent ?? ""),
               listItems: [...(region?.querySelectorAll("ul.uno-json-list > li") ?? [])].map((node) => node.textContent ?? ""),
               h3: region?.querySelectorAll("h3").length ?? -1,
@@ -2876,7 +2985,7 @@ async function consentPhase(base) {
           && JSON.stringify(seen.columns.headings) === JSON.stringify(["Left column", "Right column"])
           && JSON.stringify(seen.columns.paragraphs) === JSON.stringify(["The left text."])
           && JSON.stringify(seen.columns.listItems) === JSON.stringify(["Check one", "Check two"])
-          && seen.columns.h3 === 0 && seen.columns.controls === 0,
+          && seen.columns.h3 === 2 && seen.columns.controls === 0,
         JSON.stringify(seen.columns));
       familyCheck(`${width}px cards show a headed stack with one authored h2, a two-column list grid and two h3 titles`,
         seen.cards.rootTag === "DIV" && seen.cards.rootGap === "normal"
@@ -3049,6 +3158,53 @@ async function consentPhase(base) {
           && seen.overflow === 0,
         JSON.stringify(textFiveSeen.map((entry) => `${entry.id}:${entry.nativeId}:${entry.h2Count}:${entry.controls}`)));
 
+      // `UNO-WO-080 / R01`: the composed donor outlines as live DOM at this viewport, in native containers only.
+      const outlineSeen = await tab.evaluate(() => {
+        const steps = document.getElementById("family-11-steps-timeline");
+        const faq = document.getElementById("family-3-faq-accordion");
+        const columns = document.getElementById("family-14-columns");
+        const text = (nodes) => nodes.map((node) => node.textContent ?? "");
+        const columnCells = columns ? [...columns.children] : [];
+        return {
+          stepHeadings: steps ? text([...steps.querySelectorAll("ol > li > h3.uno-json-timeline-title")]) : [],
+          stepParagraphTitles: steps ? steps.querySelectorAll("ol > li > p.uno-json-timeline-title").length : -1,
+          faqHeadings: faq ? text([...faq.querySelectorAll("details > summary > h3")]) : [],
+          faqSummaryText: faq ? text([...faq.querySelectorAll("details > summary")]) : [],
+          columnHeadings: text(columnCells.map((cell) => cell.querySelector(":scope > div > h3.uno-json-heading"))),
+          columnFirstChildIsHeading: columnCells.every(
+            (cell) => cell.querySelector(":scope > div")?.firstElementChild?.tagName === "H3",
+          ),
+          h1Count: document.querySelectorAll("h1").length,
+          mainCount: document.querySelectorAll("main").length,
+          h4Count: document.querySelectorAll("h4").length,
+          headingRoles: document.querySelectorAll('[role="heading"], [aria-level]').length,
+          overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+          controlsInOutline: document.querySelectorAll(
+            "#family-11-steps-timeline button, #family-3-faq-accordion button, #family-14-columns button",
+          ).length,
+        };
+      });
+      outlineCheck(`${width}px two step headings sit inside their own list items`,
+        outlineSeen.stepHeadings.length === 2 && outlineSeen.stepParagraphTitles === 0, JSON.stringify(outlineSeen.stepHeadings));
+      outlineCheck(`${width}px the step headings keep authored order`,
+        outlineSeen.stepHeadings[0] === "Draft" && outlineSeen.stepHeadings[1] === "Review",
+        JSON.stringify(outlineSeen.stepHeadings));
+      outlineCheck(`${width}px one FAQ question heading sits inside its own native summary`,
+        outlineSeen.faqHeadings.length === 1
+          && outlineSeen.faqHeadings[0] === "Can this contact notice send anything?"
+          && outlineSeen.faqSummaryText.length === 1,
+        JSON.stringify({ headings: outlineSeen.faqHeadings, summaries: outlineSeen.faqSummaryText }));
+      outlineCheck(`${width}px each column title is the first level-3 heading of its own column`,
+        outlineSeen.columnHeadings.length === 2
+          && outlineSeen.columnHeadings[0] === "Left column"
+          && outlineSeen.columnHeadings[1] === "Right column"
+          && outlineSeen.columnFirstChildIsHeading,
+        JSON.stringify(outlineSeen.columnHeadings));
+      outlineCheck(`${width}px the outlined Page keeps one main, one h1, no h4 or invented heading role, no control and no overflow`,
+        outlineSeen.h1Count === 1 && outlineSeen.mainCount === 1 && outlineSeen.h4Count === 0
+          && outlineSeen.headingRoles === 0 && outlineSeen.controlsInOutline === 0 && outlineSeen.overflow === 0,
+        JSON.stringify(outlineSeen));
+
       const familySummary = tab.locator("#family-3-faq-accordion summary").first();
       const familyDetails = tab.locator("#family-3-faq-accordion details").first();
       await familySummary.focus();
@@ -3165,6 +3321,29 @@ async function consentPhase(base) {
       dividerCheck(`dark ${width}px divider visit made no foreign or provider request`,
         requests.length === 0 && requests.every((entry) => !entry.foreign && !entry.provider),
         JSON.stringify(requests.slice(0, 3)));
+      // `UNO-WO-080 / R01`: the same three level-3 outline regions survive the dark, reduced-motion scheme.
+      const darkOutline = await tab.evaluate(() => {
+        const steps = document.getElementById("family-11-steps-timeline");
+        const faq = document.getElementById("family-3-faq-accordion");
+        const columns = document.getElementById("family-14-columns");
+        return {
+          scheme: matchMedia("(prefers-color-scheme: dark)").matches,
+          reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+          steps: steps ? steps.querySelectorAll("ol > li > h3.uno-json-timeline-title").length : -1,
+          faq: faq ? faq.querySelectorAll("details > summary > h3").length : -1,
+          columns: columns
+            ? [...columns.children].filter(
+                (cell) => cell.querySelector(":scope > div")?.firstElementChild?.tagName === "H3",
+              ).length
+            : -1,
+          h4s: document.querySelectorAll("h4").length,
+          overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        };
+      });
+      outlineCheck(`dark ${width}px the three level-3 outline regions survive dark and reduced motion`,
+        darkOutline.scheme && darkOutline.reducedMotion && darkOutline.steps === 2 && darkOutline.faq === 1
+          && darkOutline.columns === 2 && darkOutline.h4s === 0 && darkOutline.overflow === 0,
+        JSON.stringify(darkOutline));
     }
     await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
     familyCheck("the family Page raised no new console or page error", consoleErrors.length === errorsBefore,
@@ -3184,10 +3363,16 @@ async function consentPhase(base) {
       textFiveBrowserOk && textFiveBrowserChecks === 2,
       `checks=${textFiveBrowserChecks}`,
     );
+    // `UNO-WO-080 / R01`: five light-viewport checks per width plus one dark/reduced-motion check per width, all gated.
+    check(
+      "FAMILY_OUTLINE_THREE_BROWSER=PASS the three level-3 outline regions were measured in real Chromium at both viewports",
+      outlineBrowserOk && outlineBrowserChecks === 12,
+      `checks=${outlineBrowserChecks} ok=${outlineBrowserOk}`,
+    );
     check(
       "FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px",
       familyOk && ledeBrowserOk && ledeBrowserChecks === 2 && sequenceBrowserOk && sequenceBrowserChecks === 2
-        && textFiveBrowserOk && textFiveBrowserChecks === 2,
+        && textFiveBrowserOk && textFiveBrowserChecks === 2 && outlineBrowserOk && outlineBrowserChecks === 12,
     );
     // `UNO-WO-069 / R01`: the divider parity gate. It depends on every executed divider check (three per light viewport
     // and three per dark/reduced-motion viewport) AND on the surrounding family gates, so no single label can stand

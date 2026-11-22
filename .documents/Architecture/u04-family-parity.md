@@ -411,3 +411,48 @@ listed in section 6 remain absent. The accounting is unchanged at **22/22** modu
 **16/16** browser matrix, **17/17** bounded mappings, **1/17** accepted full parity (`divider`) and **43/59 =
 72.88%** proxy. The reserved `.example` canonical is illustrative sample data, not a domain, deployment or ownership
 claim, and U04 remains OPEN.
+
+## 8. Three bounded donor heading outlines (`UNO-WO-080 / R01`)
+
+The pinned donor renders item-level titles as level-3 headings: `StepsSection` emits a native `ol`/`li` list whose
+`ItemTitle` is `<h3>`, `FaqSection` places `ItemTitle` inside the native `summary`, and `ColumnsSection` uses one
+`ItemTitle` per column, all beneath an authored section heading. Uno previously flattened those three to a `<p>` title,
+a bare summary label and a level-2 column heading. This order `ADAPTs` the semantic outline only, with original Uno code.
+
+**Two closed, optional presentation switches** carry the difference, both literal-only and absent by default:
+
+| Module | Optional prop | Absent behaviour |
+| --- | --- | --- |
+| `content.timeline` | `itemHeadingLevel?: 3` | the previous `<p class="uno-json-timeline-title">`, byte-identical |
+| `interaction.accordion` | `summaryHeadingLevel?: 3` | the previous plain `<summary class="uno-json-disclosure-summary">label</summary>`, byte-identical |
+
+Any other authored value — `null`, an own `undefined`, `0`–`2`, `4`, `"3"`, `false`, `NaN`, a duplicate JSON member, an
+accessor or a wrong-module key — refuses the whole document with the existing closed `document:invalid-props`,
+`document:input-not-plain` or `document:json-duplicate-key` reason. No default prop is injected into an older document,
+so every pre-existing authored Page keeps its exact serialization and markup.
+
+**Composer mapping (only these three families changed):** `steps` always sets `itemHeadingLevel: 3` on its
+`content.timeline` node; `faq` always sets `summaryHeadingLevel: 3` on its native `interaction.accordion`; `columns`
+child titles became `content.heading {level: 3}` (the two/three titles, no wrapper, no new id). No donor field was added,
+no refusal vocabulary changed and no other family mapping moved.
+
+**Outline consequence, recorded truthfully:** a columns family composed with **no** preceding authored level-2 heading
+now violates Uno's existing document outline rule and refuses as `family:target-refused`, because Uno never invents a
+section heading. The committed Components Page and both family fixtures author an `h2` above the columns family, so they
+compose; a columns-only donor source is not an accepted document. This is a document-level invariant, not a silent
+weakening: the reader still refuses a skipped outline level exactly as before.
+
+**Evidence.** Unit: strict-reader acceptance/refusal, absent-key serialization baseline, accessor and duplicate-member
+refusals, React static markup for the legacy and switched forms, the three family source shapes, and the fourteen
+untouched committed family sections compared with their recorded before-state digests. HTTP: the served committed Page,
+the temporary seventeen-family fixture (`9 h2` / `10 h3`, from `11`/`4`) and the composed fixture all assert heading
+ownership inside the native `li`, `summary` and column containers. Chromium: the same regions at 390 and 1280 CSS px,
+light and dark, and under reduced motion, with one `main`, one `h1`, no `h4`, no invented heading role, no extra control
+and no overflow.
+
+**Still absent (unchanged):** donor Markdown, links and target resolution, rich forms and transport, card media/meta/
+actions, feature icons, decorative media and gallery list wrapper, other optional donor types, and the lifecycle and
+design semantics listed in section 6. Three families gained one heading level; nothing became full parity.
+
+Accounting is unchanged: **22/22** module IDs, **4/4** asset zones, **16/16** browser matrix, **17/17** bounded mappings,
+**1/17** accepted full parity (`divider`), **43/59 = 72.88%** proxy. U04 stays OPEN and no stage credit follows.

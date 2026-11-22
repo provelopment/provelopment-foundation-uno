@@ -34,6 +34,20 @@ function envelope(section: unknown): Record<string, unknown> {
   return { version: 1, title: "Refusal fixture", sections: [section] };
 }
 
+/**
+ * `UNO-WO-080 / R01`: one valid envelope that authors a level-2 section heading before the probed family.
+ *
+ * The composed `columns` titles are level-3 headings by the donor's own outline, so a columns family only forms a legal
+ * document outline when an authored h2 precedes it — exactly as the donor's own section heading does on a real page.
+ */
+function titledEnvelope(section: unknown): Record<string, unknown> {
+  return {
+    version: 1,
+    title: "Refusal fixture",
+    sections: [{ type: "prose", heading: "Section heading", body: "Section body." }, section],
+  };
+}
+
 /** The composed, validated Page, failing loudly when the fixture itself is refused. */
 function composed(input: unknown, bindings?: unknown): UnoPageDocument {
   const outcome = composeUnoFoundationSubset(input, bindings);
@@ -609,6 +623,9 @@ describe("composeUnoFoundationSubset — bounded steps and quote", () => {
     expect(steps?.props).toEqual({
       items: [{ title: "Prepare", description: "Review the content." }, { title: "Publish" }],
       surface: "muted",
+      // `UNO-WO-080 / R01`: the donor step titles are level-3 headings, so the composed timeline always carries the
+      // closed literal presentation switch alongside its authored surface.
+      itemHeadingLevel: 3,
     });
     expect(quote?.props).toEqual({
       items: [{ quote: "The exact words.", attribution: "Example speaker", role: "Reviewer" }],
@@ -648,10 +665,10 @@ describe("composeUnoFoundationSubset — bounded steps and quote", () => {
     const quote = composed(envelope({ type: "quote", body: "Q" }));
     const attributed = composed(envelope({ type: "quote", body: "Q", attribution: "Only a name" }));
     const described = composed(envelope({ type: "steps", items: [{ title: "A", body: "B" }] }));
-    expect(steps.sections[0]?.props).toEqual({ items: [{ title: "A" }] });
+    expect(steps.sections[0]?.props).toEqual({ items: [{ title: "A" }], itemHeadingLevel: 3 });
     expect(quote.sections[0]?.props).toEqual({ items: [{ quote: "Q" }] });
     expect(attributed.sections[0]?.props).toEqual({ items: [{ quote: "Q", attribution: "Only a name" }] });
-    expect(described.sections[0]?.props).toEqual({ items: [{ title: "A", description: "B" }] });
+    expect(described.sections[0]?.props).toEqual({ items: [{ title: "A", description: "B" }], itemHeadingLevel: 3 });
   });
 });
 
@@ -771,8 +788,8 @@ describe("composeUnoFoundationSubset — steps and quote React markup", () => {
     expect(html).toContain('<section class="uno-json-timeline" data-uno-surface="muted" id="family-7-steps">');
     expect((html.match(/<ol class="uno-json-timeline-list">/gu) ?? []).length).toBe(1);
     expect((html.match(/class="uno-json-timeline-item"/gu) ?? []).length).toBe(2);
-    expect(html).toContain('<p class="uno-json-timeline-title">Prepare</p>');
-    expect(html).toContain('<p class="uno-json-timeline-title">Publish</p>');
+    expect(html).toContain('<h3 class="uno-json-timeline-title">Prepare</h3>');
+    expect(html).toContain('<h3 class="uno-json-timeline-title">Publish</h3>');
     expect((html.match(/class="uno-json-timeline-description"/gu) ?? []).length).toBe(1);
     expect(html).toContain('<p class="uno-json-timeline-description">Review the content.</p>');
     expect(html.indexOf("Prepare")).toBeLessThan(html.indexOf("Publish"));
@@ -891,6 +908,9 @@ function elevenSectionSource(): Record<string, unknown> {
       ...sections,
       {
         type: "faq",
+        // `UNO-WO-080 / R01`: the composed columns titles are level-3 headings, so this fixture authors the section
+        // heading a real donor FAQ carries; that h2 keeps the document outline legal before the columns family.
+        heading: "Family questions",
         items: [
           { question: "Where?", answer: "At the selected site." },
           { question: "When?", answer: "During stated hours." },
@@ -928,22 +948,34 @@ describe("composeUnoFoundationSubset — bounded faq and columns", () => {
     ]);
     expect(JSON.stringify(eleven.sections.slice(0, 9))).toBe(JSON.stringify(nine.sections));
 
-    const faq = eleven.sections[9];
+    const faqWrapper = eleven.sections[9];
     const columns = eleven.sections[10];
-    expect(faq?.module).toBe("interaction.accordion");
+    // `UNO-WO-080 / R01`: the fixture authors a FAQ heading so the document outline is legal before the level-3 column
+    // titles, so the FAQ family arrives as its documented heading + accordion stack under the same top-level id.
+    expect(faqWrapper?.module).toBe("layout.stack");
     expect(columns?.module).toBe("layout.grid");
-    if (faq?.module !== "interaction.accordion" || columns?.module !== "layout.grid") return;
+    if (faqWrapper?.module !== "layout.stack" || columns?.module !== "layout.grid") return;
+    expect(faqWrapper.props).toEqual({});
+    expect(faqWrapper.children.map((child) => child.id)).toEqual([
+      "family-9-faq-heading",
+      "family-9-faq-accordion",
+    ]);
+    const faq = faqWrapper.children[1];
+    expect(faq?.module).toBe("interaction.accordion");
+    if (faq?.module !== "interaction.accordion") return;
 
     // Each accordion entry names its own answer child, in the same order, with no extra field or invented default.
     expect(faq.props.items).toEqual([
       { sectionId: "family-9-faq-answer-0", label: "Where?" },
       { sectionId: "family-9-faq-answer-1", label: "When?" },
     ]);
+    // The only added key is the closed literal donor-outline switch.
+    expect(faq.props.summaryHeadingLevel).toBe(3);
     expect(faq.children.map((child) => child.id)).toEqual(["family-9-faq-answer-0", "family-9-faq-answer-1"]);
     expect(faq.children[0]?.props).toEqual({ text: "At the selected site." });
     expect(faq.children[1]?.props).toEqual({ text: "During stated hours." });
 
-    // One tight stack per authored column, each a level-2 title then a body paragraph or a native list.
+    // One tight stack per authored column, each a level-3 title then a body paragraph or a native list.
     expect(columns.props).toEqual({ columns: 2, ratio: "start-wide" });
     expect(columns.children.map((child) => child.id)).toEqual([
       "family-10-columns-column-0",
@@ -954,9 +986,9 @@ describe("composeUnoFoundationSubset — bounded faq and columns", () => {
     expect(first?.props).toEqual({ gap: "tight" });
     expect(second?.props).toEqual({ gap: "tight" });
     if (first?.module !== "layout.stack" || second?.module !== "layout.stack") return;
-    expect(first.children[0]?.props).toEqual({ text: "What", level: 2 });
+    expect(first.children[0]?.props).toEqual({ text: "What", level: 3 });
     expect(first.children[1]?.props).toEqual({ text: "A short paragraph." });
-    expect(second.children[0]?.props).toEqual({ text: "Why", level: 2 });
+    expect(second.children[0]?.props).toEqual({ text: "Why", level: 3 });
     expect(second.children[1]?.props).toEqual({ variant: "list", items: [{ label: "Plain" }, { label: "Safe" }] });
   });
 
@@ -966,12 +998,15 @@ describe("composeUnoFoundationSubset — bounded faq and columns", () => {
     const document = composed(source);
     expect(JSON.stringify(source)).toBe(before);
     expect(Object.isFrozen(document)).toBe(true);
-    const faq = document.sections[9];
+    const faqWrapper = document.sections[9];
     const columns = document.sections[10];
-    if (faq?.module === "interaction.accordion") {
-      expect(Object.isFrozen(faq.props.items)).toBe(true);
-      expect(Object.isFrozen(faq.children)).toBe(true);
-      expect(Object.isFrozen(faq.children[0])).toBe(true);
+    if (faqWrapper?.module === "layout.stack") {
+      const faq = faqWrapper.children[1];
+      if (faq?.module === "interaction.accordion") {
+        expect(Object.isFrozen(faq.props.items)).toBe(true);
+        expect(Object.isFrozen(faq.children)).toBe(true);
+        expect(Object.isFrozen(faq.children[0])).toBe(true);
+      }
     }
     if (columns?.module === "layout.grid") {
       expect(Object.isFrozen(columns.children)).toBe(true);
@@ -980,13 +1015,14 @@ describe("composeUnoFoundationSubset — bounded faq and columns", () => {
       if (stack?.module === "layout.stack") expect(Object.isFrozen(stack.children)).toBe(true);
     }
 
+    // A standalone columns family needs an authored level-2 heading before its level-3 titles in the document outline.
     const plain = composed(
-      envelope({
+      titledEnvelope({
         type: "columns",
         items: [{ title: "One", body: "First." }, { title: "Two", body: "Second." }],
       }),
     );
-    const grid = plain.sections[0];
+    const grid = plain.sections[1];
     expect(grid?.props).toEqual({ columns: 2 });
     if (grid?.module === "layout.grid") expect(Object.prototype.hasOwnProperty.call(grid.props, "ratio")).toBe(false);
   });
@@ -995,18 +1031,22 @@ describe("composeUnoFoundationSubset — bounded faq and columns", () => {
 describe("composeUnoFoundationSubset — faq and columns React markup", () => {
   const html = render(composed(elevenSectionSource()));
 
-  it("renders the faq as native disclosures with plain summaries and prose answers", () => {
-    expect(html).toContain('<div class="uno-json-accordion" id="family-9-faq">');
+  it("renders the faq as native disclosures with level-3 question headings and prose answers", () => {
+    expect(html).toContain('<div class="uno-json-stack" data-uno-gap="normal" id="family-9-faq">');
+    expect(html).toContain('<h2 class="uno-json-heading" id="family-9-faq-heading">Family questions</h2>');
+    expect(html).toContain('<div class="uno-json-accordion" id="family-9-faq-accordion">');
     expect((html.match(/<details class="uno-json-disclosure">/gu) ?? []).length).toBe(2);
-    expect((html.match(/<summary class="uno-json-disclosure-summary">/gu) ?? []).length).toBe(2);
-    expect(html).toContain('<summary class="uno-json-disclosure-summary">Where?</summary>');
-    expect(html).toContain('<summary class="uno-json-disclosure-summary">When?</summary>');
+    expect((html.match(/<summary class="uno-json-disclosure-summary"><h3>/gu) ?? []).length).toBe(2);
+    expect(html).toContain('<summary class="uno-json-disclosure-summary"><h3>Where?</h3></summary>');
+    expect(html).toContain('<summary class="uno-json-disclosure-summary"><h3>When?</h3></summary>');
     expect(html.indexOf("Where?")).toBeLessThan(html.indexOf("When?"));
     expect(html).toContain('<p class="uno-json-prose" id="family-9-faq-answer-0">At the selected site.</p>');
     expect(html).toContain('<p class="uno-json-prose" id="family-9-faq-answer-1">During stated hours.</p>');
     expect((html.match(/class="uno-json-disclosure-body"/gu) ?? []).length).toBe(2);
-    // No invented heading, form, frame or automatic open state: the disclosure is the platform's native element.
-    expect(html).not.toContain("<h3");
+    // No invented section heading, form, frame or automatic open state: the disclosure stays the platform's native
+    // element, and the only h3 elements are the two authored question labels inside their own summaries.
+    expect((html.match(/<h3>/gu) ?? []).length).toBe(2);
+    expect((html.match(/<h2 class="uno-json-heading"/gu) ?? []).length).toBe(1);
     expect(html).not.toContain("<form");
     expect(html).not.toContain("<iframe");
     expect(html).not.toContain("open=");
@@ -1017,10 +1057,13 @@ describe("composeUnoFoundationSubset — faq and columns React markup", () => {
       '<div class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="plain" data-uno-ratio="start-wide" id="family-10-columns">',
     );
     expect((html.match(/class="uno-json-cell"/gu) ?? []).length).toBe(2);
-    expect((html.match(/class="uno-json-stack"/gu) ?? []).length).toBe(2);
-    expect((html.match(/<h2 class="uno-json-heading"/gu) ?? []).length).toBe(2);
-    expect(html).toContain('<h2 class="uno-json-heading" id="family-10-columns-column-0-title">What</h2>');
-    expect(html).toContain('<h2 class="uno-json-heading" id="family-10-columns-column-1-title">Why</h2>');
+    // Two column stacks inside the grid, plus the FAQ's own authored heading wrapper elsewhere on the Page.
+    const columnsRegion = html.slice(html.indexOf('id="family-10-columns"'));
+    expect((columnsRegion.match(/class="uno-json-stack"/gu) ?? []).length).toBe(2);
+    // `UNO-WO-080 / R01`: the donor column titles are level-3 headings beneath the authored section heading.
+    expect((html.match(/<h3 class="uno-json-heading"/gu) ?? []).length).toBe(2);
+    expect(html).toContain('<h3 class="uno-json-heading" id="family-10-columns-column-0-title">What</h3>');
+    expect(html).toContain('<h3 class="uno-json-heading" id="family-10-columns-column-1-title">Why</h3>');
     expect(html).toContain('<p class="uno-json-prose" id="family-10-columns-column-0-body">A short paragraph.</p>');
     expect(html).toContain(
       '<ul class="uno-json-list" id="family-10-columns-column-1-body"><li><span>Plain</span></li><li><span>Safe</span></li></ul>',
@@ -1031,7 +1074,7 @@ describe("composeUnoFoundationSubset — faq and columns React markup", () => {
   it("renders three columns with no ratio attribute at all", () => {
     const three = render(
       composed(
-        envelope({
+        titledEnvelope({
           type: "columns",
           items: [
             { title: "One", body: "First." },
@@ -1044,7 +1087,7 @@ describe("composeUnoFoundationSubset — faq and columns React markup", () => {
     expect(three).toContain('data-uno-columns="3"');
     expect(three).not.toContain("data-uno-ratio");
     expect((three.match(/class="uno-json-cell"/gu) ?? []).length).toBe(3);
-    expect((three.match(/<h2 class="uno-json-heading"/gu) ?? []).length).toBe(3);
+    expect((three.match(/<h3 class="uno-json-heading"/gu) ?? []).length).toBe(3);
     expect(three).not.toContain("<h1");
     expect((three.match(/<main/gu) ?? []).length).toBe(0);
   });
@@ -1054,7 +1097,10 @@ describe("composeUnoFoundationSubset — faq and columns React markup", () => {
     expect(html).not.toContain("onclick");
     expect((html.match(/<h1/gu) ?? []).length).toBe(0);
     expect((html.match(/<main/gu) ?? []).length).toBe(0);
-    expect((html.match(/<h3/gu) ?? []).length).toBe(0);
+    // Only the authored FAQ heading is a level-2 heading; the six level-3 headings are the two step titles, the two
+    // FAQ questions and the two column titles, and no other heading level appears.
+    expect((html.match(/<h2 class="uno-json-heading"/gu) ?? []).length).toBe(1);
+    expect((html.match(/<h3/gu) ?? []).length).toBe(6);
   });
 });
 
@@ -1766,22 +1812,27 @@ describe("composeUnoFoundationSubset — actions refusals", () => {
     for (const href of ["#family-99-prose", "#family-0-hero", "#family-1-actions"]) {
       expectRefusal(envelope({ type: "actions", actions: [{ label: "Go", href }] }), "family:target-refused");
     }
-    // A nested generated child id exists in the output but is NOT a top-level section, so it must refuse.
+    // A nested generated child id exists in the output but is NOT a top-level section, so it must refuse. The authored
+    // heading keeps the columns family's level-3 titles inside a legal document outline.
     const nestedSource = {
       version: 1,
       title: "Nested target fixture",
       sections: [
+        { type: "prose", heading: "Section heading", body: "Section body." },
         { type: "columns", items: [{ title: "Left", body: "L" }, { title: "Right", body: "R" }] },
-        { type: "actions", actions: [{ label: "Nested", href: "#family-0-columns-column-0" }] },
+        { type: "actions", actions: [{ label: "Nested", href: "#family-1-columns-column-0" }] },
       ],
     };
     // The nested id really does exist in a composed columns document, so only the top-level equality guard can refuse.
     const composedColumns = composed({
       version: 1,
       title: "Nested id evidence",
-      sections: [{ type: "columns", items: [{ title: "Left", body: "L" }, { title: "Right", body: "R" }] }],
+      sections: [
+        { type: "prose", heading: "Section heading", body: "Section body." },
+        { type: "columns", items: [{ title: "Left", body: "L" }, { title: "Right", body: "R" }] },
+      ],
     });
-    expect(JSON.stringify(composedColumns)).toContain('"family-0-columns-column-0"');
+    expect(JSON.stringify(composedColumns)).toContain('"family-1-columns-column-0"');
     expectRefusal(nestedSource, "family:target-refused");
   });
 
@@ -4146,6 +4197,15 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     { title: "Review" },
   ];
 
+  /**
+   * `UNO-WO-080 / R01`: the four baselines above stay the historical pre-WO-072 record. The only difference the steps
+   * family now carries is the documented `content.timeline` outline switch the donor's own `<h3>` item titles need.
+   */
+  function withStepsOutline(baseline: string): string {
+    const node = JSON.parse(baseline) as { props: Record<string, unknown> };
+    return JSON.stringify({ ...node, props: { ...node.props, itemHeadingLevel: 3 } });
+  }
+
   /** One stats/steps source carrying exactly the caller-chosen fields. */
   function sequencePage(type: "stats" | "steps", fields: Record<string, unknown>): Record<string, unknown> {
     return {
@@ -4157,20 +4217,26 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
 
   /** The original one-node child that a wrapper must carry unchanged apart from its documented id. */
   function originalChildNode(type: "stats" | "steps", surface?: string): Record<string, unknown> {
-    return JSON.parse(type === "stats"
+    const baseline = type === "stats"
       ? PRE_WO072_STATS
       : surface === "muted"
         ? PRE_WO072_STEPSSURFACE
         : surface === "bordered"
           ? PRE_WO072_STEPSBORDERED
-          : PRE_WO072_STEPS) as Record<string, unknown>;
+          : PRE_WO072_STEPS;
+    // A steps child still carries the documented outline switch; a stats child is untouched.
+    return JSON.parse(type === "steps" ? withStepsOutline(baseline) : baseline) as Record<string, unknown>;
   }
 
-  it("keeps all four pre-WO-072 baselines byte-identical when no text field is authored", () => {
+  it("keeps all four pre-WO-072 baselines byte-identical apart from the documented steps outline switch", () => {
     expect(JSON.stringify(composed(sequencePage("stats", {})).sections[0])).toBe(PRE_WO072_STATS);
-    expect(JSON.stringify(composed(sequencePage("steps", {})).sections[0])).toBe(PRE_WO072_STEPS);
-    expect(JSON.stringify(composed(sequencePage("steps", { surface: "muted" })).sections[0])).toBe(PRE_WO072_STEPSSURFACE);
-    expect(JSON.stringify(composed(sequencePage("steps", { surface: "bordered" })).sections[0])).toBe(PRE_WO072_STEPSBORDERED);
+    expect(JSON.stringify(composed(sequencePage("steps", {})).sections[0])).toBe(withStepsOutline(PRE_WO072_STEPS));
+    expect(JSON.stringify(composed(sequencePage("steps", { surface: "muted" })).sections[0])).toBe(
+      withStepsOutline(PRE_WO072_STEPSSURFACE),
+    );
+    expect(JSON.stringify(composed(sequencePage("steps", { surface: "bordered" })).sections[0])).toBe(
+      withStepsOutline(PRE_WO072_STEPSBORDERED),
+    );
   });
 
 
@@ -4349,9 +4415,11 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     }
     // `surface` stays unsupported for `stats` while remaining an accepted closed literal for `steps`.
     expectRefusal(sequencePage("stats", { surface: "muted" }), "family:unsupported-feature");
-    expect(composed(sequencePage("steps", { surface: "bordered" })).sections[0]!.props).toEqual(
-      { items: [{ title: "Draft", description: "Prepare the fixture source." }, { title: "Review" }], surface: "bordered" },
-    );
+    expect(composed(sequencePage("steps", { surface: "bordered" })).sections[0]!.props).toEqual({
+      items: [{ title: "Draft", description: "Prepare the fixture source." }, { title: "Review" }],
+      surface: "bordered",
+      itemHeadingLevel: 3,
+    });
     expectRefusal(
       envelope({ type: "stats", items: [{ value: "1", label: "One", href: "https://example.test" }] }),
       "family:unsupported-feature",
@@ -4388,7 +4456,11 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     expect(stepsRegion).toContain('<ol class="uno-json-timeline-list"');
     expect(stepsRegion.indexOf("family-0-steps-heading")).toBeLessThan(stepsRegion.indexOf("family-0-steps-lede"));
     expect(stepsRegion.indexOf("family-0-steps-lede")).toBeLessThan(stepsRegion.indexOf("family-0-steps-timeline"));
-    for (const forbidden of ["<h1", "<h3", "<dl", "<script", "<iframe", "<form", "<button", "<a ", "<img", "onclick"]) {
+    // `UNO-WO-080 / R01`: the steps region now carries its documented item headings, so the outline assertions are
+    // exact rather than a blanket ban on `<h3`.
+    expect((stepsRegion.match(/<h3 class="uno-json-timeline-title">/gu) ?? []).length).toBe(2);
+    expect((stepsRegion.match(/<h3/gu) ?? []).length).toBe(2);
+    for (const forbidden of ["<h1", "<h4", "<dl", "<script", "<iframe", "<form", "<button", "<a ", "<img", "onclick"]) {
       expect(stepsRegion).not.toContain(forbidden);
     }
   });
@@ -4486,17 +4558,24 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
               : variant === "caption"
                 ? PRE_WO075_TABLECAPTION
                 : PRE_WO075_TABLE;
-    return JSON.parse(baseline) as Record<string, unknown>;
+    // `UNO-WO-080 / R01`: a FAQ child still carries the documented summary outline switch; the other four families are
+    // untransformed, so the historical baseline above remains the recorded before-state.
+    const node = JSON.parse(baseline) as Record<string, unknown>;
+    if (type !== "faq") return node;
+    const props = node["props"] as Record<string, unknown>;
+    return { ...node, props: { ...props, summaryHeadingLevel: 3 } };
   }
 
-  it("keeps all nine pre-WO-075 baselines byte-identical when neither text field is authored", () => {
+  it("keeps all nine pre-WO-075 baselines byte-identical apart from the documented faq outline switch", () => {
     expect(JSON.stringify(composed(fivePage("prose", {})).sections[0])).toBe(PRE_WO075_PROSE);
     expect(JSON.stringify(composed(fivePage("callout", {})).sections[0])).toBe(PRE_WO075_CALLOUT);
     expect(JSON.stringify(composed(fivePage("callout", {}, "tone")).sections[0])).toBe(PRE_WO075_CALLOUTTONE);
     expect(JSON.stringify(composed(fivePage("list", {})).sections[0])).toBe(PRE_WO075_LIST);
     expect(JSON.stringify(composed(fivePage("list", {}, "ordered")).sections[0])).toBe(PRE_WO075_LISTORDERED);
-    expect(JSON.stringify(composed(fivePage("faq", {})).sections[0])).toBe(PRE_WO075_FAQONE);
-    expect(JSON.stringify(composed(fivePage("faq", {}, "two")).sections[0])).toBe(PRE_WO075_FAQTWQ);
+    expect(JSON.stringify(composed(fivePage("faq", {})).sections[0])).toBe(JSON.stringify(originalChild("faq")));
+    expect(JSON.stringify(composed(fivePage("faq", {}, "two")).sections[0])).toBe(
+      JSON.stringify(originalChild("faq", "two")),
+    );
     expect(JSON.stringify(composed(fivePage("table", {})).sections[0])).toBe(PRE_WO075_TABLE);
     expect(JSON.stringify(composed(fivePage("table", {}, "caption")).sections[0])).toBe(PRE_WO075_TABLECAPTION);
   });
@@ -4722,7 +4801,11 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
       expect(region).toContain(native[type]);
       expect(region.indexOf(heading)).toBeLessThan(region.indexOf(lede));
       expect(region.indexOf(lede)).toBeLessThan(region.indexOf(native[type]));
-      for (const forbidden of ["<h1", "<h3", "<script", "<iframe", "<form", "<button", "<a ", "<img", "onclick"]) {
+      // `UNO-WO-080 / R01`: only the FAQ family in this five-family loop carries heading output of its own, so the
+      // exact level-3 count is asserted per type instead of banning `<h3` outright.
+      const expectedH3 = type === "faq" ? FAQ_ONE.length : 0;
+      expect((region.match(/<h3/gu) ?? []).length).toBe(expectedH3);
+      for (const forbidden of ["<h1", "<h4", "<script", "<iframe", "<form", "<button", "<a ", "<img", "onclick"]) {
         expect(region).not.toContain(forbidden);
       }
     }
@@ -4950,4 +5033,129 @@ describe("the committed durable family Page (`UNO-WO-078 / R01`)", () => {
     }
     expect(html).not.toMatch(/src="https?:\/\//u);
   });
+});
+
+describe("the three donor heading outlines (`UNO-WO-080 / R01`)", () => {
+  const digestOf = (value: string): string => createHash("sha256").update(value).digest("hex");
+  const committedPage = JSON.parse(readFileSync("deployment/efs/content/components.en-001.json", "utf8"));
+  const durableSource = JSON.parse(readFileSync("tests/fixtures/u04-durable-family-source.json", "utf8"));
+  const durableBindings = JSON.parse(readFileSync("tests/fixtures/u04-durable-family-bindings.json", "utf8"));
+
+  /**
+   * The fourteen appended family sections this order did not touch, hashed from the committed Page *before* any edit of
+   * this order and recorded here as an independent before-state. A drift in any of them is a failure, not a refresh.
+   */
+  const UNAFFECTED_DIGESTS: Readonly<Record<string, string>> = {
+    "family-0-prose": "87c744b233ea5fe783bb7389332c2a74f406eaaf569d3182e463b1ec4407c70a",
+    "family-1-callout": "53d6fce0fc9ba681c9734b53b1f9557ee544a6bfcd0f9767bb2b630767dd3a70",
+    "family-2-list": "4a45f6018a5c7243f88056049edf0eec4205603d9b3b61954162c28eb2df0b1b",
+    "family-4-media": "4171a9bc3d2246e34f18169512071ff17f263639b53ea4285a54b8d20589e310",
+    "family-5-gallery": "bc2c81ae13e45e3793bd71df2c3bb0f0a33674f6418860fdf10f3d59716b8132",
+    "family-6-contactform": "3f4754331eed37d16bb05351430b22dd5f6dda221795b02d955a615d6d40da05",
+    "family-7-actions": "da9fd847bf307b9cc571890cea1385f8f9f3e1a0094576a7a4a882b6610741da",
+    "family-8-divider": "3656311d722ded1ac2c86f34e35caa85879502299d40e258c628ada5b2fc82a3",
+    "family-9-hero": "4b8d7831d356d2ce7610b423a34bd639c1d6a2976f2cef9b7d6d9fc13f6c3f83",
+    "family-10-stats": "9cc437c93759820210bd316aeb99a00f346488f18fb5d460c12d3e8b4ba6777b",
+    "family-12-quote": "7271422166b1b5c94d71803989d7ea5cae3b334cbd91296c5315c137271b51e6",
+    "family-13-table": "30d076359a38ca8673aab08cea2a042bae31524a74f82ccdae97aa5c1ed70540",
+    "family-15-cards": "4ca9f095a4122b1622fad760b01e884f8ba3c3e9a50115b188e71bdb30cf89e8",
+    "family-16-features": "7873cb6c2abcf7e88ec32c31180d7f63088d1c442983179666c115a6b7bb6d7c",
+  };
+  it("composes the donor steps as a timeline whose item titles are level-3 headings", () => {
+    const outcome = composeUnoFoundationSubset(
+      envelope({ type: "steps", items: [{ title: "One", body: "First body." }, { title: "Two" }] }),
+    );
+    expect(outcome.status).toBe("composed");
+    if (outcome.status !== "composed") return;
+    const node = outcome.document.sections[0];
+    expect(node?.module).toBe("content.timeline");
+    if (node?.module !== "content.timeline") return;
+    // The switch is the only addition: same items, same ids, and no invented status, date or extra heading.
+    expect(JSON.stringify(node.props)).toBe(
+      '{"items":[{"title":"One","description":"First body."},{"title":"Two"}],"itemHeadingLevel":3}',
+    );
+    expect(Object.isFrozen(node.props)).toBe(true);
+  });
+
+  it("composes the donor faq as a native accordion whose questions are level-3 headings", () => {
+    const items = [
+      { question: "Why?", answer: "Because." },
+      { question: "How?", answer: "Plainly." },
+    ];
+    const outcome = composeUnoFoundationSubset(envelope({ type: "faq", items }));
+    expect(outcome.status).toBe("composed");
+    if (outcome.status !== "composed") return;
+    const node = outcome.document.sections[0];
+    expect(node?.module).toBe("interaction.accordion");
+    if (node?.module !== "interaction.accordion") return;
+    expect(node.props.items).toEqual([
+      { sectionId: "family-0-faq-answer-0", label: "Why?" },
+      { sectionId: "family-0-faq-answer-1", label: "How?" },
+    ]);
+    expect(node.props.summaryHeadingLevel).toBe(3);
+    expect(node.children.map((child) => child.id)).toEqual(["family-0-faq-answer-0", "family-0-faq-answer-1"]);
+  });
+
+
+  it("composes the donor columns as level-3 titles under an authored section heading", () => {
+    const outcome = composeUnoFoundationSubset(
+      titledEnvelope({
+        type: "columns",
+        items: [{ title: "Left", body: "L" }, { title: "Right", items: ["A", "B"] }],
+      }),
+    );
+    expect(outcome.status).toBe("composed");
+    if (outcome.status !== "composed") return;
+    const grid = outcome.document.sections[1];
+    expect(grid?.module).toBe("layout.grid");
+    if (grid?.module !== "layout.grid") return;
+    expect(grid.children.map((child) => child.id)).toEqual(["family-1-columns-column-0", "family-1-columns-column-1"]);
+    for (const column of grid.children) {
+      if (column.module !== "layout.stack") continue;
+      const heading = column.children[0];
+      expect(heading?.module).toBe("content.heading");
+      if (heading?.module === "content.heading") expect(heading.props.level).toBe(3);
+    }
+  });
+
+  it("refuses any donor field that would try to author its own heading level", () => {
+    for (const extra of [{ level: 3 }, { itemHeadingLevel: 3 }, { summaryHeadingLevel: 3 }, { open: true }]) {
+      expectRefusal(envelope({ type: "steps", items: [{ title: "One" }], ...extra }), "family:unsupported-feature");
+      expectRefusal(
+        envelope({ type: "faq", items: [{ question: "Why?", answer: "Because." }], ...extra }),
+        "family:unsupported-feature",
+      );
+      expectRefusal(
+        envelope({ type: "columns", items: [{ title: "A", body: "B" }, { title: "C", body: "D" }], ...extra }),
+        "family:unsupported-feature",
+      );
+    }
+  });
+
+  it("keeps the fourteen untouched family sections byte-identical to their recorded before-state", () => {
+    const byId = new Map(committedPage.sections.map((section: { id: string }) => [section.id, section]));
+    expect(Object.keys(UNAFFECTED_DIGESTS)).toHaveLength(14);
+    for (const [id, digest] of Object.entries(UNAFFECTED_DIGESTS)) {
+      const section = byId.get(id);
+      expect(section).toBeDefined();
+      expect(digestOf(JSON.stringify(section))).toBe(digest);
+    }
+  });
+
+  it("keeps exactly the three documented family sections recomposed and nothing else", () => {
+    const outcome = composeUnoFoundationSubset(durableSource, durableBindings);
+    expect(outcome.status).toBe("composed");
+    if (outcome.status !== "composed") return;
+    const parsed = readUnoPageDocument(JSON.stringify(committedPage));
+    expect(parsed.accepted).toBe(true);
+    if (!parsed.accepted) return;
+    expect(parsed.document.sections).toHaveLength(23);
+    expect(JSON.stringify(parsed.document.sections.slice(6))).toBe(JSON.stringify(outcome.document.sections));
+    const changed = parsed.document.sections
+      .slice(6)
+      .filter((node) => !(node.id in UNAFFECTED_DIGESTS))
+      .map((node) => node.id);
+    expect(changed).toEqual(["family-3-faq", "family-11-steps", "family-14-columns"]);
+  });
+
 });

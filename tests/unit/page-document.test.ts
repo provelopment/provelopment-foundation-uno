@@ -1376,6 +1376,148 @@ describe("readUnoPageDocument — the eleven remaining owned modules", () => {
       );
     });
   });
+  // `UNO-WO-080 / R01`: the two optional donor-outline switches are closed numeric literals. Absence must keep the
+  // previous serialization exactly, and every other authored value must refuse the whole document.
+  describe("content.timeline and interaction.accordion — optional level-3 outline switches", () => {
+    const timelineProbe = (props: Record<string, unknown>): unknown => probe("content.timeline", props);
+    const accordionProbe = (props: Record<string, unknown>): unknown =>
+      probe("interaction.accordion", props, [leaf("d-one")]);
+
+    it("keeps an unauthored timeline and accordion byte-identical, with no injected default", () => {
+      const timeline = readUnoPageDocument(timelineProbe({ items: [{ title: "One" }] }));
+      expect(timeline.accepted).toBe(true);
+      if (!timeline.accepted) return;
+      const timelineNode = timeline.document.sections[0];
+      expect(timelineNode?.module).toBe("content.timeline");
+      if (timelineNode?.module !== "content.timeline") return;
+      expect(JSON.stringify(timelineNode.props)).toBe('{"items":[{"title":"One"}]}');
+      expect(Object.prototype.hasOwnProperty.call(timelineNode.props, "itemHeadingLevel")).toBe(false);
+
+      const accordion = readUnoPageDocument(accordionProbe({ items: [{ sectionId: "d-one", label: "One" }] }));
+      expect(accordion.accepted).toBe(true);
+      if (!accordion.accepted) return;
+      const accordionNode = accordion.document.sections[0];
+      expect(accordionNode?.module).toBe("interaction.accordion");
+      if (accordionNode?.module !== "interaction.accordion") return;
+      expect(JSON.stringify(accordionNode.props)).toBe('{"items":[{"sectionId":"d-one","label":"One"}]}');
+      expect(Object.prototype.hasOwnProperty.call(accordionNode.props, "summaryHeadingLevel")).toBe(false);
+    });
+
+    it("accepts the authored literal 3 once, freezes it and re-reads the same JSON text identically", () => {
+      const timelineText = JSON.stringify(
+        timelineProbe({
+          items: [{ title: "One" }, { title: "Two", description: "Still authored." }],
+          itemHeadingLevel: 3,
+        }),
+      );
+      const timeline = readUnoPageDocument(timelineText);
+      expect(timeline.accepted).toBe(true);
+      if (!timeline.accepted) return;
+      const timelineNode = timeline.document.sections[0];
+      if (timelineNode?.module !== "content.timeline") return;
+      expect(timelineNode.props.itemHeadingLevel).toBe(3);
+      expect(Object.isFrozen(timelineNode.props)).toBe(true);
+      // The switch changes presentation only: the milestone sequence and its text are untouched.
+      expect(timelineNode.props.items.map((item) => item.title)).toEqual(["One", "Two"]);
+      expect(JSON.stringify(readUnoPageDocument(timelineText))).toBe(JSON.stringify(timeline));
+
+      const accordionText = JSON.stringify(
+        accordionProbe({ items: [{ sectionId: "d-one", label: "One" }], summaryHeadingLevel: 3 }),
+      );
+      const accordion = readUnoPageDocument(accordionText);
+      expect(accordion.accepted).toBe(true);
+      if (!accordion.accepted) return;
+      const accordionNode = accordion.document.sections[0];
+      if (accordionNode?.module !== "interaction.accordion") return;
+      expect(accordionNode.props.summaryHeadingLevel).toBe(3);
+      expect(Object.isFrozen(accordionNode.props)).toBe(true);
+      expect(accordionNode.props.items).toEqual([{ sectionId: "d-one", label: "One" }]);
+      expect(JSON.stringify(readUnoPageDocument(accordionText))).toBe(JSON.stringify(accordion));
+    });
+
+    it("refuses every authored value except the literal 3, without a partial document", () => {
+      const wrongValues: unknown[] = [
+        null,
+        0,
+        1,
+        2,
+        4,
+        -3,
+        3.5,
+        "3",
+        false,
+        true,
+        [],
+        {},
+        Number.NaN,
+        Number.POSITIVE_INFINITY,
+      ];
+      for (const wrong of wrongValues) {
+        expectRefusal(
+          timelineProbe({ items: [{ title: "One" }], itemHeadingLevel: wrong }),
+          "document:invalid-props",
+        );
+        expectRefusal(
+          accordionProbe({ items: [{ sectionId: "d-one", label: "One" }], summaryHeadingLevel: wrong }),
+          "document:invalid-props",
+        );
+      }
+      // An authored own `undefined` is a key, not an absence, so it refuses rather than silently disappearing.
+      expectRefusal(timelineProbe({ items: [{ title: "One" }], itemHeadingLevel: undefined }), "document:invalid-props");
+      expectRefusal(
+        accordionProbe({ items: [{ sectionId: "d-one", label: "One" }], summaryHeadingLevel: undefined }),
+        "document:invalid-props",
+      );
+      // Neither switch may appear on the other module, and no second outline key is accepted on either.
+      expectRefusal(
+        accordionProbe({ items: [{ sectionId: "d-one", label: "One" }], itemHeadingLevel: 3 }),
+        "document:invalid-props",
+      );
+      expectRefusal(timelineProbe({ items: [{ title: "One" }], summaryHeadingLevel: 3 }), "document:invalid-props");
+      // The switch never stands in for a section heading: an authored level alone still follows the heading contract,
+      // and a real authored heading keeps its own level alongside the item switch.
+      expectRefusal(
+        timelineProbe({ items: [{ title: "One" }], itemHeadingLevel: 3, level: 3 }),
+        "document:invalid-props",
+      );
+      const withHeading = readUnoPageDocument(
+        timelineProbe({ items: [{ title: "One" }], heading: "Sequence", level: 2, itemHeadingLevel: 3 }),
+      );
+      expect(withHeading.accepted).toBe(true);
+      if (withHeading.accepted) {
+        const headingNode = withHeading.document.sections[0];
+        if (headingNode?.module === "content.timeline") {
+          expect(headingNode.props.heading).toBe("Sequence");
+          expect(headingNode.props.level).toBe(2);
+          expect(headingNode.props.itemHeadingLevel).toBe(3);
+        }
+      }
+      // An accessor is refused as a hostile structure without ever invoking the getter.
+      let invoked = false;
+      const accessorProps: Record<string, unknown> = { items: [{ title: "One" }] };
+      Object.defineProperty(accessorProps, "itemHeadingLevel", {
+        enumerable: true,
+        get() {
+          invoked = true;
+          return 3;
+        },
+      });
+      expectRefusal(
+        { ...minimal(), sections: [section("subject", "content.timeline", accessorProps)] },
+        "document:input-not-plain",
+      );
+      expect(invoked).toBe(false);
+    });
+
+    it("refuses a duplicated outline member in JSON text exactly like any other duplicate key", () => {
+      const duplicated =
+        '{"version":1,"title":"T","sections":[{"id":"subject","module":"content.timeline","props":' +
+        '{"items":[{"title":"One"}],"itemHeadingLevel":3,"itemHeadingLevel":3}}]}';
+      expectRefusal(duplicated, "document:json-duplicate-key");
+    });
+  });
+
+
 
   describe("interaction.modal and interaction.contact", () => {
     const labels = { triggerLabel: "Open", title: "Details", closeLabel: "Close" };

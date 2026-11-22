@@ -63,6 +63,13 @@ corrupting the selected Home JSON refuses the whole Page instead of rescuing it 
   contract.
 - All twenty-two modules, the four asset zones, the seventeen bounded donor family mappings, the sixteen-case browser
   matrix and the `FAMILY_TEXT_FIVE_*` labels continue to execute in the existing U04 runner.
+- `UNO-WO-080 / R01` adds one bounded accessibility correction: the `steps`, `faq` and `columns` families now carry the
+  donor's level-3 item outline (`FAMILY_OUTLINE_THREE_*`), with `content.timeline.itemHeadingLevel?: 3` and
+  `interaction.accordion.summaryHeadingLevel?: 3` as the only two new optional, literal-only page props. Pages authored
+  without either switch keep their exact old serialization and markup, the six native Components sections and the
+  fourteen untouched family sections are unchanged, and the served committed Page proves the outline in real HTTP and
+  Chromium at both widths and in both themes. A columns family now requires an authored level-2 heading above it in the
+  document outline, exactly as the donor's own section heading does.
 
 ## Ownership and rights
 

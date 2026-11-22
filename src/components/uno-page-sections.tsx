@@ -423,8 +423,11 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
       );
     }
     case "content.timeline": {
-      const { items, heading, level, surface } = node.props;
+      const { items, heading, level, surface, itemHeadingLevel } = node.props;
       const Tag = level === undefined ? null : HEADING_TAGS[level];
+      // `UNO-WO-080 / R01`: only an explicitly authored literal `3` turns the milestone title into a heading; every
+      // timeline authored before that switch keeps the original `<p>` unchanged.
+      const TitleTag = itemHeadingLevel === 3 ? "h3" : "p";
       const headingId = `${node.id}-title`;
       return (
         <section
@@ -453,7 +456,7 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
                 {item.dateLabel === undefined ? null : (
                   <span className="uno-json-timeline-date">{item.dateLabel}</span>
                 )}
-                <p className="uno-json-timeline-title">{item.title}</p>
+                <TitleTag className="uno-json-timeline-title">{item.title}</TitleTag>
                 {item.description === undefined ? null : (
                   <p className="uno-json-timeline-description">{item.description}</p>
                 )}
@@ -590,11 +593,20 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
     case "interaction.accordion": {
       // Native `<details>`/`<summary>`: keyboard behaviour, expanded state and the disclosure roles are the platform's,
       // and each disclosure opens independently of the others.
+      // `UNO-WO-080 / R01`: only an explicitly authored literal `3` wraps the label in one level-3 heading inside its
+      // own `<summary>`; an accordion authored before that switch keeps its plain summary text byte-identically.
+      const summaryHeadingLevel = node.props.summaryHeadingLevel;
       return (
         <div className="uno-json-accordion" id={node.id}>
           {node.children.map((child, index) => (
             <details className="uno-json-disclosure" key={child.id}>
-              <summary className="uno-json-disclosure-summary">{node.props.items[index]?.label}</summary>
+              <summary className="uno-json-disclosure-summary">
+                {summaryHeadingLevel === 3 ? (
+                  <h3>{node.props.items[index]?.label}</h3>
+                ) : (
+                  node.props.items[index]?.label
+                )}
+              </summary>
               <div className="uno-json-disclosure-body">
                 <SectionNode media={media} node={child} />
               </div>

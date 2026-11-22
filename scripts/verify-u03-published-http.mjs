@@ -1149,6 +1149,47 @@ async function checkDurableFamilyHttp(base) {
     !/src="https?:\/\//iu.test(raw) && !/src="\/\//u.test(raw),
   );
 
+  // `UNO-WO-080 / R01`: the three donor level-3 outlines as actually served on the committed Page. Each assertion is
+  // confined to its own family region, so an unrelated heading can never satisfy it.
+  const regionBetween = (startMarker, endMarker) => {
+    const start = raw.indexOf(startMarker);
+    const end = raw.indexOf(endMarker);
+    return start < 0 || end <= start ? "" : raw.slice(start, end);
+  };
+  const outlineRegions = {
+    steps: regionBetween('id="family-11-steps"', 'id="family-12-quote"'),
+    faq: regionBetween('id="family-3-faq"', 'id="family-4-media"'),
+    columns: regionBetween('id="family-14-columns"', 'id="family-15-cards"'),
+  };
+  const stepsOutline =
+    (outlineRegions.steps.match(/<li class="uno-json-timeline-item"[^>]*>(?:(?!<\/li>)[\s\S])*?<h3 class="uno-json-timeline-title">/gu) ?? [])
+      .length === 3
+    && !outlineRegions.steps.includes('<p class="uno-json-timeline-title">');
+  const faqOutline =
+    (outlineRegions.faq.match(/<summary class="uno-json-disclosure-summary"><h3>[^<]+<\/h3><\/summary>/gu) ?? []).length === 2
+    && outlineRegions.faq.includes("<h3>Does a disclosure need a script?</h3>")
+    && outlineRegions.faq.includes("<h3>Can an answer carry markup?</h3>")
+    && outlineRegions.faq.indexOf(">Does a disclosure need a script?</h3>")
+      < outlineRegions.faq.indexOf(">Can an answer carry markup?</h3>");
+  const columnsOutline =
+    (outlineRegions.columns.match(/<div class="uno-json-cell"[^>]*>\s*<div class="uno-json-stack"[^>]*>\s*<h3 class="uno-json-heading"[^>]*>/gu) ?? [])
+      .length === 2
+    && outlineRegions.columns.includes(">A column with a body</h3>")
+    && outlineRegions.columns.includes(">A column with a list</h3>")
+    && outlineRegions.columns.indexOf(">A column with a body</h3>")
+      < outlineRegions.columns.indexOf(">A column with a list</h3>");
+  check(
+    "DURABLE_OUTLINE_THREE_HTTP the committed Page serves the step titles, FAQ questions and column titles as level-3 headings in their own regions",
+    stepsOutline
+      && faqOutline
+      && columnsOutline
+      && (raw.match(/<h1\b/giu) ?? []).length === 1
+      && (raw.match(/<main\b/giu) ?? []).length === 1
+      && (raw.match(/<h4\b/giu) ?? []).length === 0
+      && !/<button\b[^>]*>[\s\S]*?family-3-faq/iu.test(raw),
+    JSON.stringify({ stepsOutline, faqOutline, columnsOutline }),
+  );
+
   const about = await request(`${base}/en-001/about`);
   check("DURABLE_FAMILY_HTTP the About Page still answers 200", about.status === 200, `status ${about.status}`);
   const sitemap = await request(`${base}/sitemap.xml`);
@@ -1333,6 +1374,15 @@ async function committedStarterPhase(nextBin) {
       "DURABLE_FAMILY_BROWSER the real browser proof executed its durable family cases",
       browserProof.passes.some((name) => name.startsWith("DURABLE_FAMILY_BROWSER")) &&
         !browserProof.failures.some((name) => name.startsWith("DURABLE_FAMILY_BROWSER")),
+    );
+    // `UNO-WO-080 / R01`: the three level-3 outlines must be executed in real Chromium by the durable browser proof, not
+    // merely declared here — all four of its assertions per case must have passed.
+    const outlineBrowserPasses = browserProof.passes.filter((name) => name.startsWith("DURABLE_OUTLINE_THREE_BROWSER"));
+    check(
+      "DURABLE_OUTLINE_THREE_HTTP the durable browser proof executed the three level-3 outline assertions",
+      outlineBrowserPasses.length >= 4 &&
+        !browserProof.failures.some((name) => name.startsWith("DURABLE_OUTLINE_THREE_BROWSER")),
+      String(outlineBrowserPasses.length),
     );
     check("the committed starter server stayed up", child.exitCode === null && child.signalCode === null);
   } finally {

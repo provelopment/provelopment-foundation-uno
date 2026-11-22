@@ -312,6 +312,11 @@ export interface UnoContentTimelineProps {
   readonly heading?: string;
   readonly level?: 2 | 3 | 4 | 5 | 6;
   readonly surface?: UnoSectionSurface;
+  /**
+   * `UNO-WO-080 / R01`: the donor renders each milestone title as a level-3 heading inside its native ordered list.
+   * Only the literal `3` is accepted, and only when it is authored; an absent value keeps the original `<p>` title.
+   */
+  readonly itemHeadingLevel?: 3;
 }
 
 /** The two closed `layout.layers` modes. */
@@ -437,6 +442,11 @@ export interface UnoAccordionEntry {
 /** `interaction.accordion` props: 1–8 positional entries matching the children exactly. */
 export interface UnoInteractionAccordionProps {
   readonly items: readonly UnoAccordionEntry[];
+  /**
+   * `UNO-WO-080 / R01`: the donor renders each FAQ question as a level-3 heading inside its native `<summary>`.
+   * Only the literal `3` is accepted, and only when it is authored; an absent value keeps the plain summary label.
+   */
+  readonly summaryHeadingLevel?: 3;
 }
 
 /** `interaction.modal` props: the trigger, dialog title and close control labels. Its one child is the content. */
@@ -1189,6 +1199,19 @@ function optionalAlign(align: unknown): UnoSectionAlign | undefined {
 }
 
 /**
+ * `UNO-WO-080 / R01`: one optional presentation switch that can only ever mean "render this item title as an `<h3>`".
+ *
+ * Absence is decided by the own key, not by the read value, so an authored `undefined`, `null`, `0`–`2`, `4`, `"3"`,
+ * `false` or `NaN` is the same closed props refusal as any other malformed props record. Only the numeric literal `3`
+ * is accepted, and a record without the key keeps its exact previous shape and serialization.
+ */
+function optionalLevelThree(record: DataRecord, key: string): 3 | undefined {
+  if (!Object.prototype.hasOwnProperty.call(record, key)) return undefined;
+  if (record[key] !== 3) throw new RefusedDocument("document:invalid-props");
+  return 3;
+}
+
+/**
  * One optional authored text: absent stays absent, and a present value must be safe and non-empty.
  *
  * `undefined` is the ONLY way to be absent. An empty or whitespace-only string is an authored mistake that would
@@ -1778,12 +1801,13 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "content.timeline") {
-    if (!hasExactlyKeys(props, ["items"], ["heading", "level", "surface"])) {
+    if (!hasExactlyKeys(props, ["items"], ["heading", "level", "surface", "itemHeadingLevel"])) {
       throw new RefusedDocument("document:invalid-props");
     }
     const items = readTimelineItems(props["items"]);
     const surface = optionalSurface(props["surface"]);
     const { heading, level } = readOptionalHeading(props, state);
+    const itemHeadingLevel = optionalLevelThree(props, "itemHeadingLevel");
     return {
       id,
       module: "content.timeline",
@@ -1792,6 +1816,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
         ...(heading === undefined ? {} : { heading }),
         ...(level === undefined ? {} : { level }),
         ...(surface === undefined ? {} : { surface }),
+        ...(itemHeadingLevel === undefined ? {} : { itemHeadingLevel }),
       },
     };
   }
@@ -2004,7 +2029,9 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "interaction.accordion") {
-    if (!hasExactlyKeys(props, ["items"], [])) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(props, ["items"], ["summaryHeadingLevel"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
     const children = readChildren(
       record["children"],
       depth + 1,
@@ -2014,7 +2041,13 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
       UNO_PAGE_DOCUMENT_LIMITS.accordionChildren,
     );
     const items = readPanelEntries(props["items"], children, 1, UNO_PAGE_DOCUMENT_LIMITS.accordionChildren);
-    return { id, module: "interaction.accordion", props: { items }, children };
+    const summaryHeadingLevel = optionalLevelThree(props, "summaryHeadingLevel");
+    return {
+      id,
+      module: "interaction.accordion",
+      props: { items, ...(summaryHeadingLevel === undefined ? {} : { summaryHeadingLevel }) },
+      children,
+    };
   }
 
   if (moduleName === "interaction.modal") {

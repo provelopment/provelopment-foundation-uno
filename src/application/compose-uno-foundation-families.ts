@@ -770,6 +770,9 @@ function composeSection(
       }
       const props: Record<string, unknown> = { items: output };
       if (ownsKey(record, "surface")) props["surface"] = record["surface"];
+      // `UNO-WO-080 / R01`: the donor's step titles are level-3 headings inside the native ordered list, so the composed
+      // timeline always carries the closed literal switch. It is target presentation only — no donor field is accepted.
+      props["itemHeadingLevel"] = 3;
       const timeline: CandidateSection = { id, module: "content.timeline", props };
       return wrapAuthoredText(record, id, timeline, "timeline");
     }
@@ -812,7 +815,15 @@ function composeSection(
           props: { text: readNewFamilyText(entry["answer"]) },
         });
       }
-      const accordion: CandidateSection = { id, module: "interaction.accordion", props: { items: entries }, children: answers };
+      // `UNO-WO-080 / R01`: the donor renders each question as a level-3 heading inside its native `<summary>`, so the
+      // composed accordion always carries the closed literal switch. The positional entries, answer ids and refusal
+      // vocabulary are untouched, and no donor field becomes representable.
+      const accordion: CandidateSection = {
+        id,
+        module: "interaction.accordion",
+        props: { items: entries, summaryHeadingLevel: 3 },
+        children: answers,
+      };
       return wrapAuthoredText(record, id, accordion, "accordion");
     }
     case "columns": {
@@ -863,7 +874,8 @@ function composeSection(
           module: "layout.stack",
           props: { gap: "tight" },
           children: [
-            { id: `${columnId}-title`, module: "content.heading", props: { text: title, level: 2 } },
+            // `UNO-WO-080 / R01`: the donor's column titles are level-3 headings beneath the section, not peer headings.
+            { id: `${columnId}-title`, module: "content.heading", props: { text: title, level: 3 } },
             content,
           ],
         });

@@ -614,6 +614,131 @@ describe("the eleven remaining module renderers", () => {
     expect(html).toContain("Second answer");
   });
 
+  // `UNO-WO-080 / R01`: the donor outline is opt-in per composed instance. A Page authored before the switch must
+  // render exactly its old markup, and an authored literal `3` must only add the heading element, never new controls.
+  it("keeps the legacy timeline paragraph and plain disclosure summary when no outline switch is authored", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Legacy outline",
+        sections: [
+          {
+            id: "legacy-timeline",
+            module: "content.timeline",
+            props: { items: [{ title: "Only milestone", description: "Authored body." }] },
+          },
+          {
+            id: "legacy-faq",
+            module: "interaction.accordion",
+            props: { items: [{ sectionId: "legacy-answer", label: "Only question?" }] },
+            children: [{ id: "legacy-answer", module: "content.prose", props: { text: "Only answer." } }],
+          },
+        ],
+      },
+      new Map(),
+    );
+    expect(html).toContain('<p class="uno-json-timeline-title">Only milestone</p>');
+    expect(html).toContain('<summary class="uno-json-disclosure-summary">Only question?</summary>');
+    expect(html.includes("<h3")).toBe(false);
+  });
+
+  it("renders one step heading inside its own list item when itemHeadingLevel is 3", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Step outline",
+        sections: [
+          {
+            id: "steps",
+            module: "content.timeline",
+            props: {
+              items: [
+                { title: "First step", description: "First body." },
+                { title: "Second step", status: "current" },
+              ],
+              itemHeadingLevel: 3,
+            },
+          },
+        ],
+      },
+      new Map(),
+    );
+    // The headings sit inside the native ordered list, one per item, in authored order.
+    expect(html).toContain('<ol class="uno-json-timeline-list">');
+    expect((html.match(/<li class="uno-json-timeline-item"/gu) ?? []).length).toBe(2);
+    expect((html.match(/<h3 class="uno-json-timeline-title">/gu) ?? []).length).toBe(2);
+    expect(html).toContain('<h3 class="uno-json-timeline-title">First step</h3>');
+    expect(html).toContain('<h3 class="uno-json-timeline-title">Second step</h3>');
+    expect(html.indexOf("First step")).toBeLessThan(html.indexOf("Second step"));
+    // No paragraph title survives, and the only status announcement is the explicitly authored current step.
+    expect(html.includes('<p class="uno-json-timeline-title">')).toBe(false);
+    expect((html.match(/aria-current="step"/gu) ?? []).length).toBe(1);
+    expect(html).toContain("First body.");
+  });
+
+  it("renders one question heading inside its own native summary when summaryHeadingLevel is 3", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "FAQ outline",
+        sections: [
+          {
+            id: "faq",
+            module: "interaction.accordion",
+            props: {
+              items: [
+                { sectionId: "faq-answer-0", label: "First question?" },
+                { sectionId: "faq-answer-1", label: "Second question?" },
+              ],
+              summaryHeadingLevel: 3,
+            },
+            children: [
+              { id: "faq-answer-0", module: "content.prose", props: { text: "First answer." } },
+              { id: "faq-answer-1", module: "content.prose", props: { text: "Second answer." } },
+            ],
+          },
+        ],
+      },
+      new Map(),
+    );
+    expect((html.match(/<details class="uno-json-disclosure">/gu) ?? []).length).toBe(2);
+    expect(html.match(/<summary class="uno-json-disclosure-summary"><h3>/gu)?.length).toBe(2);
+    expect(html).toContain("First question?");
+    expect(html).toContain("Second question?");
+    expect(html).toContain("First answer.");
+    // Native disclosure stays the interaction: no control, role or ARIA guess is added around it.
+    expect(html.includes("<button")).toBe(false);
+    expect(html.includes('role="button"')).toBe(false);
+    expect((html.match(/<h1/gu) ?? []).length).toBe(0);
+    expect((html.match(/<main/gu) ?? []).length).toBe(0);
+  });
+
+  it("keeps authored outline text escaped in both heading positions", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Escaping",
+        sections: [
+          {
+            id: "safe-timeline",
+            module: "content.timeline",
+            props: { items: [{ title: "A & B < C" }], itemHeadingLevel: 3 },
+          },
+          {
+            id: "safe-faq",
+            module: "interaction.accordion",
+            props: { items: [{ sectionId: "safe-answer", label: "Q & A < B" }], summaryHeadingLevel: 3 },
+            children: [{ id: "safe-answer", module: "content.prose", props: { text: "Answer." } }],
+          },
+        ],
+      },
+      new Map(),
+    );
+    expect(html).toContain("A &amp; B &lt; C");
+    expect(html).toContain("Q &amp; A &lt; B");
+    expect(html.includes("<h3>Q & A")).toBe(false);
+  });
+
   it("renders the contact surface as delivery-OFF with no form and a disabled control", () => {
     const html = renderWithMedia(
       {

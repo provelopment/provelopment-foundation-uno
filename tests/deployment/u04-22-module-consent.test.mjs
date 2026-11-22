@@ -258,7 +258,9 @@ const PHASE_C_REQUIRED = Object.freeze([
   "seen.cards.h2 === 1 && seen.cards.h3 === 2",
   "seen.features.h2 === 1 && seen.features.h3 === 2",
   "seen.cards.uniqueIds",
-  "(familyHtml.match(/<h3[\\s>]/giu) ?? []).length === 4",
+  // `UNO-WO-080 / R01`: the served outline is now nine `h2` and ten `h3`, because the steps, FAQ and columns families
+  // carry genuine level-3 item headings; the count stays an exact expectation rather than a lower bound.
+  String.raw`(familyHtml.match(/<h3[\s>]/giu) ?? []).length === 9`,
   // `UNO-WO-071 / R01`: the authored plain-text lede — labels plus the executable predicates behind them.
   'lede: "Synthetic cards explain the choices.",',
   'lede: "Synthetic features describe the work.",',
@@ -326,6 +328,23 @@ const PHASE_C_REQUIRED = Object.freeze([
   "family-13-table-table",
   "family-3-faq-accordion",
   "found.ledeBeforeNative",
+  // `UNO-WO-080 / R01`: the three donor level-3 outlines — labels plus their executable predicates.
+  "FAMILY_OUTLINE_THREE_SOURCE steps, faq and columns compose the documented level-3 item outline and refuse an authored level",
+  "FAMILY_OUTLINE_THREE_HTTP the served Page puts the step titles, FAQ questions and column titles in level-3 headings of their own regions",
+  "FAMILY_OUTLINE_THREE_BROWSER=PASS the three level-3 outline regions were measured in real Chromium at both viewports",
+  "stepsTimeline.props.itemHeadingLevel === 3",
+  "faqAccordion.props.summaryHeadingLevel === 3",
+  'columnTitles.every((title) => title?.module === "content.heading" && title.props.level === 3)',
+  'authoredLevelOutcome.reason === "family:unsupported-feature"',
+  "stepsRegion.includes('<h3 class=\"uno-json-timeline-title\">Draft</h3>')",
+  'columnsRegion.match(/<h3 class="uno-json-heading"/gu)',
+  String.raw`stepsServed.match(/<li class="uno-json-timeline-item"[^>]*>(?:(?!<\/li>)[\s\S])*?<h3 class="uno-json-timeline-title">/gu)`,
+  String.raw`faqServed.match(/<summary class="uno-json-disclosure-summary"><h3>[^<]+<\/h3><\/summary>/gu)`,
+  String.raw`columnsServed.match(/<div class="uno-json-cell"[^>]*>\s*<div class="uno-json-stack"[^>]*>\s*<h3 class="uno-json-heading"[^>]*>/gu)`,
+  "outlineSeen.stepParagraphTitles === 0",
+  "outlineSeen.columnFirstChildIsHeading",
+  "outlineBrowserChecks === 12",
+  "darkOutline.columns === 2",
 ]);
 
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
@@ -807,13 +826,45 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ['outlineOk(featuresRegion, "features", "Synthetic features", 3)', "true"],
       ['region.indexOf("<h2") < region.indexOf("<h3")', "true"],
       ["new Set(allIds).size === allIds.length", "true"],
-      ["(familyHtml.match(/<h3[\\s>]/giu) ?? []).length === 4", "true"],
+      [String.raw`(familyHtml.match(/<h3[\s>]/giu) ?? []).length === 9`, "true"],
       // The Chromium item-outline predicates.
       ["family.headingIsFirst", "true"],
       ["seen.cards.h2 === 1 && seen.cards.h3 === 2", "true"],
       ["seen.features.h2 === 1 && seen.features.h3 === 2", "true"],
       ["seen.cards.uniqueIds", "true"],
     ];
+    // `UNO-WO-080 / R01`: each of the three new outline labels and their executable predicates must fail the audit when
+    // neutralized — a deleted label, a `true` predicate or a count-only substitute cannot pass.
+    for (const [token, replacement] of [
+      [
+        "FAMILY_OUTLINE_THREE_SOURCE steps, faq and columns compose the documented level-3 item outline and refuse an authored level",
+        "FAMILY_OUTLINE_THREE_SOURCE",
+      ],
+      [
+        "FAMILY_OUTLINE_THREE_HTTP the served Page puts the step titles, FAQ questions and column titles in level-3 headings of their own regions",
+        "FAMILY_OUTLINE_THREE_HTTP",
+      ],
+      [
+        "FAMILY_OUTLINE_THREE_BROWSER=PASS the three level-3 outline regions were measured in real Chromium at both viewports",
+        "FAMILY_OUTLINE_THREE_BROWSER=PASS",
+      ],
+      ["stepsTimeline.props.itemHeadingLevel === 3", "true"],
+      ["faqAccordion.props.summaryHeadingLevel === 3", "true"],
+      ['columnTitles.every((title) => title?.module === "content.heading" && title.props.level === 3)', "true"],
+      ['authoredLevelOutcome.reason === "family:unsupported-feature"', "true"],
+      ["outlineSeen.stepParagraphTitles === 0", "true"],
+      ["outlineSeen.columnFirstChildIsHeading", "true"],
+      ["outlineBrowserChecks === 12", "true"],
+      ["darkOutline.columns === 2", "true"],
+    ]) {
+      const mutatedOutline = source.split(token).join(replacement);
+      assert.notEqual(mutatedOutline, source, token);
+      assert.ok(
+        audit(mutatedOutline).some((entry) => entry.includes(token.slice(0, 40))),
+        `${token}: ${audit(mutatedOutline).join(",")}`,
+      );
+    }
+
     for (const [token, replacement] of mutations) {
       const mutated = source.split(token).join(replacement);
       assert.notEqual(mutated, source, token);

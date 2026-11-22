@@ -193,6 +193,30 @@ async function assertDurableFamily(context, base, pageCase, ids, viewportName, c
         forms: document.querySelectorAll("form, input, textarea, button").length,
         disclosureClosed: summary === null ? null : summary.parentElement.hasAttribute("open"),
         overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        // `UNO-WO-080 / R01`: the three donor level-3 outlines, each confined to its own native container.
+        outline: (() => {
+          const steps = document.getElementById("family-11-steps-timeline");
+          const faq = document.getElementById("family-3-faq");
+          const columns = document.getElementById("family-14-columns");
+          const columnCells = columns ? [...columns.children] : [];
+          return {
+            stepHeadings: steps
+              ? [...steps.querySelectorAll("ol > li > h3.uno-json-timeline-title")].map((node) => node.textContent)
+              : [],
+            stepParagraphs: steps ? steps.querySelectorAll("ol > li > p.uno-json-timeline-title").length : -1,
+            faqHeadings: faq
+              ? [...faq.querySelectorAll("details > summary > h3")].map((node) => node.textContent)
+              : [],
+            columnHeadings: columnCells.map(
+              (cell) => cell.querySelector(":scope > div > h3.uno-json-heading")?.textContent ?? "",
+            ),
+            columnFirstChildIsHeading: columnCells.every(
+              (cell) => cell.querySelector(":scope > div")?.firstElementChild?.tagName === "H3",
+            ),
+            h4Count: document.querySelectorAll("h4").length,
+            headingRoles: document.querySelectorAll('[role="heading"], [aria-level]').length,
+          };
+        })(),
       };
     }, ids);
 
@@ -249,6 +273,33 @@ async function assertDurableFamily(context, base, pageCase, ids, viewportName, c
       observed.contactNotice,
     );
     check(`DURABLE_FAMILY_BROWSER ${label} renders no form control`, observed.forms === 0, String(observed.forms));
+    // `UNO-WO-080 / R01`: the three donor level-3 outlines, in real DOM, in their own native containers.
+    check(
+      `DURABLE_OUTLINE_THREE_BROWSER ${label} puts the three committed step titles in level-3 headings of their own list items`,
+      observed.outline.stepHeadings.join("|") === "Author the source|Compose the document|Read the Page"
+        && observed.outline.stepParagraphs === 0,
+      JSON.stringify(observed.outline.stepHeadings),
+    );
+    check(
+      `DURABLE_OUTLINE_THREE_BROWSER ${label} puts the two committed FAQ questions in level-3 headings of their own summaries`,
+      observed.outline.faqHeadings.join("|") === "Does a disclosure need a script?|Can an answer carry markup?",
+      JSON.stringify(observed.outline.faqHeadings),
+    );
+    check(
+      `DURABLE_OUTLINE_THREE_BROWSER ${label} puts the two committed column titles in level-3 headings of their own columns`,
+      observed.outline.columnHeadings.join("|") === "A column with a body|A column with a list"
+        && observed.outline.columnFirstChildIsHeading,
+      JSON.stringify(observed.outline.columnHeadings),
+    );
+    check(
+      `DURABLE_OUTLINE_THREE_BROWSER ${label} keeps one main, one h1, no h4, no invented heading role and no overflow`,
+      observed.mainCount === 1
+        && observed.h1Count === 1
+        && observed.outline.h4Count === 0
+        && observed.outline.headingRoles === 0
+        && observed.overflow === 0,
+      JSON.stringify({ h4: observed.outline.h4Count, roles: observed.outline.headingRoles, overflow: observed.overflow }),
+    );
     check(
       `DURABLE_FAMILY_BROWSER ${label} does not overflow horizontally`,
       observed.overflow <= VIEWPORT_TOLERANCE_PX,
