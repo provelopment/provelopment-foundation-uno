@@ -1,71 +1,61 @@
-# Execution Report — UNO-WO-098 / R01
+# Execution Report — UNO-WO-099 / R01
 
-**The declared Site-address alias now routes: `https://abc.example/docs-old/de-de` answers a real `307` to `https://abc.example/docs/de-de` in production HTTP on both operating systems, with the original P6 assertions intact and green.**
+**Authorized redirects now keep a bounded harmless query exactly, and refuse a hostile one with the approved 404: `GET /docs-old/de-de?ref=alpha%20beta&view=compact` answers `307` with `Location: https://abc.example/docs/de-de?ref=alpha%20beta&view=compact` in real production HTTP on both operating systems.**
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-098 / R01`, `FINAL — EXECUTE` |
-| ACTIVE | **25,433 bytes**, SHA-256 `54b61656da8f35c4d914707dab26e8e2adb42f1d4c7c6634970817c5aee44eaf` — exact match, ignored/untracked |
-| Starting SHA | `08c5177eeb11263f675c2cac5037f6230940448c` — `HEAD`, `main`, `origin/main`, remote `main` equal; parent `729c585f…` |
-| **Product SHA** | **`ab4e91e2e13357e8d08dd01721a21f497bf8a8fc`** |
-| Hosted | `Verify U01 baseline` run `45186190308` — **success**; `ubuntu-24.04` + `windows-2025` both success, 38 steps each |
-| Hosted | `Uno Bootstrap Verify` run `45186190078` — **success** |
-| Both P6 steps | `Multi-Site P6 contract (mutation-sensitive)` and the three-Site two-phase runner — **success on both legs** |
-| Hosted runner output | **`139 passed, 0 failed`** on each leg, **both** fixture restorations verified byte-exactly |
+| Order | `UNO-WO-099 / R01`, `FINAL — EXECUTE` |
+| ACTIVE | **26,450 bytes**, SHA-256 `5c68690c1474ef92e495b63666c096d3f06d4aa73c2066081ac5d09fb52c71a2` — exact, ignored/untracked |
+| Starting SHA | `1d8c5771ea97c03148c69850e21c900e6e7111b2` — `HEAD == main == origin/main == ls-remote origin/main`; parent `ab4e91e2…` |
+| **Product SHA** | **`bf1d530054b66441c53ba905ae450f6800d3f63c`** |
+| Hosted | `Verify U01 baseline` run `45192043188` — **success**; `ubuntu-24.04` and `windows-2025`, 38 steps each |
+| Hosted | `Uno Bootstrap Verify` run `45192042995` — **success** |
+| Hosted P6 | **`154 passed, 0 failed`** on each leg, both fixture restorations verified byte-exactly; both P6 steps `success` on both legs |
 
-## 1. Preflight
+## 1. Preflight and preservation
 
-Proven before any write: empty `git rev-parse --show-prefix`, branch `main`, exactly one worktree, exactly one `origin` (the Uno repository only), clean index and worktree, `HEAD == main == origin/main == ls-remote origin/main`, and the single ACTIVE ignored, untracked and unstaged in the four-slot WIP directory with the exact measured size and digest above.
+Verified before any write: empty `git rev-parse --show-prefix`, branch `main`, one worktree, one `origin` (the Uno repository only), clean index and tree, the four frozen governance blobs unchanged (`AGENTS.md` `94f962d1…`, `README.md` `690f0870…`, `sop-implementation.md` `f30d6590…`, `verify-bootstrap.yml` `caac7d65…`), every current product anchor matching the order byte for byte (`src/proxy.ts` `cd45922b…`, `src/config/uno-serving.ts` `9d0a6cf2…`, `src/config/uno-not-found-response.ts` `9928250f…`, runner `0a9174ab…`, contract `55223bdf…`, alias unit `e0a7e6f3…`, workflow `8d19319d…`), and the ACTIVE exact in size and digest.
 
-Preserved by digest before **and** after every transaction and build: `deployment/efs/manifest.json` `b6213ed6ee2d…`, `deployment/uno.config.json` `58011c4324f5…`, A2 patch `5e40963895d2…` (90,536 B) and A2 test `1cdddb38a91b…` (17,405 B), both still unapplied; governance blobs `AGENTS.md` `94f962d1…`, `README.md` `690f0870…`, `sop-implementation.md` `f30d6590…`, `verify-bootstrap.yml` `caac7d65…` unchanged, since no commit touched them.
+Preserved before and after every build, transaction and at STOP: `deployment/efs/manifest.json` `b6213ed6ee2d…`, `deployment/uno.config.json` `58011c4324f5…`, A2 patch `5e40963895d2…` (90,536 B) and A2 test `1cdddb38a91b…` (17,405 B) — untouched and still unapplied — with zero `wo096-*` residue and a clean index after the product commit.
 
-## 2. What the implementation does
+## 2. What was implemented
 
-One authorized product file changed: `src/config/uno-serving.ts`. The alias layer is a **translation**, not a publisher.
+- **`src/config/uno-safe-redirect-query.ts` (new, pure).** One function, `validateUnoSafeRedirectQuery(raw)`, with fixed budgets — 512 suffix bytes, 8 parameters, 32-byte keys, 256-byte values — and a strict grammar: exactly `?key=value(&key=value)*`, a non-empty safe key, and a value of unreserved ASCII plus `%20`. Everything else is a closed refusal: any other percent triplet (`%0d`, `%0a`, `%00`, `%2f`, `%5c`, `%26`, `%3d`, `%25`, `%2e` and every recursion of them), raw controls, raw spaces, a second `?`, `#`, non-ASCII, malformed structure, empty parameters and oversize input. No Site, host, locale, file, clock, environment, header, cookie or network is read, and it cannot name a destination.
 
-- A request matches a declared alias only by **exact authority equality** against the alias origin and a **whole-segment** prefix: `/docs-old/de-de` matches, `/docs-older/de-de` does not, and a request on a Host the binding does not own matches nothing.
-- The suffix is carried across unchanged and the **stored alias prefix is replaced by that same binding's stored canonical prefix**, so `/docs-old/de-de` becomes `/docs/de-de` and `/docs-old/de-de/notes` becomes `/docs/de-de/notes`. No locale, path or default is ever synthesised.
-- The candidate is then planned through the **existing** qualified publication gate using the owning Site's **canonical host taken from its stored origin** — never the request authority — and becomes a redirect only if the plan is `served`, the Page is `public`, the planned `{facetId, siteId}` equals the translated owner, and the planned canonical URL equals the address assembled from stored values.
-- The **canonical Page is always tried first**, so an alias can never displace an accepted canonical owner; then one declared-alias translation; only then the pre-existing single-segment short-language alias. A refused, unlisted, draft or absent target yields the ordinary refusal, never a redirect.
-- Two declared aliases claiming one request are reported **ambiguous** and claim nothing; declaration order, array position and any `default` are never consulted. Alias roots (no suffix) claim nothing, so no locale is invented.
-- Version 1 and every request without a version-2 alias are byte-equivalent to before: the alias resolver returns immediately for the legacy authority.
+## 3. Real production evidence (both phases, both legs)
 
-No edge file was needed: `src/app/(site)/[...segments]/page.tsx` already delivers `kind: "redirect"` through the App Router `redirect()`, which is what produces the observed `307`. `src/proxy.ts` is untouched and remains only the static refusal responder. No committed declaration, dependency, lockfile, workflow or governance file changed.
+- `/docs-old/de-de?ref=alpha%20beta&view=compact` → `307`, `Location` exactly `https://abc.example/docs/de-de?ref=alpha%20beta&view=compact`, `cache-control: no-store`, no `+` downgrade.
+- `/docs-old/de-de/notes?ref=alpha%20beta&view=compact` → `307` to the same Site's authored nested Page with the query intact.
+- `docs.example/handbook/de-de?ref=alpha%20beta&view=compact` → `307` to the **configured** canonical host with the query intact.
+- `/en?ref=alpha%20beta` → `307` to `https://abc.example/en-001?ref=alpha%20beta` — the short-language alias obeys the same rule on its own Site.
+- `/docs/de-de?ref=alpha%20beta&view=compact` → `200`, same document, canonical still `https://abc.example/docs/de-de`; a query never changes identity, publication or metadata.
+- `/docs-old/de-de?x=%0d%0aLocation:%20https://evil.example` → **approved 404**, no `Location`, no reflected bytes, no injected header.
+- Encoded slash, encoded backslash, encoded `%`, encoded `&`, encoded `=`, a doubled `?` and a 600-byte value → each **approved 404** with no `Location`.
+- `/docs-old/de-de?a=1#frag` → `307` to `https://abc.example/docs/de-de?a=1`: a fragment is never sent by an HTTP client, and none ever appears in a `Location`.
+- Unchanged and still green: alias root refuses, lookalike prefix refuses, foreign Host refuses, undeclared locale refuses, the unlisted Page serves only its canonical `200 noindex` and is never an alias destination, and the canonical destination still serves its own document.
+- Phase two — full sources re-installed, **no declared default**, **permuted bindings**, fresh build and fresh server — the safe-query alias still redirects to the owning canonical Site, the foreign Host still refuses, and all three Sites stay active.
 
-## 3. What this does **not** claim
-
-- **Query bytes are not preserved.** The redirect target is the canonical URL only; request query bytes are neither forwarded nor reflected, and a hostile query cannot reach the `Location` header. This is stated, not silently assumed.
-- **No alias appears in discovery.** No alias is a `<loc>`, `hreflang`, `x-default`, robots sitemap, navigational link or media locator; the sitemap assertion is unchanged and green.
-- **No alias root routing.** `/docs-old` alone refuses, because naming a locale there would mean synthesising one.
-- The second-host alias (`https://docs.example/handbook`) exists **only** in the temporary test fixture; no new committed domain was declared.
-- A declaration that duplicates an address is still rejected by the validator (`config:duplicate-site-address`) rather than routed, so ambiguity at the declaration level refuses the whole declaration; the in-memory ambiguity path is unit-proven.
-
-## 4. Evidence
+## 4. Gates
 
 | Gate | Result |
 | --- | --- |
-| `tests/unit/efs-uno-site-address-alias.test.ts` (new, pure, no scratch) | **PASS** — 10 tests: positive translation, nested suffix, whole-segment refusal, alias-root refusal, foreign authority/port, case-insensitivity, stored-origin destination, ambiguity in two orders, declaration-order independence, malformed/encoded/oversized input, no-alias declarations |
-| `pnpm test` (full unit suite) | **PASS** — **1,258 passed** |
-| `tests/deployment/u03-multisite-contract.test.mjs` | **PASS** — 23 tests: the **14 previous cases preserved unchanged**, plus 9 alias cases |
-| Demonstrated red mutation (product) | Removing the `public` gate from `src/config/uno-serving.ts` turned the committed-source test **and** the mutation test red (2 failures); the file was then restored **byte-identically** (digest equal) and the suite returned to 23/23 |
-| `node scripts/verify-u03-multisite-http.mjs` (local, twice) | **PASS** — **139 passed, 0 failed** (the 125 previous assertions retained, 14 added), both phases, both restorations byte-exactly |
+| `tests/unit/uno-safe-redirect-query.test.ts` (new, pure) | **PASS** — 13 tests: byte-exact `%20`, idempotent space spelling, order/duplicates preserved, exact byte and parameter budgets with the next byte refused, every encoded control/delimiter/recursion triplet, raw controls and spaces, open-redirect shapes, malformed structure, unsafe and oversized keys, non-string input, and no destination ever returned |
+| `tests/deployment/u03-multisite-contract.test.mjs` | **PASS** — **32 tests**: all 23 previous cases retained, plus validator/edge/runner gates and 8 new mutations |
+| Demonstrated red mutation (product) | Building the `Location` from the raw request query turned the committed-policy test **and** the corresponding mutation test red (30/32); the file was restored **byte-identically** (digest equal) and the suite returned to 32/32 |
+| `node scripts/verify-u03-multisite-http.mjs` (local, twice) | **PASS** — **154 passed, 0 failed** (all 139 previous checks retained, 15 added), both phases, both restorations byte-exactly |
 | `pnpm test:bootstrap` · governance test · governance verifier | PASS · PASS · PASS |
-| `pnpm test:architecture` | PASS |
-| `pnpm lint` · `pnpm exec eslint . --max-warnings 0` | PASS · PASS |
-| `pnpm typecheck` · `pnpm build` | PASS · PASS |
+| `pnpm test:architecture` | PASS — 47/47, no new exception and no gate edit |
+| `pnpm test` | **PASS** — **1,271 passed** |
+| `pnpm lint` · `pnpm exec eslint . --max-warnings 0` · `pnpm typecheck` · `pnpm build` | PASS · PASS · PASS · PASS |
 | `node scripts/verify-u03-trace.mjs --expect committed` | PASS |
-| `pnpm test:http` | PASS — **105 passed, 0 failed** |
-| `node scripts/verify-u03-http.mjs` | PASS — **135 passed, 0 failed** |
+| `pnpm test:http` · `node scripts/verify-u03-http.mjs` | **105/0** · **135/0** |
 | `u03-fixture-transaction` · `u03-trace` · `u04-json-slice` tests | PASS · PASS · PASS |
-| `node scripts/verify-u03-published-http.mjs` | PASS — **999 passed, 0 failed** |
-| U04 JSON slice script · U04 22-module test and script | PASS · PASS · PASS |
-| Deployment-readiness test and script | PASS · PASS |
-| Security-floor · advisory-exception test and script · brand-copy | PASS · PASS · PASS · PASS |
+| `node scripts/verify-u03-published-http.mjs` | **999 passed, 0 failed** |
+| U04 JSON slice script · U04 22-module test and script · readiness test and script | PASS · PASS · PASS · PASS · PASS |
+| Security floor · advisory-exception test and script · brand copy · `pnpm audit --prod --audit-level high` | PASS · PASS · PASS · PASS · **0** |
 
-The real production proof, from the runner's own output on both hosted legs: `/docs-old/de-de` → `307` with `Location: https://abc.example/docs/de-de`; `/docs-old/de-de/notes` → the same Site's authored nested Page; `docs.example/handbook/de-de` → the configured canonical host, not the request host; `/docs-old` and `/docs-older/de-de` and `/docs-old/en-001` → the approved 404; the `docs.example` alias on an unowned Host → 404; `/docs-old/de-de/privacy` (unlisted) → 404 while `/docs/de-de/privacy` still serves `200` with `noindex`; a hostile encoded query → a clean `307` with no reflected bytes; the canonical `/docs/de-de` still serves its own document and canonical URL; and with **no declared default in a permuted declaration order** the alias still redirects to the same canonical address.
+## 5. Disposition
 
-## 5. Preservation and disposition
+Changed paths, exactly the ledger: `src/proxy.ts`, `src/config/uno-safe-redirect-query.ts` (new), `scripts/verify-u03-multisite-http.mjs`, `tests/deployment/u03-multisite-contract.test.mjs`, `tests/unit/uno-safe-redirect-query.test.ts` (new) — then this one report. No workflow, dependency, lockfile, declaration, governance, protected-repository or A2 change; no provider, DNS, merge, tag, release or deployment action; no stage closure or parity credit claimed.
 
-Declarations restored to `b6213ed6ee2d…` / `58011c4324f5…`; A2 artifacts intact and unapplied; zero `wo096-*` residue; clean index with only the four ledger paths committed and one report path pending; no provider, DNS, deployment, merge, tag or release action; no A2/M2 execution; no stage closure or parity credit claimed.
-
-Remaining U02/U03 gaps, stated plainly: alias roots never redirect, request query bytes are dropped rather than preserved, and a duplicate alias declaration is refused by the validator instead of being resolved. Handing to the Architect for independent review: `ACCEPT`, `REVISE` or `STOP`; the stage decision belongs to the Owner.
+Stated limits, not hidden: the framework erases the wire spelling of a space, so a client that literally sends `+` receives `%20` (semantic identity, one-way, idempotent); an alias root still refuses rather than inventing a locale; a duplicate alias declaration is still refused by the validator rather than resolved; and native-video byte-Range remains NOT APPLICABLE for a fixture that declares no video. Handing to the Architect for independent review: `ACCEPT`, `REVISE` or `STOP`.
