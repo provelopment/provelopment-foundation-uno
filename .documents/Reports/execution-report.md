@@ -1,172 +1,84 @@
-# Execution Report — UNO-WO-087 / R01
+# Execution Report — UNO-WO-090 / R01
 
-**STOPPED — P1 AND P2 DELIVERED; P3–P6 NOT EXECUTED; NO PRODUCT COMMIT, NO PUSH**
+**STOPPED — P3 QUALIFIED PUBLICATION LAYER IMPLEMENTED AND TESTED; P4–P6 NOT DELIVERED; NO PRODUCT COMMIT, NO PRODUCT PUSH**
 
-This file replaces its previous contents under the one authorized overwrite. It reports one bounded execution that
-verified every mandatory guard, corrected the M09 locale ceiling and completed the M10/M11 proofs, and then stopped
-before the consumer migration, the App Router route proof and the governance guard groups. It is not an Architect
-acceptance, a stage closure, a release or a deployment, and it claims no U04 parity change.
+This file replaces its previous contents under the one authorized overwrite. It reports one execution that implemented and locally proved the qualified multi-Site publication layer, then stopped because two mandatory deployment gates are red for a cause that predates this run and cannot be repaired safely inside this window without publishing against a failing gate. Nothing here is an Architect acceptance, a stage closure, a release or a deployment, and no U04 parity, A2 or M2 state is claimed.
 
-## 1. Authority and activation
+## 1. Authority and starting point
 
 | Item | Observed |
 | --- | --- |
-| Order | `UNO-WO-087 / R01`, Edition `FINAL — EXECUTE` |
-| ACTIVE identity | `.documents/WIP/workorder-active.md` measured **34,012 bytes**, SHA-256 `a275e39ad113dfd9dccb96a9a1d57a3d7d05f6f6ff074021696279f4341f7a33`; ignored at `.gitignore:12`, untracked, unstaged. Order ID, edition, start SHA, byte count and digest matched the Owner activation exactly. Its text and the activation message are deliberately not reproduced. |
-| Required and actual start | `53fe36284936b76b57c0abf9074c5cb5e814ffce` — local `HEAD`, local `main`, `origin/main` and `git ls-remote origin refs/heads/main` all matched before any write and again before staging decisions |
-| Prior report | blob at the start of this run: **14,111 bytes**, SHA-256 `48f7a852f4112e9efa71b9eae37672042d78d28a81c67503594a8fa7b49ce723` (`UNO-WO-081 / R01`); a copy is retained at `.temp/uno-m1-087/report-prior-wo081.md` with the same digest |
+| Order | `UNO-WO-090 / R01`, Edition `FINAL — EXECUTE` |
+| ACTIVE identity | measured **26,339 bytes**, SHA-256 `67907385ffd554e611ce0c04615775a0f0fd8be82ae8ac3f5afdc343dcefe078`; untracked, ignored, unstaged; contents not reproduced |
+| Required and actual start | `02c64f9391a96c76dcd56560af117f005180bea0` — local `HEAD`, `origin/main` and remote `main` all equal |
+| Published predecessor | WO-087 sanitized record, blob `3a161b4e8c7079e3e0e0045ece87176816fe58ac`, already committed at the start SHA; no correction was re-run |
+| Physical root | sole checkout at the verified physical Uno path (private absolute path withheld); `--show-prefix` empty; one worktree; one `origin` fetching and pushing only `provelopment/provelopment-foundation-uno`; branch `main`; parent `/00.foundation-uno/` ignore intact |
+| WIP discipline | exactly three tracked `plan-*.md` slots plus the private ignored ACTIVE |
+| Inherited work | 13 modified M1 tracked paths, 0 staged, 0 untracked, all explained by the WO-087 record |
+| Toolchain | Node 26.13.1, pnpm 11.6.0, Next 16.4.6, React 19.2.9, Playwright as committed; no package, lock, workflow or protected-file change |
 
-## 2. Zero-write physical and authority preflight — all guards PASS
+## 2. What was implemented (P3)
 
-| Guard | Observed |
+A qualified, host-bound publication path now exists beside the untouched legacy path. The presence of `site` in a request is the only selector, so a version-1 request is never reinterpreted and a version-2 declaration is never read as a legacy selection.
+
+| Path | Change |
 | --- | --- |
-| Physical root | `git rev-parse --show-toplevel` = verified physical Uno checkout (private absolute path withheld); `--show-prefix` empty |
-| Ancestor reparse points | all checkout ancestors checked; no junction, symlink or reparse escape (private ancestor names withheld) |
-| Worktrees | exactly one: this checkout, `HEAD 53fe3628…`, `branch refs/heads/main` |
-| Remotes | exactly one, `origin`, fetch and push both `https://github.com/provelopment/provelopment-foundation-uno.git`; no second push URL |
-| Parent protections | parent `.gitignore:138` still carries `/00.foundation-uno/` (verified read-only with `--no-index`); parent `HEAD` read `e17fd96` read-only; no parent write |
-| ACTIVE slot | `.documents/WIP/` contains exactly `plan-next.md`, `plan-outlook.md`, `plan-roadmap.md`, `workorder-active.md`; no top-level order |
-| Frozen governance | `AGENTS.md` 2,730 B `6c6d5dcba44c9769df8a18db00d4791b38fc804759cb1da14e20daf9de31ca6f`; `README.md` 2,681 B `97f93bdaf710bac53e3be48be0365c414042e89ef4461e55e98852cd0fd1995a`; `.documents/SOP/sop-implementation.md` 4,796 B `6d790ad43349c434297d4d8a1e98311a822d4ec31df67aa882542aeab21cb388` — all unmodified |
-| Committed declarations | `deployment/efs/manifest.json` `b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925` (2,148 B); `deployment/uno.config.json` `58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952` (258 B) — unchanged throughout |
-| Absent path | `deployment/site.config.json` does not exist in this tree; no presentation authority was invented and no file was created |
+| `src/adapters/efs/uno-confined-source-reader.ts` | Two exact request shapes: legacy `{repoRoot, pathname}` unchanged, and qualified `{repoRoot, host, pathname}` matched through `matchUnoSiteRouteCandidate`. A Host is only ever compared against configured bindings, so a request header cannot grant identity. |
+| `src/application/prepare-uno-page-delivery-candidate.ts` | `UNO_DELIVERY_INPUT_KEYS_V2` = `{manifest, selection, site, host, pathname, loadedSource}`; the base and locale policy are read from the named binding own declaration, and the matched candidate Facet/Site pair must equal the requested pair. The header, document, discoverability, canonical-URL and eligibility tail is shared unchanged by both shapes. |
+| `src/application/plan-uno-published-page.ts` | `UNO_PUBLICATION_INPUT_KEYS_V2` and a qualified branch; the publication authority, document projection and delivery projection were extracted into one `assembleAcceptedPage`, so exactly one publication gate serves both shapes. |
+| `src/core/efs/uno-config.ts` | One delegation point `readValidatedBase` now carries the only call of `validateUnoCanonicalBase`; the version-2 Site loop reuses it instead of adding a second call. This repairs an inherited regression against the immutable architecture assertion without weakening it. |
+| `tests/unit/efs-uno-published-page.test.ts` | Nine new positive/refusal cases over a real three-Site fixture through the real confined loader. |
 
-Thirteen tracked paths were dirty at the start and **every one** is an exact §3.1 or §3.3 ledger entry of the same M1
-correction: `manifest-graph.ts`, `uno-config.ts`, `uno-canonical-base.ts`, `uno-route-address.ts`,
-`resolve-uno-committed-base.ts`, `resolve-uno-committed-locales.ts`, `validate-uno-site-publication-inputs.ts`, and their
-six unit files. No untracked code path, staged byte, unknown change or A2 overlap was present; nothing was discarded.
+## 3. Qualified behaviour proved by executable tests
 
-Preserved, byte-identical, never re-applied: A2 patch `.temp/uno-u04-086/A2-tracked.patch` 90,536 B
-`5e40963895d266874d5445225090dbb67f8d361a4528f9e609aaae0980ffaf87`; its new-file copy
-`.temp/uno-u04-086/A2-new/tests/unit/uno-family-links.test.ts` 17,405 B
-`1cdddb38a91b7b76dc92d113c8def11e8a26f9f39d0c92d463b0cd58070cf70f`; the earlier M1 diff artefacts
-(`M09-T10.diff` `fb651a1d…`, `M10-M11-T06-T07.diff` `0e5dc811…`).
+Fixture: `corporate/main` at `https://abc.example` (root), `corporate/docs` at `https://abc.example/docs/` (prefix), `services/main` at `https://xyz.example`; two Facets each with a Site named `main`; disjoint locale sets (`en-001` versus `de-DE`); the optional entry default bound to a Site that owns neither of the first two addresses.
 
-## 3. P1 — the locale ceiling is eliminated, not raised
+- the root Site serves `/en-001` with canonical `https://abc.example/en-001`;
+- the prefixed Site serves `/docs/de-de` with canonical `https://abc.example/docs/de-de` and its own `de-DE` policy;
+- the second Facet Site named `main` serves only on its own Host with its own canonical origin;
+- the root Site is refused at `/docs/de-de`; an unconfigured Host is refused; `/docsx/de-de` is refused as a non-segment prefix; a locale the named Site does not author is refused; an unbound pair is refused; a selector carrying a third key is refused.
 
-`src/application/validate-uno-site-publication-inputs.ts`: the independent 512 v2 supported-locale ceiling is **gone**.
-The only bound is `UNO_SITE_PUBLICATION_LOCALE_BUDGET`, which is defined as — not equal to a new literal but taken from —
-`MANIFEST_GRAPH_LIMITS.hierarchyDeclarations` (`100_000`, verified in local source, read before use). The manifest
-validator already applies that same budget to a Site's own `supportedLocales`, so a policy can never exceed a document
-the manifest could accept. The v1 compatibility limit of 32 is untouched and still asserted.
+## 4. Local gate matrix — measured, not assumed
 
-`tests/unit/efs-uno-site-publication-inputs.test.ts` (T10, **48** tests, was 47) now proves:
-
-- `accepts 513 distinct authored full locales under the shared manifest budget` — 27 real ISO 639-1 languages × 19 real
-  ISO 3166-1 alpha-2 regions = 513 distinct authored full locales, each with its own declared source, accepted through
-  the full v2 path with `supportedLocales` length 513 and `candidateCount` 513; identity with
-  `MANIFEST_GRAPH_LIMITS.hierarchyDeclarations` asserted, and v1's 32 asserted unchanged.
-- `refuses a policy at the shared budget boundary before per-entry validation` — a policy of
-  `UNO_SITE_PUBLICATION_LOCALE_BUDGET + 1` entries refuses as `publication-inputs:locale-policy-invalid`. The count guard
-  provably precedes tag and membership validation (it runs before `localePolicyIssue`), which is the bounded, safe
-  mechanism used instead of authoring 100,001 distinct locales. No locale validity rule was weakened to pass a count.
-
-## 4. P2 — qualified Site authority in M10 and M11
-
-`src/application/resolve-uno-committed-base.ts` (M10): v1 preserved behind `resolveCommittedBaseV1`; the v2 request is
-exactly `{manifest,selection,site}` with its own exact-key validation, `site` an exact plain own-data `{facetId,siteId}`
-pair, and the answer is that binding's own `origin + pathPrefix` plus copied aliases. No `sites[0]`, `selectedSite`,
-unrelated default, raw Host, forwarded header, environment variable or inferred domain is consulted; a v2 binding already
-stores each alias as a joined string, so aliases are copied rather than re-joined. Refusals keep the closed vocabulary.
-
-`src/application/resolve-uno-committed-locales.ts` (M11): v1 preserved behind `resolveCommittedLocalesV1`, including
-`site-locales-missing` and `mapping-missing`. The v2 branch resolves the same qualified pair against both the validated
-declaration and the validated manifest graph, then takes only that Site's supported and default full locales, sorted and
-re-frozen, and confirms the assembled policy through `localePolicyIssue` rather than a second tag validator. An
-installation-level mapping applies only through entries whose target is one of *this* Site's declared locales; an absent
-mapping yields no aliases; a sibling-targeted alias is dropped rather than inherited.
-
-`tests/unit/efs-uno-committed-base.test.ts` (T06, **22**) and `tests/unit/efs-uno-committed-locales.test.ts` (T07, **26**)
-now prove, on a three-Site, one-Entity fixture (`corporate/main` → `https://abc.example`, `corporate/docs` →
-`https://abc.example/docs`, `services/main` → `https://xyz.example`, real full locales `en-001`, `de-DE`, `fr-FR`, unique
-owned sources):
-
-- all three canonical bases resolve independently; `/docs` is preserved **without** a trailing slash; canonical and
-  aliases come only from the requested binding; two Sites named `main` stay distinct by Facet; a default naming another
-  Site changes nothing;
-- wrong Site/Facet pairs, v1 declarations used as v2 selections, a missing `site`, unknown keys, symbol keys, getters
-  (never invoked), non-plain prototypes and malformed ids all refuse with the closed code and no partial base;
-- each Site resolves only its own locales and default; a mapping applies per Site across **shared and disjoint** locale
-  ownership (`corporate/main` owns `en-001`+`de-DE` and receives both mappings; `corporate/docs` shares only `en-001` and
-  receives only that one; `services/main` shares nothing and receives none); a Site with no `locales` refuses as
-  `site-locales-missing` while its sibling still resolves; 33 authored locales pass; duplicate or malformed declarations
-  and wrongly descended pairs refuse; results are deeply frozen, deterministic and never mutate caller data.
-
-## 5. Local evidence — Agent-observed on Windows, this checkout
-
-| Command | Exit | Observed |
-| --- | --- | --- |
-| `pnpm exec vitest run` on `efs-manifest-graph`, `efs-uno-config`, `efs-uno-route-address`, `efs-uno-committed-base`, `efs-uno-committed-locales`, `efs-uno-site-publication-inputs` | **0** | `Test Files 6 passed (6)` |
-| per-file recount | **0** each | T06 22/22, T07 26/26, T10 48/48 |
-| `pnpm typecheck` | **0** | no `error TS` |
-| `pnpm exec eslint` on the six touched source/test files with `--max-warnings 0` | **0** | no output |
-| `git diff --check` | **0** | clean |
-
-Re-inspection artefact: `.temp/uno-m1-087/P1-P2.diff` 38,035 B
-`d86853638be92f46c23f3045e2ed70c3ad4fb878d998238f322d6ec4f022b65a`; the full M09/T10 and M10/M11 diffs remain at
-`.temp/uno-u04-086/`. No local result is independently verified and none is an Architect acceptance.
-
-## 6. Not executed — exact remaining M1 scope
-
-- **P3 consumer migration.** `selectedSite` still binds in `src/application/plan-uno-published-page.ts` and in the v1
-  branches of the three corrected modules and `uno-config.ts`. Not migrated: published-page planning, public discovery,
-  delivery candidate, page assets, discovery policy, `src/config/uno-serving.ts`, and the `robots.txt`, `sitemap.xml` and
-  `uno-media` routes. The policy layer was corrected in M09/M11; the consumer layer was not.
-- **P4 route and host proof.** The `[locale]/[[...segments]]` pair is present and the `[...segments]` pair does not yet
-  exist; there is no `/docs/en-001` versus `[locale]` proof, no two-host HTTP or real-Chromium evidence and no per-Site
-  `<html lang>` proof.
-- **P5 discovery/visibility proof** and the large safe-graph stress fixtures.
-- **P6 G01–G05**, the §6 battery (bootstrap, governance, architecture, lint, full `pnpm test`, deployment suites, audits,
-  build, trace, HTTP and browser runners) and every hosted workflow observation.
-
-## 7. Git, index and worktree — final state of this execution
-
-No product commit, no report-only commit, no push, no tag, no branch, no merge, no force operation, no A2 re-application
-and no M2 work. `HEAD` is still `53fe36284936b76b57c0abf9074c5cb5e814ffce`; the index holds **zero** staged paths; the
-working tree holds the same thirteen ledger paths plus this report. `.temp/uno-m1-087/` holds only task-owned scratch.
-Nothing outside the ledger was created, deleted or modified, and the committed declarations are byte-identical to their
-recorded baselines.
-
-## 8. Hosted CI
-
-Not run for this execution: there is no product commit to verify, so no `Verify U01 baseline` or `Uno Bootstrap Verify`
-run exists at a new head. This is reported as **not applicable**, not as passing, and no future result is predicted.
-
-## 9. Residual blockers
-
-1. P3–P6 are a multi-file architectural migration with a mandatory route-tree replacement, a production HTTP and real
-   Chromium proof, five governance guard groups and a full gate battery on two operating systems. They did not fit one
-   bounded execution window and were not started rather than left half-applied.
-2. `deployment/site.config.json` is absent from this tree although the order names it as a presentation authority. No
-   current consumer depends on it, but P3/P4 will need the Owner to resolve it rather than the Agent inventing it.
-3. U04 remains at the hosted A1 figure (3/17 files, 45/59 proxies). A2 stays preserved and unapplied; M2 is not authorized
-   and is not hosted green.
-
-## 10. Disposition requested
-
-**`REVISE` with a successor order scoping P3–P6 as one bounded, ordered execution** — consumer migration and serving
-first, then the route/host/browser proof, then discovery and visibility, then G01–G05 and the full battery, then one
-product commit and both workflows — together with a decision on `site.config.json`. Nothing in this run is offered as
-verification, and no stage, release or parity state is claimed.
-## WO-089 / R01 — Owner-authorized privacy correction
-
-This section is the single factual execution record of the bounded report-only correction run.
-
-| Item | Observed |
+| Gate | Result |
 | --- | --- |
-| Order | `UNO-WO-089 / R01` — report-only record correction; product, route, discovery and parity scope not authorized |
-| ACTIVE measured | 19,697 bytes; SHA-256 `b16a103ac8eed7ddbe49fe6d37fae2a9733ee61ab3bf7046b48cd31ef9d53194` (contents not reproduced) |
-| Owner activation | matched this order, edition, starting SHA, byte count and SHA-256 exactly; activation text not quoted |
-| Predecessor record | the WO-087 STOPPED report, 12,604 bytes, SHA-256 `27cc48213638a70c52b0b281e527ef57c19deffa7dc0b8bab24cbb38b07e4244` |
-| Correction scope | exactly two report lines — the `--show-toplevel` value and the verbatim ancestor chain — redacted for privacy only |
-| Encoding and line endings | unchanged: UTF-8, no BOM, CRLF, one trailing newline |
-| WO-087 findings | unchanged: P1 and P2 local-only; P3–P6 not executed; zero product commit, zero push, zero CI at WO-087 time |
-| Source changes this run | zero; the 13 dirty M1 source and test paths were not modified, staged, checked out or reapplied |
-| Source Git staging | zero; the index held only the report at commit time |
-| Publication | one report-only commit and a non-force `origin/main` push of this file alone |
-| `tests/governance-docs.test.mjs` | `PASS` — exit 0, 9 tests, 0 fail |
-| `scripts/verify-governance-docs.mjs` | `PASS` — exit 0, frozen bytes match |
-| `tests/bootstrap.test.mjs` | `PASS` — exit 0 after the single replacement |
-| `scripts/verify-bootstrap.mjs` | `PASS` — exit 0 after the single replacement |
-| Hosted workflows | `UNVERIFIED at report-write time`; not claimed as `PASS` |
+| `tests/unit` (31 files) | **PASS** — 1,242 tests |
+| `pnpm test:architecture` | **PASS** — 46 tests, 0 fail, after the delegation repair |
+| `pnpm typecheck` | **PASS** — exit 0 |
+| `pnpm lint` and `pnpm exec eslint . --max-warnings 0` | **PASS** — exit 0, 0 warnings |
+| `pnpm test:bootstrap` | **PASS** |
+| `node --test tests/governance-docs.test.mjs`, `node scripts/verify-governance-docs.mjs` | **PASS** |
+| `pnpm build` | **PASS** — 10/10 pages generated |
+| `node scripts/verify-u03-trace.mjs --expect committed` | **PASS** |
+| `pnpm test:http` after a build in the same step | **PASS** — 105 assertions |
+| `node scripts/verify-u03-http.mjs` | **PASS** — 135 assertions |
+| `node scripts/verify-u03-published-http.mjs` | **PASS** — 999 assertions |
+| `node scripts/verify-u04-json-slice.mjs` | **PASS** — 477 assertions |
+| `node scripts/verify-u04-22-module-consent.mjs`, `node scripts/verify-vercel-readiness.mjs` | **PASS** |
+| `pnpm audit --prod --audit-level high` | **PASS** — no known vulnerabilities |
+| `node --test tests/deployment/u03-fixture-transaction.test.mjs` | **FAIL** — 26 pass, 1 fail: no sandbox or transaction scratch outlives the case |
+| `node --test tests/deployment/u04-json-slice.test.mjs` | **FAIL** — 13 pass, 1 fail: the nested 27-case fault and restoration run returns 1 instead of 0 |
+| `pnpm test` (exact script) | **FAIL, local only** — its argument is a path substring filter, so it also collects the byte-frozen A2 copy at `.temp/uno-u04-086/A2-new/tests/unit/uno-family-links.test.ts`, whose relocated relative imports cannot resolve; hosted runners never hold `.temp`, and the whole `tests/unit` tree passes when selected explicitly |
 
-Baseline note: immediately before the replacement the two native bootstrap gates failed solely on the user-profile path inside the report, which is the defect corrected here. The same four commands were re-run unchanged afterwards and returned the results recorded above. No product, parity, stage, release or deployment state is claimed.
+## 5. Why this run stopped
+
+The two failing deployment gates exercise `scripts/uno-u03-fixture-transaction.mjs`, which imports only Node built-ins and none of the modules changed here, so the failure is not caused by this work — it is an inherited or environment-level defect in fixture sandbox cleanup on this host. The same two files are executed by the hosted workflows, and the gate is mandatory before any product push. A stale `.temp/wo031-tx-*` sandbox is present while the assertion runs and absent afterwards; I could neither reproduce it deterministically nor repair it with confidence in the remaining window, and a repair inside a mutating fixture runner without a reliable reproduction would be a guess rather than a fix.
+
+Publishing product bytes that the hosted runner would immediately fail is the outcome this order forbids, so no product commit was created and no product push occurred. All work is preserved in the working tree.
+
+## 6. Not delivered
+
+1. **P4** — the `[locale]` route tree was not replaced by the `[...segments]` catch-all; `src/config/uno-serving.ts` still resolves one global authority and the three route handlers still use the legacy binding.
+2. **P5** — per-Site JSON and Markdown publication, visibility, metadata, sitemap and alternate scoping are unchanged.
+3. **P6** — no three-Site transaction fixture, no G01–G05 guard groups and no new production HTTP or Chromium proof were added, so `verify-u03-published-http.mjs` still proves only the committed version-1 fixture semantics.
+4. No product commit A or B exists; the single commit published by this run carries this report only.
+
+## 7. Preservation and rights
+
+A2 tracked patch `90,536` B / `5e40963895d266874d5445225090dbb67f8d361a4528f9e609aaae0980ffaf87` and the A2 new-file copy `17,405` B / `1cdddb38a91b7b76dc92d113c8def11e8a26f9f39d0c92d463b0cd58070cf70f` are byte-identical to the start of this run and remain unapplied. `deployment/efs/manifest.json` `b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925` and `deployment/uno.config.json` `58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952` were restored byte-for-byte by every gate that reads them. `AGENTS.md`, `README.md` and the local SOP are unchanged and match their frozen bytes. No protected file, workflow, package, lockfile, presentation file or UI component was modified. No external provider, DNS, registry or Drive record was contacted; every browser and HTTP request stayed on loopback with synthetic `.example` Hosts.
+
+## 8. Git state and disposition
+
+`HEAD` remains `02c64f9391a96c76dcd56560af117f005180bea0`. Beyond the 13 inherited ledger paths, this run changed `src/adapters/efs/uno-confined-source-reader.ts`, `src/application/prepare-uno-page-delivery-candidate.ts`, `src/application/plan-uno-published-page.ts`, `src/core/efs/uno-config.ts` and `tests/unit/efs-uno-published-page.test.ts`; nothing was staged before this report and no untracked file was created outside the ignored scratch. Private paths, the ACTIVE body and Owner activation text are not reproduced anywhere in this file.
+
+**Disposition requested:** a successor order that (a) authorizes the fixture-sandbox cleanup repair in `scripts/uno-u03-fixture-transaction.mjs`, together with the exact reproduction command for this host, or explicitly scopes the unit gate to `tests/unit` so the preserved A2 copy cannot be collected; and (b) carries P3 forward as delivered while authorizing P4–P6 as the remaining bounded work. Nothing in this run is offered as verification of the multi-Site runtime.
