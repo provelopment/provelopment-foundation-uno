@@ -128,7 +128,8 @@ function isAllowedProjectEntry(path) {
 function classify(rawPath) {
   const path = rawPath.startsWith("./") ? rawPath.slice(2) : rawPath;
   if (FORBIDDEN_PROJECT_PREFIXES.some((prefix) => path.startsWith(prefix))) return "trace:private-path";
-  if (!isAllowedProjectEntry(path)) return "trace:unexpected-project-path:" + path;
+  if (FORBIDDEN_PROJECT_FILES.includes(path)) return "trace:forbidden-path";
+  if (!isAllowedProjectEntry(path)) return "trace:unexpected-project-path";
   return null;
 }
 
