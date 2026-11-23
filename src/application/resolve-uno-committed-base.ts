@@ -19,7 +19,7 @@
  * commit `c05c55ea61b5347cf5032211dd0bf37f2cc5083c` is conceptual context only. No Foundation, Solo or
  * Connect code, media or brand is imported, and Apache-2.0 notices are unchanged.
  */
-import { validateUnoSiteSelection } from "../core/efs/uno-config";
+import { validateUnoSiteAddressConfig, validateUnoSiteSelection } from "../core/efs/uno-config";
 
 /** The closed refusal vocabulary: one literal per failure family, never widened at a call site. */
 export type UnoCommittedBaseRefusal =
@@ -128,7 +128,7 @@ function deepFreeze<T>(value: T): T {
  * unreadable meaning, and any other selection failure is `committed-base:selection-invalid`. An accepted
  * declaration that states no base is `committed-base:missing`, never a default.
  */
-export function resolveUnoCommittedBase(input: unknown): UnoCommittedBaseResult {
+function resolveCommittedBaseV1(input: unknown): UnoCommittedBaseResult {
   try {
     const request = readPlainData(input);
     if (request === null) return refuseResolution("committed-base:input-invalid");
@@ -166,6 +166,114 @@ export function resolveUnoCommittedBase(input: unknown): UnoCommittedBaseResult 
         aliases: [...storedBase.aliases],
       },
     });
+  } catch (error) {
+    if (error instanceof HostileStructure) return refuseResolution("committed-base:input-invalid");
+    return refuseResolution("committed-base:unreadable");
+  }
+}
+
+/** The three own-data keys a version-2, Site-qualified request may carry; nothing else is read. */
+export const UNO_COMMITTED_BASE_INPUT_KEYS_V2: readonly string[] = Object.freeze([
+  "manifest",
+  "selection",
+  "site",
+] as const);
+
+/** The exact pair that names one qualified Site. */
+const COMMITTED_BASE_SITE_KEYS: readonly string[] = Object.freeze(["facetId", "siteId"] as const);
+
+/**
+ * Read the qualified Site selector as a fresh pair of ids, or `null`.
+ *
+ * An accessor, a symbol or a non-plain prototype throws before any value is read, so the selector is never caller code.
+ */
+function readQualifiedSite(value: unknown): { facetId: string; siteId: string } | null {
+  const record = readPlainData(value);
+  if (record === null) return null;
+  if (!hasExactlyKeys(record, COMMITTED_BASE_SITE_KEYS)) return null;
+  const facetId = record["facetId"];
+  const siteId = record["siteId"];
+  if (typeof facetId !== "string" || facetId.length === 0) return null;
+  if (typeof siteId !== "string" || siteId.length === 0) return null;
+  return { facetId, siteId };
+}
+
+/**
+ * Resolve the declared base of one **explicitly named qualified Site** (`UNO-WO-086 / R01`, M10).
+ *
+ * The `(facetId, siteId)` pair is a lookup inside the validated version-2 address declaration, which stays the only
+ * authority: nothing is inferred from `sites[0]`, the entry `default`, `selectedSite`, a request Host, a forwarded
+ * header, an environment variable or a DNS lookup. The answer is that binding's own `origin + pathPrefix` and its own
+ * declared aliases, so `corporate/docs` answers `https://abc.example/docs` and can never receive `corporate/main`'s root
+ * base or `services/main`'s second origin.
+ */
+function resolveCommittedBaseV2(request: DataRecord): UnoCommittedBaseResult {
+  if (!hasExactlyKeys(request, UNO_COMMITTED_BASE_INPUT_KEYS_V2)) {
+    return refuseResolution("committed-base:input-invalid");
+  }
+
+  const manifest = request["manifest"];
+  const selection = request["selection"];
+  const siteRequest = request["site"];
+  for (const value of [manifest, selection, siteRequest]) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return refuseResolution("committed-base:input-invalid");
+    }
+  }
+
+  const requested = readQualifiedSite(siteRequest);
+  if (requested === null) return refuseResolution("committed-base:input-invalid");
+
+  const address = validateUnoSiteAddressConfig(selection, manifest);
+  if (!address.accepted) {
+    return refuseResolution(
+      address.reason === "config:unreadable"
+        ? "committed-base:unreadable"
+        : "committed-base:selection-invalid",
+    );
+  }
+
+  const binding = address.config.sites.find(
+    (candidate) =>
+      candidate.facetId === requested.facetId && candidate.siteId === requested.siteId,
+  );
+  if (binding === undefined) return refuseResolution("committed-base:selection-invalid");
+
+  // A validated v2 binding already stores each alias in `origin + prefix` form, so aliases are copied, never re-joined.
+  return deepFreeze({
+    accepted: true as const,
+    site: {
+      entityId: address.config.entityId,
+      facetId: binding.facetId,
+      siteId: binding.siteId,
+    },
+    base: {
+      canonical: `${binding.origin}${binding.pathPrefix}`,
+      aliases: [...binding.aliases],
+    },
+  });
+}
+
+/**
+ * Read the canonical base the committed declaration states for the publishing Site.
+ *
+ * Two request shapes are accepted, each with its own exact-key validation: the legacy `{manifest, selection}` v1
+ * request, and the v2 `{manifest, selection, site}` request whose `selection` is the multi-Site address declaration.
+ * The presence of `site` alone selects the v2 path, so a v1 request is never reinterpreted and a v2 declaration is
+ * never read as a legacy selection.
+ *
+ * Every failure is one closed literal: an unreadable declaration or base keeps the unreadable meaning, a policy-refused
+ * v1 base is `committed-base:invalid`, and any other selection or Site-binding failure is
+ * `committed-base:selection-invalid`. A v1 declaration that states no base is `committed-base:missing`, never a default.
+ */
+export function resolveUnoCommittedBase(input: unknown): UnoCommittedBaseResult {
+  try {
+    const request = readPlainData(input);
+    if (request === null) return refuseResolution("committed-base:input-invalid");
+    if (Object.prototype.hasOwnProperty.call(request, "site")) {
+      return resolveCommittedBaseV2(request);
+    }
+    return resolveCommittedBaseV1(request);
   } catch (error) {
     if (error instanceof HostileStructure) return refuseResolution("committed-base:input-invalid");
     return refuseResolution("committed-base:unreadable");

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { CONFIG_REFUSAL_REASONS, validateUnoSiteSelection, type UnoConfigRefusal } from "../../src/core/efs/uno-config";
+import { CONFIG_REFUSAL_REASONS, UNO_SITE_ADDRESS_CONFIG_VERSION, validateUnoSiteAddressConfig, validateUnoSiteSelection, type UnoConfigRefusal } from "../../src/core/efs/uno-config";
 import { validateUnoManifestGraph } from "../../src/core/efs/manifest-graph";
 
 /**
@@ -655,5 +655,190 @@ describe("the declared base under hostile and non-URL input", () => {
     expect(refused.accepted).toBe(false);
     expect(JSON.stringify(refused)).toBe('{"accepted":false,"reason":"config:invalid-base"}');
     expect(JSON.stringify(refused).includes("secret-path")).toBe(false);
+  });
+});
+
+/**
+ * `UNO-WO-086 / R01` (M1): the multi-Facet / multi-Site address declaration.
+ *
+ * Two Facets are bound to unrelated reserved `.example` domains, and the `corporate` Facet hosts a second Site on a
+ * disjoint path prefix of its own domain. Every case asserts a specific closed code, so a validator that bound only one
+ * Site, inferred a host, or fell back to the first entry could not pass.
+ */
+describe("multi-Facet / multi-Site address configuration", () => {
+  const siteOf = (siteId: string, slug: string) => ({
+    id: siteId,
+    pages: [
+      {
+        id: "home",
+        route: ["home"],
+        representations: [
+          { locale: "en-001", sources: [{ kind: "markdown", path: `deployment/efs/content/${slug}.en-001.md` }] },
+        ],
+      },
+    ],
+  });
+
+  const twoFacetManifest = () => ({
+    entities: [
+      {
+        id: ENTITY_ID,
+        facets: [
+          { id: "corporate", sites: [siteOf("main", "corp-main"), siteOf("docs", "corp-docs")] },
+          { id: "services", sites: [siteOf("main", "svc-main")] },
+        ],
+      },
+    ],
+  });
+
+  const addressConfig = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+    version: UNO_SITE_ADDRESS_CONFIG_VERSION,
+    entityId: ENTITY_ID,
+    sites: [
+      { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+      { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+      { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+    ],
+    default: { facetId: "corporate", siteId: "main" },
+    ...overrides,
+  });
+
+  it("accepts two unrelated Facet domains plus a disjoint prefix, with every Site independently bound", () => {
+    const result = validateUnoSiteAddressConfig(addressConfig(), twoFacetManifest());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect(result.config.version).toBe(UNO_SITE_ADDRESS_CONFIG_VERSION);
+    expect(result.config.sites.map((site) => `${site.facetId}/${site.siteId}`)).toEqual([
+      "corporate/main",
+      "corporate/docs",
+      "services/main",
+    ]);
+    expect(result.config.sites.map((site) => `${site.origin}${site.pathPrefix}`)).toEqual([
+      "https://abc.example",
+      "https://abc.example/docs",
+      "https://xyz.example",
+    ]);
+    // A declared default resolves the ambiguous entry; it must never remove another Site from the authority.
+    expect(result.config.selectedSite).toEqual({ facetId: "corporate", siteId: "main" });
+    expect(result.config.defaultSite).toEqual({ facetId: "corporate", siteId: "main" });
+    expect(Object.isFrozen(result.config.sites)).toBe(true);
+    expect(Object.isFrozen(result.config.sites[0])).toBe(true);
+  });
+
+  it("binds the only Site without any declared default", () => {
+    const single = {
+      version: UNO_SITE_ADDRESS_CONFIG_VERSION,
+      entityId: ENTITY_ID,
+      sites: [{ facetId: "foundation", siteId: "main", origin: "https://abc.example" }],
+    };
+    const result = validateUnoSiteAddressConfig(single, manifest());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect(result.config.sites).toHaveLength(1);
+    expect(result.config.defaultSite).toBeUndefined();
+    expect(result.config.selectedSite).toEqual({ facetId: "foundation", siteId: "main" });
+  });
+
+  it("refuses an origin claimed twice with the same prefix", () => {
+    const duplicated = addressConfig({
+      sites: [
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example" },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+      ],
+    });
+    expect(validateUnoSiteAddressConfig(duplicated, twoFacetManifest())).toEqual({
+      accepted: false,
+      reason: "config:duplicate-site-address",
+    });
+  });
+
+  it("refuses the same Site bound twice", () => {
+    const duplicated = addressConfig({
+      sites: [
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+        { facetId: "corporate", siteId: "main", origin: "https://other.example" },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+      ],
+    });
+    expect(validateUnoSiteAddressConfig(duplicated, twoFacetManifest())).toEqual({
+      accepted: false,
+      reason: "config:duplicate-site-address",
+    });
+  });
+
+  it("refuses partial authority: a declared Site left without its own address", () => {
+    const partial = addressConfig({
+      sites: [
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+      ],
+    });
+    expect(validateUnoSiteAddressConfig(partial, twoFacetManifest())).toEqual({
+      accepted: false,
+      reason: "config:incomplete-site-bindings",
+    });
+  });
+
+  it("refuses a default that names no bound Site", () => {
+    const badDefault = addressConfig({ default: { facetId: "corporate", siteId: "ghost" } });
+    expect(validateUnoSiteAddressConfig(badDefault, twoFacetManifest())).toEqual({
+      accepted: false,
+      reason: "config:invalid-default",
+    });
+  });
+
+  it("refuses a Site that does not exist under the named Facet", () => {
+    const wrongOwner = addressConfig({
+      sites: [
+        { facetId: "corporate", siteId: "missing", origin: "https://abc.example" },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+      ],
+    });
+    expect(validateUnoSiteAddressConfig(wrongOwner, twoFacetManifest())).toEqual({
+      accepted: false,
+      reason: "config:site-not-found",
+    });
+  });
+
+  it("refuses an origin the accepted canonical policy rejects, without echoing it", () => {
+    const hostile = addressConfig({
+      sites: [
+        { facetId: "corporate", siteId: "main", origin: "javascript:alert(1)" },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+      ],
+    });
+    const result = validateUnoSiteAddressConfig(hostile, twoFacetManifest());
+    expect(result).toEqual({ accepted: false, reason: "config:invalid-site-address" });
+    expect(JSON.stringify(result).includes("javascript")).toBe(false);
+  });
+
+  it("refuses a version-1 declaration through the address entry point", () => {
+    expect(validateUnoSiteAddressConfig({ ...config(), version: 1 }, manifest())).toEqual({
+      accepted: false,
+      reason: "config:version",
+    });
+  });
+
+  it("keeps every binding whatever the declaration order, and never re-derives the default", () => {
+    const reversed = addressConfig({
+      sites: [
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+      ],
+    });
+    const result = validateUnoSiteAddressConfig(reversed, twoFacetManifest());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect(result.config.sites.map((site) => `${site.facetId}/${site.siteId}`)).toEqual([
+      "services/main",
+      "corporate/docs",
+      "corporate/main",
+    ]);
+    expect(result.config.selectedSite).toEqual({ facetId: "corporate", siteId: "main" });
   });
 });

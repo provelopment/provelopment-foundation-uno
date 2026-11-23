@@ -459,19 +459,42 @@ test('a restore that cannot write fails closed, keeps the backups, then succeeds
 
 test('successful cases leave no stray .temp/wo031-* data behind', async () => {
   mkdirSync(SCRATCH_PARENT, { recursive: true });
-  const before = readdirSync(SCRATCH_PARENT).filter((entry) => entry.startsWith('wo031-'));
+  const sandbox = makeSandbox();
+  const ownedSandbox = sandbox.sandbox;
+  let transaction;
+  try {
+    transaction = await prepareUnoU03FixtureTransaction({ ...sandbox, writer: makeWriter() });
+    assert.equal(transaction.status, 'armed');
+    assert.equal((await transaction.install()).ok, true);
+    assert.equal((await transaction.restore()).ok, true);
+    assert.equal((await transaction.dispose()).ok, true);
+    // Ownership evidence, never a peer snapshot: *this* transaction's own scratch root is empty, and the only
+    // directory this case created is the one about to be removed. A concurrent case owning its own `wo031-*`
+    // sandbox can neither make this pass nor make it fail.
+    assert.deepEqual(readdirSync(sandbox.scratchRoot), [], 'this transaction retained no scratch');
+  } finally {
+    sandbox.cleanup();
+  }
+  assert.equal(existsSync(ownedSandbox), false, 'the sandbox this case created is gone');
+});
+
+test('the ownership assertion is not vacuous: skipping dispose leaves owned scratch behind', async () => {
+  mkdirSync(SCRATCH_PARENT, { recursive: true });
   const sandbox = makeSandbox();
   try {
     const transaction = await prepareUnoU03FixtureTransaction({ ...sandbox, writer: makeWriter() });
     assert.equal(transaction.status, 'armed');
     assert.equal((await transaction.install()).ok, true);
     assert.equal((await transaction.restore()).ok, true);
+    // Mutation guard: the two assertions above would be meaningless if scratch never existed. Without `dispose`
+    // the transaction's own scratch must still be present, so removing `dispose()` from the positive case above
+    // makes that case fail rather than silently pass.
+    assert.notDeepEqual(readdirSync(sandbox.scratchRoot), [], 'owned scratch survives until dispose');
     assert.equal((await transaction.dispose()).ok, true);
+    assert.deepEqual(readdirSync(sandbox.scratchRoot), [], 'dispose removes only the owned scratch');
   } finally {
     sandbox.cleanup();
   }
-  const after = readdirSync(SCRATCH_PARENT).filter((entry) => entry.startsWith('wo031-'));
-  assert.deepEqual(after, before, 'no sandbox or transaction scratch outlives the case');
 });
 
 test('the transaction exposes one entry point and refuses an unauthorised call', async () => {

@@ -23,13 +23,18 @@
  */
 import type { PageSourceKind, PageVisibility } from "../core/page-authoring-policy";
 import type { UnoPageDocument, UnoPageDocumentRefusal } from "../core/page-document";
-import { validateUnoManifestGraph } from "../core/efs/manifest-graph";
-import { matchUnoCandidateRoute } from "../core/efs/uno-route-address";
+import { validateUnoManifestGraph, type UnoManifestGraph } from "../core/efs/manifest-graph";
+import {
+  matchUnoCandidateRoute,
+  matchUnoSiteRouteCandidate,
+  type UnoRouteCandidate,
+} from "../core/efs/uno-route-address";
 import { validateUnoCanonicalBase } from "../core/efs/uno-canonical-base";
 import { validateUnoSiteSelection } from "../core/efs/uno-config";
 import { resolveUnoCommittedLocales } from "./resolve-uno-committed-locales";
 import {
   prepareUnoPageDeliveryCandidate,
+  type UnoDeliveryAccepted,
   type UnoDeliveryEligibility,
   type UnoDeliveryRefusal,
 } from "./prepare-uno-page-delivery-candidate";
@@ -81,6 +86,22 @@ export const UNO_PUBLICATION_INPUT_KEYS: readonly string[] = Object.freeze([
   "manifest",
   "selection",
   "base",
+  "pathname",
+  "loadedSource",
+] as const);
+
+/**
+ * The six own-data keys a **version-2, Site-qualified** request may carry (`UNO-WO-090 / R01`, P3).
+ *
+ * The qualified path exists so that publication can be decided for *one named* Site of a multi-Site declaration instead
+ * of for a single global selection. `site` is a lookup inside the already validated declaration and `host` is only ever
+ * compared against configured bindings, so neither can create a Site, move a boundary or promote a Page.
+ */
+export const UNO_PUBLICATION_INPUT_KEYS_V2: readonly string[] = Object.freeze([
+  "manifest",
+  "selection",
+  "site",
+  "host",
   "pathname",
   "loadedSource",
 ] as const);
@@ -212,6 +233,10 @@ export function planUnoPublishedPage(input: unknown): UnoPublishedPageResult {
   try {
     const request = readPlainData(input);
     if (request === null) return refusePublication("publication:input-invalid");
+    // The presence of `site` alone selects the qualified, multi-Site path; a legacy request keeps its exact contract.
+    if (Object.prototype.hasOwnProperty.call(request, "site")) {
+      return planQualifiedPage(request);
+    }
     if (!hasExactlyKeys(request, UNO_PUBLICATION_INPUT_KEYS)) {
       return refusePublication("publication:input-invalid");
     }
@@ -268,78 +293,154 @@ export function planUnoPublishedPage(input: unknown): UnoPublishedPageResult {
       return refusePublication("publication:route-invalid");
     }
 
-    // The publication authority: the candidate's own Page, taken from the validated graph by identity.
-    const entity = graph.graph.entities[0];
-    if (entity === undefined) return refusePublication("publication:manifest-invalid");
-    const facet = entity.facets.find((entry) => entry.id === matched.candidate.facetId);
-    if (facet === undefined) return refusePublication("publication:selection-invalid");
-    const site = facet.sites.find((entry) => entry.id === matched.candidate.siteId);
-    if (site === undefined) return refusePublication("publication:selection-invalid");
-    const page = site.pages.find((entry) => entry.id === matched.candidate.pageId);
-    if (page === undefined) return refusePublication("publication:page-missing");
-    if (page.publication !== "published") return refusePublication("publication:not-published");
-
-
-    const document: {
-      kind: PageSourceKind;
-      title: string;
-      description?: string;
-      visibility: PageVisibility;
-      markdownBody?: string;
-      pageDocument?: UnoPageDocument;
-      pageDocumentRefusal?: UnoPageDocumentRefusal;
-    } = {
-      kind: candidate.document.kind,
-      title: candidate.document.title,
-      visibility: candidate.document.visibility,
-    };
-    if (candidate.document.description !== undefined) document.description = candidate.document.description;
-    if (candidate.document.markdownBody !== undefined) document.markdownBody = candidate.document.markdownBody;
-    if (candidate.document.pageDocument !== undefined) document.pageDocument = candidate.document.pageDocument;
-    if (candidate.document.pageDocumentRefusal !== undefined) {
-      document.pageDocumentRefusal = candidate.document.pageDocumentRefusal;
-    }
-
-    const languagePreferences = Object.create(null) as Record<string, string>;
-    for (const key of Object.keys(stored.localePolicy.languagePreferences).sort()) {
-      languagePreferences[key] = stored.localePolicy.languagePreferences[key] as string;
-    }
-
-    return deepFreeze({
-      accepted: true as const,
-      identity: {
-        entityId: matched.candidate.entityId,
-        facetId: matched.candidate.facetId,
-        siteId: matched.candidate.siteId,
-        pageId: matched.candidate.pageId,
-        localeTag: matched.candidate.localeTag,
-        localePathKey: matched.candidate.localePathKey,
-        routePath: matched.candidate.routePath,
-        pathname: matched.candidate.pathname,
-      },
-      document,
-      delivery: {
-        canonicalUrl: candidate.ifServed.canonicalUrl,
-        robots: candidate.ifServed.robots,
-        public: candidate.document.visibility === "public",
-        unlisted: candidate.document.visibility === "unlisted",
-        indexable: candidate.ifServed.robots === null,
-        eligible: {
-          navigation: candidate.ifServed.eligibleIfPublished.navigation,
-          sitemap: candidate.ifServed.eligibleIfPublished.sitemap,
-          hreflang: candidate.ifServed.eligibleIfPublished.hreflang,
-          xDefault: candidate.ifServed.eligibleIfPublished.xDefault,
-          languageSwitch: candidate.ifServed.eligibleIfPublished.languageSwitch,
-          automaticLocaleRedirectTarget:
-            candidate.ifServed.eligibleIfPublished.automaticLocaleRedirectTarget,
-        },
-        supportedLocales: [...stored.localePolicy.supportedLocales],
-        defaultLocale: stored.localePolicy.defaultLocale,
-        languagePreferences,
-      },
-    });
+    return assembleAcceptedPage(candidate, matched.candidate, graph.graph, stored.localePolicy);
   } catch (error) {
     if (error instanceof HostileStructure) return refusePublication("publication:input-invalid");
     return refusePublication("publication:unreadable");
   }
+}
+
+/** The stored locale policy of one Site, exactly as the committed-locales contract returns it. */
+interface CommittedLocalePolicy {
+  readonly supportedLocales: readonly string[];
+  readonly defaultLocale: string;
+  readonly languagePreferences: Readonly<Record<string, string>>;
+}
+
+/**
+ * Assemble one accepted published-Page record from an already-accepted delivery candidate.
+ *
+ * This is the only place the publication authority is consulted: the candidate's own Page is located in the validated
+ * graph **by the matched candidate's identity**, and only that Page's own `publication: "published"` declaration can
+ * turn an otherwise accepted candidate into an accepted plan. Both the legacy and the qualified request shapes end
+ * here, so there is exactly one publication gate, one document projection and one delivery projection to audit.
+ */
+function assembleAcceptedPage(
+  candidate: UnoDeliveryAccepted,
+  matchedCandidate: UnoRouteCandidate,
+  graph: UnoManifestGraph,
+  localePolicy: CommittedLocalePolicy,
+): UnoPublishedPageResult {
+  const entity = graph.entities[0];
+  if (entity === undefined) return refusePublication("publication:manifest-invalid");
+  const facet = entity.facets.find((entry) => entry.id === matchedCandidate.facetId);
+  if (facet === undefined) return refusePublication("publication:selection-invalid");
+  const site = facet.sites.find((entry) => entry.id === matchedCandidate.siteId);
+  if (site === undefined) return refusePublication("publication:selection-invalid");
+  const page = site.pages.find((entry) => entry.id === matchedCandidate.pageId);
+  if (page === undefined) return refusePublication("publication:page-missing");
+  if (page.publication !== "published") return refusePublication("publication:not-published");
+
+  const document: {
+    kind: PageSourceKind;
+    title: string;
+    description?: string;
+    visibility: PageVisibility;
+    markdownBody?: string;
+    pageDocument?: UnoPageDocument;
+    pageDocumentRefusal?: UnoPageDocumentRefusal;
+  } = {
+    kind: candidate.document.kind,
+    title: candidate.document.title,
+    visibility: candidate.document.visibility,
+  };
+  if (candidate.document.description !== undefined) document.description = candidate.document.description;
+  if (candidate.document.markdownBody !== undefined) document.markdownBody = candidate.document.markdownBody;
+  if (candidate.document.pageDocument !== undefined) document.pageDocument = candidate.document.pageDocument;
+  if (candidate.document.pageDocumentRefusal !== undefined) {
+    document.pageDocumentRefusal = candidate.document.pageDocumentRefusal;
+  }
+
+  const languagePreferences = Object.create(null) as Record<string, string>;
+  for (const key of Object.keys(localePolicy.languagePreferences).sort()) {
+    languagePreferences[key] = localePolicy.languagePreferences[key] as string;
+  }
+
+  return deepFreeze({
+    accepted: true as const,
+    identity: {
+      entityId: matchedCandidate.entityId,
+      facetId: matchedCandidate.facetId,
+      siteId: matchedCandidate.siteId,
+      pageId: matchedCandidate.pageId,
+      localeTag: matchedCandidate.localeTag,
+      localePathKey: matchedCandidate.localePathKey,
+      routePath: matchedCandidate.routePath,
+      pathname: matchedCandidate.pathname,
+    },
+    document,
+    delivery: {
+      canonicalUrl: candidate.ifServed.canonicalUrl,
+      robots: candidate.ifServed.robots,
+      public: candidate.document.visibility === "public",
+      unlisted: candidate.document.visibility === "unlisted",
+      indexable: candidate.ifServed.robots === null,
+      eligible: {
+        navigation: candidate.ifServed.eligibleIfPublished.navigation,
+        sitemap: candidate.ifServed.eligibleIfPublished.sitemap,
+        hreflang: candidate.ifServed.eligibleIfPublished.hreflang,
+        xDefault: candidate.ifServed.eligibleIfPublished.xDefault,
+        languageSwitch: candidate.ifServed.eligibleIfPublished.languageSwitch,
+        automaticLocaleRedirectTarget: candidate.ifServed.eligibleIfPublished.automaticLocaleRedirectTarget,
+      },
+      supportedLocales: [...localePolicy.supportedLocales],
+      defaultLocale: localePolicy.defaultLocale,
+      languagePreferences,
+    },
+  });
+}
+
+
+/**
+ * Plan one published Page for **one explicitly named qualified Site** (`UNO-WO-090 / R01`, P3).
+ *
+ * The request must be exactly `{manifest, selection, site, host, pathname, loadedSource}`. Unlike the legacy path there
+ * is no caller-proposed base: the base is read from the named binding's own declaration, so a sibling Site's origin,
+ * prefix or aliases can never be substituted, and `host` is only ever compared against configured bindings — an
+ * unknown, forwarded or hostile Host matches nothing and grants nothing.
+ */
+function planQualifiedPage(request: DataRecord): UnoPublishedPageResult {
+  if (!hasExactlyKeys(request, UNO_PUBLICATION_INPUT_KEYS_V2)) {
+    return refusePublication("publication:input-invalid");
+  }
+
+  const manifest = request["manifest"];
+  const selection = request["selection"];
+  const site = request["site"];
+  const host = request["host"];
+  const pathname = request["pathname"];
+  const loadedSource = request["loadedSource"];
+  for (const value of [manifest, selection, site, loadedSource]) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return refusePublication("publication:input-invalid");
+    }
+  }
+  if (typeof host !== "string" || typeof pathname !== "string") {
+    return refusePublication("publication:input-invalid");
+  }
+
+  const graph = validateUnoManifestGraph(manifest);
+  if (!graph.accepted) {
+    return refusePublication(
+      graph.reason === "input:unreadable" ? "publication:unreadable" : "publication:manifest-invalid",
+    );
+  }
+
+  const stored = resolveUnoCommittedLocales({ manifest, selection, site });
+  if (!stored.accepted) return refusePublication("publication:committed-locales-invalid");
+
+  const matched = matchUnoSiteRouteCandidate(host, pathname, manifest, selection);
+  if (!matched.accepted) return refusePublication("publication:route-invalid");
+
+  const candidate = prepareUnoPageDeliveryCandidate({ manifest, selection, site, host, pathname, loadedSource });
+  if (!candidate.accepted) return refusePublication(DELIVERY_REFUSAL_MAP[candidate.reason]);
+  if (
+    candidate.identity.pageId !== matched.candidate.pageId ||
+    candidate.identity.localeTag !== matched.candidate.localeTag ||
+    candidate.identity.pathname !== matched.candidate.pathname
+  ) {
+    return refusePublication("publication:route-invalid");
+  }
+
+  return assembleAcceptedPage(candidate, matched.candidate, graph.graph, stored.localePolicy);
 }

@@ -7,10 +7,12 @@ import {
   UNO_SITE_PUBLICATION_INPUT_KEYS,
   UNO_SITE_PUBLICATION_INPUT_LIMITS,
   UNO_SITE_PUBLICATION_INPUT_REFUSALS,
+  UNO_SITE_PUBLICATION_LOCALE_BUDGET,
   validateUnoSitePublicationInputs,
   type UnoSitePublicationInputsRefusal,
   type UnoSitePublicationResult,
 } from "../../src/application/validate-uno-site-publication-inputs";
+import { MANIFEST_GRAPH_LIMITS } from "../../src/core/efs/manifest-graph";
 import { resolveUnoCommittedLocales } from "../../src/application/resolve-uno-committed-locales";
 import { resolveUnoCommittedBase } from "../../src/application/resolve-uno-committed-base";
 
@@ -609,5 +611,566 @@ describe("the stored policy composes with this validator (`UNO-WO-025 / R01`)", 
     expect(resolveUnoCommittedLocales({ manifest: readJson(MANIFEST_URL), selection: withoutMapping }).accepted).toBe(
       false,
     );
+  });
+});
+
+/**
+ * T10 — `UNO-WO-086 / R01` (M9): Site-qualified publication inputs.
+ *
+ * One synthetic Entity with three bound Sites: `corporate/main` and `corporate/docs` on one origin (root and `/docs`),
+ * and `services/main` on a second origin. Every declared source path is unique across the whole manifest, every Site
+ * authors its own locales, and the two Sites named `main` differ only by Facet — which is exactly what must keep them
+ * apart. All hosts, bases and policies below are synthetic fixtures, never a deployment decision.
+ */
+const M9_CORPORATE_MAIN = { facetId: "corporate", siteId: "main" } as const;
+const M9_CORPORATE_DOCS = { facetId: "corporate", siteId: "docs" } as const;
+const M9_SERVICES_MAIN = { facetId: "services", siteId: "main" } as const;
+
+function m9Page(id: string, route: readonly string[], locales: readonly string[], slug: string) {
+  return {
+    id,
+    route: [...route],
+    representations: locales.map((locale) => ({
+      locale,
+      sources: [{ kind: "markdown", path: `deployment/efs/content/${slug}.${locale}.md` }],
+    })),
+  };
+}
+
+const M9_MANIFEST = {
+  entities: [
+    {
+      id: ENTITY_ID,
+      facets: [
+        {
+          id: "corporate",
+          sites: [
+            {
+              id: "main",
+              pages: [
+                m9Page("home", ["home"], ["en-001"], "corp-main-home"),
+                m9Page("about", ["about"], ["en-001"], "corp-main-about"),
+              ],
+            },
+            {
+              id: "docs",
+              locales: { supportedLocales: ["en-001", "fr-FR"], defaultLocale: "en-001" },
+              pages: [
+                m9Page("home", ["home"], ["en-001", "fr-FR"], "corp-docs-home"),
+                m9Page("guide", ["guide"], ["en-001", "fr-FR"], "corp-docs-guide"),
+              ],
+            },
+          ],
+        },
+        {
+          id: "services",
+          sites: [
+            {
+              id: "main",
+              pages: [
+                m9Page("home", ["home"], ["de-DE"], "svc-main-home"),
+                m9Page("offers", ["offers"], ["de-DE"], "svc-main-offers"),
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+function m9Address(withDefault = false) {
+  return {
+    version: 2,
+    entityId: ENTITY_ID,
+    sites: [
+      { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+      { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+      { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+    ],
+    ...(withDefault ? { default: { facetId: "corporate", siteId: "main" } } : {}),
+  };
+}
+
+const M9_BASE_CORPORATE_MAIN = { canonical: "https://abc.example", aliases: [] as string[] };
+const M9_BASE_CORPORATE_DOCS = { canonical: "https://abc.example/docs", aliases: [] as string[] };
+const M9_BASE_SERVICES_MAIN = { canonical: "https://xyz.example", aliases: [] as string[] };
+
+function m9Policy(supportedLocales: string[], defaultLocale: string) {
+  return { supportedLocales, defaultLocale, languagePreferences: {} };
+}
+
+const M9_POLICY_CORPORATE_MAIN = m9Policy(["en-001"], "en-001");
+const M9_POLICY_CORPORATE_DOCS = m9Policy(["en-001", "fr-FR"], "en-001");
+const M9_POLICY_SERVICES_MAIN = m9Policy(["de-DE"], "de-DE");
+
+describe("site-qualified publication inputs (v2)", () => {
+  it("composes publication inputs for three independently bound Sites", () => {
+    const corporateMain = validateUnoSitePublicationInputs({
+      manifest: M9_MANIFEST,
+      selection: m9Address(),
+      site: M9_CORPORATE_MAIN,
+      base: M9_BASE_CORPORATE_MAIN,
+      localePolicy: M9_POLICY_CORPORATE_MAIN,
+    });
+    expect(corporateMain.accepted).toBe(true);
+    if (corporateMain.accepted) {
+      expect(corporateMain.site).toEqual({
+        entityId: ENTITY_ID,
+        facetId: "corporate",
+        siteId: "main",
+      });
+      expect(corporateMain.canonicalBase).toEqual({ origin: "https://abc.example", pathPrefix: "" });
+      expect(corporateMain.candidateCount).toBe(2);
+    }
+
+    const corporateDocs = validateUnoSitePublicationInputs({
+      manifest: M9_MANIFEST,
+      selection: m9Address(),
+      site: M9_CORPORATE_DOCS,
+      base: M9_BASE_CORPORATE_DOCS,
+      localePolicy: M9_POLICY_CORPORATE_DOCS,
+    });
+    expect(corporateDocs.accepted).toBe(true);
+    if (corporateDocs.accepted) {
+      expect(corporateDocs.canonicalBase).toEqual({ origin: "https://abc.example", pathPrefix: "/docs" });
+      expect(corporateDocs.candidateCount).toBe(4);
+      expect(corporateDocs.localePolicy.supportedLocales).toEqual(["en-001", "fr-FR"]);
+    }
+
+    const servicesMain = validateUnoSitePublicationInputs({
+      manifest: M9_MANIFEST,
+      selection: m9Address(),
+      site: M9_SERVICES_MAIN,
+      base: M9_BASE_SERVICES_MAIN,
+      localePolicy: M9_POLICY_SERVICES_MAIN,
+    });
+    expect(servicesMain.accepted).toBe(true);
+    if (servicesMain.accepted) {
+      expect(servicesMain.canonicalBase).toEqual({ origin: "https://xyz.example", pathPrefix: "" });
+      expect(servicesMain.candidateCount).toBe(2);
+    }
+  });
+
+  it("keeps two Sites named main distinct because their Facets differ", () => {
+    const corporate = validateUnoSitePublicationInputs({
+      manifest: M9_MANIFEST,
+      selection: m9Address(),
+      site: M9_CORPORATE_MAIN,
+      base: M9_BASE_CORPORATE_MAIN,
+      localePolicy: M9_POLICY_CORPORATE_MAIN,
+    });
+    const services = validateUnoSitePublicationInputs({
+      manifest: M9_MANIFEST,
+      selection: m9Address(),
+      site: M9_SERVICES_MAIN,
+      base: M9_BASE_SERVICES_MAIN,
+      localePolicy: M9_POLICY_SERVICES_MAIN,
+    });
+    expect(corporate.accepted && services.accepted).toBe(true);
+    if (corporate.accepted && services.accepted) {
+      expect(corporate.site.siteId).toBe(services.site.siteId);
+      expect(corporate.site.facetId).not.toBe(services.site.facetId);
+      expect(corporate.canonicalBase).not.toEqual(services.canonicalBase);
+    }
+    // The `services` base can never be accepted for `corporate/main` even though the Site id matches.
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: M9_CORPORATE_MAIN,
+        base: M9_BASE_SERVICES_MAIN,
+        localePolicy: M9_POLICY_CORPORATE_MAIN,
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:base-invalid" });
+  });
+
+  it("does not disable another Site when a default names one Site", () => {
+    const withoutDefault = validateUnoSitePublicationInputs({
+      manifest: M9_MANIFEST,
+      selection: m9Address(),
+      site: M9_SERVICES_MAIN,
+      base: M9_BASE_SERVICES_MAIN,
+      localePolicy: M9_POLICY_SERVICES_MAIN,
+    });
+    const withDefault = validateUnoSitePublicationInputs({
+      manifest: M9_MANIFEST,
+      selection: m9Address(true),
+      site: M9_SERVICES_MAIN,
+      base: M9_BASE_SERVICES_MAIN,
+      localePolicy: M9_POLICY_SERVICES_MAIN,
+    });
+    expect(withDefault).toEqual(withoutDefault);
+    expect(withDefault.accepted).toBe(true);
+  });
+
+  it("counts only the requested Site's own candidate addresses", () => {
+    const counts: number[] = [];
+    for (const request of [
+      { site: M9_CORPORATE_MAIN, base: M9_BASE_CORPORATE_MAIN, localePolicy: M9_POLICY_CORPORATE_MAIN },
+      { site: M9_CORPORATE_DOCS, base: M9_BASE_CORPORATE_DOCS, localePolicy: M9_POLICY_CORPORATE_DOCS },
+      { site: M9_SERVICES_MAIN, base: M9_BASE_SERVICES_MAIN, localePolicy: M9_POLICY_SERVICES_MAIN },
+    ]) {
+      const result = validateUnoSitePublicationInputs({ manifest: M9_MANIFEST, selection: m9Address(), ...request });
+      expect(result.accepted).toBe(true);
+      if (result.accepted) counts.push(result.candidateCount);
+    }
+    // Two plus four plus two is the whole index; no Site reports any of another Site's candidates.
+    expect(counts).toEqual([2, 4, 2]);
+    expect(counts.reduce((total, count) => total + count, 0)).toBe(8);
+  });
+
+  it("refuses when one Site cannot satisfy another Site's locales or Home", () => {
+    // `corporate/main` authors only en-001, so the `docs` policy's fr-FR is not represented there.
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: M9_CORPORATE_MAIN,
+        base: M9_BASE_CORPORATE_MAIN,
+        localePolicy: M9_POLICY_CORPORATE_DOCS,
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:unrepresented-supported-locale" });
+
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: M9_CORPORATE_MAIN,
+        base: M9_BASE_CORPORATE_MAIN,
+        localePolicy: M9_POLICY_SERVICES_MAIN,
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:unsupported-representation" });
+
+    // A Site that declares its own locales refuses any policy that is not that declaration.
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: M9_CORPORATE_DOCS,
+        base: M9_BASE_CORPORATE_DOCS,
+        localePolicy: m9Policy(["en-001"], "en-001"),
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:locale-policy-invalid" });
+
+    // Home authored in en-001 only: a fr-FR default is a missing Home, not a translation to invent.
+    const noFrenchHome = {
+      entities: [
+        {
+          id: ENTITY_ID,
+          facets: [
+            {
+              id: "corporate",
+              sites: [
+                {
+                  id: "main",
+                  pages: [
+                    m9Page("home", ["home"], ["en-001"], "solo-home"),
+                    m9Page("about", ["about"], ["en-001", "fr-FR"], "solo-about"),
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: noFrenchHome,
+        selection: {
+          version: 2,
+          entityId: ENTITY_ID,
+          sites: [{ facetId: "corporate", siteId: "main", origin: "https://abc.example" }],
+        },
+        site: M9_CORPORATE_MAIN,
+        base: M9_BASE_CORPORATE_MAIN,
+        localePolicy: m9Policy(["en-001", "fr-FR"], "fr-FR"),
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:default-home-missing" });
+  });
+
+  it("refuses a base or alias set borrowed from a sibling Site", () => {
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: M9_CORPORATE_DOCS,
+        base: M9_BASE_CORPORATE_MAIN,
+        localePolicy: M9_POLICY_CORPORATE_DOCS,
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:base-invalid" });
+
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: M9_CORPORATE_DOCS,
+        base: { canonical: "https://abc.example/docs", aliases: ["https://abc.example/old"] },
+        localePolicy: M9_POLICY_CORPORATE_DOCS,
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:base-invalid" });
+  });
+
+  it("refuses a Site with no qualified binding and returns no partial result", () => {
+    const unbound = validateUnoSitePublicationInputs({
+      manifest: M9_MANIFEST,
+      selection: m9Address(),
+      site: { facetId: "corporate", siteId: "archive" },
+      base: M9_BASE_CORPORATE_MAIN,
+      localePolicy: M9_POLICY_CORPORATE_MAIN,
+    });
+    expect(unbound).toEqual({ accepted: false, reason: "publication-inputs:selection-invalid" });
+
+    // The right Site id under the wrong Facet is a different Site, so it is not found either.
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: { facetId: "services", siteId: "docs" },
+        base: M9_BASE_CORPORATE_DOCS,
+        localePolicy: M9_POLICY_CORPORATE_DOCS,
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:selection-invalid" });
+  });
+
+  it("accepts thirty-three authored full locales for one Site", () => {
+    const locales = Array.from({ length: 33 }, (_, index) => `de-${String(101 + index)}`);
+    const wide = {
+      entities: [
+        {
+          id: ENTITY_ID,
+          facets: [
+            {
+              id: "corporate",
+              sites: [{ id: "main", pages: [m9Page("home", ["home"], locales, "wide-home")] }],
+            },
+          ],
+        },
+      ],
+    };
+    const result = validateUnoSitePublicationInputs({
+      manifest: wide,
+      selection: {
+        version: 2,
+        entityId: ENTITY_ID,
+        sites: [{ facetId: "corporate", siteId: "main", origin: "https://abc.example" }],
+      },
+      site: M9_CORPORATE_MAIN,
+      base: M9_BASE_CORPORATE_MAIN,
+      localePolicy: m9Policy(locales, "de-101"),
+    });
+    expect(result.accepted).toBe(true);
+    if (result.accepted) {
+      expect(result.localePolicy.supportedLocales.length).toBe(33);
+      expect(result.candidateCount).toBe(33);
+    }
+  });
+
+  it("refuses duplicate and invalid locale tags before any publication decision", () => {
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: M9_CORPORATE_MAIN,
+        base: M9_BASE_CORPORATE_MAIN,
+        localePolicy: m9Policy(["en-001", "en-001"], "en-001"),
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:locale-policy-invalid" });
+
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: M9_CORPORATE_MAIN,
+        base: M9_BASE_CORPORATE_MAIN,
+        localePolicy: m9Policy(["not-a-locale!"], "not-a-locale!"),
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:locale-policy-invalid" });
+
+    // A policy whose default is not among its own supported locales is not a policy.
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: M9_CORPORATE_MAIN,
+        base: M9_BASE_CORPORATE_MAIN,
+        localePolicy: m9Policy(["en-001"], "fr-FR"),
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:locale-policy-invalid" });
+  });
+
+  it("refuses accessors, symbols, extra keys and wrong Site shapes without running a getter", () => {
+    let invoked = 0;
+    const hostile = {
+      manifest: M9_MANIFEST,
+      selection: m9Address(),
+      site: M9_CORPORATE_MAIN,
+      get base() {
+        invoked += 1;
+        return M9_BASE_CORPORATE_MAIN;
+      },
+      localePolicy: M9_POLICY_CORPORATE_MAIN,
+    };
+    expect(validateUnoSitePublicationInputs(hostile)).toEqual({
+      accepted: false,
+      reason: "publication-inputs:input-not-plain",
+    });
+    expect(invoked).toBe(0);
+
+    const extraKey = { ...m9Address() };
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: { ...M9_CORPORATE_MAIN, extra: "x" },
+        base: M9_BASE_CORPORATE_MAIN,
+        localePolicy: M9_POLICY_CORPORATE_MAIN,
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:input-shape" });
+    expect(extraKey.version).toBe(2);
+
+    // The selector is a pair only: a Site named by id alone is not a qualified Site.
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: { siteId: "main" },
+        base: M9_BASE_CORPORATE_MAIN,
+        localePolicy: M9_POLICY_CORPORATE_MAIN,
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:input-shape" });
+
+    const symbolKeyed = { ...M9_CORPORATE_MAIN } as Record<PropertyKey, unknown>;
+    symbolKeyed[Symbol("facet")] = "services";
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        site: symbolKeyed,
+        base: M9_BASE_CORPORATE_MAIN,
+        localePolicy: M9_POLICY_CORPORATE_MAIN,
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:input-not-plain" });
+
+    // A v1-shaped request is never read as a Site-qualified one: without `site` the address declaration is not a legacy
+    // selection, so the legacy contract refuses it rather than publishing from it.
+    expect(
+      validateUnoSitePublicationInputs({
+        manifest: M9_MANIFEST,
+        selection: m9Address(),
+        base: M9_BASE_CORPORATE_MAIN,
+        localePolicy: M9_POLICY_CORPORATE_MAIN,
+      }),
+    ).toEqual({ accepted: false, reason: "publication-inputs:selection-invalid" });
+  });
+
+  it("returns deeply frozen, independently allocated and deterministic results", () => {
+    const first = validateUnoSitePublicationInputs({
+      manifest: M9_MANIFEST,
+      selection: m9Address(),
+      site: M9_CORPORATE_DOCS,
+      base: M9_BASE_CORPORATE_DOCS,
+      localePolicy: M9_POLICY_CORPORATE_DOCS,
+    });
+    const second = validateUnoSitePublicationInputs({
+      manifest: M9_MANIFEST,
+      selection: m9Address(),
+      site: M9_CORPORATE_DOCS,
+      base: M9_BASE_CORPORATE_DOCS,
+      localePolicy: M9_POLICY_CORPORATE_DOCS,
+    });
+    expect(first).toEqual(second);
+    expect(first).not.toBe(second);
+    expect(first.accepted).toBe(true);
+    if (first.accepted && second.accepted) {
+      expect(first.localePolicy).not.toBe(second.localePolicy);
+      expect(first.localePolicy.supportedLocales).not.toBe(second.localePolicy.supportedLocales);
+      expect(Object.isFrozen(first)).toBe(true);
+      expect(Object.isFrozen(first.site)).toBe(true);
+      expect(Object.isFrozen(first.canonicalBase)).toBe(true);
+      expect(Object.isFrozen(first.aliases)).toBe(true);
+      expect(Object.isFrozen(first.localePolicy)).toBe(true);
+      expect(Object.isFrozen(first.localePolicy.supportedLocales)).toBe(true);
+      expect(Object.isFrozen(first.localePolicy.languagePreferences)).toBe(true);
+    }
+  });
+
+  it("accepts 513 distinct authored full locales under the shared manifest budget", () => {
+    // The former 512 was a per-Site count ceiling; the only remaining bound is the single documented machine-safety
+    // budget the manifest validator already applies to a Site's own `supportedLocales`.
+    expect(UNO_SITE_PUBLICATION_LOCALE_BUDGET).toBe(MANIFEST_GRAPH_LIMITS.hierarchyDeclarations);
+    expect(UNO_SITE_PUBLICATION_LOCALE_BUDGET).toBeGreaterThan(512);
+
+    // 27 real ISO 639-1 languages x 19 real ISO 3166-1 alpha-2 regions = 513 distinct authored full locales.
+    const languages = [
+      "en", "de", "fr", "es", "it", "pt", "nl", "sv", "da", "fi", "nb", "pl", "cs", "sk",
+      "hu", "ro", "bg", "el", "tr", "ru", "uk", "ar", "hi", "ja", "ko", "zh", "th",
+    ];
+    const regions = [
+      "US", "GB", "DE", "FR", "ES", "IT", "PT", "NL", "SE", "DK", "FI", "NO", "PL", "CZ",
+      "SK", "HU", "RO", "BG", "GR", "RU",
+    ].slice(0, 19);
+    const locales: string[] = [];
+    for (const language of languages) for (const region of regions) locales.push(`${language}-${region}`);
+    expect(locales).toHaveLength(513);
+    expect(new Set(locales).size).toBe(513);
+
+    const wide = {
+      entities: [
+        {
+          id: ENTITY_ID,
+          facets: [
+            {
+              id: "corporate",
+              sites: [
+                {
+                  id: "main",
+                  locales: { supportedLocales: [...locales], defaultLocale: locales[0] },
+                  pages: [m9Page("home", ["home"], locales, "wide513-home")],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const result = validateUnoSitePublicationInputs({
+      manifest: wide,
+      selection: {
+        version: 2,
+        entityId: ENTITY_ID,
+        sites: [{ facetId: "corporate", siteId: "main", origin: "https://abc.example" }],
+      },
+      site: M9_CORPORATE_MAIN,
+      base: M9_BASE_CORPORATE_MAIN,
+      localePolicy: m9Policy([...locales], locales[0] as string),
+    });
+    expect(result.accepted).toBe(true);
+    if (result.accepted) {
+      expect(result.localePolicy.supportedLocales).toHaveLength(513);
+      expect(result.candidateCount).toBe(513);
+    }
+    // The v1 compatibility ceiling is unchanged and still refuses the same oversized policy it always did.
+    expect(UNO_SITE_PUBLICATION_INPUT_LIMITS.supportedLocales).toBe(32);
+  });
+
+  it("refuses a policy at the shared budget boundary before per-entry validation", () => {
+    const overBoundary = Array.from(
+      { length: UNO_SITE_PUBLICATION_LOCALE_BUDGET + 1 },
+      () => "en-001",
+    );
+    const result = validateUnoSitePublicationInputs({
+      manifest: M9_MANIFEST,
+      selection: m9Address(),
+      site: M9_CORPORATE_MAIN,
+      base: M9_BASE_CORPORATE_MAIN,
+      localePolicy: m9Policy(overBoundary, "en-001"),
+    });
+    // The count guard precedes tag and membership validation, which is what keeps an oversized policy cheap to refuse.
+    expect(result.accepted).toBe(false);
+    if (!result.accepted) {
+      expect(result.reason).toBe("publication-inputs:locale-policy-invalid");
+    }
   });
 });

@@ -610,14 +610,25 @@ describe("hostile and oversized input", () => {
     expect(JSON.stringify(result)).not.toContain("HOSTILE-MANIFEST-TOKEN");
   });
 
-  it("refuses a graph with too many facets instead of truncating it", () => {
-    const graph = authoredGraph();
-    const facets: MutableFacet[] = [];
-    for (let index = 0; index <= MANIFEST_GRAPH_LIMITS.facetsPerEntity; index += 1) {
-      facets.push({ id: `facet-${index}`, sites: copy(facetOf(graph)).sites });
+  // `UNO-WO-086 / R01` (M1): Facets, Sites, Pages, locales and representations no longer carry a product cardinality
+  // ceiling. This asserts the structural fact that the retired product keys are gone and that a single finite
+  // machine-safety budget replaced every one of them. The Owner's stress graph (9 Facets, 9 Sites, 65 Pages, 33 locales,
+  // 17 representations, >512 sources) is an M1-completion requirement and is NOT claimed by this structural test.
+  it("exposes no product cardinality ceiling, only one finite safety budget", () => {
+    const limits = MANIFEST_GRAPH_LIMITS as Record<string, number>;
+    for (const retired of [
+      "facetsPerEntity",
+      "sitesPerFacet",
+      "pagesPerSite",
+      "siteLocales",
+      "representationsPerPage",
+    ]) {
+      expect(Object.prototype.hasOwnProperty.call(limits, retired)).toBe(false);
     }
-    entityOf(graph).facets = facets;
-    expectRefused(graph, "shape:too-many");
+    expect(limits["entities"]).toBe(1);
+    expect(Number.isFinite(limits["hierarchyDeclarations"])).toBe(true);
+    expect(limits["hierarchyDeclarations"]).toBeGreaterThan(512);
+    expect(validateUnoManifestGraph(authoredGraph()).accepted).toBe(true);
   });
 
   it("does not mutate the caller's graph", () => {

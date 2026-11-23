@@ -32,10 +32,20 @@ import { isContentSlug } from "../page-content";
 import { isEntityId } from "./identity";
 import { validateUnoManifestGraph } from "./manifest-graph";
 import { localePolicyIssue } from "./uno-locales";
-import { validateUnoCanonicalBase, type UnoCanonicalBase } from "./uno-canonical-base";
+import { canonicalBaseConflict, validateUnoCanonicalBase, type UnoCanonicalBase, type UnoCanonicalBaseResult } from "./uno-canonical-base";
 
-/** The only accepted declaration version. */
+/** The only accepted declaration version of the legacy single-Site form. */
 export const UNO_CONFIG_VERSION = 1;
+
+/**
+ * The multi-Facet / multi-Site address declaration version (`UNO-WO-086 / R01`, checkpoint M1).
+ *
+ * This is a *superset* declaration, not a replacement: version 1 keeps its exact meaning and is still accepted, so a
+ * legacy one-Site installation is untouched. Version 2 replaces the single `selectedSite` target with an explicit map
+ * from every declared `{facetId, siteId}` to its own public address, so that every valid Site is independently active.
+ * An optional `default` names the entry used to resolve an otherwise ambiguous request; it never deactivates a Site.
+ */
+export const UNO_SITE_ADDRESS_CONFIG_VERSION = 2;
 
 /** The most short-language mappings one declaration may carry. A limit, not a default. */
 export const UNO_SITE_LANGUAGE_PREFERENCE_LIMIT = 16;
@@ -62,7 +72,11 @@ export type UnoConfigRefusal =
   | "config:ambiguous-site"
   | "config:invalid-language-preferences"
   | "config:locale-authority-missing"
-  | "config:invalid-base";
+  | "config:invalid-base"
+  | "config:invalid-site-address"
+  | "config:duplicate-site-address"
+  | "config:incomplete-site-bindings"
+  | "config:invalid-default";
 
 /** The closed refusal vocabulary as data, for callers that must enumerate or document it. */
 export const CONFIG_REFUSAL_REASONS: readonly UnoConfigRefusal[] = Object.freeze([
@@ -81,6 +95,10 @@ export const CONFIG_REFUSAL_REASONS: readonly UnoConfigRefusal[] = Object.freeze
   "config:invalid-language-preferences",
   "config:locale-authority-missing",
   "config:invalid-base",
+  "config:invalid-site-address",
+  "config:duplicate-site-address",
+  "config:incomplete-site-bindings",
+  "config:invalid-default",
 ]);
 
 /** One declared future publication target: an authored Facet id and an authored Site id. */
@@ -125,10 +143,52 @@ export interface UnoSelectedSiteConfig {
   readonly base?: UnoDeclaredBase;
 }
 
-/** A tagged result: the validated declaration, or one closed reason and no partial selection. */
+/**
+ * One Site's declared public address: the exact pair that makes that Site independently active.
+ *
+ * `origin` is a validated absolute origin with no trailing slash; `pathPrefix` is the accepted policy's own prefix form
+ * — `""` at the root, otherwise a leading `/` with no trailing slash — so two Sites may share one origin only when their
+ * prefixes are disjoint. `aliases` are further addresses that resolve to this same Site and never to a second one.
+ */
+export interface UnoSiteAddressBinding {
+  readonly facetId: string;
+  readonly siteId: string;
+  readonly origin: string;
+  readonly pathPrefix: string;
+  readonly aliases: readonly string[];
+}
+
+/**
+ * The validated version-2 declaration: every Site's own address, plus an optional nonexclusive entry default.
+ *
+ * `selectedSite` is retained so the unchanged consumers keep one well-defined entry target — the declared `default`, or
+ * the only binding when exactly one exists. It is never an exclusivity claim: `sites` is authoritative, and a default
+ * must never be read as deactivating another Site.
+ */
+export interface UnoSiteAddressConfig {
+  readonly version: typeof UNO_SITE_ADDRESS_CONFIG_VERSION;
+  readonly entityId: string;
+  readonly sites: readonly UnoSiteAddressBinding[];
+  readonly selectedSite: UnoSelectedSite;
+  readonly defaultSite?: UnoSelectedSite;
+  readonly languagePreferences?: Readonly<Record<string, string>>;
+}
+
+/** The refusal branch both declaration validators share: one closed reason and no partial value. */
+export interface UnoConfigRefusalResult {
+  readonly accepted: false;
+  readonly reason: UnoConfigRefusal;
+}
+
+/** A tagged result: the validated legacy declaration, or one closed reason and no partial selection. */
 export type UnoConfigValidationResult =
   | { readonly accepted: true; readonly config: UnoSelectedSiteConfig }
-  | { readonly accepted: false; readonly reason: UnoConfigRefusal };
+  | UnoConfigRefusalResult;
+
+/** A tagged result: the validated multi-Site address declaration, or one closed reason and no partial authority. */
+export type UnoSiteAddressValidationResult =
+  | { readonly accepted: true; readonly config: UnoSiteAddressConfig }
+  | UnoConfigRefusalResult;
 
 /** A plain own-data view of an untrusted object. */
 type DataRecord = Readonly<Record<string, unknown>>;
@@ -137,7 +197,7 @@ type DataRecord = Readonly<Record<string, unknown>>;
 class HostileInput extends Error {}
 
 /** The bounded refusal. No partial selection, no echoed value, no stack. */
-function refuse(reason: UnoConfigRefusal): UnoConfigValidationResult {
+function refuse(reason: UnoConfigRefusal): UnoConfigRefusalResult {
   return Object.freeze({ accepted: false, reason });
 }
 
@@ -224,8 +284,19 @@ type DeclaredBaseOutcome =
  * own unreadable outcome, which keeps this module's existing `config:unreadable` meaning so a hostile
  * structure is not misreported as an authored mistake. Neither branch returns the rejected value.
  */
+/**
+ * The single call site of the accepted canonical-base policy in this module.
+ *
+ * Both the legacy `base` field and every version-2 Site address are validated only through this one delegation, so no
+ * lexical URL, prefix, alias or overlap rule is ever restated here (`UNO-WO-090 / R01`, P3). The structured policy answer
+ * is returned unchanged, because a version-2 binding needs the accepted `origin` and `pathPrefix` separately.
+ */
+function readValidatedBase(value: unknown): UnoCanonicalBaseResult {
+  return validateUnoCanonicalBase(value);
+}
+
 function readDeclaredBase(value: unknown): DeclaredBaseOutcome {
-  const validated = validateUnoCanonicalBase(value);
+  const validated = readValidatedBase(value);
   if (!validated.accepted) {
     if (validated.reason === "base:unreadable") {
       return { state: "refused", reason: "config:unreadable" };
@@ -258,6 +329,211 @@ export function validateUnoSiteSelection(
   } catch {
     return refuse("config:unreadable");
   }
+}
+
+/**
+ * Validate the version-2 multi-Site address declaration (`UNO-WO-086 / R01`, checkpoint M1).
+ *
+ * This is a separate entry point by design. `validateUnoSiteSelection` keeps its exact version-1 contract and refusal
+ * order, so an existing one-Site installation is never re-interpreted; a caller that needs every Site's own address asks
+ * this function instead. A declaration that is not version 2 refuses with `config:version`, and a hostile structure
+ * becomes `config:unreadable` without any accessor ever being invoked.
+ */
+export function validateUnoSiteAddressConfig(
+  input: unknown,
+  manifest: unknown,
+): UnoSiteAddressValidationResult {
+  try {
+    const root = readOwnData(input);
+    if (root === null) return refuse("config:invalid-shape");
+    if (root["version"] !== UNO_SITE_ADDRESS_CONFIG_VERSION) return refuse("config:version");
+    return analyzeAddressConfiguration(root, manifest);
+  } catch {
+    return refuse("config:unreadable");
+  }
+}
+
+/**
+ * Validate a version-2 multi-Site address declaration against the caller's manifest.
+ *
+ * Every URL, prefix and alias lexical rule is delegated to `validateUnoCanonicalBase`; this walk adds only what a
+ * per-Site policy cannot see: no duplicated address, no origin shared by two Sites with the same prefix, no alias
+ * pointing at a second Site, and complete coverage of the manifest's own Sites so no declared Site is silently
+ * unreachable. Nothing is inferred: an unbound Site, an unnamed default for an ambiguous entry, or a Site that does not
+ * exist under the named Facet all refuse rather than being guessed.
+ */
+function analyzeAddressConfiguration(input: DataRecord, manifest: unknown): UnoSiteAddressValidationResult {
+  const shape = shapeIssue(input, ["version", "entityId", "sites"], ["default", "languagePreferences"]);
+  if (shape) return refuse(shape);
+
+  const entityId = input["entityId"];
+  if (!isEntityId(entityId)) return refuse("config:invalid-entity");
+
+  const sitesValue = input["sites"];
+  if (!Array.isArray(sitesValue) || sitesValue.length === 0) return refuse("config:invalid-site-address");
+
+  const validatedManifest = validateUnoManifestGraph(manifest);
+  if (!validatedManifest.accepted) return refuse("config:manifest-invalid");
+  const entity = validatedManifest.graph.entities[0];
+  if (entity === undefined || entity.id !== entityId) return refuse("config:entity-mismatch");
+
+  const bindings: UnoSiteAddressBinding[] = [];
+  const seenAddresses = new Set<string>();
+  const prefixesByOrigin = new Map<string, string[]>();
+  const seenAliases = new Set<string>();
+
+  for (const rawEntry of sitesValue as readonly unknown[]) {
+    const entry = readOwnData(rawEntry);
+    if (entry === null) return refuse("config:invalid-site-address");
+    const entryShape = shapeIssue(entry, ["facetId", "siteId", "origin"], ["pathPrefix", "aliases"]);
+    if (entryShape) return refuse(entryShape);
+
+    const facetId = entry["facetId"];
+    const siteId = entry["siteId"];
+    const origin = entry["origin"];
+    if (!isContentSlug(facetId) || !isContentSlug(siteId)) return refuse("config:invalid-site-address");
+    if (typeof origin !== "string") return refuse("config:invalid-site-address");
+
+    const prefix = entry["pathPrefix"];
+    if (prefix !== undefined) {
+      // A declared prefix is an explicit routing segment, so it must be spelled as one: leading and trailing slash, no
+      // query, fragment, backslash or traversal. The policy below still owns every URL rule; this only refuses a shape
+      // it could never mean.
+      if (typeof prefix !== "string" || !prefix.startsWith("/") || !prefix.endsWith("/")) {
+        return refuse("config:invalid-site-address");
+      }
+      if (prefix.length > 1 && (prefix.slice(1, -1).length === 0 || /[\\?#]|(?:^|\/)\.\.?(?:\/|$)/u.test(prefix.slice(1, -1)))) {
+        return refuse("config:invalid-site-address");
+      }
+    }
+    const aliases = entry["aliases"];
+    if (aliases !== undefined && !Array.isArray(aliases)) return refuse("config:invalid-site-address");
+
+    // The declaration states host and prefix separately for clarity; the accepted canonical policy takes one URL, so the
+    // two are joined exactly here and nowhere else, and the policy's own answer is the only form stored.
+    const canonical = typeof prefix === "string" && prefix.length > 1 ? `${origin}${prefix.slice(0, -1)}` : origin;
+    const validated = readValidatedBase({ canonical, aliases: aliases ?? [] });
+    if (!validated.accepted) {
+      return refuse(validated.reason === "base:unreadable" ? "config:unreadable" : "config:invalid-site-address");
+    }
+
+    const facet = entity.facets.find((candidate) => candidate.id === facetId);
+    if (facet === undefined) return refuse("config:facet-not-found");
+    // A version-2 binding is fully qualified by `facetId` + `siteId`, so the same Site id may legitimately exist under two
+    // Facets. Only the pair itself must be unique, which the duplicate check below enforces.
+    if (facet.sites.filter((candidate) => candidate.id === siteId).length !== 1) {
+      return refuse("config:site-not-found");
+    }
+    if (bindings.some((bound) => bound.facetId === facetId && bound.siteId === siteId)) {
+      return refuse("config:duplicate-site-address");
+    }
+
+    const address = `${validated.canonical.origin}${validated.canonical.pathPrefix}`;
+    if (seenAddresses.has(address)) return refuse("config:duplicate-site-address");
+    seenAddresses.add(address);
+
+    const originPrefixes = prefixesByOrigin.get(validated.canonical.origin) ?? [];
+    if (originPrefixes.includes(validated.canonical.pathPrefix)) return refuse("config:duplicate-site-address");
+    originPrefixes.push(validated.canonical.pathPrefix);
+    prefixesByOrigin.set(validated.canonical.origin, originPrefixes);
+
+    // `UNO-WO-086 / R01` (M4): on one origin two Sites must not claim the *same* prefix — that is a duplicate, and no
+    // request path could be assigned. A nested prefix is not a duplicate: the longer prefix owns its own subtree, which is
+    // the "at most one longest matching unambiguous prefix" rule the address contract requires.
+    for (const bound of bindings) {
+      if (bound.origin !== validated.canonical.origin) continue;
+      if (canonicalBaseConflict(bound, validated.canonical) === "duplicate") {
+        return refuse("config:duplicate-site-address");
+      }
+    }
+
+    const aliasStrings: string[] = [];
+    for (const alias of validated.aliases) {
+      const aliasString = `${alias.origin}${alias.pathPrefix}`;
+      if (seenAddresses.has(aliasString) || seenAliases.has(aliasString)) {
+        return refuse("config:duplicate-site-address");
+      }
+      seenAliases.add(aliasString);
+      aliasStrings.push(aliasString);
+    }
+
+    bindings.push(Object.freeze({
+      facetId,
+      siteId,
+      origin: validated.canonical.origin,
+      pathPrefix: validated.canonical.pathPrefix,
+      aliases: Object.freeze(aliasStrings),
+    }));
+  }
+
+  // Fail closed on partial authority: a declared Site without its own address would otherwise be silently unreachable,
+  // which is the opposite of "every valid configured Site is active".
+  const boundSites = new Set(bindings.map((bound) => `${bound.facetId}/${bound.siteId}`));
+  const unbound = entity.facets
+    .flatMap((facet) => facet.sites.map((site) => `${facet.id}/${site.id}`))
+    .find((site) => !boundSites.has(site));
+  if (unbound !== undefined) return refuse("config:incomplete-site-bindings");
+
+  let defaultSite: UnoSelectedSite | undefined;
+  if (Object.prototype.hasOwnProperty.call(input, "default")) {
+    const declaredDefault = readOwnData(input["default"]);
+    if (declaredDefault === null) return refuse("config:invalid-default");
+    if (shapeIssue(declaredDefault, ["facetId", "siteId"]) !== null) return refuse("config:invalid-default");
+    const defaultFacetId = declaredDefault["facetId"];
+    const defaultSiteId = declaredDefault["siteId"];
+    if (!isContentSlug(defaultFacetId) || !isContentSlug(defaultSiteId)) return refuse("config:invalid-default");
+    if (!bindings.some((bound) => bound.facetId === defaultFacetId && bound.siteId === defaultSiteId)) {
+      return refuse("config:invalid-default");
+    }
+    defaultSite = Object.freeze({ facetId: defaultFacetId, siteId: defaultSiteId });
+  }
+
+  let chosen: UnoSelectedSite;
+  if (defaultSite !== undefined) {
+    chosen = defaultSite;
+  } else {
+    const [sole] = bindings;
+    if (sole === undefined) return refuse("config:invalid-default");
+    chosen = { facetId: sole.facetId, siteId: sole.siteId };
+  }
+
+  let languagePreferences: Record<string, string> | null = null;
+  if (Object.prototype.hasOwnProperty.call(input, "languagePreferences")) {
+    languagePreferences = readLanguagePreferences(input["languagePreferences"]);
+    if (languagePreferences === null) return refuse("config:invalid-language-preferences");
+    const chosenFacet = entity.facets.find((facet) => facet.id === chosen.facetId);
+    const chosenSite = chosenFacet?.sites.find((site) => site.id === chosen.siteId);
+    if (chosenSite?.locales === undefined) return refuse("config:locale-authority-missing");
+    const policyIssue = localePolicyIssue({
+      supportedLocales: [...chosenSite.locales.supportedLocales],
+      defaultLocale: chosenSite.locales.defaultLocale,
+      languagePreferences,
+    });
+    if (policyIssue !== null) return refuse("config:invalid-language-preferences");
+  }
+
+  const config: {
+    version: typeof UNO_SITE_ADDRESS_CONFIG_VERSION;
+    entityId: string;
+    sites: readonly UnoSiteAddressBinding[];
+    selectedSite: UnoSelectedSite;
+    defaultSite?: UnoSelectedSite;
+    languagePreferences?: Record<string, string>;
+  } = {
+    version: UNO_SITE_ADDRESS_CONFIG_VERSION,
+    entityId,
+    sites: Object.freeze(bindings),
+    selectedSite: chosen,
+  };
+  if (defaultSite !== undefined) config.defaultSite = defaultSite;
+  if (languagePreferences !== null) {
+    const sorted = Object.create(null) as Record<string, string>;
+    for (const key of Object.keys(languagePreferences).sort()) {
+      sorted[key] = languagePreferences[key] as string;
+    }
+    config.languagePreferences = sorted;
+  }
+  return Object.freeze({ accepted: true, config: deepFreeze(config) });
 }
 
 /** The guarded selection walk. Every failure returns before any selection is produced. */

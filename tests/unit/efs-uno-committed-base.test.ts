@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   UNO_COMMITTED_BASE_INPUT_KEYS,
+  UNO_COMMITTED_BASE_INPUT_KEYS_V2,
   UNO_COMMITTED_BASE_REFUSAL_REASONS,
   resolveUnoCommittedBase,
   type UnoCommittedBaseRefusal,
@@ -296,5 +297,255 @@ describe("request shape and hostile input", () => {
     expect(JSON.stringify(rejected)).toBe('{"accepted":false,"reason":"committed-base:invalid"}');
     expect(JSON.stringify(rejected).includes("secret-path")).toBe(false);
     expect(JSON.stringify(rejected).includes("secret-host")).toBe(false);
+  });
+});
+
+/**
+ * T06 — `UNO-WO-086 / R01` (M10): Site-qualified committed base.
+ *
+ * One synthetic Entity, three bound Sites: `corporate/main` at the root of `https://abc.example`,
+ * `corporate/docs` beneath `/docs` on the same origin, and `services/main` on `https://xyz.example`. Every declared
+ * source path is unique across the manifest. The two Sites named `main` differ only by Facet, which is exactly the
+ * distinction a `siteId`-only reader would lose. All hosts here are synthetic fixtures.
+ */
+function t06Page(id: string, route: readonly string[], locales: readonly string[], slug: string) {
+  return {
+    id,
+    route: [...route],
+    representations: locales.map((locale) => ({
+      locale,
+      sources: [{ kind: "markdown", path: `deployment/efs/content/${slug}.${locale}.md` }],
+    })),
+  };
+}
+
+const T06_DOC_ALIASES = ["https://abc.example/docs-old"];
+
+function t06Manifest(): Record<string, unknown> {
+  return {
+    entities: [
+      {
+        id: ENTITY_ID,
+        facets: [
+          {
+            id: "corporate",
+            sites: [
+              {
+                id: "main",
+                locales: { supportedLocales: ["en-001"], defaultLocale: "en-001" },
+                pages: [
+                  t06Page("home", ["home"], ["en-001"], "corp-main-home"),
+                  t06Page("about", ["about"], ["en-001"], "corp-main-about"),
+                ],
+              },
+              {
+                id: "docs",
+                locales: { supportedLocales: ["de-DE"], defaultLocale: "de-DE" },
+                pages: [
+                  t06Page("home", ["home"], ["de-DE"], "corp-docs-home"),
+                  t06Page("guide", ["guide"], ["de-DE"], "corp-docs-guide"),
+                ],
+              },
+            ],
+          },
+          {
+            id: "services",
+            sites: [
+              {
+                id: "main",
+                locales: { supportedLocales: ["fr-FR"], defaultLocale: "fr-FR" },
+                pages: [
+                  t06Page("home", ["home"], ["fr-FR"], "svc-main-home"),
+                  t06Page("offers", ["offers"], ["fr-FR"], "svc-main-offers"),
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function t06Address(withDefault = false): Record<string, unknown> {
+  return {
+    version: 2,
+    entityId: ENTITY_ID,
+    sites: [
+      { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+      {
+        facetId: "corporate",
+        siteId: "docs",
+        origin: "https://abc.example",
+        pathPrefix: "/docs/",
+        aliases: ["https://abc.example/docs-old"],
+      },
+      { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+    ],
+    ...(withDefault ? { default: { facetId: "corporate", siteId: "main" } } : {}),
+  };
+}
+
+const T06_MAIN = { facetId: "corporate", siteId: "main" } as const;
+const T06_DOCS = { facetId: "corporate", siteId: "docs" } as const;
+const T06_SERVICES = { facetId: "services", siteId: "main" } as const;
+
+describe("a qualified Site's committed base (v2)", () => {
+  it("resolves each of three Sites to its own declared canonical base", () => {
+    const main = resolveUnoCommittedBase({ manifest: t06Manifest(), selection: t06Address(), site: T06_MAIN });
+    const docs = resolveUnoCommittedBase({ manifest: t06Manifest(), selection: t06Address(), site: T06_DOCS });
+    const services = resolveUnoCommittedBase({ manifest: t06Manifest(), selection: t06Address(), site: T06_SERVICES });
+
+    expect(main.accepted && docs.accepted && services.accepted).toBe(true);
+    if (!main.accepted || !docs.accepted || !services.accepted) return;
+
+    expect(main.base.canonical).toBe("https://abc.example");
+    expect(docs.base.canonical).toBe("https://abc.example/docs");
+    expect(services.base.canonical).toBe("https://xyz.example");
+    expect(main.site).toEqual({ entityId: ENTITY_ID, facetId: "corporate", siteId: "main" });
+    expect(docs.site).toEqual({ entityId: ENTITY_ID, facetId: "corporate", siteId: "docs" });
+    expect(services.site).toEqual({ entityId: ENTITY_ID, facetId: "services", siteId: "main" });
+  });
+
+  it("keeps two Sites named main distinct because their Facets differ", () => {
+    const corporate = resolveUnoCommittedBase({ manifest: t06Manifest(), selection: t06Address(), site: T06_MAIN });
+    const services = resolveUnoCommittedBase({ manifest: t06Manifest(), selection: t06Address(), site: T06_SERVICES });
+    expect(corporate.accepted && services.accepted).toBe(true);
+    if (!corporate.accepted || !services.accepted) return;
+
+    expect(corporate.site.siteId).toBe(services.site.siteId);
+    expect(corporate.site.facetId).not.toBe(services.site.facetId);
+    expect(corporate.base.canonical).not.toBe(services.base.canonical);
+  });
+
+  it("preserves a declared /docs prefix without a trailing slash", () => {
+    const docs = resolveUnoCommittedBase({ manifest: t06Manifest(), selection: t06Address(), site: T06_DOCS });
+    expect(docs.accepted).toBe(true);
+    if (!docs.accepted) return;
+    expect(docs.base.canonical).toBe("https://abc.example/docs");
+    expect(docs.base.canonical.endsWith("/")).toBe(false);
+  });
+
+  it("takes canonical and aliases only from the requested binding", () => {
+    const main = resolveUnoCommittedBase({ manifest: t06Manifest(), selection: t06Address(), site: T06_MAIN });
+    const docs = resolveUnoCommittedBase({ manifest: t06Manifest(), selection: t06Address(), site: T06_DOCS });
+    expect(main.accepted && docs.accepted).toBe(true);
+    if (!main.accepted || !docs.accepted) return;
+
+    // The docs alias belongs to docs alone and is never offered to the root Site.
+    expect(main.base.aliases).toEqual([]);
+    expect(docs.base.aliases).toEqual(T06_DOC_ALIASES);
+    expect(docs.base.aliases).not.toBe(T06_DOC_ALIASES);
+  });
+
+  it("does not change a Site's answer when a default names another Site", () => {
+    const withoutDefault = resolveUnoCommittedBase({
+      manifest: t06Manifest(),
+      selection: t06Address(),
+      site: T06_SERVICES,
+    });
+    const withDefault = resolveUnoCommittedBase({
+      manifest: t06Manifest(),
+      selection: t06Address(true),
+      site: T06_SERVICES,
+    });
+    expect(withDefault).toEqual(withoutDefault);
+    expect(withDefault.accepted).toBe(true);
+  });
+
+  it("refuses a wrong Site or Facet pair with no fallback base", () => {
+    expectRefused(
+      resolveUnoCommittedBase({
+        manifest: t06Manifest(),
+        selection: t06Address(),
+        site: { facetId: "services", siteId: "docs" },
+      }),
+      "committed-base:selection-invalid",
+    );
+    expectRefused(
+      resolveUnoCommittedBase({
+        manifest: t06Manifest(),
+        selection: t06Address(),
+        site: { facetId: "corporate", siteId: "archive" },
+      }),
+      "committed-base:selection-invalid",
+    );
+    // A v1 declaration is not an address declaration, so a v2 request cannot publish a base from it.
+    expectRefused(
+      resolveUnoCommittedBase({ manifest: t06Manifest(), selection: readSelection(), site: T06_MAIN }),
+      "committed-base:selection-invalid",
+    );
+  });
+
+  it("refuses hostile, malformed and unknown-field v2 requests", () => {
+    let invoked = 0;
+    expectRefused(
+      resolveUnoCommittedBase({
+        manifest: t06Manifest(),
+        selection: t06Address(),
+        site: T06_MAIN,
+        get extra(): unknown {
+          invoked += 1;
+          return "x";
+        },
+      }),
+      "committed-base:input-invalid",
+    );
+    expect(invoked).toBe(0);
+
+    for (const site of [
+      { siteId: "main" },
+      { facetId: "corporate" },
+      { facetId: "corporate", siteId: "main", extra: true },
+      { facetId: "", siteId: "main" },
+      { facetId: 1, siteId: "main" },
+      "corporate/main",
+      [],
+      null,
+    ]) {
+      expectRefused(
+        resolveUnoCommittedBase({ manifest: t06Manifest(), selection: t06Address(), site }),
+        "committed-base:input-invalid",
+      );
+    }
+
+    const symbolKeyed = { ...T06_MAIN } as Record<PropertyKey, unknown>;
+    symbolKeyed[Symbol("facet")] = "services";
+    expectRefused(
+      resolveUnoCommittedBase({ manifest: t06Manifest(), selection: t06Address(), site: symbolKeyed }),
+      "committed-base:input-invalid",
+    );
+
+    expectRefused(
+      resolveUnoCommittedBase({ manifest: t06Manifest(), site: T06_MAIN }),
+      "committed-base:input-invalid",
+    );
+  });
+
+  it("returns frozen, deterministic answers and a refusal with no partial base", () => {
+    const manifest = t06Manifest();
+    const selection = t06Address();
+    const snapshot = JSON.stringify({ manifest, selection });
+
+    const first = resolveUnoCommittedBase({ manifest, selection, site: T06_DOCS });
+    const second = resolveUnoCommittedBase({ manifest, selection, site: T06_DOCS });
+    expect(first).toEqual(second);
+    expect(first).not.toBe(second);
+    expect(first.accepted).toBe(true);
+    if (first.accepted && second.accepted) {
+      expect(first.base).not.toBe(second.base);
+      expect(first.base.aliases).not.toBe(second.base.aliases);
+      expect(Object.isFrozen(first)).toBe(true);
+      expect(Object.isFrozen(first.site)).toBe(true);
+      expect(Object.isFrozen(first.base)).toBe(true);
+      expect(Object.isFrozen(first.base.aliases)).toBe(true);
+    }
+    expect(JSON.stringify({ manifest, selection })).toBe(snapshot);
+
+    const refused = resolveUnoCommittedBase({ manifest, selection, site: { facetId: "corporate", siteId: "nope" } });
+    expect(Object.keys(refused).sort()).toEqual(["accepted", "reason"]);
+    expect(JSON.stringify(refused)).toBe('{"accepted":false,"reason":"committed-base:selection-invalid"}');
+    expect(UNO_COMMITTED_BASE_INPUT_KEYS_V2).toEqual(["manifest", "selection", "site"]);
+    expect(Object.isFrozen(UNO_COMMITTED_BASE_INPUT_KEYS_V2)).toBe(true);
   });
 });

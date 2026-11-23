@@ -26,11 +26,11 @@
  * `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`. No Foundation, Solo Rust, GEO-04, Connect, mark or asset is
  * imported, and no dependency or schema is added.
  */
-import { validateUnoManifestGraph } from "../core/efs/manifest-graph";
-import { validateUnoSiteSelection } from "../core/efs/uno-config";
+import { MANIFEST_GRAPH_LIMITS, validateUnoManifestGraph } from "../core/efs/manifest-graph";
+import { validateUnoSiteAddressConfig, validateUnoSiteSelection } from "../core/efs/uno-config";
 import { validateUnoCanonicalBase } from "../core/efs/uno-canonical-base";
 import { localePolicyIssue } from "../core/efs/uno-locales";
-import { buildUnoCandidateRouteIndex } from "../core/efs/uno-route-address";
+import { buildUnoCandidateRouteIndex, buildUnoSiteRouteIndex } from "../core/efs/uno-route-address";
 import { HOME_CONTENT_SLUG } from "../core/page-content";
 
 /** The exact proposed inputs one future publication decision would consume. */
@@ -86,6 +86,36 @@ export const UNO_SITE_PUBLICATION_INPUT_LIMITS = Object.freeze({
   supportedLocales: 32,
   languagePreferences: 16,
 });
+
+/**
+ * The exact keys a **version-2, Site-qualified** request may carry (`UNO-WO-086 / R01`, M9).
+ *
+ * `site` names one qualified Site inside the already validated address declaration; it is a lookup request, never a
+ * second source of publication authority. Its presence is what selects the v2 path, so a v1 request is never silently
+ * reinterpreted as a Site-qualified one.
+ */
+export const UNO_SITE_PUBLICATION_INPUT_KEYS_V2: readonly string[] = Object.freeze([
+  "manifest",
+  "selection",
+  "site",
+  "base",
+  "localePolicy",
+]);
+
+/** The exact keys the qualified Site selector may carry. Nothing else is read or ignored. */
+export const UNO_SITE_PUBLICATION_SITE_KEYS: readonly string[] = Object.freeze(["facetId", "siteId"]);
+
+/**
+ * The v2 locale bound — and the audit of the earlier 512 (`UNO-WO-086 / R01`, M9 correction).
+ *
+ * 512 was a per-Site *count* ceiling: an arbitrary product-level cardinality that no declaration justified, and one
+ * that could refuse a legitimately authored Site. It is gone. What remains is not a second ceiling but the single
+ * machine-safety budget the manifest validator already applies to a Site's own `supportedLocales`
+ * (`MANIFEST_GRAPH_LIMITS.hierarchyDeclarations`), so a policy can never exceed a document the manifest could accept.
+ * A Site's locale count is therefore bounded by its own declaration and its own authored candidates, not by this
+ * module; the both-direction checks below refuse any locale the Site did not author.
+ */
+export const UNO_SITE_PUBLICATION_LOCALE_BUDGET = MANIFEST_GRAPH_LIMITS.hierarchyDeclarations;
 
 /** The one selected Site, its validated base and the policy that agrees with it. */
 export interface UnoSitePublicationAccepted {
@@ -209,7 +239,10 @@ function deepFreeze<T>(value: T): T {
  * language is guessed from geography and no locale is enrolled implicitly. `null` also covers a non-object,
  * because a policy that is not a record cannot be a record of proposed locales.
  */
-function readLocalePolicy(value: unknown): {
+function readLocalePolicy(
+  value: unknown,
+  maxSupportedLocales: number,
+): {
   supportedLocales: string[];
   defaultLocale: string;
   languagePreferences: Record<string, string>;
@@ -220,7 +253,7 @@ function readLocalePolicy(value: unknown): {
 
   const supported = readDenseStrings(readOwnField(record, "supportedLocales"));
   if (supported === null || supported.length === 0) return null;
-  if (supported.length > UNO_SITE_PUBLICATION_INPUT_LIMITS.supportedLocales) return null;
+  if (supported.length > maxSupportedLocales) return null;
 
   const defaultLocale = readOwnField(record, "defaultLocale");
   if (typeof defaultLocale !== "string") return null;
@@ -249,7 +282,7 @@ function readLocalePolicy(value: unknown): {
  * clock, environment or provider is touched, the caller's value is never mutated, no getter is invoked and
  * no rejected value is echoed back.
  */
-export function validateUnoSitePublicationInputs(input: unknown): UnoSitePublicationResult {
+function composeLegacyPublicationInputs(input: unknown): UnoSitePublicationResult {
   try {
     const request = readPlainData(input);
     if (request === null) return refuse("publication-inputs:input-not-plain");
@@ -294,7 +327,10 @@ export function validateUnoSitePublicationInputs(input: unknown): UnoSitePublica
       );
     }
 
-    const policy = readLocalePolicy(localePolicy);
+    const policy = readLocalePolicy(
+      localePolicy,
+      UNO_SITE_PUBLICATION_INPUT_LIMITS.supportedLocales,
+    );
     if (policy === null) return refuse("publication-inputs:locale-policy-invalid");
 
     const index = buildUnoCandidateRouteIndex(manifest, selection);
@@ -353,6 +389,222 @@ export function validateUnoSitePublicationInputs(input: unknown): UnoSitePublica
       },
       candidateCount: index.candidates.length,
     });
+  } catch (error) {
+    if (error instanceof HostileStructure) return refuse("publication-inputs:input-not-plain");
+    return refuse("publication-inputs:unreadable");
+  }
+}
+
+/** One validated address in its canonical `origin + prefix` spelling. */
+function addressKey(address: { readonly origin: string; readonly pathPrefix: string }): string {
+  return `${address.origin}${address.pathPrefix}`;
+}
+
+/**
+ * Read the qualified Site selector as a fresh plain-data pair of ids, or `null`.
+ *
+ * A missing pair, an extra member, an empty string or a non-string answers `null`; an accessor, a symbol or a non-plain
+ * prototype throws before any value is read, so the selector can never be a function of caller code.
+ */
+function readQualifiedSite(value: unknown): { facetId: string; siteId: string } | null {
+  const record = readPlainData(value);
+  if (record === null) return null;
+  if (!hasExactKeys(record, UNO_SITE_PUBLICATION_SITE_KEYS)) return null;
+  const facetId = readOwnField(record, "facetId");
+  const siteId = readOwnField(record, "siteId");
+  if (typeof facetId !== "string" || facetId.length === 0) return null;
+  if (typeof siteId !== "string" || siteId.length === 0) return null;
+  return { facetId, siteId };
+}
+
+/** True when the supplied aliases are exactly the binding's declared aliases, in the same declared order. */
+function sameDeclaredAliases(
+  declared: readonly string[],
+  supplied: readonly { readonly origin: string; readonly pathPrefix: string }[],
+): boolean {
+  if (declared.length !== supplied.length) return false;
+  return declared.every((alias, index) => {
+    const candidate = supplied[index];
+    return candidate !== undefined && alias === addressKey(candidate);
+  });
+}
+
+/**
+ * Compose publication inputs for **one explicitly named qualified Site** (`UNO-WO-086 / R01`, M9).
+ *
+ * The requested `(facetId, siteId)` is a lookup inside the already validated version-2 address declaration: it resolves
+ * which Site publishes, and it is never itself a source of authority, so the accepted declaration stays the only one.
+ * Neither the declaration's `default` nor its first entry can select a publisher, and the two Sites that share the id
+ * `main` under different Facets stay distinct because only the pair is ever compared.
+ *
+ * The base must be *that* binding's own address — origin, prefix and declared aliases — so a sibling Site's base refuses
+ * instead of being substituted. Locales are proven against this Site's own candidates alone: another Site's authored
+ * locales can never satisfy a promise this Site did not keep, and this Site's Home must exist at its own default locale.
+ */
+function composeQualifiedSite(request: DataRecord): UnoSitePublicationResult {
+  if (!hasExactKeys(request, UNO_SITE_PUBLICATION_INPUT_KEYS_V2)) {
+    return refuse("publication-inputs:input-shape");
+  }
+
+  const manifest = readOwnField(request, "manifest");
+  const selection = readOwnField(request, "selection");
+  const siteRequest = readOwnField(request, "site");
+  const base = readOwnField(request, "base");
+  const localePolicy = readOwnField(request, "localePolicy");
+  for (const value of [manifest, selection, siteRequest, base, localePolicy]) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return refuse("publication-inputs:input-shape");
+    }
+  }
+
+  const graph = validateUnoManifestGraph(manifest);
+  if (!graph.accepted) {
+    return refuse(
+      graph.reason === "input:unreadable"
+        ? "publication-inputs:unreadable"
+        : "publication-inputs:manifest-invalid",
+    );
+  }
+
+  const requested = readQualifiedSite(siteRequest);
+  if (requested === null) return refuse("publication-inputs:input-shape");
+
+  const address = validateUnoSiteAddressConfig(selection, manifest);
+  if (!address.accepted) {
+    return refuse(
+      address.reason === "config:unreadable"
+        ? "publication-inputs:unreadable"
+        : "publication-inputs:selection-invalid",
+    );
+  }
+
+  // The pair is resolved inside the accepted declaration; `sites[0]` and `defaultSite` are never consulted, so an entry
+  // default cannot decide what publishes.
+  const binding = address.config.sites.find(
+    (bound) => bound.facetId === requested.facetId && bound.siteId === requested.siteId,
+  );
+  if (binding === undefined) return refuse("publication-inputs:selection-invalid");
+
+  const canonical = validateUnoCanonicalBase(base);
+  if (!canonical.accepted) {
+    return refuse(
+      canonical.reason === "base:unreadable"
+        ? "publication-inputs:unreadable"
+        : "publication-inputs:base-invalid",
+    );
+  }
+
+  // The supplied base must be this binding's own address. A sibling Site's origin, prefix or alias set refuses rather than
+  // being replaced by the correct one.
+  if (
+    canonical.canonical.origin !== binding.origin ||
+    canonical.canonical.pathPrefix !== binding.pathPrefix ||
+    !sameDeclaredAliases(binding.aliases, canonical.aliases)
+  ) {
+    return refuse("publication-inputs:base-invalid");
+  }
+
+  const policy = readLocalePolicy(localePolicy, UNO_SITE_PUBLICATION_LOCALE_BUDGET);
+  if (policy === null) return refuse("publication-inputs:locale-policy-invalid");
+
+  const index = buildUnoSiteRouteIndex(manifest, selection);
+  if (!index.accepted) {
+    return refuse(
+      index.reason === "route:unreadable"
+        ? "publication-inputs:unreadable"
+        : "publication-inputs:route-index-invalid",
+    );
+  }
+
+  // This Site's own candidates, and only those: `candidateCount` is this Site's declared address count, never the global
+  // index total, so one Site's pages can never appear to satisfy another Site's locales.
+  const siteCandidates = index.candidates.filter(
+    (candidate) =>
+      candidate.facetId === binding.facetId && candidate.siteId === binding.siteId,
+  );
+
+  const supported = [...policy.supportedLocales].sort();
+  const supportedSet = new Set(supported);
+
+  // A Site that declares its own locale policy is the authority on what it supports: the proposed policy must be that
+  // same declaration, not a superset, a subset or a different default. A Site without one is proven by its candidates.
+  const boundSite = graph.graph.entities[0]
+    ?.facets.find((facet) => facet.id === binding.facetId)
+    ?.sites.find((site) => site.id === binding.siteId);
+  const declaredLocales = boundSite?.locales;
+  if (declaredLocales !== undefined) {
+    const declared = [...declaredLocales.supportedLocales].sort();
+    const sameLocales =
+      declared.length === supported.length &&
+      declared.every((locale, index) => locale === supported[index]);
+    if (!sameLocales || declaredLocales.defaultLocale !== policy.defaultLocale) {
+      return refuse("publication-inputs:locale-policy-invalid");
+    }
+  }
+  const authored = new Set<string>();
+  for (const candidate of siteCandidates) authored.add(candidate.localeTag);
+
+  for (const locale of authored) {
+    if (!supportedSet.has(locale)) return refuse("publication-inputs:unsupported-representation");
+  }
+  for (const locale of supported) {
+    if (!authored.has(locale)) {
+      return refuse("publication-inputs:unrepresented-supported-locale");
+    }
+  }
+
+  const defaultHome = siteCandidates.some(
+    (candidate) =>
+      candidate.pageId === HOME_CONTENT_SLUG &&
+      candidate.routePath === "" &&
+      candidate.localeTag === policy.defaultLocale,
+  );
+  if (!defaultHome) return refuse("publication-inputs:default-home-missing");
+
+  const entity = graph.graph.entities[0];
+  if (entity === undefined || entity.id !== address.config.entityId) {
+    return refuse("publication-inputs:selection-invalid");
+  }
+
+  const languagePreferences = Object.create(null) as Record<string, string>;
+  for (const key of Object.keys(policy.languagePreferences).sort()) {
+    languagePreferences[key] = policy.languagePreferences[key] as string;
+  }
+
+  return deepFreeze({
+    accepted: true as const,
+    site: { entityId: address.config.entityId, facetId: binding.facetId, siteId: binding.siteId },
+    canonicalBase: { origin: binding.origin, pathPrefix: binding.pathPrefix },
+    aliases: canonical.aliases.map((alias) => ({ origin: alias.origin, pathPrefix: alias.pathPrefix })),
+    localePolicy: {
+      supportedLocales: supported,
+      defaultLocale: policy.defaultLocale,
+      languagePreferences,
+    },
+    candidateCount: siteCandidates.length,
+  });
+}
+
+/**
+ * Compose the proposed publication inputs and prove that they agree.
+ *
+ * Two request shapes are accepted, each with its own exact-key validation: the legacy version-1 composition and the
+ * version-2 Site-qualified one, selected solely by the presence of `site`. A v1 request is never reinterpreted, and a v2
+ * request is never answered by a v1 reading of `selection`.
+ *
+ * Returns a freshly allocated, deeply frozen `{accepted: true, site, canonicalBase, aliases, localePolicy,
+ * candidateCount}` when the named Site authors exactly the proposed locales and a reserved Home at the declared default;
+ * otherwise one closed `{accepted: false, reason}`. No file, network, clock, environment or provider is touched, the
+ * caller's value is never mutated, no getter is invoked and no rejected value is echoed back.
+ */
+export function validateUnoSitePublicationInputs(input: unknown): UnoSitePublicationResult {
+  try {
+    const request = readPlainData(input);
+    if (request === null) return refuse("publication-inputs:input-not-plain");
+    if (Object.prototype.hasOwnProperty.call(request, "site")) {
+      return composeQualifiedSite(request);
+    }
+    return composeLegacyPublicationInputs(request);
   } catch (error) {
     if (error instanceof HostileStructure) return refuse("publication-inputs:input-not-plain");
     return refuse("publication-inputs:unreadable");

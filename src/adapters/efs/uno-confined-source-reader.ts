@@ -53,6 +53,7 @@ import {
 import type { PageSourceKind } from "../../core/page-authoring-policy";
 import {
   matchUnoCandidateRoute,
+  matchUnoSiteRouteCandidate,
   UNO_ROUTE_REFUSAL_REASONS,
   type UnoRouteCandidate,
   type UnoRouteRefusal,
@@ -748,7 +749,17 @@ async function analyzeLoad(
   const request = readPlainData(input);
   if (request === null) return refuseLoad("source:input-invalid");
   const requestKeys = Object.keys(request);
-  if (requestKeys.length !== 2 || !requestKeys.includes("repoRoot") || !requestKeys.includes("pathname")) {
+  // Two request shapes, each validated by its own exact key set. The presence of `host` is what selects the
+  // version-2, host-qualified match (`UNO-WO-090 / R01`, P3); a legacy `{repoRoot, pathname}` request is never
+  // reinterpreted, and a Host is only ever compared against the *configured* bindings, so it cannot grant identity.
+  const qualified =
+    requestKeys.length === 3 &&
+    requestKeys.includes("repoRoot") &&
+    requestKeys.includes("host") &&
+    requestKeys.includes("pathname");
+  const legacy =
+    requestKeys.length === 2 && requestKeys.includes("repoRoot") && requestKeys.includes("pathname");
+  if (!qualified && !legacy) {
     return refuseLoad("source:input-invalid");
   }
 
@@ -761,7 +772,14 @@ async function analyzeLoad(
   const selection = readFixedJson(root.root, UNO_SELECTION_PATH, UNO_SOURCE_LIMITS.configBytes);
   if (!selection.ok) return refuseLoad(declarationRefusal(selection.code));
 
-  const matched = matchUnoCandidateRoute(request["pathname"], manifest.data, selection.data);
+  const matched = qualified
+    ? matchUnoSiteRouteCandidate(
+        request["host"],
+        request["pathname"],
+        manifest.data,
+        selection.data,
+      )
+    : matchUnoCandidateRoute(request["pathname"], manifest.data, selection.data);
   if (!matched.accepted) return refuseLoad(matched.reason);
   const candidate = matched.candidate;
 

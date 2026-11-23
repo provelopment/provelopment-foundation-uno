@@ -43,7 +43,7 @@
 import { HOME_CONTENT_SLUG, isContentSlug } from "../page-content";
 import { pageRoutePath } from "../page-route-path";
 import { validateUnoManifestGraph } from "./manifest-graph";
-import { validateUnoSiteSelection } from "./uno-config";
+import { validateUnoSiteAddressConfig, validateUnoSiteSelection } from "./uno-config";
 import { canonicalLocaleTag, localePathKey, localeTagIssue } from "./uno-locales";
 
 /** Declared bounds. A limit, not a default: exceeding it is a refusal, never a truncation. */
@@ -337,4 +337,226 @@ function analyzeMatch(
   const match = index.candidates.find((candidate) => candidate.pathname === target);
   if (match === undefined) return refuseMatch("route:unmatched");
   return Object.freeze({ accepted: true, candidate: match });
+}
+
+/**
+ * The declared host of one accepted origin, lowercased (`UNO-WO-086 / R01`, M3).
+ *
+ * It is read from the configured origin and from nowhere else: no request `Host` header, forwarded header, cookie,
+ * environment value or DNS lookup can produce or alter it. The lexical URL rules are already the canonical policy's, so
+ * this only removes the scheme and lowercases the authority.
+ */
+function hostOf(origin: string): string | null {
+  const marker = origin.indexOf("://");
+  if (marker < 0) return null;
+  const host = origin.slice(marker + 3).toLowerCase();
+  if (host.length === 0 || host.length > 260) return null;
+  if (/[/\\?#@\s]/u.test(host)) return null;
+  return host;
+}
+
+/**
+ * One candidate address of one bound Site: the single-Site candidate plus the identity that makes it host-qualified.
+ *
+ * `pathname` keeps its existing meaning — the path *inside* the Site, beginning at the locale key — while `pathPrefix`
+ * and `origin` place it, and `address` is the full public address. `pathname` is never the request path when a Site has a
+ * prefix, so a caller can never mistake a Site-local path for a host-wide one.
+ */
+export interface UnoSiteRouteCandidate extends UnoRouteCandidate {
+  readonly origin: string;
+  readonly pathPrefix: string;
+  readonly host: string;
+  readonly address: string;
+}
+
+/** A tagged multi-Site index result: candidates for every bound Site, or one closed reason. */
+export type UnoSiteRouteIndexResult =
+  | { readonly accepted: true; readonly candidates: readonly UnoSiteRouteCandidate[] }
+  | { readonly accepted: false; readonly reason: UnoRouteRefusal };
+
+/** A tagged multi-Site match result: exactly one candidate, or one closed reason. */
+export type UnoSiteRouteMatchResult =
+  | { readonly accepted: true; readonly candidate: UnoSiteRouteCandidate }
+  | { readonly accepted: false; readonly reason: UnoRouteRefusal };
+
+function refuseSiteIndex(reason: UnoRouteRefusal): UnoSiteRouteIndexResult {
+  return Object.freeze({ accepted: false, reason });
+}
+
+function refuseSiteMatch(reason: UnoRouteRefusal): UnoSiteRouteMatchResult {
+  return Object.freeze({ accepted: false, reason });
+}
+
+/**
+ * Build the immutable candidate index for **every** Site the address declaration binds (`UNO-WO-086 / R01`, M3).
+ *
+ * The declared `default` is never consulted: it resolves an ambiguous entry and must not be able to remove a Site, so a
+ * default-bound installation and a default-free one produce the same candidate set. Two Sites may share an origin only
+ * with disjoint whole-segment prefixes, which is what makes a request path assignable to exactly one Site; an overlapping
+ * or duplicated pair refuses here rather than being resolved by guessing.
+ */
+export function buildUnoSiteRouteIndex(
+  manifest: unknown,
+  addressConfig: unknown,
+): UnoSiteRouteIndexResult {
+  try {
+    return analyzeSiteIndex(manifest, addressConfig);
+  } catch {
+    return refuseSiteIndex("route:unreadable");
+  }
+}
+
+/** The guarded multi-Site index walk. Every failure returns before any candidate escapes. */
+function analyzeSiteIndex(manifest: unknown, addressConfig: unknown): UnoSiteRouteIndexResult {
+  const validated = validateUnoManifestGraph(manifest);
+  if (!validated.accepted) {
+    return refuseSiteIndex(
+      validated.reason === "input:unreadable" ? "route:unreadable" : "route:manifest-invalid",
+    );
+  }
+  const addresses = validateUnoSiteAddressConfig(addressConfig, manifest);
+  if (!addresses.accepted) {
+    return refuseSiteIndex(
+      addresses.reason === "config:unreadable" ? "route:unreadable" : "route:selection-invalid",
+    );
+  }
+  const entity = validated.graph.entities[0];
+  if (entity === undefined) return refuseSiteIndex("route:manifest-invalid");
+
+  const bindings = addresses.config.sites;
+  const candidates: UnoSiteRouteCandidate[] = [];
+  const seenAddresses = new Set<string>();
+
+  for (const binding of bindings) {
+    const facet = entity.facets.find((candidate) => candidate.id === binding.facetId);
+    if (facet === undefined) return refuseSiteIndex("route:selection-invalid");
+    const site = facet.sites.find((candidate) => candidate.id === binding.siteId);
+    if (site === undefined) return refuseSiteIndex("route:selection-invalid");
+    const host = hostOf(binding.origin);
+    if (host === null) return refuseSiteIndex("route:selection-invalid");
+
+    for (const page of site.pages) {
+      const routePath = pageRoutePath(...page.route);
+      if (routePath === null) return refuseSiteIndex("route:invalid-route");
+
+      const isReservedHome =
+        page.id === HOME_CONTENT_SLUG &&
+        page.route.length === 1 &&
+        page.route[0] === HOME_CONTENT_SLUG;
+
+      for (const representation of page.representations) {
+        const locale = representation.locale;
+        if (localeTagIssue(locale) !== null) return refuseSiteIndex("route:invalid-locale");
+
+        let localeTag: string;
+        let pathKey: string;
+        try {
+          localeTag = canonicalLocaleTag(locale);
+          pathKey = localePathKey(locale);
+        } catch {
+          return refuseSiteIndex("route:invalid-locale");
+        }
+        if (localeTag !== locale) return refuseSiteIndex("route:invalid-locale");
+        if (pathKey.length === 0 || pathKey.length > UNO_ROUTE_LIMITS.localePathKeyLength) {
+          return refuseSiteIndex("route:invalid-locale");
+        }
+
+        const relativeRoutePath = isReservedHome ? "" : routePath;
+        const pathname =
+          relativeRoutePath === ""
+            ? `${PATH_SEPARATOR}${pathKey}`
+            : `${PATH_SEPARATOR}${pathKey}${PATH_SEPARATOR}${relativeRoutePath}`;
+        const fullPathname = binding.pathPrefix === "" ? pathname : `${binding.pathPrefix}${pathname}`;
+        if (fullPathname.length > UNO_ROUTE_LIMITS.pathnameLength) {
+          return refuseSiteIndex("route:pathname-too-long");
+        }
+
+        // Host-qualified identity: the same Site-local path on two origins is two different addresses, so the key is the
+        // whole address and never the path alone.
+        const addressKey = `${binding.origin}${fullPathname}`;
+        if (seenAddresses.has(addressKey)) return refuseSiteIndex("route:duplicate-address");
+        seenAddresses.add(addressKey);
+
+        candidates.push({
+          entityId: entity.id,
+          facetId: facet.id,
+          siteId: site.id,
+          pageId: page.id,
+          localeTag,
+          localePathKey: pathKey,
+          routePath: relativeRoutePath,
+          origin: binding.origin,
+          pathPrefix: binding.pathPrefix,
+          host,
+          address: addressKey,
+          pathname,
+          sources: representation.sources.map((source) => ({ kind: source.kind, path: source.path })),
+        });
+      }
+    }
+  }
+
+  candidates.sort(
+    (left, right) =>
+      compareCodePoints(left.address, right.address) ||
+      compareCodePoints(left.pageId, right.pageId) ||
+      compareCodePoints(left.localeTag, right.localeTag),
+  );
+
+  return Object.freeze({
+    accepted: true,
+    candidates: Object.freeze(deepFreeze(candidates) as UnoSiteRouteCandidate[]),
+  });
+}
+
+/**
+ * Match one declared host and request pathname to exactly one bound Site's candidate (`UNO-WO-086 / R01`, M3).
+ *
+ * Assignment is whole-segment: a Site bound at `/docs` owns `/docs` and `/docs/...` and never `/docsy`, while the root
+ * Site owns only paths that no longer prefix claims. The host is compared against the *configured* authority only, so an
+ * unknown, hostile or forwarded host can never grant identity — it simply matches nothing.
+ */
+export function matchUnoSiteRouteCandidate(
+  host: unknown,
+  pathname: unknown,
+  manifest: unknown,
+  addressConfig: unknown,
+): UnoSiteRouteMatchResult {
+  try {
+    return analyzeSiteMatch(host, pathname, manifest, addressConfig);
+  } catch {
+    return refuseSiteMatch("route:unreadable");
+  }
+}
+
+/** The guarded multi-Site match walk. */
+function analyzeSiteMatch(
+  host: unknown,
+  pathname: unknown,
+  manifest: unknown,
+  addressConfig: unknown,
+): UnoSiteRouteMatchResult {
+  const issue = pathnameIssue(pathname);
+  if (issue !== null) return refuseSiteMatch(issue);
+  if (typeof host !== "string") return refuseSiteMatch("route:unmatched");
+  const declaredHost = host.toLowerCase();
+  if (declaredHost.length === 0) return refuseSiteMatch("route:unmatched");
+
+  const index = buildUnoSiteRouteIndex(manifest, addressConfig);
+  if (!index.accepted) return refuseSiteMatch(index.reason);
+
+  const target = pathname as string;
+  const matches = index.candidates.filter((candidate) => {
+    if (candidate.host !== declaredHost) return false;
+    if (candidate.pathPrefix === "") return candidate.pathname === target;
+    if (target !== candidate.pathPrefix && !target.startsWith(`${candidate.pathPrefix}${PATH_SEPARATOR}`)) {
+      return false;
+    }
+    return candidate.pathname === target.slice(candidate.pathPrefix.length);
+  });
+
+  if (matches.length === 0) return refuseSiteMatch("route:unmatched");
+  const [only] = matches;
+  if (only === undefined || matches.length > 1) return refuseSiteMatch("route:duplicate-address");
+  return Object.freeze({ accepted: true, candidate: only });
 }

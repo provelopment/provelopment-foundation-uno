@@ -23,11 +23,15 @@ import {
   type UnoPageDocument,
   type UnoPageDocumentRefusal,
 } from "../core/page-document";
-import { matchUnoCandidateRoute } from "../core/efs/uno-route-address";
+import { matchUnoCandidateRoute, matchUnoSiteRouteCandidate, type UnoRouteCandidate } from "../core/efs/uno-route-address";
 import { classifyUnoPageDiscoverability } from "../core/efs/uno-discovery-policy";
+import { resolveUnoCommittedBase } from "./resolve-uno-committed-base";
 import { resolveUnoCommittedLocales } from "./resolve-uno-committed-locales";
 import { resolveUnoPageHeader } from "./resolve-uno-page-header";
-import { validateUnoSitePublicationInputs } from "./validate-uno-site-publication-inputs";
+import {
+  validateUnoSitePublicationInputs,
+  type UnoSitePublicationAccepted,
+} from "./validate-uno-site-publication-inputs";
 
 /**
  * The closed refusal vocabulary: one literal per failure family.
@@ -68,6 +72,22 @@ export const UNO_DELIVERY_INPUT_KEYS: readonly string[] = Object.freeze([
   "manifest",
   "selection",
   "base",
+  "pathname",
+  "loadedSource",
+] as const);
+
+/**
+ * The six own-data keys a **version-2, Site-qualified** request may carry (`UNO-WO-090 / R01`, P3).
+ *
+ * `site` names one qualified Site inside the already validated multi-Site address declaration and `host` is the exact
+ * request Host to match against the configured bindings. Neither is a source of authority: the base and the locale
+ * policy come from that binding's own declaration, and `host` can only ever select a binding that is already declared.
+ */
+export const UNO_DELIVERY_INPUT_KEYS_V2: readonly string[] = Object.freeze([
+  "manifest",
+  "selection",
+  "site",
+  "host",
   "pathname",
   "loadedSource",
 ] as const);
@@ -231,40 +251,100 @@ export function prepareUnoPageDeliveryCandidate(input: unknown): UnoDeliveryResu
   try {
     const request = readPlainData(input);
     if (request === null) return refuseDelivery("delivery:input-invalid");
-    if (!hasExactlyKeys(request, UNO_DELIVERY_INPUT_KEYS)) return refuseDelivery("delivery:input-invalid");
 
-    const manifest = request["manifest"];
-    const selection = request["selection"];
-    const base = request["base"];
-    const pathname = request["pathname"];
     const loadedSource = request["loadedSource"];
-    for (const value of [manifest, selection, base, loadedSource]) {
-      if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    // The presence of `site` alone selects the version-2, Site-qualified path (`UNO-WO-090 / R01`, P3), so a legacy
+    // request is never reinterpreted and a multi-Site declaration is never read as a legacy selection.
+    const qualified = Object.prototype.hasOwnProperty.call(request, "site");
+
+    let siteInputs: UnoSitePublicationAccepted;
+    let candidate: UnoRouteCandidate;
+
+    if (qualified) {
+      if (!hasExactlyKeys(request, UNO_DELIVERY_INPUT_KEYS_V2)) {
         return refuseDelivery("delivery:input-invalid");
       }
+      const manifest = request["manifest"];
+      const selection = request["selection"];
+      const site = request["site"];
+      const host = request["host"];
+      const pathname = request["pathname"];
+      for (const value of [manifest, selection, site, loadedSource]) {
+        if (typeof value !== "object" || value === null || Array.isArray(value)) {
+          return refuseDelivery("delivery:input-invalid");
+        }
+      }
+      if (typeof host !== "string" || typeof pathname !== "string") {
+        return refuseDelivery("delivery:input-invalid");
+      }
+
+      // Both the base and the locale policy are read from the named binding's own declaration; `host` is only ever
+      // compared against configured bindings, so a request header can neither grant nor move an identity.
+      const declaredBase = resolveUnoCommittedBase({ manifest, selection, site });
+      if (!declaredBase.accepted) return refuseDelivery("delivery:site-inputs-invalid");
+
+      const siteLocales = resolveUnoCommittedLocales({ manifest, selection, site });
+      if (!siteLocales.accepted) return refuseDelivery("delivery:committed-locales-invalid");
+
+      const qualifiedInputs = validateUnoSitePublicationInputs({
+        manifest,
+        selection,
+        site,
+        base: { canonical: declaredBase.base.canonical, aliases: [...declaredBase.base.aliases] },
+        localePolicy: siteLocales.localePolicy,
+      });
+      if (!qualifiedInputs.accepted) return refuseDelivery("delivery:site-inputs-invalid");
+
+      const qualifiedMatch = matchUnoSiteRouteCandidate(host, pathname, manifest, selection);
+      if (!qualifiedMatch.accepted) return refuseDelivery("delivery:route-invalid");
+      if (
+        qualifiedMatch.candidate.facetId !== qualifiedInputs.site.facetId ||
+        qualifiedMatch.candidate.siteId !== qualifiedInputs.site.siteId
+      ) {
+        return refuseDelivery("delivery:route-invalid");
+      }
+
+      siteInputs = qualifiedInputs;
+      candidate = qualifiedMatch.candidate;
+    } else {
+      if (!hasExactlyKeys(request, UNO_DELIVERY_INPUT_KEYS)) {
+        return refuseDelivery("delivery:input-invalid");
+      }
+
+      const manifest = request["manifest"];
+      const selection = request["selection"];
+      const base = request["base"];
+      const pathname = request["pathname"];
+      for (const value of [manifest, selection, base, loadedSource]) {
+        if (typeof value !== "object" || value === null || Array.isArray(value)) {
+          return refuseDelivery("delivery:input-invalid");
+        }
+      }
+
+      const stored = resolveUnoCommittedLocales({ manifest, selection });
+      if (!stored.accepted) return refuseDelivery("delivery:committed-locales-invalid");
+
+      const legacyInputs = validateUnoSitePublicationInputs({
+        manifest,
+        selection,
+        base,
+        localePolicy: stored.localePolicy,
+      });
+      if (!legacyInputs.accepted) return refuseDelivery("delivery:site-inputs-invalid");
+      if (
+        legacyInputs.site.entityId !== stored.site.entityId ||
+        legacyInputs.site.facetId !== stored.site.facetId ||
+        legacyInputs.site.siteId !== stored.site.siteId
+      ) {
+        return refuseDelivery("delivery:site-inputs-invalid");
+      }
+
+      const matched = matchUnoCandidateRoute(pathname, manifest, selection);
+      if (!matched.accepted) return refuseDelivery("delivery:route-invalid");
+
+      siteInputs = legacyInputs;
+      candidate = matched.candidate;
     }
-
-    const stored = resolveUnoCommittedLocales({ manifest, selection });
-    if (!stored.accepted) return refuseDelivery("delivery:committed-locales-invalid");
-
-    const siteInputs = validateUnoSitePublicationInputs({
-      manifest,
-      selection,
-      base,
-      localePolicy: stored.localePolicy,
-    });
-    if (!siteInputs.accepted) return refuseDelivery("delivery:site-inputs-invalid");
-    if (
-      siteInputs.site.entityId !== stored.site.entityId ||
-      siteInputs.site.facetId !== stored.site.facetId ||
-      siteInputs.site.siteId !== stored.site.siteId
-    ) {
-      return refuseDelivery("delivery:site-inputs-invalid");
-    }
-
-    const matched = matchUnoCandidateRoute(pathname, manifest, selection);
-    if (!matched.accepted) return refuseDelivery("delivery:route-invalid");
-    const candidate = matched.candidate;
 
     const load = readPlainData(loadedSource);
     if (load === null) return refuseDelivery("delivery:load-refused");

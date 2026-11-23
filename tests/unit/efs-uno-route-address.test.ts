@@ -6,7 +6,9 @@ import {
   UNO_ROUTE_LIMITS,
   UNO_ROUTE_REFUSAL_REASONS,
   buildUnoCandidateRouteIndex,
+  buildUnoSiteRouteIndex,
   matchUnoCandidateRoute,
+  matchUnoSiteRouteCandidate,
   type UnoRouteRefusal,
 } from "../../src/core/efs/uno-route-address";
 
@@ -751,5 +753,165 @@ describe("the closed refusal vocabulary", () => {
       ],
     };
     expectIndexRefused(duplicateLocale, selection(), "route:manifest-invalid");
+  });
+});
+
+/**
+ * `UNO-WO-086 / R01` (M3/M4): host-qualified candidates for every bound Site.
+ *
+ * Three Sites are bound at once — `corporate/main` on its own reserved domain, `corporate/docs` on a disjoint whole-segment
+ * prefix of that same domain, and `services/main` on an unrelated reserved domain. Every case asserts which Site owns the
+ * request, so an implementation that enumerated only the default Site, matched a bare path prefix, or let a host confer
+ * identity could not pass.
+ */
+describe("multi-Site host-qualified route candidates", () => {
+  const ENTITY = "e_7a3knkx60eacyhca7a0cr1k6e1";
+
+  const pageOf = (id: string, route: readonly string[], slug: string) => ({
+    id,
+    route,
+    representations: [
+      { locale: "en-001", sources: [{ kind: "markdown", path: `deployment/efs/content/${slug}.en-001.md` }] },
+    ],
+  });
+
+  const manifest = () => ({
+    entities: [
+      {
+        id: ENTITY,
+        facets: [
+          {
+            id: "corporate",
+            sites: [
+              {
+                id: "main",
+                pages: [pageOf("home", ["home"], "corp-main-home"), pageOf("about", ["about"], "corp-main-about")],
+              },
+              {
+                id: "docs",
+                pages: [pageOf("home", ["home"], "corp-docs-home"), pageOf("about", ["about"], "corp-docs-about")],
+              },
+            ],
+          },
+          {
+            id: "services",
+            sites: [
+              {
+                id: "main",
+                pages: [pageOf("home", ["home"], "svc-main-home"), pageOf("about", ["about"], "svc-main-about")],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  const sites = () => [
+    { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+    { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+    { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+  ];
+
+  const config = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+    version: 2,
+    entityId: ENTITY,
+    sites: sites(),
+    default: { facetId: "corporate", siteId: "main" },
+    ...overrides,
+  });
+
+  it("enumerates every bound Site, not only the declared default", () => {
+    const index = buildUnoSiteRouteIndex(manifest(), config());
+    expect(index.accepted).toBe(true);
+    if (!index.accepted) return;
+    expect(index.candidates).toHaveLength(6);
+    expect(index.candidates.map((candidate) => candidate.address)).toEqual([
+      "https://abc.example/docs/en-001",
+      "https://abc.example/docs/en-001/about",
+      "https://abc.example/en-001",
+      "https://abc.example/en-001/about",
+      "https://xyz.example/en-001",
+      "https://xyz.example/en-001/about",
+    ]);
+  });
+
+  it("a declared default changes no candidate, so it cannot deactivate a Site", () => {
+    const withDefault = buildUnoSiteRouteIndex(manifest(), config());
+    const withoutDefault = buildUnoSiteRouteIndex(
+      manifest(),
+      { version: 2, entityId: ENTITY, sites: sites() },
+    );
+    expect(withDefault.accepted && withoutDefault.accepted).toBe(true);
+    if (!withDefault.accepted || !withoutDefault.accepted) return;
+    expect(withoutDefault.candidates.map((candidate) => candidate.address)).toEqual(
+      withDefault.candidates.map((candidate) => candidate.address),
+    );
+  });
+
+  it("assigns each request to exactly one Site by declared host and whole-segment prefix", () => {
+    const rootHome = matchUnoSiteRouteCandidate("abc.example", "/en-001", manifest(), config());
+    expect(rootHome.accepted && rootHome.candidate.siteId === "main"
+      && rootHome.candidate.facetId === "corporate").toBe(true);
+
+    const docsHome = matchUnoSiteRouteCandidate("abc.example", "/docs/en-001", manifest(), config());
+    expect(docsHome.accepted && docsHome.candidate.siteId === "docs").toBe(true);
+
+    const docsAbout = matchUnoSiteRouteCandidate("abc.example", "/docs/en-001/about", manifest(), config());
+    expect(docsAbout.accepted && docsAbout.candidate.routePath === "about").toBe(true);
+
+    const servicesAbout = matchUnoSiteRouteCandidate("xyz.example", "/en-001/about", manifest(), config());
+    expect(servicesAbout.accepted && servicesAbout.candidate.facetId === "services").toBe(true);
+  });
+
+  it("refuses a site-local path presented on the wrong host, so no Site leaks across hosts", () => {
+    expect(matchUnoSiteRouteCandidate("xyz.example", "/docs/en-001", manifest(), config())).toEqual({
+      accepted: false,
+      reason: "route:unmatched",
+    });
+    expect(matchUnoSiteRouteCandidate("abc.example", "/en-001", manifest(), config({})).accepted).toBe(true);
+    expect(matchUnoSiteRouteCandidate("evil.example", "/en-001", manifest(), config())).toEqual({
+      accepted: false,
+      reason: "route:unmatched",
+    });
+  });
+
+  it("matches whole segments only: a lookalike prefix belongs to nobody", () => {
+    expect(matchUnoSiteRouteCandidate("abc.example", "/docsy/en-001", manifest(), config())).toEqual({
+      accepted: false,
+      reason: "route:unmatched",
+    });
+  });
+
+  it("resolves a nested prefix to its longer owner, and refuses only a true duplicate claim", () => {
+    // A nested prefix is not ambiguous: the longer segment owns its own subtree, which is the "one longest matching
+    // unambiguous prefix" rule. Only the same prefix twice leaves no assignment at all.
+    const nested = config({
+      sites: [
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+      ],
+      default: { facetId: "corporate", siteId: "docs" },
+    });
+    const docs = matchUnoSiteRouteCandidate("abc.example", "/docs/en-001", manifest(), nested);
+    expect(docs.accepted && docs.candidate.siteId === "docs").toBe(true);
+    const root = matchUnoSiteRouteCandidate("abc.example", "/en-001", manifest(), nested);
+    expect(root.accepted && root.candidate.siteId === "main").toBe(true);
+
+    const duplicatePrefix = {
+      version: 2,
+      entityId: ENTITY,
+      sites: [
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example" },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+      ],
+      default: { facetId: "corporate", siteId: "main" },
+    };
+    expect(buildUnoSiteRouteIndex(manifest(), duplicatePrefix)).toEqual({
+      accepted: false,
+      reason: "route:selection-invalid",
+    });
   });
 });

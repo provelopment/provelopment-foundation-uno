@@ -285,6 +285,30 @@ function isAncestorPrefix(ancestor: string, descendant: string): boolean {
   return descendant.startsWith(`${ancestor}/`);
 }
 
+/**
+ * Report the first conflict between two accepted bases, under the rule their aliases already obey: on one origin, the
+ * same prefix twice is a duplicate and a whole-segment prefix of another is an overlap; two different origins never
+ * conflict, so unrelated Facet domains are untouched.
+ *
+ * Exported for the cross-Site address authority (`UNO-WO-086 / R01`, M4). Two Sites bound to one origin must have
+ * disjoint whole-segment prefixes, otherwise no request path could be assigned to exactly one Site. This adds no lexical
+ * rule of its own: it reuses the conflict test the alias walk already applies.
+ */
+export function canonicalBaseConflict(
+  first: UnoCanonicalBase,
+  second: UnoCanonicalBase,
+): "duplicate" | "overlap" | null {
+  if (first.origin !== second.origin) return null;
+  if (first.pathPrefix === second.pathPrefix) return "duplicate";
+  // `""` is the origin root, so it contains every other prefix; otherwise containment is whole-segment only, which is
+  // what keeps `/docs` and `/docsy` unrelated.
+  const contains = (outer: string, inner: string): boolean =>
+    outer === "" || inner === outer || inner.startsWith(`${outer}/`);
+  if (contains(first.pathPrefix, second.pathPrefix)) return "overlap";
+  if (contains(second.pathPrefix, first.pathPrefix)) return "overlap";
+  return null;
+}
+
 /** Two bases conflict only on one origin: the same prefix twice, or a whole-segment overlap. */
 function classifyPair(
   first: UnoCanonicalBase,

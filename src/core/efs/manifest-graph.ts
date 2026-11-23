@@ -194,17 +194,19 @@ export const MANIFEST_CONTENT_ROOT = "deployment/efs/content/";
  * and exceeding a bound is a refusal rather than a truncation.
  */
 export const MANIFEST_GRAPH_LIMITS = Object.freeze({
+  // The only product cardinality declaration: exactly one Entity per Installation (`UNO-WO-086`).
   entities: 1,
-  facetsPerEntity: 8,
-  sitesPerFacet: 8,
-  pagesPerSite: 64,
-  siteLocales: 32,
-  representationsPerPage: 16,
+  // `UNO-WO-086 / R01`: Facets, Sites, Pages, locales and localized representations carry NO product cardinality
+  // ceiling. The Owner contract is 1+ of each, so a small product maximum would be a fabricated product rule. What
+  // remains below is one *machine-safety* budget for a single manifest document: a finite, documented bound that keeps
+  // parsing deterministic and refuses a hostile graph instead of exhausting memory. It is not a product limit and must
+  // never be read as one.
+  hierarchyDeclarations: 100_000,
+  totalSources: 100_000,
   sourcesPerRepresentation: 2,
   routeSegments: PAGE_ROUTE_PATH_MAX_SEGMENTS,
   sourcePathLength: 240,
   identifierLength: 64,
-  totalSources: 512,
 });
 
 /** A plain own-data view of an untrusted object. */
@@ -397,7 +399,7 @@ function analyzeGraph(input: unknown): UnoManifestValidationResult {
     seenEntityIds.add(entityId);
 
     const facetValue = entity.facets;
-    const facetCollection = collectionIssue(facetValue, MANIFEST_GRAPH_LIMITS.facetsPerEntity);
+    const facetCollection = collectionIssue(facetValue, MANIFEST_GRAPH_LIMITS.hierarchyDeclarations);
     if (facetCollection) return refuse(facetCollection);
 
     const seenFacetIds = new Set<string>();
@@ -417,7 +419,7 @@ function analyzeGraph(input: unknown): UnoManifestValidationResult {
       seenFacetIds.add(facetId);
 
       const siteValue = facet.sites;
-      const siteCollection = collectionIssue(siteValue, MANIFEST_GRAPH_LIMITS.sitesPerFacet);
+      const siteCollection = collectionIssue(siteValue, MANIFEST_GRAPH_LIMITS.hierarchyDeclarations);
       if (siteCollection) return refuse(siteCollection);
 
       const seenSiteIds = new Set<string>();
@@ -446,7 +448,7 @@ function analyzeGraph(input: unknown): UnoManifestValidationResult {
         seenSiteIds.add(siteId);
 
         const pageValue = site.pages;
-        const pageCollection = collectionIssue(pageValue, MANIFEST_GRAPH_LIMITS.pagesPerSite);
+        const pageCollection = collectionIssue(pageValue, MANIFEST_GRAPH_LIMITS.hierarchyDeclarations);
         if (pageCollection) return refuse(pageCollection);
 
         const seenPageIds = new Set<string>();
@@ -520,7 +522,7 @@ function readSiteLocales(raw: unknown): Step<UnoSiteLocales> {
     if (typeof descriptor.value !== "string") return { ok: false, reason: "site:invalid-locales" };
     supported.push(descriptor.value);
   }
-  if (supported.length === 0 || supported.length > MANIFEST_GRAPH_LIMITS.siteLocales) {
+  if (supported.length === 0 || supported.length > MANIFEST_GRAPH_LIMITS.hierarchyDeclarations) {
     return { ok: false, reason: "site:invalid-locales" };
   }
 
@@ -594,7 +596,7 @@ function readPage(
   const representationValue = page.representations;
   const representationCollection = collectionIssue(
     representationValue,
-    MANIFEST_GRAPH_LIMITS.representationsPerPage,
+    MANIFEST_GRAPH_LIMITS.hierarchyDeclarations,
   );
   if (representationCollection) return { ok: false, reason: representationCollection };
 

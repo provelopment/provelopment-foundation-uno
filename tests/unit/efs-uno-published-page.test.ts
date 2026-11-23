@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { loadUnoCandidateSource } from "../../src/adapters/efs/uno-confined-source-reader";
+
 import { planUnoPublicDiscovery } from "../../src/application/plan-uno-public-discovery";
 import { resolveUnoCommittedBase } from "../../src/application/resolve-uno-committed-base";
 import {
@@ -528,5 +529,193 @@ describe("hostile input and vocabulary", () => {
     expectRefused(refused, "publication:route-invalid");
     expect(JSON.stringify(refused)).toBe('{"accepted":false,"reason":"publication:route-invalid"}');
     expect(JSON.stringify(refused).includes("secret-path")).toBe(false);
+  });
+});
+
+/**
+ * Qualified, multi-Site publication (`UNO-WO-090 / R01`, P3).
+ *
+ * Every decision below is produced from a real on-disk fixture through the real confined loader in its host-qualified
+ * mode, so a Host is only ever compared against the three configured bindings. The fixtures deliberately give two
+ * different Facets a Site with the id `main`, give two Sites the same Host with disjoint whole-segment prefixes, and
+ * give those Sites disjoint locale sets, so an accidental `sites[0]`, `defaultSite` or global selection cannot pass.
+ */
+const MULTI_ROOT = join(process.cwd(), ".temp", "uno-wo090-multisite");
+
+const MULTI_PAGE = (id: string, locale: string, file: string) => ({
+  id,
+  route: id === "home" ? ["home"] : [id],
+  publication: "published",
+  representations: [{ locale, sources: [{ kind: "markdown", path: `deployment/efs/content/${file}` }] }],
+});
+
+const MULTI_MANIFEST = {
+  entities: [
+    {
+      id: ENTITY_ID,
+      facets: [
+        {
+          id: "corporate",
+          sites: [
+            {
+              id: "main",
+              locales: { supportedLocales: ["en-001"], defaultLocale: "en-001" },
+              pages: [MULTI_PAGE("home", "en-001", "corp-main-home.en-001.md")],
+            },
+            {
+              id: "docs",
+              locales: { supportedLocales: ["de-DE"], defaultLocale: "de-DE" },
+              pages: [MULTI_PAGE("home", "de-DE", "corp-docs-home.de-DE.md")],
+            },
+          ],
+        },
+        {
+          id: "services",
+          sites: [
+            {
+              id: "main",
+              locales: { supportedLocales: ["en-001"], defaultLocale: "en-001" },
+              pages: [MULTI_PAGE("home", "en-001", "svc-main-home.en-001.md")],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const MULTI_CONFIG = {
+  version: 2,
+  entityId: ENTITY_ID,
+  sites: [
+    { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+    { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+    { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+  ],
+  // The default names a Site that owns neither of the first two addresses, so no fallback can rescue a failed match.
+  default: { facetId: "services", siteId: "main" },
+};
+
+const CORP_MAIN = Object.freeze({ facetId: "corporate", siteId: "main" });
+const CORP_DOCS = Object.freeze({ facetId: "corporate", siteId: "docs" });
+const SVC_MAIN = Object.freeze({ facetId: "services", siteId: "main" });
+
+/** Load one host-qualified address through the real confined loader and plan it for one named Site. */
+async function planQualified(
+  host: string,
+  pathname: string,
+  site: unknown,
+): Promise<UnoPublishedPageResult> {
+  const loaded = await loadUnoCandidateSource({ repoRoot: MULTI_ROOT, host, pathname });
+  const loadedSource = loaded.accepted
+    ? { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text }
+    : { accepted: false, reason: loaded.reason };
+  return planUnoPublishedPage({
+    manifest: MULTI_MANIFEST,
+    selection: MULTI_CONFIG,
+    site,
+    host,
+    pathname,
+    loadedSource,
+  });
+}
+
+describe("qualified multi-Site publication", () => {
+  beforeAll(() => {
+    mkdirSync(join(MULTI_ROOT, "deployment", "efs", "content"), { recursive: true });
+    writeFileSync(join(MULTI_ROOT, "deployment", "efs", "manifest.json"), JSON.stringify(MULTI_MANIFEST));
+    writeFileSync(join(MULTI_ROOT, "deployment", "uno.config.json"), JSON.stringify(MULTI_CONFIG));
+    writeFileSync(
+      join(MULTI_ROOT, "deployment", "efs", "content", "corp-main-home.en-001.md"),
+      "# Corporate home\n\nThe corporate root Site body.\n",
+    );
+    writeFileSync(
+      join(MULTI_ROOT, "deployment", "efs", "content", "corp-docs-home.de-DE.md"),
+      "# Docs home\n\nThe documentation Site body.\n",
+    );
+    writeFileSync(
+      join(MULTI_ROOT, "deployment", "efs", "content", "svc-main-home.en-001.md"),
+      "# Services home\n\nThe services Site body.\n",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(MULTI_ROOT, { recursive: true, force: true });
+  });
+
+  it("serves the root Site at its own configured Host and canonical origin", async () => {
+    const result = await planQualified("abc.example", "/en-001", CORP_MAIN);
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+
+    expect(result.identity.facetId).toBe("corporate");
+    expect(result.identity.siteId).toBe("main");
+    expect(result.document.title).toBe("Corporate home");
+    expect(result.delivery.canonicalUrl).toBe("https://abc.example/en-001");
+    expect(result.delivery.supportedLocales).toEqual(["en-001"]);
+  });
+
+  it("serves a prefixed Site only below its own whole-segment prefix", async () => {
+    const result = await planQualified("abc.example", "/docs/de-de", CORP_DOCS);
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+
+    expect(result.identity.facetId).toBe("corporate");
+    expect(result.identity.siteId).toBe("docs");
+    expect(result.identity.localeTag).toBe("de-DE");
+    expect(result.identity.pathname).toBe("/de-de");
+    expect(result.document.title).toBe("Docs home");
+    expect(result.delivery.canonicalUrl).toBe("https://abc.example/docs/de-de");
+    expect(result.delivery.defaultLocale).toBe("de-DE");
+  });
+
+  it("keeps two Sites named main in different Facets distinct by Host", async () => {
+    const result = await planQualified("xyz.example", "/en-001", SVC_MAIN);
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+
+    expect(result.identity.facetId).toBe("services");
+    expect(result.identity.siteId).toBe("main");
+    expect(result.document.title).toBe("Services home");
+    expect(result.delivery.canonicalUrl).toBe("https://xyz.example/en-001");
+  });
+
+  it("refuses to let the root Site answer a prefixed Site's address", async () => {
+    expectRefused(await planQualified("abc.example", "/docs/de-de", CORP_MAIN), "publication:route-invalid");
+  });
+
+  it("refuses a Host that is not a configured binding", async () => {
+    expectRefused(
+      await planQualified("abc.example.evil.test", "/en-001", CORP_MAIN),
+      "publication:route-invalid",
+    );
+    expectRefused(await planQualified("localhost", "/en-001", CORP_MAIN), "publication:route-invalid");
+  });
+
+  it("refuses a prefix match that is not a whole segment", async () => {
+    expectRefused(await planQualified("abc.example", "/docsx/de-de", CORP_DOCS), "publication:route-invalid");
+  });
+
+  it("refuses a locale the named Site does not author", async () => {
+    expectRefused(await planQualified("abc.example", "/en-001", CORP_DOCS), "publication:route-invalid");
+    expectRefused(await planQualified("abc.example", "/de-de", CORP_MAIN), "publication:route-invalid");
+  });
+
+  it("refuses a Site pair that the declaration does not bind", async () => {
+    expectRefused(
+      await planQualified("abc.example", "/en-001", { facetId: "corporate", siteId: "missing" }),
+      "publication:committed-locales-invalid",
+    );
+  });
+
+  it("refuses a selector that carries more than facetId and siteId", async () => {
+    expectRefused(
+      await planQualified("abc.example", "/en-001", {
+        facetId: "corporate",
+        siteId: "main",
+        host: "abc.example",
+      }),
+      "publication:committed-locales-invalid",
+    );
   });
 });

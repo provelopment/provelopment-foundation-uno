@@ -16,7 +16,7 @@
  * Foundation, Solo, Connect code, media or brand is imported, and Apache-2.0 notices are unchanged.
  */
 import { validateUnoManifestGraph } from "../core/efs/manifest-graph";
-import { validateUnoSiteSelection } from "../core/efs/uno-config";
+import { validateUnoSiteAddressConfig, validateUnoSiteSelection } from "../core/efs/uno-config";
 import { localePolicyIssue } from "../core/efs/uno-locales";
 
 /** The closed refusal vocabulary: one member per failure family, never a caller's own value. */
@@ -103,7 +103,7 @@ function deepFreeze<T>(value: T): T {
  * accepted locale contract stays the only authority on tag spelling, membership and the approved alias.
  * Nothing is defaulted, inferred or echoed.
  */
-export function resolveUnoCommittedLocales(input: unknown): UnoCommittedLocalesResult {
+function resolveCommittedLocalesV1(input: unknown): UnoCommittedLocalesResult {
   try {
     const request = readPlainData(input);
     if (request === null) return refuse("committed-locales:input-invalid");
@@ -186,6 +186,159 @@ export function resolveUnoCommittedLocales(input: unknown): UnoCommittedLocalesR
         languagePreferences,
       },
     });
+  } catch (error) {
+    if (error instanceof HostileStructure) return refuse("committed-locales:input-invalid");
+    return refuse("committed-locales:unreadable");
+  }
+}
+
+/** The three own-data keys a version-2, Site-qualified request may carry; nothing else is read. */
+export const UNO_COMMITTED_LOCALES_INPUT_KEYS_V2: readonly string[] = Object.freeze([
+  "manifest",
+  "selection",
+  "site",
+] as const);
+
+/** The exact pair that names one qualified Site. */
+const COMMITTED_LOCALES_SITE_KEYS: readonly string[] = Object.freeze(["facetId", "siteId"] as const);
+
+/** Read the qualified Site selector as a fresh pair of ids, or `null`; accessors and symbols throw. */
+function readQualifiedSite(value: unknown): { facetId: string; siteId: string } | null {
+  const record = readPlainData(value);
+  if (record === null) return null;
+  const keys = Object.keys(record);
+  if (keys.length !== COMMITTED_LOCALES_SITE_KEYS.length) return null;
+  for (const key of COMMITTED_LOCALES_SITE_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(record, key)) return null;
+  }
+  const facetId = record["facetId"];
+  const siteId = record["siteId"];
+  if (typeof facetId !== "string" || facetId.length === 0) return null;
+  if (typeof siteId !== "string" || siteId.length === 0) return null;
+  return { facetId, siteId };
+}
+
+/**
+ * Read the stored locale policy of one **explicitly named qualified Site** (`UNO-WO-086 / R01`, M11).
+ *
+ * The pair is resolved inside the validated v2 address declaration and then against the validated manifest graph, so
+ * the locale authority is that Site's own `locales` declaration: no locale is collected from a sibling Site, no
+ * default Site filters a publisher, and no other Site's Home can supply a missing locale.
+ *
+ * An installation-level v2 language mapping applies here only through the entries whose target is one of *this* Site's
+ * declared locales. A sibling-targeted alias is not this Site's redirect and is dropped rather than inherited; an
+ * absent mapping means no short aliases, never a guessed default.
+ */
+function resolveCommittedLocalesV2(request: DataRecord): UnoCommittedLocalesResult {
+  const keys = Object.keys(request);
+  if (keys.length !== UNO_COMMITTED_LOCALES_INPUT_KEYS_V2.length) {
+    return refuse("committed-locales:input-invalid");
+  }
+  for (const key of UNO_COMMITTED_LOCALES_INPUT_KEYS_V2) {
+    if (!Object.prototype.hasOwnProperty.call(request, key)) {
+      return refuse("committed-locales:input-invalid");
+    }
+  }
+
+  const manifest = request["manifest"];
+  const selection = request["selection"];
+  const siteRequest = request["site"];
+  for (const value of [manifest, selection, siteRequest]) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return refuse("committed-locales:input-invalid");
+    }
+  }
+
+  const requested = readQualifiedSite(siteRequest);
+  if (requested === null) return refuse("committed-locales:input-invalid");
+
+  const graph = validateUnoManifestGraph(manifest);
+  if (!graph.accepted) {
+    return refuse(
+      graph.reason === "input:unreadable"
+        ? "committed-locales:unreadable"
+        : "committed-locales:manifest-invalid",
+    );
+  }
+
+  const address = validateUnoSiteAddressConfig(selection, manifest);
+  if (!address.accepted) {
+    return refuse(
+      address.reason === "config:unreadable"
+        ? "committed-locales:unreadable"
+        : "committed-locales:selection-invalid",
+    );
+  }
+
+  const binding = address.config.sites.find(
+    (candidate) =>
+      candidate.facetId === requested.facetId && candidate.siteId === requested.siteId,
+  );
+  if (binding === undefined) return refuse("committed-locales:selection-invalid");
+
+  const entity = graph.graph.entities[0];
+  const facet = entity?.facets.find((candidate) => candidate.id === binding.facetId);
+  const site = facet?.sites.find((candidate) => candidate.id === binding.siteId);
+  if (entity === undefined || site === undefined) {
+    return refuse("committed-locales:selection-invalid");
+  }
+
+  const siteLocales = site.locales;
+  if (siteLocales === undefined) return refuse("committed-locales:site-locales-missing");
+
+  const supportedLocales = [...siteLocales.supportedLocales].sort();
+  const supportedSet = new Set(supportedLocales);
+
+  // A mapping entry is this Site's only when its target is one of this Site's own declared locales.
+  const languagePreferences = Object.create(null) as Record<string, string>;
+  const declaredMapping = address.config.languagePreferences;
+  if (declaredMapping !== undefined) {
+    for (const key of Object.keys(declaredMapping).sort()) {
+      const target = declaredMapping[key];
+      if (typeof target === "string" && supportedSet.has(target)) {
+        languagePreferences[key] = target;
+      }
+    }
+  }
+
+  // The accepted locale contract stays the only authority on tag spelling, membership, aliases and mapping bounds.
+  if (
+    localePolicyIssue({
+      supportedLocales,
+      defaultLocale: siteLocales.defaultLocale,
+      languagePreferences,
+    }) !== null
+  ) {
+    return refuse("committed-locales:policy-invalid");
+  }
+
+  return deepFreeze({
+    accepted: true as const,
+    site: { entityId: entity.id, facetId: binding.facetId, siteId: binding.siteId },
+    localePolicy: {
+      supportedLocales,
+      defaultLocale: siteLocales.defaultLocale,
+      languagePreferences,
+    },
+  });
+}
+
+/**
+ * Read the stored locale policy of the publishing Site.
+ *
+ * Two request shapes are accepted, each with its own exact-key validation: the legacy `{manifest, selection}` v1
+ * request, which still requires an explicit `languagePreferences` mapping, and the v2
+ * `{manifest, selection, site}` request, whose `selection` is the multi-Site address declaration and whose Site is
+ * named explicitly. A v1 request is never reinterpreted, and a v2 declaration is never read as a legacy selection.
+ */
+export function resolveUnoCommittedLocales(input: unknown): UnoCommittedLocalesResult {
+  try {
+    const request = readPlainData(input);
+    if (request === null) return refuse("committed-locales:input-invalid");
+    if (Object.prototype.hasOwnProperty.call(request, "site")) {
+      return resolveCommittedLocalesV2(request);
+    }
+    return resolveCommittedLocalesV1(request);
   } catch (error) {
     if (error instanceof HostileStructure) return refuse("committed-locales:input-invalid");
     return refuse("committed-locales:unreadable");
