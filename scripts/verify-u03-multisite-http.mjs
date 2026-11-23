@@ -1046,6 +1046,36 @@ function residue() {
   return found;
 }
 
+/**
+ * The protected A2 artifacts, pinned only where they exist.
+ *
+ * Both live under ignored `.temp/`, so a clean hosted checkout legitimately has neither. Absence is therefore not a
+ * failure, while a *present* artifact that no longer matches its pinned digest is: that is the only case this run could
+ * actually cause, and it is the one worth failing on.
+ */
+const A2_PINS = Object.freeze([
+  [".temp/uno-u04-086/A2-tracked.patch", "5e40963895d266874d5445225090dbb67f8d361a4528f9e609aaae0980ffaf87"],
+  [
+    ".temp/uno-u04-086/A2-new/tests/unit/uno-family-links.test.ts",
+    "1cdddb38a91b7b76dc92d113c8def11e8a26f9f39d0c92d463b0cd58070cf70f",
+  ],
+]);
+
+/** True when every present protected artifact still matches its pin; absent ones are reported, not failed. */
+function a2Verdict() {
+  const observed = [];
+  for (const [relativePath, pin] of A2_PINS) {
+    const digest = digestOfFile(relativePath);
+    if (digest === null) {
+      observed.push(`${relativePath.split("/").pop()}:absent`);
+      continue;
+    }
+    if (digest !== pin) return { ok: false, detail: `${relativePath.split("/").pop()}:altered` };
+    observed.push(`${relativePath.split("/").pop()}:pinned`);
+  }
+  return { ok: true, detail: observed.join(", ") };
+}
+
 /** The Site-scoped media directories the fixture writes into: created only when absent, pruned only when empty. */
 const FIXTURE_DIRECTORIES = Object.freeze([
   `deployment/efs/capsule/${ENTITY_ID}/corporate/main`,
@@ -1285,13 +1315,8 @@ async function main() {
 
     const left = residue();
     check("no owned fixture file survives the run", left.length === 0, left.join(", "));
-    check(
-      "the protected A2 artifacts are unchanged",
-      digestOfFile(".temp/uno-u04-086/A2-tracked.patch") ===
-        "5e40963895d266874d5445225090dbb67f8d361a4528f9e609aaae0980ffaf87" &&
-        digestOfFile(".temp/uno-u04-086/A2-new/tests/unit/uno-family-links.test.ts") ===
-          "1cdddb38a91b7b76dc92d113c8def11e8a26f9f39d0c92d463b0cd58070cf70f",
-    );
+    const a2 = a2Verdict();
+    check("no protected A2 artifact is present but altered", a2.ok, a2.detail);
   } finally {
     if (child !== null) {
       await stopChild(child);
