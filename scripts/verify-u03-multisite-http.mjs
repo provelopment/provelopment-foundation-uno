@@ -883,12 +883,87 @@ async function g03Discovery(port) {
   const queryAlias = await requestAs(port, HOST_ABC, "/docs-old/de-de?x=%0d%0aLocation:%20https://evil.example");
   const queryLocation = String(queryAlias.headers.location ?? "");
   check(
-    "G03 an alias redirect never reflects request query bytes",
-    queryAlias.status === 307 &&
-      queryLocation === `https://${HOST_ABC}/docs/de-de` &&
-      !/[?\r\n]/u.test(queryLocation),
+    "G03 a hostile query on an authorized alias refuses with the approved 404 and no reflection",
+    isApprovedRefusal(queryAlias) &&
+      queryAlias.headers.location === undefined &&
+      !queryAlias.body.includes("evil.example") &&
+      !/Location:/u.test(queryAlias.body),
     `status ${queryAlias.status} location ${queryLocation}`,
   );
+
+  const safeQuery = "?ref=alpha%20beta&view=compact";
+  const safeAlias = await requestAs(port, HOST_ABC, `/docs-old/de-de${safeQuery}`);
+  check(
+    "G03 an authorized alias preserves a safe query byte for byte",
+    safeAlias.status === 307 && String(safeAlias.headers.location ?? "") === `https://${HOST_ABC}/docs/de-de${safeQuery}`,
+    `status ${safeAlias.status} location ${String(safeAlias.headers.location ?? "")}`,
+  );
+  check(
+    "G03 a safe-query alias redirect is never cached and never rewritten to a plus sign",
+    String(safeAlias.headers["cache-control"] ?? "").includes("no-store") &&
+      !String(safeAlias.headers.location ?? "").includes("+"),
+    `cache ${String(safeAlias.headers["cache-control"] ?? "")}`,
+  );
+
+  const safeNested = await requestAs(port, HOST_ABC, `/docs-old/de-de/notes${safeQuery}`);
+  check(
+    "G03 a safe query survives a nested alias redirect unchanged",
+    safeNested.status === 307 &&
+      String(safeNested.headers.location ?? "") === `https://${HOST_ABC}/docs/de-de/notes${safeQuery}`,
+    `status ${safeNested.status} location ${String(safeNested.headers.location ?? "")}`,
+  );
+
+  const safeOtherHost = await requestAs(port, "docs.example", `/handbook/de-de${safeQuery}`);
+  check(
+    "G03 a safe query survives an alias declared on another host",
+    safeOtherHost.status === 307 &&
+      String(safeOtherHost.headers.location ?? "") === `https://${HOST_ABC}/docs/de-de${safeQuery}`,
+    `status ${safeOtherHost.status} location ${String(safeOtherHost.headers.location ?? "")}`,
+  );
+
+  const safeShortAlias = await requestAs(port, HOST_ABC, "/en?ref=alpha%20beta");
+  check(
+    "G03 the short language alias preserves a safe query to its own Site's Home",
+    safeShortAlias.status === 307 &&
+      String(safeShortAlias.headers.location ?? "") === `https://${HOST_ABC}/en-001?ref=alpha%20beta`,
+    `status ${safeShortAlias.status} location ${String(safeShortAlias.headers.location ?? "")}`,
+  );
+
+  const canonicalQuery = await requestAs(port, HOST_ABC, `/docs/de-de${safeQuery}`);
+  check(
+    "G03 a canonical Page keeps its identity and canonical URL under a query",
+    canonicalQuery.status === 200 &&
+      canonicalOf(canonicalQuery) === `https://${HOST_ABC}/docs/de-de` &&
+      canonicalQuery.body.includes("Dokumentation (DE)"),
+    `status ${canonicalQuery.status} canonical ${String(canonicalOf(canonicalQuery))}`,
+  );
+
+  const fragmentQuery = await requestAs(port, HOST_ABC, "/docs-old/de-de?a=1#frag");
+  const fragmentLocation = String(fragmentQuery.headers.location ?? "");
+  check(
+    "G03 an alias redirect never carries a fragment and keeps only the real query",
+    fragmentQuery.status === 307 &&
+      fragmentLocation === `https://${HOST_ABC}/docs/de-de?a=1` &&
+      !fragmentLocation.includes("#"),
+    `status ${fragmentQuery.status} location ${fragmentLocation}`,
+  );
+
+  for (const [label, suffix] of [
+    ["an encoded slash", "?path=..%2Fdocs%2Fde-de"],
+    ["an encoded backslash", "?path=..%5Cdocs"],
+    ["an encoded percent", "?q=%2521"],
+    ["an encoded ampersand", "?a=1%26b=2"],
+    ["an encoded equals", "?a%3D1"],
+    ["a doubled question mark", "?a=1?b=2"],
+    ["an oversized value", `?q=${"a".repeat(600)}`],
+  ]) {
+    const hostile = await requestAs(port, HOST_ABC, `/docs-old/de-de${suffix}`);
+    check(
+      `G03 ${label} in a query refuses with the approved 404 and no reflection`,
+      isApprovedRefusal(hostile) && hostile.headers.location === undefined,
+      `status ${hostile.status} location ${String(hostile.headers.location ?? "")}`,
+    );
+  }
 
   const encodedAlias = await requestAs(port, HOST_ABC, "/docs-old/%2e%2e/docs/de-de");
   const encodedLocation = String(encodedAlias.headers.location ?? "");
@@ -1405,6 +1480,7 @@ async function main() {
               servicesRoot: await requestAs(secondPort, HOST_XYZ, "/en-001"),
               foreign: await requestAs(secondPort, "unknown.example", "/de-de"),
               alias: await requestAs(secondPort, HOST_ABC, "/docs-old/de-de"),
+              aliasQuery: await requestAs(secondPort, HOST_ABC, "/docs-old/de-de?ref=alpha%20beta&view=compact"),
             };
             const statuses = [
               noDefault.corporateRoot.status,
@@ -1440,6 +1516,13 @@ async function main() {
               noDefault.alias.status === 307 &&
                 String(noDefault.alias.headers.location ?? "") === `https://${HOST_ABC}/docs/de-de`,
               `status ${noDefault.alias.status} location ${String(noDefault.alias.headers.location ?? "")}`,
+            );
+            check(
+              "G03 with no declared default a safe query still reaches the owning canonical Site on a fresh server",
+              noDefault.aliasQuery.status === 307 &&
+                String(noDefault.aliasQuery.headers.location ?? "") ===
+                  `https://${HOST_ABC}/docs/de-de?ref=alpha%20beta&view=compact`,
+              `status ${noDefault.aliasQuery.status} location ${String(noDefault.aliasQuery.headers.location ?? "")}`,
             );
           }
           await stopChild(child);

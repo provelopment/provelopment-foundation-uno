@@ -21,6 +21,8 @@ const ROOT = process.cwd();
 const RUNNER = "scripts/verify-u03-multisite-http.mjs";
 const WORKFLOW = ".github/workflows/verify-u01.yml";
 const SERVING = "src/config/uno-serving.ts";
+const PROXY = "src/proxy.ts";
+const QUERY_HELPER = "src/config/uno-safe-redirect-query.ts";
 
 /** Read one repository file as text with normalised newlines; a missing file is a failure, never a skip. */
 function read(relativePath) {
@@ -191,7 +193,7 @@ function analyseAliasRunner(source) {
     "G03 an alias prefix matches whole segments only",
     "G03 an alias never invents a locale the owning Site does not declare",
     "G03 an unlisted Page keeps its canonical access and is never an alias destination",
-    "G03 an alias redirect never reflects request query bytes",
+    "G03 a hostile query on an authorized alias refuses with the approved 404 and no reflection",
     "G03 with no declared default a declared address alias still redirects to its own Site's canonical",
   ]) {
     if (!source.includes(needed)) add(`alias-runner:${needed.slice(4, 34)}`);
@@ -199,6 +201,55 @@ function analyseAliasRunner(source) {
 
   return { ok: problems.length === 0, problems };
 }
+
+/**
+ * The safe-query contract (`UNO-WO-099 / R01`).
+ *
+ * Three files must agree: the pure validator exists and bounds itself, the thin edge consults it and appends only its
+ * accepted answer to a location the serving decision already granted, and the production runner proves both the
+ * byte-preserving positive and the refusing negative.
+ */
+function analyseQueryPolicy(proxySource, helperSource, runnerSource) {
+  const problems = [];
+  const add = (code) => problems.push(code);
+
+  if (!/export function validateUnoSafeRedirectQuery\(/u.test(helperSource)) add("query:helper");
+  if (!/export const UNO_SAFE_REDIRECT_QUERY_LIMITS/u.test(helperSource)) add("query:limits");
+  if (!/bytes: 512/u.test(helperSource)) add("query:byte-budget");
+  if (!/parameters: 8/u.test(helperSource)) add("query:parameter-budget");
+  if (!/const SAFE_VALUE = /u.test(helperSource)) add("query:value-grammar");
+  if (!/function normalizeSpaceSpelling\(/u.test(helperSource)) add("query:space-spelling");
+  if (!/"query:too-long"/u.test(helperSource)) add("query:refusal-vocabulary");
+
+  if (!/import \{ validateUnoSafeRedirectQuery \} from '\.\/config\/uno-safe-redirect-query';/u.test(proxySource)) {
+    add("query:edge-import");
+  }
+  if (!/if \(safeQuery\.status !== 'accepted'\) return approvedRefusal\(\);/u.test(proxySource)) add("query:edge-guard");
+  if (!/location: `\$\{decision\.location\}\$\{safeQuery\.query\}`,/u.test(proxySource)) add("query:edge-concat");
+  if (!/status: 307,/u.test(proxySource)) add("query:edge-status");
+  if (!/'cache-control': 'no-store',/u.test(proxySource)) add("query:edge-cache");
+  if (/new URL\(/u.test(proxySource)) add("query:edge-url");
+  if (/x-forwarded/u.test(proxySource)) add("query:edge-forwarded");
+
+  if (!runnerSource.includes("G03 an authorized alias preserves a safe query byte for byte")) {
+    add("query-runner:positive");
+  }
+  if (!runnerSource.includes("?ref=alpha%20beta&view=compact")) add("query-runner:literal");
+  if (!runnerSource.includes("G03 a hostile query on an authorized alias refuses with the approved 404 and no reflection")) {
+    add("query-runner:hostile");
+  }
+  if (!runnerSource.includes("G03 the short language alias preserves a safe query to its own Site's Home")) {
+    add("query-runner:short-alias");
+  }
+  if (
+    !runnerSource.includes("G03 with no declared default a safe query still reaches the owning canonical Site on a fresh server")
+  ) {
+    add("query-runner:phase-two");
+  }
+
+  return { ok: problems.length === 0, problems };
+}
+
 function mutate(source, from, to) {
   assert.ok(source.includes(from), `mutation target must exist: ${from.slice(0, 60)}`);
   return source.replace(from, to);
@@ -388,6 +439,76 @@ test("the alias runner contract rejects a lost positive redirect assertion", () 
   const verdict = analyseAliasRunner(mutated);
   assert.equal(verdict.ok, false);
   assert.ok(verdict.problems.includes("alias-runner:positive"));
+});
+
+test("the committed safe-query policy satisfies every validator, edge and runner rule", () => {
+  const verdict = analyseQueryPolicy(read(PROXY), read(QUERY_HELPER), read(RUNNER));
+  assert.deepEqual(verdict.problems, []);
+  assert.equal(verdict.ok, true);
+});
+
+test("the query contract rejects an edge that appends a query without consulting the validator", () => {
+  const mutated = mutate(read(PROXY), "  if (safeQuery.status !== 'accepted') return approvedRefusal();\n", "");
+  const verdict = analyseQueryPolicy(mutated, read(QUERY_HELPER), read(RUNNER));
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("query:edge-guard"));
+});
+
+test("the query contract rejects a location built from the raw request query", () => {
+  const mutated = mutate(read(PROXY), "location: `${decision.location}${safeQuery.query}`,", "location: `${decision.location}${rawQuery}`,");
+  const verdict = analyseQueryPolicy(mutated, read(QUERY_HELPER), read(RUNNER));
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("query:edge-concat"));
+});
+
+test("the query contract rejects a widened byte budget", () => {
+  const mutated = mutate(read(QUERY_HELPER), "  bytes: 512,", "  bytes: 65536,");
+  const verdict = analyseQueryPolicy(read(PROXY), mutated, read(RUNNER));
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("query:byte-budget"));
+});
+
+test("the query contract rejects removing the single space normalization", () => {
+  const mutated = mutate(read(QUERY_HELPER), "function normalizeSpaceSpelling(", "function unusedSpaceSpelling(");
+  const verdict = analyseQueryPolicy(read(PROXY), mutated, read(RUNNER));
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("query:space-spelling"));
+});
+
+test("the query contract rejects a lost byte-preserving positive assertion", () => {
+  const mutated = mutate(
+    read(RUNNER),
+    "G03 an authorized alias preserves a safe query byte for byte",
+    "G03 an authorized alias is recorded",
+  );
+  const verdict = analyseQueryPolicy(read(PROXY), read(QUERY_HELPER), mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("query-runner:positive"));
+});
+
+test("the query contract rejects a lost hostile-query refusal assertion", () => {
+  const mutated = mutate(
+    read(RUNNER),
+    "G03 a hostile query on an authorized alias refuses with the approved 404 and no reflection",
+    "G03 a hostile query on an authorized alias is tolerated",
+  );
+  const verdict = analyseQueryPolicy(read(PROXY), read(QUERY_HELPER), mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("query-runner:hostile"));
+});
+
+test("the query contract rejects an edge that trusts a forwarded authority", () => {
+  const mutated = mutate(read(PROXY), "request.headers.get('host')", "request.headers.get('x-forwarded-host')");
+  const verdict = analyseQueryPolicy(mutated, read(QUERY_HELPER), read(RUNNER));
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("query:edge-forwarded"));
+});
+
+test("the alias contract keeps rejecting the pre-existing public-gate removal", () => {
+  const mutated = mutate(read(SERVING), "  if (!planned.page.delivery.public) return null;\n", "");
+  const verdict = analyseAliasRouting(mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("alias:public-gate"));
 });
 
 /** Named mutations the suite above actually executes; kept here so the count is asserted, not assumed. */
