@@ -394,6 +394,21 @@ function delay(ms) {
   return new Promise((done) => setTimeout(done, ms));
 }
 
+/**
+ * Run one requirement group, converting an exception into a named failed check.
+ *
+ * A hosted failure must always name the group that died; letting an exception escape to the process handler would hide
+ * which of G01–G05 broke, and would hide it from the annotation channel too.
+ */
+async function guard(label, run) {
+  try {
+    return await run();
+  } catch (error) {
+    check(`${label} completes without throwing`, false, String(error?.message ?? error));
+    return {};
+  }
+}
+
 /** An ephemeral loopback port, chosen and released by the OS. */
 async function freeLoopbackPort() {
   return new Promise((resolvePort, rejectPort) => {
@@ -1165,15 +1180,18 @@ async function main() {
       return;
     }
 
-    const routing = await g01Routing(port);
-    await g01Refusals(port);
-    await g02Publication(port);
-    const discovery = await g03Discovery(port);
-    const hostile = await g04Hostile(port, plateBytes);
-    await g05Browser(port);
+    const routing = await guard("G01 routing", () => g01Routing(port));
+    await guard("G01 refusals", () => g01Refusals(port));
+    await guard("G02 publication", () => g02Publication(port));
+    const discovery = await guard("G03 discovery", () => g03Discovery(port));
+    const hostile = await guard("G04 hostile", () => g04Hostile(port, plateBytes));
+    await guard("G05 Chromium", () => g05Browser(port));
 
-    check("G01 the two shared-Host Sites are genuinely different documents", routing.corpHome.body !== routing.docsHome.body);
-    check("G03 the declared address alias is recorded truthfully", true, `status ${discovery.addressAliasStatus}`);
+    check(
+      "G01 the two shared-Host Sites are genuinely different documents",
+      routing.corpHome !== undefined && routing.docsHome !== undefined && routing.corpHome.body !== routing.docsHome.body,
+    );
+    check("G03 the declared address alias is recorded truthfully", true, `status ${String(discovery.addressAliasStatus)}`);
     check("G04 the owned media length is the committed plate length", hostile.uniqueMediaBytes === plateBytes.length);
 
     await stopChild(child);
@@ -1307,6 +1325,8 @@ async function main() {
 }
 
 main().catch((error) => {
-  process.stderr.write(`verify-u03-multisite-http: unhandled failure: ${String(error?.message ?? error)}\n`);
+  const message = String(error?.message ?? error);
+  annotate("the runner terminated with an unhandled failure", message);
+  process.stderr.write(`verify-u03-multisite-http: unhandled failure: ${message}\n`);
   process.exitCode = 1;
 });
