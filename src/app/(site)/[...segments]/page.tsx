@@ -1,0 +1,112 @@
+/**
+ * Foundation Uno — the authority-aware published-Page route (`UNO-WO-030 / R01`, `UNO-WO-095 / R01`).
+ *
+ * One catch-all segment below the document layout. It reuses that layout's single request-scoped decision — keyed by the
+ * primitive authority and pathname — and is the **first App Router 404 boundary**: a refused address calls `notFound()` here,
+ * a validated public alias is the only redirect, and everything else renders the accepted published Page.
+ * `src/proxy.ts` answers most refused addresses earlier with the approved static 404; this route keeps the same refusal as
+ * defense in depth, so a responder bypass can never turn a refusal into a page.
+ *
+ * SEO. A published **public** Page takes its canonical, its same-Page public locale alternates and its `x-default` from the
+ * authority-scoped public discovery plan — the same plan that produces `robots.txt` and `sitemap.xml` for that authority.
+ * Those entries were planned per Site, so an alternate can never point at a sibling Site. A published **unlisted** Page keeps
+ * its own canonical and `noindex,nofollow` but advertises no alternate.
+ *
+ * METADATA NEVER THROWS. `generateMetadata` returns non-indexable metadata for a refused or redirecting address rather than
+ * calling `notFound()`, because a throw during the metadata phase is what produced an error shell for a 404.
+ */
+import type { Metadata } from 'next';
+import { notFound, redirect } from 'next/navigation';
+import type { ReactNode } from 'react';
+
+import type { UnoPublishedPageAccepted } from '../../../application/plan-uno-published-page';
+import type { UnoPageMedia } from '../../../core/assets/uno-owned-media';
+import { UnoPageSections } from '../../../components/uno-page-sections';
+import { UnoSafeMarkdownPage, parseUnoSafeMarkdown } from '../../../components/uno-safe-markdown-page';
+import { planUnoServingDiscovery } from '../../../config/uno-serving';
+import { readSiteRequest, resolveSiteRequest } from './layout';
+
+/** Every request is decided from the committed authority on its own terms. */
+export const dynamic = 'force-dynamic';
+
+/** The one route parameter this segment reads: the whole path below the root. */
+interface CatchAllRouteParams {
+  readonly segments?: readonly string[];
+}
+
+/** The metadata shared by a refused address and a redirecting alias: never indexed, never thrown. */
+const NON_INDEXABLE: Metadata = {
+  title: 'Page not found',
+  robots: { index: false, follow: false, nocache: true },
+};
+
+/** The metadata of one accepted published Page, from the same authority-scoped plan that produces that Site's sitemap. */
+export async function generateMetadata({ params }: { params: Promise<CatchAllRouteParams> }): Promise<Metadata> {
+  const request = await readSiteRequest(params);
+  const decision = await resolveSiteRequest(request.host, request.pathname);
+  if (decision.kind !== 'page') return NON_INDEXABLE;
+
+  const { page } = decision;
+  const languages: Record<string, string> = {};
+
+  if (page.delivery.public) {
+    const discovery = await planUnoServingDiscovery(request.host);
+    if (discovery.status !== 'planned') return NON_INDEXABLE;
+
+    const entry = discovery.plan.entries.find((candidate) => candidate.canonicalUrl === page.delivery.canonicalUrl);
+    if (entry === undefined) return NON_INDEXABLE;
+
+    languages[entry.localeTag] = entry.canonicalUrl;
+    for (const alternate of entry.alternates) languages[alternate.localeTag] = alternate.href;
+    if (entry.xDefault !== undefined) languages['x-default'] = entry.xDefault;
+  }
+
+  const metadata: Metadata = {
+    title: page.document.title,
+    alternates:
+      Object.keys(languages).length === 0
+        ? { canonical: page.delivery.canonicalUrl }
+        : { canonical: page.delivery.canonicalUrl, languages },
+    robots: page.delivery.indexable
+      ? { index: true, follow: true }
+      : { index: false, follow: false, nocache: true },
+    openGraph: { url: page.delivery.canonicalUrl, title: page.document.title, type: 'website' },
+  };
+  if (page.document.description !== undefined) {
+    metadata.description = page.document.description;
+    metadata.openGraph = { ...metadata.openGraph, description: page.document.description };
+  }
+  return metadata;
+}
+
+/** Render one visible `h1`, the optional description and exactly one body: inert Markdown or the JSON Page. */
+function renderPage(page: UnoPublishedPageAccepted, media: UnoPageMedia | undefined): ReactNode {
+  let body: ReactNode;
+  if (page.document.kind === 'json') {
+    if (page.document.pageDocument === undefined) notFound();
+    body = <UnoPageSections document={page.document.pageDocument} media={media} />;
+  } else {
+    const parsed = parseUnoSafeMarkdown(page.document.markdownBody);
+    if (!parsed.ok) notFound();
+    body = <UnoSafeMarkdownPage blocks={parsed.blocks} />;
+  }
+
+  return (
+    <main className="uno-shell uno-narrow">
+      <h1>{page.document.title}</h1>
+      {page.document.description !== undefined ? <p>{page.document.description}</p> : null}
+      {body}
+    </main>
+  );
+}
+
+/** The first App Router 404 boundary of the site document: refuse here, never in the root layout. */
+export default async function SitePage({ params }: { params: Promise<CatchAllRouteParams> }) {
+  const request = await readSiteRequest(params);
+  const decision = await resolveSiteRequest(request.host, request.pathname);
+
+  if (decision.kind === 'redirect') redirect(decision.location);
+  if (decision.kind === 'refused') notFound();
+
+  return renderPage(decision.page, decision.media);
+}

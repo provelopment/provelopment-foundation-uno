@@ -427,7 +427,7 @@ test('the next config scopes its includes to the routes that read the declaratio
     ),
   ].map((match) => match[1]);
   assert.deepEqual(keys.sort(), [
-    "/[locale]/[[...segments]]",
+    "/[...segments]",
     "/robots.txt",
     "/sitemap.xml",
     "/uno-media/[...segments]",

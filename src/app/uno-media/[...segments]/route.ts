@@ -109,7 +109,7 @@ export async function GET(
   context: { params: Promise<{ segments: readonly string[] }> },
 ): Promise<Response> {
   const { segments } = await context.params;
-  const outcome = await readUnoServingMedia(segments);
+  const outcome = await readUnoServingMedia(segments, request.headers.get("host") ?? "");
   if (outcome.status !== "resolved") return notFound();
 
   const body = new Uint8Array(outcome.bytes);
@@ -160,7 +160,7 @@ export async function HEAD(
   context: { params: Promise<{ segments: readonly string[] }> },
 ): Promise<Response> {
   const { segments } = await context.params;
-  const outcome = await readUnoServingMedia(segments);
+  const outcome = await readUnoServingMedia(segments, _request.headers.get("host") ?? "");
   if (outcome.status !== "resolved") return notFound();
 
   const total = new Uint8Array(outcome.bytes).byteLength;

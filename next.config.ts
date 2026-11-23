@@ -48,7 +48,7 @@ const nextConfig: NextConfig = {
     globalNotFound: true,
   },
   outputFileTracingIncludes: {
-    '/[locale]/[[...segments]]': [...UNO_DEPLOYMENT_INPUTS, ...UNO_MEDIA_ZONE_INPUTS],
+    '/[...segments]': [...UNO_DEPLOYMENT_INPUTS, ...UNO_MEDIA_ZONE_INPUTS],
     '/sitemap.xml': UNO_DEPLOYMENT_INPUTS,
     '/robots.txt': UNO_DEPLOYMENT_INPUTS,
     '/uno-media/[...segments]': [...UNO_DEPLOYMENT_INPUTS, ...UNO_MEDIA_ZONE_INPUTS],

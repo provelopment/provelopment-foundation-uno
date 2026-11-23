@@ -1301,9 +1301,14 @@ test('one server-only composition owns the fixed root and the file read', () => 
 
   // Exactly one `process.cwd()`: the fixed deployment root, never a request value.
   assert.equal((config.match(/process\.cwd\(\)/gu) ?? []).length, 1);
-  for (const forbidden of ['process.env', 'headers(', 'cookies(', 'next/headers', 'x-forwarded', 'host']) {
+  // The composition may accept a plain `host` field, but only as an **untrusted lookup key** (`UNO-WO-095 / R01`): it never
+  // reads a request header itself, never trusts a forwarded authority and never reads the environment. It compares that key
+  // with the origins the validated declaration already binds and constructs no origin from it.
+  for (const forbidden of ['process.env', 'headers(', 'cookies(', 'next/headers', 'x-forwarded']) {
     assert.equal(config.includes(forbidden), false, `the composition must not read ${forbidden}`);
   }
+  assert.equal(config.includes('x-forwarded'), false, 'the composition must not trust a forwarded authority');
+  assert.match(config, /=== host/u, 'the request authority is only ever compared for exact equality');
   for (const forbidden of ["from 'react'", 'from "react"', "from 'next", 'from "next']) {
     assert.equal(config.includes(forbidden), false, `the composition must not import ${forbidden}`);
   }
@@ -1320,9 +1325,37 @@ test('one server-only composition owns the fixed root and the file read', () => 
   }
 });
 
+test('only the thin request edge reads a request header', () => {
+  // The document layout is the one named thin edge: it reads the raw `Host` header exactly once and hands it, unchanged and
+  // untrusted, to the composition. Nothing else in the product may read a header, a cookie, a forwarded authority or the
+  // environment, so no second authority surface can appear later.
+  const EDGE = 'src/app/(site)/[...segments]/layout.tsx';
+  const edge = stripComments(readFileSync(resolve(ROOT, EDGE), 'utf8'));
+  assert.match(edge, /next\/headers/u, 'the thin edge imports the header reader');
+  assert.match(edge, /headers\(\)/u, 'the thin edge reads the request headers');
+  for (const forbidden of ['x-forwarded', 'cookies(', 'process.env', 'Accept-Language']) {
+    assert.equal(edge.includes(forbidden), false, `the thin edge must not read ${forbidden}`);
+  }
+
+  // No composition, kernel, application or adapter module reads a raw header: the key is always an argument.
+  for (const layer of ['src/core', 'src/application', 'src/adapters']) {
+    for (const [path, content] of Object.entries(readTree(layer, layer))) {
+      const executable = stripComments(content);
+      for (const forbidden of ['next/headers', 'headers()', 'cookies(', 'x-forwarded']) {
+        assert.equal(executable.includes(forbidden), false, `${path} must not read ${forbidden}`);
+      }
+    }
+  }
+
+  const serving = stripComments(readFileSync(resolve(ROOT, 'src/config/uno-serving.ts'), 'utf8'));
+  for (const forbidden of ['headers()', 'next/headers', 'cookies(', 'x-forwarded', 'request.headers']) {
+    assert.equal(serving.includes(forbidden), false, `the composition must not read ${forbidden}`);
+  }
+});
+
 test('the locale, robots and sitemap surfaces consume only the server composition', () => {
   const surfaces = [
-    'src/app/(site)/[locale]/[[...segments]]/page.tsx',
+    'src/app/(site)/[...segments]/page.tsx',
     'src/app/robots.txt/route.ts',
     'src/app/sitemap.xml/route.ts',
   ];
@@ -1331,9 +1364,10 @@ test('the locale, robots and sitemap surfaces consume only the server compositio
     const executable = stripComments(source);
 
     assert.match(executable, /config\/uno-serving/u, `${path} must use the server composition`);
+    // `(UNO-WO-095 / R01)` The Page may reach the named thin header adapter; the two route surfaces read the Host from the
+    // request object they are handed. Neither may read the environment, a cookie, a forwarded authority or a query string.
     for (const forbidden of [
       'process.env',
-      'next/headers',
       'cookies(',
       'x-forwarded',
       'searchParams',
@@ -1360,13 +1394,18 @@ test('the locale, robots and sitemap surfaces consume only the server compositio
     }
   }
 
-  // The locale-root layout owns the document language and nothing else: no canonical, no analytics, no redirect.
-  const localeLayout = stripComments(readFileSync(resolve(ROOT, 'src/app/(site)/[locale]/layout.tsx'), 'utf8'));
-  assert.match(localeLayout, /resolveUnoServingLocaleTag/u);
-  assert.match(localeLayout, /<html lang=\{/u);
+  // The published document layout owns the document language and nothing else: no canonical, no analytics, no redirect. Its
+  // `lang` is the **authored full tag** of the accepted qualified Page decision (`(UNO-WO-095 / R01)`), for the legacy
+  // one-Site form exactly as for a multi-Site one, and a refusal falls back to the neutral error-document language rather
+  // than claiming a published locale.
+  const siteLayout = stripComments(readFileSync(resolve(ROOT, 'src/app/(site)/[...segments]/layout.tsx'), 'utf8'));
+  assert.match(siteLayout, /identity\.localeTag/u);
+  assert.match(siteLayout, /<html lang=\{/u);
   for (const forbidden of ['<Analytics', 'rel="canonical"', 'hreflang', 'redirect(', 'process.env', 'Accept-Language']) {
-    assert.equal(localeLayout.includes(forbidden), false, `the locale layout must not contain ${forbidden}`);
+    assert.equal(siteLayout.includes(forbidden), false, `the document layout must not contain ${forbidden}`);
   }
+  // The group carries an approved 404 boundary of its own, so a refused address never depends on the framework shell.
+  assert.equal(existsSync(resolve(ROOT, 'src/app/(site)/not-found.tsx')), true);
 
   // The global 404 document carries the approved copy, one h1 and no advertising or analytics of any kind.
   const globalNotFound = stripComments(readFileSync(resolve(ROOT, 'src/app/global-not-found.tsx'), 'utf8'));
@@ -1648,12 +1687,12 @@ test('exactly one client island exists, and it is the U04 interaction island', (
   assert.deepEqual(packages, ['react'], 'the client island may import React and nothing else');
 });
 
-test('only the localized Page segment imports the JSON section renderer', () => {
+test('only the host-aware Page segment imports the JSON section renderer', () => {
   const importers = Object.entries(readTree('src', 'src'))
     .filter(([path, content]) =>
       path.replaceAll('\\', '/') !== 'src/components/uno-page-sections.tsx' &&
       /components\/uno-page-sections/u.test(content),
     )
     .map(([path]) => path.replaceAll('\\', '/'));
-  assert.deepEqual(importers, ['src/app/(site)/[locale]/[[...segments]]/page.tsx']);
+  assert.deepEqual(importers, ['src/app/(site)/[...segments]/page.tsx']);
 });

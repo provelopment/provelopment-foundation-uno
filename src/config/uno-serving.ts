@@ -1,29 +1,31 @@
 /**
- * Foundation Uno — the server-only U03 serving composition (`UNO-WO-028 / R01`).
+ * Foundation Uno — the server-only multi-Site serving composition (`UNO-WO-028 / R01`, `UNO-WO-095 / R01`).
  *
- * WHAT THIS IS. The single trusted IO boundary between Next.js and the accepted U03 contracts. It reads the
- * two FIXED committed declarations through a fixed deployment root, resolves the committed canonical base,
- * loads one address through the confined source loader, and asks the published-Page planner whether that
- * address may be served. It also plans the public discovery surface from the same authority.
+ * The single trusted IO boundary between Next.js and the accepted U03/U04 contracts. It reads the two fixed committed
+ * declarations through one fixed deployment root, resolves the committed authority (the legacy one-Site form or the
+ * version-2 all-Sites address declaration) and answers one question per request: which Site owns this authority and
+ * whole-segment prefix, and may that Site serve this address?
  *
- * THE GATE. Nothing here may serve, redirect, emit metadata, advertise a canonical URL or list a sitemap
- * entry unless the committed base exists and is valid *and* the specific Page's own manifest declaration is
- * `published` *and* every other accepted contract agrees. Otherwise the caller is told `not-served` and the
- * route answers a genuine 404. There is no environment fallback, no request-Host inference, no proxy header,
- * no geo lookup, no first-Site default, no localhost default and no cached "last known" page.
- *
- * ROOT. `process.cwd()` is used once, only to locate this repository's own fixed deployment root in this
- * server-side adapter. It is never read from a request, a header or a query, and the two declaration paths
- * are constants, so no incoming value can redirect the read.
- *
- * WHAT THIS IS NOT. No provider SDK, no outbound request, no deployment action, no domain selection, no
- * `basePath`, no rewrite or proxy. A JSON Page is served only when its versioned document contract validates and
- * every module in it has a real renderer; otherwise this boundary answers `serving:renderer-unavailable` and the
- * route resolves to a genuine 404.
+ * The request `host` is a plain **untrusted lookup key**. It is lowercased, shape-checked and compared for exact equality
+ * against the origins the validated declaration already binds; it is never used to construct an origin and never falls back
+ * to a default, an entry position, a forwarded header, the scheme or the environment. An authority no binding declares
+ * matches nothing. This module reads no request header itself: only the thin document edge does, and it passes the value
+ * here as an argument.
  */
 import { readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { readUnoOwnedMedia, type UnoOwnedMediaOwner } from "../adapters/assets/uno-owned-media-reader";
+import { planUnoPageAssets, readUnoPageAssetOccurrence, type UnoPageAssetPlan } from "../application/plan-uno-page-assets";
+import { planUnoPublicDiscovery, type UnoPublicDiscoveryEntry } from "../application/plan-uno-public-discovery";
+import { planUnoPublishedPage, type UnoPublishedPageAccepted } from "../application/plan-uno-published-page";
+import { resolveUnoCommittedBase } from "../application/resolve-uno-committed-base";
+import { resolveUnoCommittedLocales } from "../application/resolve-uno-committed-locales";
+import {
+  UNO_MANIFEST_PATH,
+  UNO_SELECTION_PATH,
+  UNO_SOURCE_LIMITS,
+  loadUnoCandidateSource,
+} from "../adapters/efs/uno-confined-source-reader";
 import {
   UNO_MEDIA_NOMINAL_SIZE,
   readUnoOwnedAssetRef,
@@ -33,25 +35,21 @@ import {
   type UnoResolvedMedia,
 } from "../core/assets/uno-owned-media";
 import {
-  planUnoPageAssets,
-  readUnoPageAssetOccurrence,
-  type UnoPageAssetPlan,
-} from "../application/plan-uno-page-assets";
-import {
-  UNO_MANIFEST_PATH,
-  UNO_SELECTION_PATH,
-  UNO_SOURCE_LIMITS,
-  loadUnoCandidateSource,
-} from "../adapters/efs/uno-confined-source-reader";
-import { planUnoPublicDiscovery, type UnoPublicDiscoveryAccepted } from "../application/plan-uno-public-discovery";
-import { planUnoPublishedPage, type UnoPublishedPageAccepted } from "../application/plan-uno-published-page";
-import { resolveUnoCommittedBase } from "../application/resolve-uno-committed-base";
-import { resolveUnoCommittedLocales } from "../application/resolve-uno-committed-locales";
-import { HOME_CONTENT_SLUG } from "../core/page-content";
-import { buildUnoCandidateRouteIndex } from "../core/efs/uno-route-address";
+  UNO_SITE_ADDRESS_CONFIG_VERSION,
+  validateUnoSiteAddressConfig,
+  type UnoSiteAddressBinding,
+} from "../core/efs/uno-config";
 import { localePathKey } from "../core/efs/uno-locales";
+import {
+  buildUnoCandidateRouteIndex,
+  buildUnoSiteRouteIndex,
+  matchUnoSiteRouteCandidate,
+  type UnoRouteCandidate,
+  type UnoSiteRouteCandidate,
+} from "../core/efs/uno-route-address";
+import { HOME_CONTENT_SLUG } from "../core/page-content";
 
-/** The closed refusal vocabulary of this boundary. One literal per failure family. */
+/** The closed refusal vocabulary of this boundary: one literal per failure family. */
 export type UnoServingRefusal =
   | "serving:input-invalid"
   | "serving:authority-unavailable"
@@ -60,21 +58,7 @@ export type UnoServingRefusal =
   | "serving:media-unavailable"
   | "serving:discovery-unavailable";
 
-/** The same vocabulary as frozen data, so a caller can assert membership without copying literals. */
-export const UNO_SERVING_REFUSAL_REASONS: readonly UnoServingRefusal[] = Object.freeze([
-  "serving:input-invalid",
-  "serving:authority-unavailable",
-  "serving:publication-refused",
-  "serving:renderer-unavailable",
-  "serving:media-unavailable",
-  "serving:discovery-unavailable",
-] as const);
-
-/**
- * A Page that may be served: an accepted published plan whose body this version can render, plus — for a JSON Page —
- * the resolved owned-media projections its sections declared and the occurrence ledger the media route authorises
- * against.
- */
+/** A Page that may be served: an accepted published plan plus the media and occurrence ledger it declared. */
 export type UnoServingPageOutcome =
   | {
       readonly status: "served";
@@ -89,24 +73,36 @@ export type UnoServingAliasOutcome =
   | { readonly status: "redirect"; readonly location: string }
   | { readonly status: "none"; readonly reason: UnoServingRefusal };
 
-/** The discovery outcome used by `robots.txt` and `sitemap.xml`. */
-export type UnoServingDiscoveryOutcome =
-  | { readonly status: "planned"; readonly plan: UnoPublicDiscoveryAccepted }
-  | { readonly status: "unavailable"; readonly reason: UnoServingRefusal };
+/** One request decision, as the document, metadata, route and refusal responder each need it. */
+export type UnoServingDecision =
+  | { readonly kind: "page"; readonly page: UnoPublishedPageAccepted; readonly media?: UnoPageMedia }
+  | { readonly kind: "redirect"; readonly location: string }
+  | { readonly kind: "refused"; readonly reason: UnoServingRefusal };
 
-/** The committed authority this boundary resolved, or a closed refusal. */
-type AuthorityOutcome =
+
+/** The committed authority: the legacy one-Site form, the version-2 all-Sites form, or a refusal. */
+type ServingAuthority =
   | {
-      readonly status: "resolved";
+      readonly mode: "legacy";
       readonly root: string;
       readonly manifest: unknown;
       readonly selection: unknown;
       readonly canonical: string;
       readonly aliases: readonly string[];
     }
-  | { readonly status: "refused"; readonly reason: UnoServingRefusal };
+  | {
+      readonly mode: "qualified";
+      readonly root: string;
+      readonly manifest: unknown;
+      readonly selection: unknown;
+      readonly bindings: readonly UnoSiteAddressBinding[];
+    }
+  | { readonly mode: "refused"; readonly reason: UnoServingRefusal };
 
-/** The bounded reader for one fixed declaration file, or `null`. */
+/** The qualified branch, named so helpers need no narrowing gymnastics. */
+type QualifiedAuthority = Extract<ServingAuthority, { mode: "qualified" }>;
+
+/** The bounded reader for one fixed declaration file, or `null` when it is absent, oversized or not JSON. */
 function readFixedJson(root: string, relativePath: string, maxBytes: number): unknown | null {
   try {
     const path = resolve(root, relativePath);
@@ -118,25 +114,37 @@ function readFixedJson(root: string, relativePath: string, maxBytes: number): un
   }
 }
 
+/** The declared version of an untrusted declaration record, or `null` when it states none. */
+function declaredVersion(value: unknown): number | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const version = (value as { readonly version?: unknown }).version;
+  return typeof version === "number" && Number.isInteger(version) ? version : null;
+}
+
 /**
- * Resolve the committed authority: the two fixed declarations plus the declared canonical base.
+ * Resolve the committed authority from the two fixed declarations.
  *
- * A missing or invalid base is `serving:authority-unavailable` — exactly the committed reality today — and
- * nothing downstream may treat that as "serve anyway".
+ * A version-2 declaration is validated **once**, so the validated binding set is the only authority downstream and an
+ * invalid multi-Site declaration can never be partially served.
  */
-function readAuthority(): AuthorityOutcome {
+function readAuthority(): ServingAuthority {
   const root = process.cwd();
   const manifest = readFixedJson(root, UNO_MANIFEST_PATH, UNO_SOURCE_LIMITS.manifestBytes);
   const selection = readFixedJson(root, UNO_SELECTION_PATH, UNO_SOURCE_LIMITS.configBytes);
   if (manifest === null || selection === null) {
-    return { status: "refused", reason: "serving:authority-unavailable" };
+    return { mode: "refused", reason: "serving:authority-unavailable" };
+  }
+
+  if (declaredVersion(selection) === UNO_SITE_ADDRESS_CONFIG_VERSION) {
+    const addresses = validateUnoSiteAddressConfig(selection, manifest);
+    if (!addresses.accepted) return { mode: "refused", reason: "serving:authority-unavailable" };
+    return { mode: "qualified", root, manifest, selection, bindings: addresses.config.sites };
   }
 
   const committed = resolveUnoCommittedBase({ manifest, selection });
-  if (!committed.accepted) return { status: "refused", reason: "serving:authority-unavailable" };
-
+  if (!committed.accepted) return { mode: "refused", reason: "serving:authority-unavailable" };
   return {
-    status: "resolved",
+    mode: "legacy",
     root,
     manifest,
     selection,
@@ -144,6 +152,7 @@ function readAuthority(): AuthorityOutcome {
     aliases: committed.base.aliases,
   };
 }
+
 
 /** One absolute address of this build, or `null` when the shape cannot be one. */
 function normalizePathname(pathname: unknown): string | null {
@@ -155,8 +164,68 @@ function normalizePathname(pathname: unknown): string | null {
   return pathname;
 }
 
+/**
+ * Normalize an untrusted request authority for exact comparison against a configured origin.
+ *
+ * Only a lowercase DNS authority with an optional explicit port survives; a scheme, credentials, path, space, bracket,
+ * trailing dot or empty label is refused. A different port, case or punycode form therefore simply matches no binding.
+ */
+function normalizeHost(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  if (value.length === 0 || value.length > 260) return null;
+  const host = value.toLowerCase();
+  if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d{1,5})?$/u.test(host)) return null;
+  if (host.includes("..")) return null;
+  return host;
+}
 
-/** One mutable section projection while a plan is being resolved into render-ready media. */
+/** One request authority, where the empty string means the legacy, authority-less form. */
+function readHost(hostInput: unknown): string | null {
+  if (hostInput === undefined || hostInput === "") return "";
+  return normalizeHost(hostInput);
+}
+
+/** The declared authority of one configured origin: scheme removed, lowercased, port preserved. */
+function hostOfOrigin(origin: string): string | null {
+  const marker = origin.indexOf("://");
+  if (marker < 0) return null;
+  return normalizeHost(origin.slice(marker + 3));
+}
+
+/** The bindings one request authority owns. An unknown authority owns none, so it can authorise nothing. */
+function bindingsForHost(authority: ServingAuthority, host: string): readonly UnoSiteAddressBinding[] {
+  if (authority.mode !== "qualified" || host.length === 0) return [];
+  return authority.bindings.filter((binding) => hostOfOrigin(binding.origin) === host);
+}
+
+/** The Site-local path of one candidate, spelled as a request pathname carries it. */
+function requestPathOf(binding: UnoSiteAddressBinding, candidatePathname: string): string {
+  return binding.pathPrefix === "" ? candidatePathname : `${binding.pathPrefix}${candidatePathname}`;
+}
+
+/**
+ * Both accepted call shapes, normalized once.
+ *
+ * The `(pathname)` string form carries no request authority and therefore never qualifies a version-2 request; the
+ * `{ host, pathname }` object form is the qualified one. One helper serves every entry point, so no caller can silently
+ * drop its pathname and no entry point can disagree with another about the same request.
+ */
+function readRequestInput(
+  request: unknown,
+  pathnameInput?: unknown,
+): { readonly host: string; readonly pathname: string } | null {
+  const stringForm = typeof request === "string";
+  const host = stringForm ? "" : readHost((request as { readonly host?: unknown } | null)?.host);
+  const rawPathname = stringForm
+    ? request
+    : (pathnameInput ?? (request as { readonly pathname?: unknown } | null)?.pathname);
+  const pathname = normalizePathname(rawPathname);
+  if (host === null || pathname === null) return null;
+  return Object.freeze({ host, pathname });
+}
+
+
+/** One mutable section projection while a plan is resolved into render-ready media. */
 interface MutableSectionMedia {
   image?: UnoResolvedImage;
   video?: UnoResolvedMedia;
@@ -167,19 +236,14 @@ interface MutableSectionMedia {
 
 /** The accepted Page's own identity: the only thing that may select a `page`-zone capsule directory. */
 function ownerOf(page: UnoPublishedPageAccepted): UnoOwnedMediaOwner {
-  return {
-    entityId: page.identity.entityId,
-    facetId: page.identity.facetId,
-    siteId: page.identity.siteId,
-  };
+  return { entityId: page.identity.entityId, facetId: page.identity.facetId, siteId: page.identity.siteId };
 }
 
 /**
  * Resolve and verify every asset one accepted Page declares.
  *
- * A Page is served only when **all** of its declared assets resolve: a missing, oversized, wrongly signed, escaping or
- * integrity-mismatched occurrence refuses the whole Page rather than dropping one module. Images are read in full so the
- * intrinsic box can be taken from their own header; video is read only far enough to prove its container.
+ * All-or-nothing: a missing, oversized, wrongly signed, escaping or integrity-mismatched occurrence refuses the whole Page
+ * rather than dropping one module from a published document.
  */
 function resolvePageMedia(
   root: string,
@@ -230,59 +294,147 @@ function resolvePageMedia(
   return { ok: true, media: bySection as UnoPageMedia };
 }
 
+/** Whether the loader's own candidate is exactly the request-scoped match: no sibling Site may substitute. */
+function sameQualifiedCandidate(loaded: UnoRouteCandidate, matched: UnoSiteRouteCandidate): boolean {
+  return (
+    loaded.facetId === matched.facetId &&
+    loaded.siteId === matched.siteId &&
+    loaded.entityId === matched.entityId &&
+    loaded.pathname === matched.pathname
+  );
+}
+
+/** Whether a planned Page is exactly the matched candidate's Site and declared public address. */
+function sameQualifiedPage(page: UnoPublishedPageAccepted, candidate: UnoSiteRouteCandidate): boolean {
+  return (
+    page.identity.facetId === candidate.facetId &&
+    page.identity.siteId === candidate.siteId &&
+    page.identity.entityId === candidate.entityId &&
+    page.delivery.canonicalUrl === candidate.address
+  );
+}
+
+/** Finish one accepted plan: the renderer gate, then the all-or-nothing owned-media preflight. */
+function finishPage(root: string, planned: UnoPublishedPageAccepted): UnoServingPageOutcome {
+  if (planned.document.kind !== "json") return { status: "served", page: planned };
+  if (planned.document.pageDocument === undefined) {
+    return { status: "not-served", reason: "serving:renderer-unavailable" };
+  }
+  const assets = planUnoPageAssets(planned);
+  if (assets.status !== "planned") return { status: "not-served", reason: "serving:media-unavailable" };
+  const resolved = resolvePageMedia(root, planned, assets.plan);
+  if (!resolved.ok) return { status: "not-served", reason: "serving:media-unavailable" };
+  return { status: "served", page: planned, media: resolved.media, assets: assets.plan };
+}
+
 /**
- * Decide whether one absolute address may be served as a published Page of the selected Site.
+ * Decide whether one request may be served as a published Page of the Site that owns it.
  *
- * The order is deliberate: authority first (a missing base can never be worked around), then the confined
- * source load, then the published-Page planner, then the renderer capability. A JSON Page whose document
- * validates and whose modules all render is served on the same terms as Markdown; a registered-but-unrenderable
- * or invalid JSON document is refused with `serving:renderer-unavailable`.
+ * Authority first, then — for a version-2 declaration — the authority/prefix placement, then the confined source load, then
+ * the published-Page planner, then the renderer capability. The matched `{facetId, siteId}` is passed unchanged to the
+ * loader and the planner, the loader's candidate must be that same pair at that same pathname, and the planner's own
+ * identity and canonical must equal the matched candidate's address. Any disagreement is `not-served`.
  */
-export async function planUnoServingPage(pathname: unknown): Promise<UnoServingPageOutcome> {
-  const target = normalizePathname(pathname);
-  if (target === null) return { status: "not-served", reason: "serving:input-invalid" };
+export async function planUnoServingPage(request: unknown, pathnameInput?: unknown): Promise<UnoServingPageOutcome> {
+  const input = readRequestInput(request, pathnameInput);
+  if (input === null) return { status: "not-served", reason: "serving:input-invalid" };
+  const { host, pathname } = input;
 
   const authority = readAuthority();
-  if (authority.status === "refused") return { status: "not-served", reason: authority.reason };
+  if (authority.mode === "refused") return { status: "not-served", reason: authority.reason };
 
-  const loaded = await loadUnoCandidateSource({ repoRoot: authority.root, pathname: target });
+  if (authority.mode === "qualified") {
+    const matched = matchUnoSiteRouteCandidate(host, pathname, authority.manifest, authority.selection);
+    if (!matched.accepted) return { status: "not-served", reason: "serving:publication-refused" };
+
+    const loaded = await loadUnoCandidateSource({ repoRoot: authority.root, host, pathname });
+    if (!loaded.accepted) return { status: "not-served", reason: "serving:publication-refused" };
+    if (!sameQualifiedCandidate(loaded.candidate, matched.candidate)) {
+      return { status: "not-served", reason: "serving:publication-refused" };
+    }
+
+    const planned = planUnoPublishedPage({
+      manifest: authority.manifest,
+      selection: authority.selection,
+      site: { facetId: matched.candidate.facetId, siteId: matched.candidate.siteId },
+      host,
+      pathname,
+      loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
+    });
+    if (!planned.accepted) return { status: "not-served", reason: "serving:publication-refused" };
+    if (!sameQualifiedPage(planned, matched.candidate)) {
+      return { status: "not-served", reason: "serving:publication-refused" };
+    }
+    return finishPage(authority.root, planned);
+  }
+
+  const loaded = await loadUnoCandidateSource({ repoRoot: authority.root, pathname });
   if (!loaded.accepted) return { status: "not-served", reason: "serving:publication-refused" };
 
   const planned = planUnoPublishedPage({
     manifest: authority.manifest,
     selection: authority.selection,
     base: { canonical: authority.canonical, aliases: [...authority.aliases] },
-    pathname: target,
+    pathname,
     loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
   });
   if (!planned.accepted) return { status: "not-served", reason: "serving:publication-refused" };
-  // A JSON Page is served only when the selected source is also a fully validated, renderable version-1 Page
-  // document. Publication (the manifest gate above) and renderability are separate decisions, so an accepted
-  // but unrenderable JSON Page is refused here with its own closed reason and no partial content.
-  if (planned.document.kind === "json" && planned.document.pageDocument === undefined) {
-    return { status: "not-served", reason: "serving:renderer-unavailable" };
-  }
-
-  if (planned.document.kind === "json") {
-    // A JSON Page is served only when every asset it declares is present, in place and valid. One bad asset refuses the
-    // whole Page with its own closed reason; nothing is silently pruned and no partial Page reaches a renderer.
-    const assets = planUnoPageAssets(planned);
-    if (assets.status !== "planned") return { status: "not-served", reason: "serving:media-unavailable" };
-    const resolved = resolvePageMedia(authority.root, planned, assets.plan);
-    if (!resolved.ok) return { status: "not-served", reason: "serving:media-unavailable" };
-    return { status: "served", page: planned, media: resolved.media, assets: assets.plan };
-  }
-
-  return { status: "served", page: planned };
+  return finishPage(authority.root, planned);
 }
 
 /**
- * The outcome of one media locator request.
+ * The single request decision the document, metadata, route and refusal responder all consume.
  *
- * There is no "partial" and no redirect: a locator either names an occurrence of the one accepted published Page for its
- * own address, in which case the bytes and their true MIME type are returned, or it does not, in which case the caller
- * answers a real 404 with no metadata at all.
+ * It is deliberately non-throwing: every failure is a `refused` value, never an exception, so the document layout renders for
+ * any address, the Page performs the App Router refusal, and the pre-render responder can answer a refused address before a
+ * Flight-only shell is produced. A single-segment address may fall through to an explicit short alias, and only that Site's
+ * own stored mapping is read.
  */
+export async function resolveUnoServingRequest(request: unknown, pathnameInput?: unknown): Promise<UnoServingDecision> {
+  const input = readRequestInput(request, pathnameInput);
+  if (input === null) return { kind: "refused", reason: "serving:input-invalid" };
+  const { host, pathname } = input;
+
+  const served = await planUnoServingPage({ host, pathname });
+  if (served.status === "served") {
+    return served.media === undefined
+      ? { kind: "page", page: served.page }
+      : { kind: "page", page: served.page, media: served.media };
+  }
+
+  const parts = pathname.slice(1).split("/");
+  const [single] = parts;
+  if (parts.length === 1 && single !== undefined) {
+    const alias = await resolveUnoServingAlias(single, host);
+    if (alias.status === "redirect") return { kind: "redirect", location: alias.location };
+  }
+
+  return { kind: "refused", reason: served.reason };
+}
+
+
+
+/**
+ * Resolve one Site-local media locator against the bindings that own the request authority.
+ *
+ * The locator carries only the path *inside* a Site, so each authority-owning binding offers exactly one candidate path. More
+ * than one accepted reading is refused rather than picking the first, so a locator can never resolve to a sibling Site.
+ */
+async function resolveQualifiedMediaPage(
+  authority: ServingAuthority,
+  host: string,
+  sitePath: string,
+): Promise<UnoServingPageOutcome> {
+  const served: UnoServingPageOutcome[] = [];
+  for (const binding of bindingsForHost(authority, host)) {
+    const outcome = await planUnoServingPage({ host, pathname: requestPathOf(binding, sitePath) });
+    if (outcome.status === "served") served.push(outcome);
+  }
+  if (served.length !== 1) return { status: "not-served", reason: "serving:publication-refused" };
+  return served[0] as UnoServingPageOutcome;
+}
+
+/** The outcome of one media locator request: real bytes with their true MIME type, or nothing. */
 export type UnoServingMediaOutcome =
   | { readonly status: "resolved"; readonly bytes: Uint8Array; readonly mime: string }
   | { readonly status: "not-found"; readonly reason: UnoServingRefusal };
@@ -296,12 +448,11 @@ const PATH_SEGMENT = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 /**
  * Serve the bytes behind one media locator.
  *
- * The last segment is the occurrence index and everything before it is the Page's own public address, so the route can
- * never be given a storage path: it re-derives the address, re-runs the full publication and media preflight, and only
- * then reads the one occurrence that address declares. An unlisted Page is addressable only at its own exact locator,
- * which is why no sitemap or navigation reference can make it discoverable.
+ * The last segment is the occurrence index and everything before it is the Page's own public address inside its Site, so the
+ * route can never be given a storage path: it re-derives the address, re-runs the full publication and media preflight for
+ * the Site that owns the request authority, and only then reads the one occurrence that address declares.
  */
-export async function readUnoServingMedia(segments: unknown): Promise<UnoServingMediaOutcome> {
+export async function readUnoServingMedia(segments: unknown, hostInput?: unknown): Promise<UnoServingMediaOutcome> {
   if (!Array.isArray(segments) || segments.length < 2 || segments.length > 6) {
     return { status: "not-found", reason: "serving:input-invalid" };
   }
@@ -317,10 +468,19 @@ export async function readUnoServingMedia(segments: unknown): Promise<UnoServing
   if (last === undefined || !OCCURRENCE_SEGMENT.test(last)) {
     return { status: "not-found", reason: "serving:input-invalid" };
   }
-  const occurrence = Number(last);
-  const pathname = `/${parts.slice(0, -1).join("/")}`;
+  const host = readHost(hostInput);
+  if (host === null) return { status: "not-found", reason: "serving:input-invalid" };
 
-  const served = await planUnoServingPage(pathname);
+  const occurrence = Number(last);
+  const sitePath = `/${parts.slice(0, -1).join("/")}`;
+
+  const authority = readAuthority();
+  if (authority.mode === "refused") return { status: "not-found", reason: authority.reason };
+
+  const served =
+    authority.mode === "qualified"
+      ? await resolveQualifiedMediaPage(authority, host, sitePath)
+      : await planUnoServingPage(sitePath);
   if (served.status !== "served" || served.assets === undefined) {
     return { status: "not-found", reason: "serving:publication-refused" };
   }
@@ -328,11 +488,8 @@ export async function readUnoServingMedia(segments: unknown): Promise<UnoServing
   const declared = readUnoPageAssetOccurrence(served.assets, occurrence);
   if (declared === undefined) return { status: "not-found", reason: "serving:media-unavailable" };
 
-  const decision: ReturnType<typeof readUnoOwnedAssetRef> = readUnoOwnedAssetRef(declared.ref, declared.purpose);
+  const decision = readUnoOwnedAssetRef(declared.ref, declared.purpose);
   if (!decision.ok) return { status: "not-found", reason: "serving:media-unavailable" };
-
-  const authority = readAuthority();
-  if (authority.status === "refused") return { status: "not-found", reason: authority.reason };
 
   const read = readUnoOwnedMedia({
     repoRoot: authority.root,
@@ -345,20 +502,50 @@ export async function readUnoServingMedia(segments: unknown): Promise<UnoServing
   return { status: "resolved", bytes: read.bytes, mime: read.mime };
 }
 
+
 /**
  * Resolve an explicit short-locale alias to a real published public destination.
  *
- * `en → en-001` comes from the **stored** declaration's own language preferences, never from a guess, a
- * header or a preference. The destination must itself be an accepted published plan for the reserved Home
- * with `public` visibility; anything else resolves to nothing at all, so the caller answers 404.
+ * The mapping comes from the **stored** declaration — never a guess, a header or a preference — and for a version-2
+ * declaration it applies only to the Site that owns the request authority *and* owns the mapped locale. The destination must
+ * itself be an accepted published plan for that Site's reserved Home with `public` visibility; anything else resolves to
+ * nothing at all, so the caller answers 404 rather than redirecting somewhere unproven.
  */
-export async function resolveUnoServingAlias(localeKey: unknown): Promise<UnoServingAliasOutcome> {
+export async function resolveUnoServingAlias(localeKey: unknown, hostInput?: unknown): Promise<UnoServingAliasOutcome> {
   if (typeof localeKey !== "string" || localeKey.length === 0 || localeKey.length > 64) {
     return { status: "none", reason: "serving:input-invalid" };
   }
+  const host = readHost(hostInput);
+  if (host === null) return { status: "none", reason: "serving:input-invalid" };
 
   const authority = readAuthority();
-  if (authority.status === "refused") return { status: "none", reason: authority.reason };
+  if (authority.mode === "refused") return { status: "none", reason: authority.reason };
+
+  if (authority.mode === "qualified") {
+    for (const binding of bindingsForHost(authority, host)) {
+      const stored = resolveUnoCommittedLocales({
+        manifest: authority.manifest,
+        selection: authority.selection,
+        site: { facetId: binding.facetId, siteId: binding.siteId },
+      });
+      if (!stored.accepted) continue;
+      const targetTag = stored.localePolicy.languagePreferences[localeKey];
+      if (targetTag === undefined) continue;
+
+      let targetKey: string;
+      try {
+        targetKey = localePathKey(targetTag);
+      } catch {
+        continue;
+      }
+
+      const target = await planUnoServingPage({ host, pathname: requestPathOf(binding, `/${targetKey}`) });
+      if (target.status !== "served") continue;
+      if (target.page.identity.pageId !== HOME_CONTENT_SLUG || !target.page.delivery.public) continue;
+      return { status: "redirect", location: target.page.delivery.canonicalUrl };
+    }
+    return { status: "none", reason: "serving:publication-refused" };
+  }
 
   const stored = resolveUnoCommittedLocales({ manifest: authority.manifest, selection: authority.selection });
   if (!stored.accepted) return { status: "none", reason: "serving:authority-unavailable" };
@@ -378,23 +565,120 @@ export async function resolveUnoServingAlias(localeKey: unknown): Promise<UnoSer
   if (target.page.identity.pageId !== HOME_CONTENT_SLUG || !target.page.delivery.public) {
     return { status: "none", reason: "serving:publication-refused" };
   }
-
   return { status: "redirect", location: target.page.delivery.canonicalUrl };
 }
 
+/** The host-scoped discovery plan: entries already planned per Site, so no entry can span two Sites. */
+export interface UnoServingDiscoveryPlan {
+  readonly entries: readonly UnoPublicDiscoveryEntry[];
+  readonly sitemapUrls: readonly string[];
+  /** The one selected Site of a legacy declaration; a qualified plan has no single Site to name. */
+  readonly site?: { readonly entityId: string; readonly facetId: string; readonly siteId: string };
+  /** The default locale of that one Site, when the plan belongs to a single Site. */
+  readonly defaultLocale?: string;
+}
+
+/** The discovery outcome used by `robots.txt`, `sitemap.xml` and each Page's metadata. */
+export type UnoServingDiscoveryOutcome =
+  | { readonly status: "planned"; readonly plan: UnoServingDiscoveryPlan }
+  | { readonly status: "unavailable"; readonly reason: UnoServingRefusal };
+
 
 /**
- * Plan the public discovery surface from the same committed authority.
+ * One Site's accepted public discovery plan, or `null` when that Site contributes no public Page.
  *
- * Every candidate address of the selected Site is loaded through the confined loader and offered to the
- * published-Page planner; only accepted, renderable (`markdown`) decisions survive, so a refused or missing
- * source can never become an entry. The collection is then handed to `planUnoPublicDiscovery`, which enforces
- * the declared locales, the single Site, collision rules and deterministic ordering. Anything less than one
- * public published Page is `serving:discovery-unavailable`, which the routes render as a real 404.
+ * Each Site is planned from its own decisions and its own locale authority, so a same-Page `hreflang`, `x-default` or
+ * automatic link can never span two Sites even when their public URLs are combined for the same request authority.
  */
-export async function planUnoServingDiscovery(): Promise<UnoServingDiscoveryOutcome> {
+async function planOneSiteDiscovery(
+  authority: QualifiedAuthority,
+  binding: UnoSiteAddressBinding,
+  host: string,
+  candidates: readonly UnoSiteRouteCandidate[],
+): Promise<UnoServingDiscoveryPlan | null> {
+  const stored = resolveUnoCommittedLocales({
+    manifest: authority.manifest,
+    selection: authority.selection,
+    site: { facetId: binding.facetId, siteId: binding.siteId },
+  });
+  if (!stored.accepted) return null;
+
+  const decisions: UnoPublishedPageAccepted[] = [];
+  for (const candidate of candidates) {
+    const pathname = requestPathOf(binding, candidate.pathname);
+    const loaded = await loadUnoCandidateSource({ repoRoot: authority.root, host, pathname });
+    if (!loaded.accepted) continue;
+    const planned = planUnoPublishedPage({
+      manifest: authority.manifest,
+      selection: authority.selection,
+      site: { facetId: binding.facetId, siteId: binding.siteId },
+      host,
+      pathname,
+      loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
+    });
+    if (!planned.accepted) continue;
+    if (!sameQualifiedPage(planned, candidate)) continue;
+    if (planned.document.kind === "json" && planned.document.pageDocument === undefined) continue;
+    decisions.push(planned);
+  }
+  if (decisions.length === 0) return null;
+
+  const plan = planUnoPublicDiscovery({
+    decisions,
+    locales: {
+      supportedLocales: [...stored.localePolicy.supportedLocales],
+      defaultLocale: stored.localePolicy.defaultLocale,
+    },
+  });
+  if (!plan.accepted) return null;
+  return Object.freeze({
+    entries: Object.freeze([...plan.entries]) as readonly UnoPublicDiscoveryEntry[],
+    sitemapUrls: Object.freeze([...plan.sitemapUrls]) as readonly string[],
+  });
+}
+
+/**
+ * Plan the public discovery surface for one request authority.
+ *
+ * Legacy: the one selected Site, exactly as before. Version 2: only the Sites bound to the request authority contribute,
+ * each planned from its own candidates and locales before the authority-scoped public URLs are combined.
+ */
+export async function planUnoServingDiscovery(hostInput?: unknown): Promise<UnoServingDiscoveryOutcome> {
+  const host = readHost(hostInput);
+  if (host === null) return { status: "unavailable", reason: "serving:input-invalid" };
+
   const authority = readAuthority();
-  if (authority.status === "refused") return { status: "unavailable", reason: authority.reason };
+  if (authority.mode === "refused") return { status: "unavailable", reason: authority.reason };
+
+  if (authority.mode === "qualified") {
+    const bindings = bindingsForHost(authority, host);
+    if (bindings.length === 0) return { status: "unavailable", reason: "serving:discovery-unavailable" };
+
+    const index = buildUnoSiteRouteIndex(authority.manifest, authority.selection);
+    if (!index.accepted) return { status: "unavailable", reason: "serving:authority-unavailable" };
+
+    const entries: UnoPublicDiscoveryEntry[] = [];
+    const sitemapUrls: string[] = [];
+    for (const binding of bindings) {
+      const candidates = index.candidates.filter(
+        (candidate) => candidate.facetId === binding.facetId && candidate.siteId === binding.siteId,
+      );
+      const plan = await planOneSiteDiscovery(authority, binding, host, candidates);
+      if (plan === null) continue;
+      entries.push(...plan.entries);
+      sitemapUrls.push(...plan.sitemapUrls);
+    }
+    if (entries.length === 0 || sitemapUrls.length === 0) {
+      return { status: "unavailable", reason: "serving:discovery-unavailable" };
+    }
+    return {
+      status: "planned",
+      plan: Object.freeze({
+        entries: Object.freeze(entries) as readonly UnoPublicDiscoveryEntry[],
+        sitemapUrls: Object.freeze(sitemapUrls) as readonly string[],
+      }),
+    };
+  }
 
   const stored = resolveUnoCommittedLocales({ manifest: authority.manifest, selection: authority.selection });
   if (!stored.accepted) return { status: "unavailable", reason: "serving:authority-unavailable" };
@@ -406,7 +690,6 @@ export async function planUnoServingDiscovery(): Promise<UnoServingDiscoveryOutc
   for (const candidate of index.candidates) {
     const loaded = await loadUnoCandidateSource({ repoRoot: authority.root, pathname: candidate.pathname });
     if (!loaded.accepted) continue;
-
     const planned = planUnoPublishedPage({
       manifest: authority.manifest,
       selection: authority.selection,
@@ -415,15 +698,10 @@ export async function planUnoServingDiscovery(): Promise<UnoServingDiscoveryOutc
       loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
     });
     if (!planned.accepted) continue;
-    // Discovery follows the same renderability rule as serving: a JSON Page that is not a validated document
-    // cannot be a sitemap entry or an alternate, exactly as Markdown cannot be discovered without a valid body.
     if (planned.document.kind === "json" && planned.document.pageDocument === undefined) continue;
     decisions.push(planned);
   }
-
-  if (decisions.length === 0) {
-    return { status: "unavailable", reason: "serving:discovery-unavailable" };
-  }
+  if (decisions.length === 0) return { status: "unavailable", reason: "serving:discovery-unavailable" };
 
   const plan = planUnoPublicDiscovery({
     decisions,
@@ -433,44 +711,33 @@ export async function planUnoServingDiscovery(): Promise<UnoServingDiscoveryOutc
     },
   });
   if (!plan.accepted) return { status: "unavailable", reason: "serving:discovery-unavailable" };
-
-  return { status: "planned", plan };
+  return {
+    status: "planned",
+    plan: Object.freeze({
+      entries: Object.freeze([...plan.entries]) as readonly UnoPublicDiscoveryEntry[],
+      sitemapUrls: Object.freeze([...plan.sitemapUrls]) as readonly string[],
+      site: plan.site,
+      defaultLocale: plan.defaultLocale,
+    }),
+  };
 }
 
-/** One localized address this deployment may render, in route-parameter form. */
-export interface UnoServingAddress {
-  readonly locale: string;
-  readonly segments: readonly string[];
-}
 
 /** What a requested locale path key resolved to against the stored Site authority. */
 export type UnoServingLocaleOutcome =
-  | { readonly status: 'supported'; readonly tag: string }
-  | { readonly status: 'alias'; readonly tag: string }
-  | { readonly status: 'unknown' };
+  | { readonly status: "supported"; readonly tag: string }
+  | { readonly status: "alias"; readonly tag: string }
+  | { readonly status: "unknown" };
 
-/**
- * Resolve a requested locale path key against the **committed** locale authority.
- *
- * This is the only locale lookup the App Router may use, and it is deliberately narrow: the key must be one of the
- * lowercase full path keys the selected Site actually authors, or an explicit short alias the declaration itself
- * stores. `de-de` maps back to the authored `de-DE`; a short alias such as `en` maps to its declared target and is
- * reported as `alias`, because only a redirect-only request may use it. Nothing here reads a Host, a cookie,
- * `Accept-Language`, an environment variable or the raw path as authority: an unknown, malformed or unsupported key
- * is `unknown`, and every caller must fail closed.
- */
-export function resolveUnoServingLocaleTag(pathKey: unknown): UnoServingLocaleOutcome {
-  if (typeof pathKey !== "string") return { status: "unknown" };
-  if (pathKey.length === 0 || pathKey.length > 64) return { status: "unknown" };
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(pathKey)) return { status: "unknown" };
-
-  const authority = readAuthority();
-  if (authority.status === "refused") return { status: "unknown" };
-
-  const stored = resolveUnoCommittedLocales({ manifest: authority.manifest, selection: authority.selection });
-  if (!stored.accepted) return { status: "unknown" };
-
-  for (const tag of stored.localePolicy.supportedLocales) {
+/** Match one path key against one accepted locale policy; both branches stay closed. */
+function matchLocale(
+  policy: {
+    readonly supportedLocales: readonly string[];
+    readonly languagePreferences: Readonly<Record<string, string>>;
+  },
+  pathKey: string,
+): UnoServingLocaleOutcome {
+  for (const tag of policy.supportedLocales) {
     let key: string;
     try {
       key = localePathKey(tag);
@@ -479,25 +746,64 @@ export function resolveUnoServingLocaleTag(pathKey: unknown): UnoServingLocaleOu
     }
     if (key === pathKey) return { status: "supported", tag };
   }
-
-  const aliasTarget = stored.localePolicy.languagePreferences[pathKey];
+  const aliasTarget = policy.languagePreferences[pathKey];
   if (aliasTarget === undefined) return { status: "unknown" };
-  if (!stored.localePolicy.supportedLocales.includes(aliasTarget)) return { status: "unknown" };
+  if (!policy.supportedLocales.includes(aliasTarget)) return { status: "unknown" };
   return { status: "alias", tag: aliasTarget };
 }
 
 /**
- * Enumerate the addresses this deployment may render.
+ * Resolve a requested locale path key against the **committed** locale authority of one Site.
  *
- * This is the build-time counterpart of `planUnoServingPage`: the same authority, the same confined loader and the
- * same publication planner decide which localized addresses exist. Only accepted published Pages with a renderable
- * (Markdown) body are listed, plus an explicit short alias whose destination is a published public Home. With no
- * declared base and no published Page — the committed reality — the list is empty, so every localized address is
- * refused by the router with the ordinary static 404 document.
+ * The key must be one of the lowercase full path keys the Site authors, or an explicit short alias the declaration itself
+ * stores. A version-2 declaration is resolved per Site, so the request authority is required there: without it there is no
+ * Site context and the answer is `unknown`, never a guess borrowed from another Site's locales.
+ */
+export function resolveUnoServingLocaleTag(pathKey: unknown, hostInput?: unknown): UnoServingLocaleOutcome {
+  if (typeof pathKey !== "string") return { status: "unknown" };
+  if (pathKey.length === 0 || pathKey.length > 64) return { status: "unknown" };
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(pathKey)) return { status: "unknown" };
+
+  const host = readHost(hostInput);
+  if (host === null) return { status: "unknown" };
+
+  const authority = readAuthority();
+  if (authority.mode === "refused") return { status: "unknown" };
+
+  if (authority.mode === "qualified") {
+    for (const binding of bindingsForHost(authority, host)) {
+      const stored = resolveUnoCommittedLocales({
+        manifest: authority.manifest,
+        selection: authority.selection,
+        site: { facetId: binding.facetId, siteId: binding.siteId },
+      });
+      if (!stored.accepted) continue;
+      const outcome = matchLocale(stored.localePolicy, pathKey);
+      if (outcome.status !== "unknown") return outcome;
+    }
+    return { status: "unknown" };
+  }
+
+  const stored = resolveUnoCommittedLocales({ manifest: authority.manifest, selection: authority.selection });
+  if (!stored.accepted) return { status: "unknown" };
+  return matchLocale(stored.localePolicy, pathKey);
+}
+
+/** One localized address this deployment may render, in route-parameter form. */
+export interface UnoServingAddress {
+  readonly locale: string;
+  readonly segments: readonly string[];
+}
+
+/**
+ * Enumerate the addresses a **legacy** declaration may render.
+ *
+ * A version-2 declaration is not enumerated: its addresses are chosen per request from the binding that owns the authority
+ * and prefix, so no authority-free list could be mistaken for one.
  */
 export async function listUnoServingAddresses(): Promise<readonly UnoServingAddress[]> {
   const authority = readAuthority();
-  if (authority.status === "refused") return [];
+  if (authority.mode !== "legacy") return [];
 
   const index = buildUnoCandidateRouteIndex(authority.manifest, authority.selection);
   if (!index.accepted) return [];
@@ -514,7 +820,6 @@ export async function listUnoServingAddresses(): Promise<readonly UnoServingAddr
   for (const candidate of index.candidates) {
     const loaded = await loadUnoCandidateSource({ repoRoot: authority.root, pathname: candidate.pathname });
     if (!loaded.accepted) continue;
-
     const planned = planUnoPublishedPage({
       manifest: authority.manifest,
       selection: authority.selection,
@@ -523,9 +828,6 @@ export async function listUnoServingAddresses(): Promise<readonly UnoServingAddr
       loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
     });
     if (!planned.accepted) continue;
-    // Routing enumeration includes a JSON Page only when it is a validated, renderable document; an unlisted Page
-    // is enumerated here (so the build can serve its exact full-locale address) but stays out of every discovery
-    // surface by its own visibility policy.
     if (planned.document.kind === "json" && planned.document.pageDocument === undefined) continue;
 
     const segments = planned.identity.routePath === "" ? [] : planned.identity.routePath.split("/");
@@ -540,18 +842,15 @@ export async function listUnoServingAddresses(): Promise<readonly UnoServingAddr
     }
   }
 
-  return Object.freeze(addresses.sort((left, right) =>
-    left.locale === right.locale
-      ? left.segments.join("/") < right.segments.join("/")
-        ? -1
-        : left.segments.join("/") > right.segments.join("/")
-          ? 1
-          : 0
-      : left.locale < right.locale
-        ? -1
-        : 1,
-  ));
+  return Object.freeze(
+    addresses.sort((left, right) => {
+      const a = `${left.locale}\u0000${left.segments.join("/")}`;
+      const b = `${right.locale}\u0000${right.segments.join("/")}`;
+      return a < b ? -1 : a > b ? 1 : 0;
+    }),
+  );
 }
+
 
 /** Escape the five XML metacharacters so a declared URL cannot alter the document structure. */
 function escapeXml(value: string): string {
@@ -563,32 +862,55 @@ function escapeXml(value: string): string {
     .replace(/'/gu, "&apos;");
 }
 
-/** The absolute sitemap address of the committed base, or `null` when no authority exists. */
-export function readUnoServingSitemapUrl(): string | null {
+/**
+ * The absolute sitemap address of the request authority's own Site, or `null` when no authority exists.
+ *
+ * It is always the accepted binding's declared `origin + pathPrefix` — never a request-derived origin — so this advertises
+ * exactly the Site it belongs to and a sibling Site's address can never be published here.
+ */
+export function readUnoServingSitemapUrl(hostInput?: unknown): string | null {
+  const host = readHost(hostInput);
+  if (host === null) return null;
+
   const authority = readAuthority();
-  if (authority.status === "refused") return null;
+  if (authority.mode === "refused") return null;
+
+  if (authority.mode === "qualified") {
+    const [binding] = bindingsForHost(authority, host);
+    if (binding === undefined) return null;
+    return `${binding.origin}${binding.pathPrefix}/sitemap.xml`;
+  }
   return `${authority.canonical}/sitemap.xml`;
 }
 
-
 /**
- * Render `robots.txt`, or `null` when the discovery gate does not hold.
+ * Render `robots.txt` for one request authority, or `null` when the discovery gate does not hold.
  *
- * No `Disallow` rule names an unlisted Page: an unlisted Page is protected by its own `noindex,nofollow`
- * response, not by a rule that would advertise its address. The single `Sitemap` line is the committed
- * canonical origin's own address.
+ * No `Disallow` rule names an unlisted Page: an unlisted Page is protected by its own `noindex,nofollow` response, not by a
+ * rule that would advertise its address. The single `Sitemap` line is the request authority's own Site address.
  */
-export async function renderUnoServingRobots(): Promise<string | null> {
-  const discovery = await planUnoServingDiscovery();
+export async function renderUnoServingRobots(hostInput?: unknown): Promise<string | null> {
+  const host = readHost(hostInput);
+  if (host === null) return null;
+
+  const discovery = await planUnoServingDiscovery(host);
   if (discovery.status !== "planned") return null;
-  const sitemapUrl = readUnoServingSitemapUrl();
+  const sitemapUrl = readUnoServingSitemapUrl(host);
   if (sitemapUrl === null) return null;
   return ["User-agent: *", "Allow: /", `Sitemap: ${sitemapUrl}`, ""].join("\n");
 }
 
-/** Render `sitemap.xml`, or `null` when the discovery gate does not hold. */
-export async function renderUnoServingSitemap(): Promise<string | null> {
-  const discovery = await planUnoServingDiscovery();
+/**
+ * Render `sitemap.xml` for one request authority, or `null` when the discovery gate does not hold.
+ *
+ * Every `<loc>` and alternate is a URL its own Site's accepted plan produced, so an unlisted Page, an alias, a refused
+ * source, an unpublished Page or a sibling Site can never appear, and every emitted value is XML-escaped.
+ */
+export async function renderUnoServingSitemap(hostInput?: unknown): Promise<string | null> {
+  const host = readHost(hostInput);
+  if (host === null) return null;
+
+  const discovery = await planUnoServingDiscovery(host);
   if (discovery.status !== "planned") return null;
 
   const lines: string[] = [
@@ -599,15 +921,13 @@ export async function renderUnoServingSitemap(): Promise<string | null> {
     lines.push("  <url>");
     lines.push(`    <loc>${escapeXml(entry.canonicalUrl)}</loc>`);
     for (const alternate of entry.alternates) {
-      lines.push(
-        `    <xhtml:link rel="alternate" hreflang="${escapeXml(alternate.localeTag)}" href="${escapeXml(alternate.href)}"/>`,
-      );
+      const href = escapeXml(alternate.href);
+      const tag = escapeXml(alternate.localeTag);
+      lines.push(`    <xhtml:link rel="alternate" hreflang="${tag}" href="${href}"/>`);
     }
     lines.push(`    <xhtml:link rel="alternate" hreflang="${escapeXml(entry.localeTag)}" href="${escapeXml(entry.canonicalUrl)}"/>`);
     if (entry.xDefault !== undefined) {
-      lines.push(
-        `    <xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(entry.xDefault)}"/>`,
-      );
+      lines.push(`    <xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(entry.xDefault)}"/>`);
     }
     lines.push("  </url>");
   }
@@ -617,3 +937,4 @@ export async function renderUnoServingSitemap(): Promise<string | null> {
   if (document.length > 512 * 1024) return null;
   return document;
 }
+

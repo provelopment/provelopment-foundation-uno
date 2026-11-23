@@ -13,9 +13,9 @@ import { renderUnoServingRobots } from '../../config/uno-serving';
 /** Nothing is cached: the answer is derived from the committed declaration on every request. */
 export const dynamic = 'force-dynamic';
 
-/** The bounded plain-text body, or a real 404. */
-export async function GET(): Promise<NextResponse> {
-  const body = await renderUnoServingRobots();
+/** The bounded plain-text body for this request authority, or a real 404. */
+export async function GET(request: Request): Promise<NextResponse> {
+  const body = await renderUnoServingRobots(request.headers.get('host') ?? '');
   if (body === null) return new NextResponse(null, { status: 404 });
 
   return new NextResponse(body, {
