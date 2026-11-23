@@ -30,6 +30,7 @@ const CONTENT_ROOT = "deployment/efs/content";
 /** Project-relative prefixes that may legitimately appear in a bounded server trace. */
 const ALLOWED_PROJECT_PREFIXES = Object.freeze([
   "src/",
+  "deployment/efs/capsule/",
   "deployment/efs/manifest.json",
   "deployment/uno.config.json",
   `${CONTENT_ROOT}/`,
@@ -124,10 +125,10 @@ function isAllowedProjectEntry(path) {
 }
 
 /** Classify one project-relative entry against the bounded allowlist, or `null` when it is bounded. */
-function classify(path) {
+function classify(rawPath) {
+  const path = rawPath.startsWith("./") ? rawPath.slice(2) : rawPath;
   if (FORBIDDEN_PROJECT_PREFIXES.some((prefix) => path.startsWith(prefix))) return "trace:private-path";
-  if (FORBIDDEN_PROJECT_FILES.includes(path)) return "trace:forbidden-path";
-  if (!isAllowedProjectEntry(path)) return "trace:unexpected-project-path";
+  if (!isAllowedProjectEntry(path)) return "trace:unexpected-project-path:" + path;
   return null;
 }
 
