@@ -198,6 +198,26 @@ jobs:
         env:
           PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers
 
+      # Blocking multi-Site contract (UNO-WO-097 / R01, M1 P6). Hermetic and mutation-sensitive: it reads the committed
+      # runner and this very workflow, and it fails if the no-default phase stops owning its sources, if a declared
+      # default reappears, if the exit or restoration guard is weakened, if a requirement group or the real Chromium
+      # transport is removed, or if either of the two steps below stops being unconditional on both operating systems.
+      - name: Multi-Site P6 contract (mutation-sensitive)
+        run: node --test tests/deployment/u03-multisite-contract.test.mjs
+        shell: bash
+
+      # Blocking three-Site production proof (UNO-WO-097 / R01, M1 P6). Installs a three-Site fixture twice through the
+      # recovery-armed transaction — the second time with no declared default and the same authored sources — builds and
+      # serves the REAL production output on loopback each time, and asserts independent Facet domains, a shared-Host
+      # prefix Site, JSON and Markdown precedence, unlisted and draft behaviour, per-Site locales/discovery, media
+      # ownership, hostile authorities and a real headless Chromium DOM, then proves both declarations restored
+      # byte-for-byte. The two steps are unconditional: no continuation, condition or report-only substitute.
+      - name: Run production HTTP and browser (three-Site P6, default-bearing and default-free, restored afterwards)
+        run: node scripts/verify-u03-multisite-http.mjs
+        shell: bash
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: .temp/uno-u03-browsers
+
       # Blocking U04 JSON Page vertical-slice gate (UNO-WO-035 / R01). It installs the same restore-in-finally
       # publication fixture, proves the version-1 JSON Page document with the real loader/planner, builds and serves
       # the REAL production output on loopback, then asserts the two-card article grid, truthful locale documents,

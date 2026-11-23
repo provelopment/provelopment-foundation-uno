@@ -207,11 +207,14 @@ const CONFIG = {
   languagePreferences: { en: "en-001" },
 };
 
-/** The same declaration with no default at all: every Site must still be active. */
+/** The same bindings, deliberately permuted, so a sorted declaration order cannot become an implicit default. */
+const SITE_BINDINGS_PERMUTED = [SITE_BINDINGS[2], SITE_BINDINGS[1], SITE_BINDINGS[0]];
+
+/** The same declaration with no default at all: every Site must still be active, in any declaration order. */
 const CONFIG_NO_DEFAULT = {
   version: 2,
   entityId: ENTITY_ID,
-  sites: SITE_BINDINGS,
+  sites: SITE_BINDINGS_PERMUTED,
   languagePreferences: { en: "en-001" },
 };
 
@@ -1088,6 +1091,7 @@ async function main() {
   let second;
   let child = null;
   let restoration = { ok: false, reason: "not-attempted" };
+  let noDefaultRestoration = { ok: false, reason: "not-attempted" };
   const createdDirectories = createFixtureDirectories();
 
   try {
@@ -1163,39 +1167,74 @@ async function main() {
         { path: MANIFEST_PATH, bytes: buildBytes(MANIFEST) },
         { path: CONFIG_PATH, bytes: buildBytes(CONFIG_NO_DEFAULT) },
       ],
-      fixtureSources: [],
+      // REQUIRED: phase one's verified restore removed every owned `wo096-*` source and plate, so the no-default phase
+      // must install the same authored bytes again. Declaring Pages whose sources it never installs would prove nothing.
+      fixtureSources: sources,
     });
     check("the no-default permutation is armed", second.status === "armed", (second.reasons ?? []).join(","));
     if (second.status === "armed") {
       const swapped = await second.install();
-      check("the no-default permutation installs", swapped.ok === true, String(swapped.reason ?? ""));
+      check("the no-default permutation installs its own sources", swapped.ok === true, JSON.stringify(swapped).slice(0, 400));
       if (swapped.ok === true) {
         const secondPort = await freeLoopbackPort();
-        child = startServer(nextBin, secondPort);
-        const secondReady = await waitForReady(secondPort);
-        if (secondReady.ok) {
-          const corpNoDefault = await requestAs(secondPort, HOST_ABC, "/de-de");
-          const svcNoDefault = await requestAs(secondPort, HOST_XYZ, "/en-001");
-          check(
-            "G01 with no declared default every Site stays active",
-            corpNoDefault.status === 200 && svcNoDefault.status === 200,
-            `${corpNoDefault.status}/${svcNoDefault.status}`,
-          );
-          check(
-            "G01 with no declared default each Site serves its own document",
-            corpNoDefault.body.includes("Corporate Hauptseite (DE)") && svcNoDefault.body.includes("Services Home"),
-          );
-        } else {
+        const secondBuild = await runChild([nextBin, "build"], BUILD_TIMEOUT_MS);
+        const secondBuilt = check(
+          "the no-default three-Site fixture builds",
+          secondBuild.code === 0,
+          `exit ${secondBuild.code}`,
+        );
+        if (!secondBuilt) process.stderr.write(secondBuild.output.slice(-4000));
+        if (secondBuilt) {
+          child = startServer(nextBin, secondPort);
+          const secondReady = await waitForReady(secondPort);
           check(
             "the no-default server answers on loopback",
-            false,
+            secondReady.ok,
             `last status ${secondReady.status} ${secondReady.error} · ${child.__output.join("").slice(-400)}`,
           );
+          if (secondReady.ok) {
+            const noDefault = {
+              corporateRoot: await requestAs(secondPort, HOST_ABC, "/de-de"),
+              corporateDocs: await requestAs(secondPort, HOST_ABC, "/docs/de-de"),
+              servicesRoot: await requestAs(secondPort, HOST_XYZ, "/en-001"),
+              foreign: await requestAs(secondPort, "unknown.example", "/de-de"),
+            };
+            const statuses = [
+              noDefault.corporateRoot.status,
+              noDefault.corporateDocs.status,
+              noDefault.servicesRoot.status,
+            ];
+            check(
+              "G01 with no declared default every Site stays active",
+              statuses.every((status) => status === 200),
+              statuses.join("/"),
+            );
+            check(
+              "G01 with no declared default each Site serves its own authored body",
+              noDefault.corporateRoot.body.includes("Corporate Hauptseite (DE)") &&
+                noDefault.corporateDocs.body.includes("Dokumentation (DE)") &&
+                noDefault.servicesRoot.body.includes("Services Home"),
+              "corporateRoot/corporateDocs/servicesRoot",
+            );
+            check(
+              "G01 with no declared default each Site keeps its own canonical origin",
+              canonicalOf(noDefault.corporateRoot) === `https://${HOST_ABC}/de-de` &&
+                canonicalOf(noDefault.corporateDocs) === `${CORPORATE_DOCS}de-de` &&
+                canonicalOf(noDefault.servicesRoot) === `https://${HOST_XYZ}/en-001`,
+              `${String(canonicalOf(noDefault.corporateRoot))} | ${String(canonicalOf(noDefault.corporateDocs))} | ${String(canonicalOf(noDefault.servicesRoot))}`,
+            );
+            check(
+              "G01 with no declared default a foreign Host is still refused",
+              isApprovedRefusal(noDefault.foreign),
+              `status ${noDefault.foreign.status}`,
+            );
+          }
+          await stopChild(child);
+          child = null;
         }
-        await stopChild(child);
-        child = null;
       }
       const secondRestoration = await restoreAndVerify(second);
+      noDefaultRestoration = secondRestoration;
       check("the no-default permutation is restored byte-exactly", secondRestoration.ok, String(secondRestoration.reason ?? ""));
       if (secondRestoration.ok) await second.dispose();
       second = undefined;
@@ -1234,8 +1273,12 @@ async function main() {
   if (failedNames.length > 0) {
     process.stdout.write(`failed assertions:\n${failedNames.map((name) => `  - ${name}`).join("\n")}\n`);
   }
-  process.stdout.write(`restoration: ${restoration.ok ? "verified byte-exactly" : "UNVERIFIED"}\n`);
-  process.exitCode = failed === 0 && restoration.ok ? 0 : 1;
+  process.stdout.write(
+    `restoration: phase one ${restoration.ok ? "verified byte-exactly" : "UNVERIFIED"} · phase two ${
+      noDefaultRestoration.ok ? "verified byte-exactly" : "UNVERIFIED"
+    }\n`,
+  );
+  process.exitCode = failed === 0 && restoration.ok && noDefaultRestoration.ok ? 0 : 1;
 }
 
 main().catch((error) => {
