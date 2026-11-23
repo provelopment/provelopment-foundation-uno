@@ -169,7 +169,15 @@ export interface UnoSiteAddressConfig {
   readonly version: typeof UNO_SITE_ADDRESS_CONFIG_VERSION;
   readonly entityId: string;
   readonly sites: readonly UnoSiteAddressBinding[];
-  readonly selectedSite: UnoSelectedSite;
+  /**
+   * The entry target, present **only** when the declaration authored `default` (`UNO-WO-092 / R01`).
+   *
+   * It used to be filled with `sites[0]` when no default was authored, which made declaration order decide which Site
+   * looked like the publisher and let a language mapping be checked against an arbitrary Site. A default is a declared
+   * entry choice, not an implication: with several Sites and no `default` this field is absent, every Site stays active,
+   * and an ambiguous entry refuses instead of silently selecting index zero.
+   */
+  readonly selectedSite?: UnoSelectedSite;
   readonly defaultSite?: UnoSelectedSite;
   readonly languagePreferences?: Readonly<Record<string, string>>;
 }
@@ -378,9 +386,16 @@ function analyzeAddressConfiguration(input: DataRecord, manifest: unknown): UnoS
   if (entity === undefined || entity.id !== entityId) return refuse("config:entity-mismatch");
 
   const bindings: UnoSiteAddressBinding[] = [];
-  const seenAddresses = new Set<string>();
   const prefixesByOrigin = new Map<string, string[]>();
-  const seenAliases = new Set<string>();
+  /**
+   * One normalized ownership index across **every** canonical and alias address (`UNO-WO-092 / R01`, §4.A1).
+   *
+   * The earlier walk compared a new canonical only against older *canonicals* and a new alias only against older
+   * canonicals and aliases, so `A.alias = B.canonical` escaped whenever A was declared first: declaration order decided
+   * validity. One index refuses the exact collision in either order, still permits two Sites to share a host under
+   * disjoint whole-segment prefixes, and stays fail-closed for cross-owner overlap.
+   */
+  const ownerOfAddress = new Map<string, string>();
 
   for (const rawEntry of sitesValue as readonly unknown[]) {
     const entry = readOwnData(rawEntry);
@@ -428,9 +443,10 @@ function analyzeAddressConfiguration(input: DataRecord, manifest: unknown): UnoS
       return refuse("config:duplicate-site-address");
     }
 
+    const owner = `${facetId}\u0000${siteId}`;
     const address = `${validated.canonical.origin}${validated.canonical.pathPrefix}`;
-    if (seenAddresses.has(address)) return refuse("config:duplicate-site-address");
-    seenAddresses.add(address);
+    if (ownerOfAddress.has(address)) return refuse("config:duplicate-site-address");
+    ownerOfAddress.set(address, owner);
 
     const originPrefixes = prefixesByOrigin.get(validated.canonical.origin) ?? [];
     if (originPrefixes.includes(validated.canonical.pathPrefix)) return refuse("config:duplicate-site-address");
@@ -450,10 +466,8 @@ function analyzeAddressConfiguration(input: DataRecord, manifest: unknown): UnoS
     const aliasStrings: string[] = [];
     for (const alias of validated.aliases) {
       const aliasString = `${alias.origin}${alias.pathPrefix}`;
-      if (seenAddresses.has(aliasString) || seenAliases.has(aliasString)) {
-        return refuse("config:duplicate-site-address");
-      }
-      seenAliases.add(aliasString);
+      if (ownerOfAddress.has(aliasString)) return refuse("config:duplicate-site-address");
+      ownerOfAddress.set(aliasString, owner);
       aliasStrings.push(aliasString);
     }
 
@@ -488,43 +502,68 @@ function analyzeAddressConfiguration(input: DataRecord, manifest: unknown): UnoS
     defaultSite = Object.freeze({ facetId: defaultFacetId, siteId: defaultSiteId });
   }
 
-  let chosen: UnoSelectedSite;
-  if (defaultSite !== undefined) {
-    chosen = defaultSite;
-  } else {
-    const [sole] = bindings;
-    if (sole === undefined) return refuse("config:invalid-default");
-    chosen = { facetId: sole.facetId, siteId: sole.siteId };
-  }
+  // `UNO-WO-092 / R01` (§4.A2): no implicit entry Site for a multi-Site declaration. `sites[0]` is never promoted to
+  // `selectedSite`, so a no-default declaration validates identically under any `sites[]` permutation, keeps every Site
+  // active, and an ambiguous entry refuses elsewhere rather than silently selecting index zero. A declaration with
+  // exactly one binding is not ambiguous, so the single-Site version-2 case keeps its one well-defined entry target.
+  const selectedSite: UnoSelectedSite | undefined =
+    defaultSite ??
+    (bindings.length === 1
+      ? Object.freeze({ facetId: bindings[0]!.facetId, siteId: bindings[0]!.siteId })
+      : undefined);
 
   let languagePreferences: Record<string, string> | null = null;
   if (Object.prototype.hasOwnProperty.call(input, "languagePreferences")) {
     languagePreferences = readLanguagePreferences(input["languagePreferences"]);
     if (languagePreferences === null) return refuse("config:invalid-language-preferences");
-    const chosenFacet = entity.facets.find((facet) => facet.id === chosen.facetId);
-    const chosenSite = chosenFacet?.sites.find((site) => site.id === chosen.siteId);
-    if (chosenSite?.locales === undefined) return refuse("config:locale-authority-missing");
-    const policyIssue = localePolicyIssue({
-      supportedLocales: [...chosenSite.locales.supportedLocales],
-      defaultLocale: chosenSite.locales.defaultLocale,
-      languagePreferences,
-    });
-    if (policyIssue !== null) return refuse("config:invalid-language-preferences");
+
+    // A mapping is installation-level, but each entry is applied only to the Sites that own its target locale. It is
+    // therefore checked per Site against that Site's own projection: an alias can never be validated against a sibling
+    // Site's locales, no per-Site preference or translation is synthesized, and a target no bound Site authors refuses.
+    const coveredKeys = new Set<string>();
+    let siteWithLocales = 0;
+    for (const bound of bindings) {
+      const boundFacet = entity.facets.find((facet) => facet.id === bound.facetId);
+      const boundSite = boundFacet?.sites.find((site) => site.id === bound.siteId);
+      const boundLocales = boundSite?.locales;
+      if (boundLocales === undefined) continue;
+      siteWithLocales += 1;
+
+      const supported = [...boundLocales.supportedLocales];
+      const owned = new Set(supported);
+      const projection = Object.create(null) as Record<string, string>;
+      for (const key of Object.keys(languagePreferences).sort()) {
+        const target = languagePreferences[key] as string;
+        if (!owned.has(target)) continue;
+        projection[key] = target;
+        coveredKeys.add(key);
+      }
+      const policyIssue = localePolicyIssue({
+        supportedLocales: supported,
+        defaultLocale: boundLocales.defaultLocale,
+        languagePreferences: projection,
+      });
+      if (policyIssue !== null) return refuse("config:invalid-language-preferences");
+    }
+    if (siteWithLocales === 0) return refuse("config:locale-authority-missing");
+    for (const key of Object.keys(languagePreferences)) {
+      if (!coveredKeys.has(key)) return refuse("config:invalid-language-preferences");
+    }
   }
 
   const config: {
     version: typeof UNO_SITE_ADDRESS_CONFIG_VERSION;
     entityId: string;
     sites: readonly UnoSiteAddressBinding[];
-    selectedSite: UnoSelectedSite;
+    selectedSite?: UnoSelectedSite;
     defaultSite?: UnoSelectedSite;
     languagePreferences?: Record<string, string>;
   } = {
     version: UNO_SITE_ADDRESS_CONFIG_VERSION,
     entityId,
     sites: Object.freeze(bindings),
-    selectedSite: chosen,
   };
+  if (selectedSite !== undefined) config.selectedSite = selectedSite;
   if (defaultSite !== undefined) config.defaultSite = defaultSite;
   if (languagePreferences !== null) {
     const sorted = Object.create(null) as Record<string, string>;

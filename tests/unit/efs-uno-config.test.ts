@@ -842,3 +842,195 @@ describe("multi-Facet / multi-Site address configuration", () => {
     expect(result.config.selectedSite).toEqual({ facetId: "corporate", siteId: "main" });
   });
 });
+
+/**
+ * `UNO-WO-092 / R01` (§4.A): the two independently found version-2 authority defects.
+ *
+ * The first is order-dependent address ownership: `A.alias = B.canonical` used to validate whenever A was declared
+ * first, because a new canonical was compared only against older canonicals. The second is the implicit entry Site:
+ * with several Sites and no authored `default`, `selectedSite` was filled with `sites[0]` and a language mapping was
+ * checked against that arbitrary choice. Every case below asserts a specific closed code or an exact absence.
+ */
+describe("version-2 authority: address ownership and entry default", () => {
+  const siteWithLocales = (siteId: string, slug: string, supportedLocales: readonly string[], defaultLocale: string) => ({
+    id: siteId,
+    locales: { supportedLocales: [...supportedLocales], defaultLocale },
+    pages: [
+      {
+        id: "home",
+        route: ["home"],
+        representations: [
+          {
+            locale: supportedLocales[0],
+            sources: [{ kind: "markdown", path: `deployment/efs/content/${slug}.en-001.md` }],
+          },
+        ],
+      },
+    ],
+  });
+
+  const manifestWithLocales = () => ({
+    entities: [
+      {
+        id: ENTITY_ID,
+        facets: [
+          {
+            id: "corporate",
+            sites: [
+              siteWithLocales("main", "corp-main", ["en-001"], "en-001"),
+              siteWithLocales("docs", "corp-docs", ["de-DE"], "de-DE"),
+            ],
+          },
+          { id: "services", sites: [siteWithLocales("main", "svc-main", ["en-001"], "en-001")] },
+        ],
+      },
+    ],
+  });
+
+  const declaration = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+    version: UNO_SITE_ADDRESS_CONFIG_VERSION,
+    entityId: ENTITY_ID,
+    sites: [
+      { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+      { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+      { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+    ],
+    ...overrides,
+  });
+
+  const duplicate = { accepted: false, reason: "config:duplicate-site-address" };
+
+  it("refuses an alias another Site claims as canonical, whichever Site is declared first", () => {
+    const aliasFirst = declaration({
+      sites: [
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example", aliases: ["https://xyz.example"] },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+      ],
+    });
+    expect(validateUnoSiteAddressConfig(aliasFirst, manifestWithLocales())).toEqual(duplicate);
+
+    // The same two addresses, opposite declaration order: the answer must not depend on `sites[]` order.
+    const canonicalFirst = declaration({
+      sites: [
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example", aliases: ["https://xyz.example"] },
+      ],
+    });
+    expect(validateUnoSiteAddressConfig(canonicalFirst, manifestWithLocales())).toEqual(duplicate);
+  });
+
+  it("refuses a canonical an earlier Site already claims as an alias", () => {
+    // The alias belongs to the root Site and sits under *another* Site's canonical address, not under its own, so the
+    // per-base policy accepts it and only the one shared ownership index can refuse the collision.
+    const selfAliased = declaration({
+      sites: [
+        {
+          facetId: "corporate",
+          siteId: "main",
+          origin: "https://abc.example",
+          aliases: ["https://xyz.example/docs"],
+        },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example", pathPrefix: "/docs/" },
+      ],
+    });
+    expect(validateUnoSiteAddressConfig(selfAliased, manifestWithLocales())).toEqual(duplicate);
+  });
+
+
+
+  it("refuses two Sites that claim the same alias, in either declaration order", () => {
+    const forward = declaration({
+      sites: [
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example", aliases: ["https://alias.example"] },
+        {
+          facetId: "corporate",
+          siteId: "docs",
+          origin: "https://abc.example",
+          pathPrefix: "/docs/",
+          aliases: ["https://alias.example"],
+        },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+      ],
+    });
+    expect(validateUnoSiteAddressConfig(forward, manifestWithLocales())).toEqual(duplicate);
+
+    const reversed = declaration({
+      sites: [
+        {
+          facetId: "corporate",
+          siteId: "docs",
+          origin: "https://abc.example",
+          pathPrefix: "/docs/",
+          aliases: ["https://alias.example"],
+        },
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example", aliases: ["https://alias.example"] },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+      ],
+    });
+    expect(validateUnoSiteAddressConfig(reversed, manifestWithLocales())).toEqual(duplicate);
+  });
+
+  it("keeps disjoint legitimate prefixes and unrelated aliases valid on one shared host", () => {
+    const shared = declaration({
+      sites: [
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example", aliases: ["https://www.abc.example"] },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+      ],
+    });
+    const result = validateUnoSiteAddressConfig(shared, manifestWithLocales());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect(result.config.sites.map((site) => `${site.origin}${site.pathPrefix}`)).toEqual([
+      "https://abc.example",
+      "https://abc.example/docs",
+      "https://xyz.example",
+    ]);
+  });
+
+  it("never promotes the first binding to an entry default, and is permutation independent", () => {
+    const result = validateUnoSiteAddressConfig(declaration(), manifestWithLocales());
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    expect(result.config.defaultSite).toBeUndefined();
+    expect(result.config.selectedSite).toBeUndefined();
+    // Every Site stays active: an entry choice must not remove one from the authority.
+    expect(result.config.sites).toHaveLength(3);
+
+    const reversed = declaration({
+      sites: [
+        { facetId: "services", siteId: "main", origin: "https://xyz.example" },
+        { facetId: "corporate", siteId: "docs", origin: "https://abc.example", pathPrefix: "/docs/" },
+        { facetId: "corporate", siteId: "main", origin: "https://abc.example" },
+      ],
+    });
+    const permuted = validateUnoSiteAddressConfig(reversed, manifestWithLocales());
+    expect(permuted.accepted).toBe(true);
+    if (!permuted.accepted) return;
+    expect(permuted.config.selectedSite).toBeUndefined();
+    const key = (value: { facetId: string; siteId: string; origin: string; pathPrefix: string }) =>
+      `${value.facetId}/${value.siteId}=${value.origin}${value.pathPrefix}`;
+    expect([...permuted.config.sites].map(key).sort()).toEqual([...result.config.sites].map(key).sort());
+  });
+
+  it("applies a mapping only to the Sites that own its target locale", () => {
+    // `corporate/main` owns en-001 and `corporate/docs` owns de-DE, so each projection is valid for its own Site.
+    const mapped = validateUnoSiteAddressConfig(
+      declaration({ languagePreferences: { en: "en-001", de: "de-DE" } }),
+      manifestWithLocales(),
+    );
+    expect(mapped.accepted).toBe(true);
+    if (!mapped.accepted) return;
+    expect(mapped.config.languagePreferences).toEqual({ de: "de-DE", en: "en-001" });
+
+    // A target no bound Site authors refuses instead of being validated against an arbitrary first Site.
+    const unowned = validateUnoSiteAddressConfig(
+      declaration({ languagePreferences: { fr: "fr-001" } }),
+      manifestWithLocales(),
+    );
+    expect(unowned).toEqual({ accepted: false, reason: "config:invalid-language-preferences" });
+  });
+});
