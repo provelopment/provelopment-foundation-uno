@@ -20,6 +20,7 @@ import test from "node:test";
 const ROOT = process.cwd();
 const RUNNER = "scripts/verify-u03-multisite-http.mjs";
 const WORKFLOW = ".github/workflows/verify-u01.yml";
+const SERVING = "src/config/uno-serving.ts";
 
 /** Read one repository file as text with normalised newlines; a missing file is a failure, never a skip. */
 function read(relativePath) {
@@ -124,7 +125,80 @@ function analyseWorkflow(text) {
   return { ok: problems.length === 0, problems };
 }
 
-/** One replacement that must make the detector fail, applied only in memory. */
+/**
+ * The alias-routing contract (`UNO-WO-098 / R01`).
+ *
+ * A green redirect can hide a policy regression in three places a log cannot show: the branch may run *before* the
+ * canonical match (shadowing an owner), the destination may skip the `public` gate (redirecting an unlisted Page), or the
+ * planner's own identity/canonical may never be compared with the translated target. Each rule below is one predicate, so
+ * the mutation cases below exercise the real detector rather than a restatement of it.
+ */
+function analyseAliasRouting(source) {
+  const problems = [];
+  const add = (code) => problems.push(code);
+
+  if (!/export function matchUnoServingAliasAddress\(/u.test(source)) add("alias:matcher");
+  if (!/if \(!planned\.page\.delivery\.public\) return null;/u.test(source)) add("alias:public-gate");
+  if (
+    !/if \(planned\.page\.identity\.facetId !== target\.facetId \|\| planned\.page\.identity\.siteId !== target\.siteId\) return null;/u.test(
+      source,
+    )
+  ) {
+    add("alias:identity-gate");
+  }
+  if (!/if \(planned\.page\.delivery\.canonicalUrl !== target\.canonicalUrl\) return null;/u.test(source)) {
+    add("alias:canonical-gate");
+  }
+  if (!/if \(matched\.status !== "match"\) return null;/u.test(source)) add("alias:single-owner");
+  if (!/async function redirectThroughAlias\(/u.test(source)) add("alias:resolver");
+  if (!/const aliased = await redirectThroughAlias\(host, pathname\);/u.test(source)) add("alias:wiring");
+  if (!/if \(aliased !== null\) return \{ kind: "redirect", location: aliased\.location \};/u.test(source)) {
+    add("alias:decision");
+  }
+  // Whole-segment prefix match and no synthesised locale for an alias root.
+  if (!/requestPath\.startsWith\(`\$\{declared\.prefix\}\/`\)/u.test(source)) add("alias:whole-segment");
+  if (!/suffix === null \|\| suffix === ""/u.test(source)) add("alias:no-root");
+  // The destination authority comes from the stored origin, never from the request.
+  if (!/host: canonicalHost,/u.test(source)) add("alias:stored-host");
+  // The canonical Page must be attempted before any alias may answer.
+  const canonicalAt = source.indexOf("const served = await planUnoServingPage({ host, pathname });");
+  const aliasAt = source.indexOf("const aliased = await redirectThroughAlias(host, pathname);");
+  if (canonicalAt < 0) add("alias:canonical-first-missing");
+  if (aliasAt < 0 || (canonicalAt >= 0 && aliasAt < canonicalAt)) add("alias:canonical-first-order");
+  // One fixed deployment root only, and no request-shaped URL construction.
+  if ((source.match(/process\.cwd\(\)/gu) ?? []).length !== 1) add("alias:single-cwd");
+  if (/new URL\(\s*[^)]*(host|pathname)/u.test(source)) add("alias:request-url");
+
+  return { ok: problems.length === 0, problems };
+}
+
+/** The production runner's alias evidence: positive redirect assertions, and no permissive substitute. */
+function analyseAliasRunner(source) {
+  const problems = [];
+  const add = (code) => problems.push(code);
+
+  if (!/G03 a declared address alias redirects temporarily to its own Site's canonical address/u.test(source)) {
+    add("alias-runner:positive");
+  }
+  if (!/addressAlias\.status === 307 && addressAliasLocation === `https:\/\/\$\{HOST_ABC\}\/docs\/de-de`/u.test(source)) {
+    add("alias-runner:exact-location");
+  }
+  if (/when offered/u.test(source)) add("alias-runner:permissive");
+  for (const needed of [
+    "G03 a nested alias path redirects to the same Site's authored nested Page",
+    "G03 an alias declared on another host redirects to its Site's configured canonical host",
+    "G03 an alias root never synthesises a locale and is refused",
+    "G03 an alias prefix matches whole segments only",
+    "G03 an alias never invents a locale the owning Site does not declare",
+    "G03 an unlisted Page keeps its canonical access and is never an alias destination",
+    "G03 an alias redirect never reflects request query bytes",
+    "G03 with no declared default a declared address alias still redirects to its own Site's canonical",
+  ]) {
+    if (!source.includes(needed)) add(`alias-runner:${needed.slice(4, 34)}`);
+  }
+
+  return { ok: problems.length === 0, problems };
+}
 function mutate(source, from, to) {
   assert.ok(source.includes(from), `mutation target must exist: ${from.slice(0, 60)}`);
   return source.replace(from, to);
@@ -245,6 +319,75 @@ test("the workflow contract rejects a missing Playwright browser path", () => {
 test("the detector is exercised by many mutations and inspects a real check surface", () => {
   assert.ok(MUTATION_LABELS.length >= 10);
   assert.ok((read(RUNNER).match(/\bcheck\(/gu) ?? []).length >= 100);
+});
+
+test("the committed serving composition satisfies every declared-alias routing rule", () => {
+  const verdict = analyseAliasRouting(read(SERVING));
+  assert.deepEqual(verdict.problems, []);
+  assert.equal(verdict.ok, true);
+});
+
+test("the committed runner proves the declared alias positively, not permissively", () => {
+  const verdict = analyseAliasRunner(read(RUNNER));
+  assert.deepEqual(verdict.problems, []);
+  assert.equal(verdict.ok, true);
+});
+
+test("the alias contract rejects a redirect that skips the public gate", () => {
+  const mutated = mutate(read(SERVING), "  if (!planned.page.delivery.public) return null;\n", "");
+  const verdict = analyseAliasRouting(mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("alias:public-gate"));
+});
+
+test("the alias contract rejects a redirect that never compares the planned canonical", () => {
+  const mutated = mutate(read(SERVING), "  if (planned.page.delivery.canonicalUrl !== target.canonicalUrl) return null;\n", "");
+  const verdict = analyseAliasRouting(mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("alias:canonical-gate"));
+});
+
+test("the alias contract rejects answering an alias before the canonical owner is tried", () => {
+  const mutated = mutate(read(SERVING), "  const served = await planUnoServingPage({ host, pathname });\n", "");
+  const verdict = analyseAliasRouting(mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("alias:canonical-first-missing"));
+});
+
+test("the alias contract rejects removing the alias branch entirely", () => {
+  const mutated = mutate(read(SERVING), "  const aliased = await redirectThroughAlias(host, pathname);\n", "");
+  const verdict = analyseAliasRouting(mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("alias:wiring"));
+});
+
+test("the alias contract rejects a destination authority taken from the request", () => {
+  const mutated = mutate(read(SERVING), "        host: canonicalHost,", "        host: requestHost,");
+  const verdict = analyseAliasRouting(mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("alias:stored-host"));
+});
+
+test("the alias runner contract rejects the permissive alias wording returning", () => {
+  const mutated = mutate(
+    read(RUNNER),
+    "G03 an alias prefix matches whole segments only",
+    "G03 an alias redirect, when offered, matches whole segments only",
+  );
+  const verdict = analyseAliasRunner(mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("alias-runner:permissive"));
+});
+
+test("the alias runner contract rejects a lost positive redirect assertion", () => {
+  const mutated = mutate(
+    read(RUNNER),
+    "G03 a declared address alias redirects temporarily to its own Site's canonical address",
+    "G03 a declared address alias is recorded",
+  );
+  const verdict = analyseAliasRunner(mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("alias-runner:positive"));
 });
 
 /** Named mutations the suite above actually executes; kept here so the count is asserted, not assumed. */

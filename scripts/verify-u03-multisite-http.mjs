@@ -134,6 +134,11 @@ const MANIFEST = {
                   locale: "de-DE",
                   sources: [{ kind: "markdown", file: "wo096-corp-docs-notes.de-DE.md" }],
                 },
+                {
+                  id: "privacy",
+                  locale: "de-DE",
+                  sources: [{ kind: "json", file: "wo096-corp-docs-privacy.de-DE.json" }],
+                },
               ]),
             },
           ],
@@ -185,7 +190,25 @@ const MANIFEST = {
   ],
 };
 
-/** The version-2 address declaration: three bindings, an unrelated default, and one declared alias. */
+/** The unlisted docs Page: directly reachable on its canonical address, never discoverable and never aliased. */
+function unlistedDocument(title, lines) {
+  return `${JSON.stringify(
+    {
+      version: 1,
+      title,
+      description: lines[1],
+      visibility: "unlisted",
+      sections: [
+        { id: "lede", module: "content.heading", props: { text: lines[0], level: 2 } },
+        { id: "body", module: "content.prose", props: { text: lines[1] } },
+      ],
+    },
+    null,
+    2,
+  )}\n`;
+}
+
+/** The version-2 address declaration: three bindings, an unrelated default, and the declared Site-address aliases. */
 const SITE_BINDINGS = [
   { facetId: "corporate", siteId: "main", origin: CORPORATE_MAIN },
   {
@@ -193,7 +216,9 @@ const SITE_BINDINGS = [
     siteId: "docs",
     origin: CORPORATE_MAIN,
     pathPrefix: "/docs/",
-    aliases: ["https://abc.example/docs-old"],
+    // One alias on the Site's own host and one on a different host: both must redirect to this Site's own canonical
+    // address, and neither may ever become a publisher or a destination authority.
+    aliases: ["https://abc.example/docs-old", "https://docs.example/handbook"],
   },
   { facetId: "services", siteId: "main", origin: SERVICES_MAIN },
 ];
@@ -278,6 +303,13 @@ function buildFixtureSources() {
         "Notizen (DE)",
         "Die Notizen sind als Markdown verfasst und werden als Markdown ausgeliefert, nicht aus JSON abgeleitet.",
       ),
+    ),
+    contentFile(
+      "wo096-corp-docs-privacy.de-DE.json",
+      unlistedDocument("Dokumentation Datenschutz (DE)", [
+        "Datenschutz der Dokumentation",
+        "Diese Seite ist unlisted: auf ihrer kanonischen Adresse direkt erreichbar, aber niemals entdeckbar und niemals ein Aliasziel.",
+      ]),
     ),
     contentFile(
       "wo096-svc-home.en-001.json",
@@ -773,13 +805,114 @@ async function g03Discovery(port) {
 
   const addressAlias = await requestAs(port, HOST_ABC, "/docs-old/de-de");
   const addressAliasLocation = String(addressAlias.headers.location ?? "");
-  check("G03 a declared address alias never serves as a second owner", addressAlias.status !== 200, `status ${addressAlias.status}`);
   check(
-    "G03 an address alias redirect, when offered, targets the owning Site's canonical",
-    !(addressAlias.status === 307 || addressAlias.status === 308) || addressAliasLocation === `https://${HOST_ABC}/docs/de-de`,
+    "G03 a declared address alias redirects temporarily to its own Site's canonical address",
+    addressAlias.status === 307 && addressAliasLocation === `https://${HOST_ABC}/docs/de-de`,
     `status ${addressAlias.status} location ${addressAliasLocation}`,
   );
-  return { addressAliasStatus: addressAlias.status };
+  check(
+    "G03 a declared address alias never serves a document of its own",
+    !addressAlias.body.includes("Dokumentation (DE)") && canonicalOf(addressAlias) !== `https://${HOST_ABC}/docs-old/de-de`,
+    `${addressAlias.body.length} bytes canonical ${String(canonicalOf(addressAlias))}`,
+  );
+  check(
+    "G03 a declared address alias never becomes the canonical origin",
+    !addressAliasLocation.includes("/docs-old") && addressAliasLocation.startsWith(`https://${HOST_ABC}/docs/`),
+    addressAliasLocation,
+  );
+
+  const nestedAlias = await requestAs(port, HOST_ABC, "/docs-old/de-de/notes");
+  const nestedAliasLocation = String(nestedAlias.headers.location ?? "");
+  check(
+    "G03 a nested alias path redirects to the same Site's authored nested Page",
+    nestedAlias.status === 307 && nestedAliasLocation === `https://${HOST_ABC}/docs/de-de/notes`,
+    `status ${nestedAlias.status} location ${nestedAliasLocation}`,
+  );
+
+  const otherHostAlias = await requestAs(port, "docs.example", "/handbook/de-de");
+  const otherHostLocation = String(otherHostAlias.headers.location ?? "");
+  check(
+    "G03 an alias declared on another host redirects to its Site's configured canonical host",
+    otherHostAlias.status === 307 && otherHostLocation === `https://${HOST_ABC}/docs/de-de`,
+    `status ${otherHostAlias.status} location ${otherHostLocation}`,
+  );
+
+  const aliasRoot = await requestAs(port, HOST_ABC, "/docs-old");
+  check(
+    "G03 an alias root never synthesises a locale and is refused",
+    isApprovedRefusal(aliasRoot),
+    `status ${aliasRoot.status} location ${String(aliasRoot.headers.location ?? "")}`,
+  );
+
+  const lookalikeAlias = await requestAs(port, HOST_ABC, "/docs-older/de-de");
+  check(
+    "G03 an alias prefix matches whole segments only",
+    isApprovedRefusal(lookalikeAlias),
+    `status ${lookalikeAlias.status}`,
+  );
+
+  const foreignHostAlias = await requestAs(port, HOST_XYZ, "/docs-old/de-de");
+  check(
+    "G03 an alias request on a Host its Site does not own is refused",
+    isApprovedRefusal(foreignHostAlias),
+    `status ${foreignHostAlias.status}`,
+  );
+
+  const foreignLocaleAlias = await requestAs(port, HOST_ABC, "/docs-old/en-001");
+  check(
+    "G03 an alias never invents a locale the owning Site does not declare",
+    isApprovedRefusal(foreignLocaleAlias),
+    `status ${foreignLocaleAlias.status}`,
+  );
+
+  const unlistedAlias = await requestAs(port, HOST_ABC, "/docs-old/de-de/privacy");
+  check(
+    "G03 an unlisted Page keeps its canonical access and is never an alias destination",
+    isApprovedRefusal(unlistedAlias),
+    `status ${unlistedAlias.status}`,
+  );
+  const unlistedCanonical = await requestAs(port, HOST_ABC, "/docs/de-de/privacy");
+  check(
+    "G03 the unlisted Page itself stays directly reachable and non-indexable",
+    unlistedCanonical.status === 200 &&
+      unlistedCanonical.body.includes("Datenschutz der Dokumentation") &&
+      /<meta[^>]+name="robots"[^>]*noindex/u.test(unlistedCanonical.body),
+    `status ${unlistedCanonical.status} robots ${/<meta[^>]+name="robots"[^>]*>/u.exec(unlistedCanonical.body)?.[0] ?? "absent"}`,
+  );
+
+  const queryAlias = await requestAs(port, HOST_ABC, "/docs-old/de-de?x=%0d%0aLocation:%20https://evil.example");
+  const queryLocation = String(queryAlias.headers.location ?? "");
+  check(
+    "G03 an alias redirect never reflects request query bytes",
+    queryAlias.status === 307 &&
+      queryLocation === `https://${HOST_ABC}/docs/de-de` &&
+      !/[?\r\n]/u.test(queryLocation),
+    `status ${queryAlias.status} location ${queryLocation}`,
+  );
+
+  const encodedAlias = await requestAs(port, HOST_ABC, "/docs-old/%2e%2e/docs/de-de");
+  const encodedLocation = String(encodedAlias.headers.location ?? "");
+  check(
+    "G03 an encoded traversal can never be served or redirected as the alias",
+    encodedLocation === "" || encodedLocation === `https://${HOST_ABC}/docs/de-de`,
+    `status ${encodedAlias.status} location ${encodedLocation}`,
+  );
+  check(
+    "G03 an encoded traversal never exposes the alias prefix",
+    !encodedLocation.includes("docs-old") && !encodedAlias.body.includes("/docs-old"),
+    `location ${encodedLocation}`,
+  );
+
+  const canonicalDocs = await requestAs(port, HOST_ABC, "/docs/de-de");
+  check(
+    "G03 the alias destination still serves its own canonical Page",
+    canonicalDocs.status === 200 &&
+      canonicalDocs.body.includes("Dokumentation (DE)") &&
+      canonicalOf(canonicalDocs) === `https://${HOST_ABC}/docs/de-de`,
+    `status ${canonicalDocs.status}`,
+  );
+
+  return { addressAliasStatus: addressAlias.status, addressAliasLocation };
 }
 
 /** G04 — hostile authorities, ambiguous authorities and media ownership. */
@@ -1271,6 +1404,7 @@ async function main() {
               corporateDocs: await requestAs(secondPort, HOST_ABC, "/docs/de-de"),
               servicesRoot: await requestAs(secondPort, HOST_XYZ, "/en-001"),
               foreign: await requestAs(secondPort, "unknown.example", "/de-de"),
+              alias: await requestAs(secondPort, HOST_ABC, "/docs-old/de-de"),
             };
             const statuses = [
               noDefault.corporateRoot.status,
@@ -1300,6 +1434,12 @@ async function main() {
               "G01 with no declared default a foreign Host is still refused",
               isApprovedRefusal(noDefault.foreign),
               `status ${noDefault.foreign.status}`,
+            );
+            check(
+              "G03 with no declared default a declared address alias still redirects to its own Site's canonical",
+              noDefault.alias.status === 307 &&
+                String(noDefault.alias.headers.location ?? "") === `https://${HOST_ABC}/docs/de-de`,
+              `status ${noDefault.alias.status} location ${String(noDefault.alias.headers.location ?? "")}`,
             );
           }
           await stopChild(child);

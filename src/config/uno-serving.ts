@@ -192,6 +192,98 @@ function hostOfOrigin(origin: string): string | null {
   return normalizeHost(origin.slice(marker + 3));
 }
 
+/** One whole-segment, lowercase public path prefix, as a validated declaration spells it. */
+const DECLARED_PATH_PREFIX = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/u;
+
+/**
+ * Split one stored alias string into the authority and the path prefix it claims.
+ *
+ * The stored form is the validator's own `origin + pathPrefix` string, so this only re-reads it: the authority is
+ * normalized exactly as a request authority is, and a prefix survives only when it is a whole-segment lowercase path.
+ * Anything else yields `null` and therefore claims nothing at all.
+ */
+function splitDeclaredAddress(address: string): { readonly host: string; readonly prefix: string } | null {
+  const marker = address.indexOf("://");
+  if (marker < 0) return null;
+  const rest = address.slice(marker + 3);
+  const slash = rest.indexOf("/");
+  const host = normalizeHost(slash < 0 ? rest : rest.slice(0, slash));
+  if (host === null) return null;
+  const prefix = slash < 0 ? "" : rest.slice(slash);
+  if (prefix !== "" && !DECLARED_PATH_PREFIX.test(prefix)) return null;
+  return { host, prefix };
+}
+
+/** One declared alias already translated into the address its owning Site actually publishes. */
+export interface UnoServingAliasTarget {
+  readonly facetId: string;
+  readonly siteId: string;
+  /** The owning Site's canonical authority, taken from its stored origin — never from the request. */
+  readonly host: string;
+  /** The owning Site's canonical pathname: the alias prefix replaced by that same binding's canonical prefix. */
+  readonly pathname: string;
+  /** The owning Site's canonical URL, assembled from stored values only. */
+  readonly canonicalUrl: string;
+}
+
+/** The verdict of matching one request against every declared Site-address alias. */
+export type UnoServingAliasAddressMatch =
+  | { readonly status: "match"; readonly match: UnoServingAliasTarget }
+  | { readonly status: "none" }
+  | { readonly status: "ambiguous" };
+
+/**
+ * Translate one request into the canonical address of the Site that declared it as an alias.
+ *
+ * This is a **pure** translation: it reads nothing, binds nothing and publishes nothing. A request matches an alias only
+ * by exact authority equality and a whole-segment prefix, so `/docs-older` never matches `/docs-old`, a different
+ * authority matches nothing, and a suffix is carried over unchanged instead of a locale being invented. An alias root
+ * (`/docs-old` with no suffix) names no authored locale and therefore claims nothing. Two claims on one request are
+ * reported as ambiguous — never resolved by declaration order, array position or a default.
+ */
+export function matchUnoServingAliasAddress(
+  bindings: readonly UnoSiteAddressBinding[],
+  host: unknown,
+  pathname: unknown,
+): UnoServingAliasAddressMatch {
+  const requestHost = normalizeHost(host);
+  const requestPath = normalizePathname(pathname);
+  if (requestHost === null || requestPath === null) return { status: "none" };
+
+  const claims: UnoServingAliasTarget[] = [];
+  for (const binding of bindings) {
+    const canonicalHost = hostOfOrigin(binding.origin);
+    if (canonicalHost === null) continue;
+    for (const alias of binding.aliases) {
+      const declared = splitDeclaredAddress(alias);
+      if (declared === null || declared.prefix === "" || declared.host !== requestHost) continue;
+      const suffix =
+        requestPath === declared.prefix
+          ? ""
+          : requestPath.startsWith(`${declared.prefix}/`)
+            ? requestPath.slice(declared.prefix.length)
+            : null;
+      if (suffix === null || suffix === "") continue;
+      const canonicalPath = `${binding.pathPrefix}${suffix}`;
+      // The translated address must itself be a whole-segment public path: no dot segment, empty segment or stray
+      // character may ride across from the alias request into the destination.
+      if (!DECLARED_PATH_PREFIX.test(canonicalPath)) continue;
+      claims.push({
+        facetId: binding.facetId,
+        siteId: binding.siteId,
+        host: canonicalHost,
+        pathname: canonicalPath,
+        canonicalUrl: `${binding.origin}${canonicalPath}`,
+      });
+    }
+  }
+
+  if (claims.length === 0) return { status: "none" };
+  if (claims.length > 1) return { status: "ambiguous" };
+  return { status: "match", match: claims[0] as UnoServingAliasTarget };
+}
+
+
 /** The bindings one request authority owns. An unknown authority owns none, so it can authorise nothing. */
 function bindingsForHost(authority: ServingAuthority, host: string): readonly UnoSiteAddressBinding[] {
   if (authority.mode !== "qualified" || host.length === 0) return [];
@@ -383,12 +475,40 @@ export async function planUnoServingPage(request: unknown, pathnameInput?: unkno
 }
 
 /**
+ * Resolve one declared Site-address alias into a temporary redirect to that Site's own canonical Page.
+ *
+ * Order of proof: the alias must translate to exactly one owning Site (`matchUnoServingAliasAddress`), the **canonical
+ * binding's own host** must then accept the translated pathname through the ordinary qualified publication gate, the
+ * planned identity must be that same Site, the planned canonical URL must equal the address assembled from stored values,
+ * and the Page must be `public`. Anything else returns `null`, so the caller answers its normal refusal: an alias never
+ * serves a document, never redirects to another alias, never redirects an unlisted, draft or absent Page, and never lets
+ * a request authority reach the destination.
+ */
+async function redirectThroughAlias(host: string, pathname: string): Promise<{ readonly location: string } | null> {
+  const authority = readAuthority();
+  if (authority.mode !== "qualified") return null;
+
+  const matched = matchUnoServingAliasAddress(authority.bindings, host, pathname);
+  if (matched.status !== "match") return null;
+  const target = matched.match;
+
+  const planned = await planUnoServingPage({ host: target.host, pathname: target.pathname });
+  if (planned.status !== "served") return null;
+  if (!planned.page.delivery.public) return null;
+  if (planned.page.identity.facetId !== target.facetId || planned.page.identity.siteId !== target.siteId) return null;
+  if (planned.page.delivery.canonicalUrl !== target.canonicalUrl) return null;
+  return { location: planned.page.delivery.canonicalUrl };
+}
+
+/**
  * The single request decision the document, metadata, route and refusal responder all consume.
  *
  * It is deliberately non-throwing: every failure is a `refused` value, never an exception, so the document layout renders for
  * any address, the Page performs the App Router refusal, and the pre-render responder can answer a refused address before a
- * Flight-only shell is produced. A single-segment address may fall through to an explicit short alias, and only that Site's
- * own stored mapping is read.
+ * Flight-only shell is produced. The canonical Page is always tried first, so a declared alias can never displace an accepted
+ * canonical owner; a declared Site-address alias may then become one temporary redirect to that same Site's own public
+ * canonical Page; only then may a single-segment address fall through to an explicit short alias, and only that Site's own
+ * stored mapping is read.
  */
 export async function resolveUnoServingRequest(request: unknown, pathnameInput?: unknown): Promise<UnoServingDecision> {
   const input = readRequestInput(request, pathnameInput);
@@ -401,6 +521,9 @@ export async function resolveUnoServingRequest(request: unknown, pathnameInput?:
       ? { kind: "page", page: served.page }
       : { kind: "page", page: served.page, media: served.media };
   }
+
+  const aliased = await redirectThroughAlias(host, pathname);
+  if (aliased !== null) return { kind: "redirect", location: aliased.location };
 
   const parts = pathname.slice(1).split("/");
   const [single] = parts;
