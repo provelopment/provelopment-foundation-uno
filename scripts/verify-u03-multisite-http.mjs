@@ -352,6 +352,30 @@ function buildFixtureSources() {
 const results = [];
 let failed = 0;
 
+/** How many hosted annotations to emit; enough to diagnose, bounded so a red run cannot flood the log. */
+const ANNOTATION_LIMIT = 5;
+let annotationsWritten = 0;
+
+/**
+ * Emit one bounded GitHub error annotation, so a hosted failure is legible without private log access.
+ *
+ * The message is sanitised: the absolute checkout path is replaced, drive-qualified paths are masked, newlines are
+ * flattened and the command separators are removed, so no private path or multi-line payload can reach a public
+ * annotation.
+ */
+function annotate(name, detail) {
+  if (annotationsWritten >= ANNOTATION_LIMIT) return;
+  annotationsWritten += 1;
+  const safe = String(detail ?? "")
+    .split(ROOT)
+    .join("<repo>")
+    .replace(/[A-Za-z]:[\\/][^\s"']*/gu, "<path>")
+    .replace(/\r?\n/gu, " | ")
+    .slice(0, 400)
+    .replace(/[%:]/gu, " ");
+  process.stdout.write(`::error title=${String(name).replace(/[%:]/gu, " ").slice(0, 120)}::${safe}\n`);
+}
+
 /** Record one assertion. `detail` is printed only when the assertion fails. */
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -361,6 +385,7 @@ function check(name, ok, detail) {
   }
   failed += 1;
   process.stdout.write(`  FAIL ${name}${detail === undefined ? "" : ` — ${detail}`}\n`);
+  annotate(name, detail);
   return false;
 }
 
