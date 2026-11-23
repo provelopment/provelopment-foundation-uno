@@ -1468,7 +1468,8 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
     .map(([path]) => path.split('\\').join('/'))
     .sort();
   assert.deepEqual(importers, [
-    'scripts/verify-u03-published-http.mjs',
+    'scripts/verify-u03-multisite-http.mjs',
+  'scripts/verify-u03-published-http.mjs',
     'scripts/verify-u04-22-module-consent.mjs',
     'scripts/verify-u04-json-slice.mjs',
     'tests/deployment/u03-fixture-transaction.test.mjs',
