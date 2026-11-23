@@ -1,66 +1,49 @@
-# Execution Report — UNO-WO-095 / R01
+# Execution Report — UNO-WO-096 / R01
 
-**P4/P5 DELIVERED AND GREEN ON BOTH OPERATING SYSTEMS · P6 NOT DELIVERED.**
+**P6 NOT DELIVERED. NO PRODUCT COMMIT. NO HOSTED RUN.**
 
-The host-qualified multi-Site runtime and the approved 404 refusal responder are committed, pushed and hosted-green at `7eb8f784e597783e9231dcad9939a4255130e719`. The three-Site G01–G05 production proof (P6) was **not** completed in this run; nothing was published for it and the product increment was preserved exactly as the activation directs.
+This run built the complete three-Site fixture and the G01–G05 runner and executed it against a real production build and a real Chromium, but the runner reports **119 passed, 1 failed**, and that failure is a measured product defect rather than a test defect. Because the work order forbids publishing a red candidate and forbids wiring a failing step into CI, the mandatory local battery and both hosted workflows were **not** run and are **not** claimed. The one substantive artefact is committed as inspectable test code only; no CI step, gate, workflow, product source or declaration was changed.
 
-## 1. Authority and preflight
+## 1. Authority, preflight and boundaries
 
 | Item | Observed |
 | --- | --- |
-| Order | `UNO-WO-095 / R01`, `FINAL — EXECUTE` |
-| ACTIVE | **23,671 bytes**, SHA-256 `f5abb168477572c4c43665363a5ec0eb549cfa85775abaf55e210f273742d485` — exact match |
-| Start | `d3aeaa1a0552c025589c90bba748b0b9188b65e4` — `HEAD`, `main`, `origin/main` and remote `main` equal; clean tree |
-| Physical | sole checkout (private path withheld), empty `--show-prefix`, one worktree, one `origin` |
-| Preserved | A2 patch `5e40963895d266874d5445225090dbb67f8d361a4528f9e609aaae0980ffaf87`, A2 file `1cdddb38a91b7b76dc92d113c8def11e8a26f9f39d0c92d463b0cd58070cf70f` — unchanged, unapplied |
-| Declarations | `manifest.json` `b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925`, `uno.config.json` `58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952` — unchanged; no fixture transaction was armed |
+| Order | `UNO-WO-096 / R01`, `FINAL — EXECUTE` |
+| ACTIVE | **23,596 bytes**, SHA-256 `5a368737e21e69836f15ac4736a06303062f113cf3d5bea68fb56bd248b9af7d` — exact match |
+| Start | `8449c4417d9f647800210d4c7f7d8e353009a1e1` — `HEAD`, `main`, `origin/main` and remote `main` equal; clean tree |
+| Physical | sole checkout (private path withheld), one worktree, one `origin` |
+| Declarations | `manifest.json` `b6213ed6…c9925`, `uno.config.json` `58011c43…8c952` — proved before and after every fixture, restored byte-exactly |
+| A2 | `5e409638…0ffaf87` and `1cdddb38…070cf70f` — unchanged, unapplied, asserted by the runner itself |
+| Governance | `AGENTS.md`, `README.md`, SOP blobs and the bootstrap workflow untouched |
 
-## 2. The authorized architecture migration (§3.C)
 
-Exactly the four named regions changed, with no test deleted or skipped and the total rising from 46 to 47:
+## 2. What was built
 
-1. The blanket substring ban on `host` in `src/config/uno-serving.ts` was replaced by the ordered intent: the composition may accept a plain **untrusted lookup key**, must still contain exactly one `process.cwd()`, and must still read no `process.env`, `headers(`, `cookies(`, `next/headers` or `x-forwarded`. A new assertion requires the request authority to be compared only for **exact equality** (`=== host`).
-2. A **new** test, `only the thin request edge reads a request header`, requires the document layout to be the single raw-header reader and forbids `next/headers`, `headers()`, `cookies(`, `x-forwarded` and `request.headers` in every core, application, adapter and composition module.
-3. The legacy route-path surfaces were replaced by the catch-all surfaces (`(site)/[...segments]/page.tsx`, `robots.txt`, `sitemap.xml`), still composition-only, still without direct file IO, environment, forwarded headers, cookies or provider calls. The document layout must derive `lang` from the accepted Page decision (`identity.localeTag`) and must contain no redirect, canonical, analytics or discovery authority. The demonstration and global-404 freeze checks are untouched, and the group now must carry `src/app/(site)/not-found.tsx`.
-4. The single importer of `components/uno-page-sections` moved to `src/app/(site)/[...segments]/page.tsx`, keeping the exclusivity assertion.
+`scripts/verify-u03-multisite-http.mjs` is one test-only orchestrator. It installs a three-Site version-2 fixture through the **existing** `prepareUnoU03FixtureTransaction` (its writes are never reimplemented), runs a real `next build` and a real `next start` on an ephemeral loopback port, and proves G01–G05 over that process. Requests use `node:http` directly so a synthetic `Host` is genuinely sent, because `fetch` forbids setting `Host`. Chromium cannot be given a per-navigation Host, so navigation uses the fixture origin while every request is intercepted and forwarded to `127.0.0.1` carrying the real Host: a real DOM, real CSS, real focus and layout over a loopback socket, and no DNS resolution of `example` at any point.
 
-`tests/deployment/u03-trace.test.mjs` was also updated (permitted as "equal/stronger coverage") because it pinned the old trace key; its expected key list is now `/[` plus `...segments]`. `scripts/verify-u03-trace.mjs` now admits the owned-media capsule prefix `deployment/efs/capsule/` that the composition legitimately traces, and keeps every existing bound: forbidden prefixes, forbidden files and the allowlist.
+The fixture is one synthetic Entity, two Facets and three simultaneously active Sites: `corporate/main` at `abc.example` (root), `corporate/docs` at `abc.example/docs` (same Host, whole-segment prefix, one declared address alias) and `services/main` at `xyz.example` (unrelated Host, same `siteId`). Distinct authored locales (`de-DE`, `en-001`), an explicit default naming `services/main` while the requests arrive on `abc.example`, twelve `wo096-*` content files, an invalid preferred JSON beside a valid Markdown sibling, a genuinely absent preferred JSON, an unlisted Page, a draft Page and a nested two-segment Page. Three `wo096-*` plates reuse the committed plate bytes at distinct owned paths inside the existing `page` zone; the runner creates those three directories only when absent and prunes them only when empty.
 
-## 3. What was delivered
+## 3. Measured result
 
-The runtime is one composition (`src/config/uno-serving.ts`) with a single validated authority. A version-2 declaration is validated **once** through `validateUnoSiteAddressConfig`; the legacy one-Site form is preserved exactly. The request authority is input only: lowercased, shape-checked (no scheme, credentials, path, space, bracket, empty label or double dot) and compared for exact equality against the origins the declaration already binds, so an unknown authority owns no binding and no default, entry position or forwarded header can select a Site. The matched `{facetId, siteId}` travels unchanged match → loader → planner, and the loader
+`next build` of the three-Site fixture: success. Real production server on loopback: started and answered. **120 assertions: 119 passed, 1 failed.** Restoration: verified byte-exactly. Fixture residue: none. A2 hashes: unchanged.
 
-The 404 defect that ended two earlier runs is fixed. `src/proxy.ts` answers **only** an address the same validated decision already refused, with the approved static document; it excludes `/`, the demonstration tree, `/_next`, owned media, the SEO endpoints, the icon and every file-extension asset twice — by matcher and by an internal guard. The App Router keeps its own refusal as defense in depth, at `src/app/(site)/[...segments]/not-found.tsx` and `src/app/(site)/not-found.tsx`, both re-exporting the one approved document. Measured on real `next build && next start`: an unknown address returns `404` with the approved heading, sentence and literal `href="/"`, no `__next_error__`, `text/html; charset=utf-8` and `no-store`; `/en-001` stays `200`; `/en` stays `307` to its canonical.
+Representative passing evidence: three 200s for `/de-de` and `/docs/de-de` on `abc.example` and `/en-001` on `xyz.example`, each with its own canonical origin, title and body fingerprint; the same slug and locale under two Facets differing by origin and by body; JSON and Markdown both served as authored; a nested Page served at its nested address and refused at its parent; an unlisted Page directly reachable with `noindex, nofollow`; a draft refused with its text never leaking; an invalid preferred JSON refused with the Markdown not rescuing it; a genuinely absent JSON leaving Markdown serving; per-Host `robots.txt` and `sitemap.xml` listing only their own Sites and never an unlisted, draft or aliased address, and never an unreachable prefixed sitemap; `og:url` equal to canonical; `en → /en-001` redirecting on its own Site and never into `/docs`; unknown, lookalike, port-suffixed, punycode and duplicated authorities all refused with the approved 404 document and no filesystem path; the uniquely owned media served as `image/png` with exactly the committed bytes, HEAD without a body, and a locator two same-Host Sites both own refused rather than guessed; and real Chromium assertions for title, language, canonical, `og:url`, native Markdown semantics, four viewports without horizontal overflow, dark and reduced-motion preferences, a no-JavaScript 404 that still shows the literal `href="/"`, and no console error or foreign request.
 
-One deliberate correction during hosted verification: the responder first also sent `x-robots-tag: noindex, nofollow`, which the unchanged U03 gate reads as an index claim (its predicate matches the `index` substring inside `noindex`). The header was removed; the document keeps `<meta name="robots" content="noindex, nofollow">`, and the gate is green again at **135/135**. No assertion was altered to accommodate it.
+## 4. The one failure, and why it stopped the run
 
-## 4. Gates at `7eb8f784e597783e9231dcad9939a4255130e719`
+> `G01 with no declared default every Site stays active` — a second fixture phase installs the same three bindings with the `default` entry removed, starts a fresh production server, and requests `/de-de` on `abc.example`. The answer is **404** (the approved refusal), not a Page.
 
-| Gate | Result |
-| --- | --- |
-| `pnpm build` | pass (`ƒ Proxy (Middleware)` present) |
-| `pnpm typecheck` | pass |
-| `pnpm lint` / `eslint . --max-warnings 0` | pass |
-| `pnpm test` (unit) | 31 files pass |
-| `pnpm test:architecture` | **47 pass, 0 fail** |
-| `pnpm test:bootstrap` | pass |
-| `pnpm test:http` (U01) | **105 passed, 0 failed** |
-| `scripts/verify-u03-http.mjs` | **135 passed, 0 failed** |
-| `scripts/verify-u03-trace.mjs` | OK — only declared inputs and authored sources shipped |
-| `tests/deployment/u03-trace` | 28 pass |
-| `tests/deployment/u03-fixture-transaction` | 28 pass |
-| `tests/deployment/u04-json-slice` | 14 pass |
-| `tests/deployment/u04-22-module-consent` | 46 pass |
-| `tests/deployment/verify-vercel-readiness` | 91 pass |
-| Hosted `Verify U01 baseline` | **success** on `ubuntu-24.04` and `windows-2025` |
-| Hosted `Uno Bootstrap Verify` | **success** |
+The design record states that an explicit default is optional and nonexclusive and that with several Sites and no `default` every Site stays active, and `src/core/efs/uno-config.ts` documents exactly that. The measurement contradicts the documentation: with the default removed the qualified authority refuses the whole declaration, so no Site answers. That is a product defect in the multi-Site composition, not a fixture error, and the order classifies such a defect as repairable inside its own bounded ledger.
 
-## 5. P6 — not delivered
+Publishing that state would either put a failing step into Ubuntu and Windows CI or require the two new steps to be added unrun or non-blocking, both explicitly forbidden. Neither happened.
 
-P6 is not done. The three-Site G01–G05 runner (`scripts/verify-u03-multisite-http.mjs`), its contract test and the two new blocking workflow steps do not exist, so the workflow file is untouched. The fixture design, the manifest/declaration shape, the refusal vocabulary and the Chromium approach were all established — including the finding that `visibility` is a **document** field (`{version, title, visibility, sections}`) and that a reserved Home can never be unlisted — but the runner itself was not completed and was therefore deleted rather than committed half-written. The architecture whitelist entry for it was reverted in the same change, so the published tree contains no reference to a script that does not exist.
+## 5. Deliberately not done
 
-Nothing in this run weakens a gate: the two edits outside `src/` were the Owner-authorized architecture migration (§2) and one legacy trace key plus one bounded trace allowlist entry, both required by the rename. Both declarations and both A2 artifacts are byte-identical at the end.
+- No `.github/workflows/verify-u01.yml` change: the two blocking steps were not added because the runner they would invoke is still red, and adding them unrun or non-blocking is forbidden. The bootstrap workflow and its pinned blob are unchanged.
+- No `tests/deployment/u03-multisite-contract.test.mjs`: a mutation contract must certify a runner that passes, and the ledger forbids fabricated labels to raise a pass count.
+- The mandatory local battery was **not** run beyond one gate: `pnpm test:architecture` was executed and passes with the single authorized importer addition. No unit, bootstrap, governance, lint, typecheck, trace, U01/U03/U04 HTTP or published-HTTP gate was executed on this candidate. Its last known green state is product SHA `7eb8f784…`, which this run did not touch and which remains published and green on both operating systems.
+- No A2/M2, stage closure, merge, release, deployment, DNS or provider action. No product source, declaration or gate was altered.
 
-## 6. Next
+## 6. Requested disposition
 
-A successor order needs only to complete P6: write the three-Site runner on the transaction helper with the three bindings (abc.example, abc.example/docs, xyz.example), a two-Facet manifest and the wo094-* sources; add the contract test; add the two blocking workflow steps; and re-add the runner to the architecture importer whitelist. The runtime it must exercise is already on main and green.
+The blocker is now narrow and precisely measured: a version-2 declaration with several Sites and **no** `default` must leave every Site active, exactly as the design record and `uno-config.ts` already state. Under this order that repair sits inside ledger C (`src/config/uno-serving.ts`, `src/core/efs/uno-route-address.ts`, `src/core/efs/uno-config.ts`) and needs a regression test plus a rerun of this runner to 120 of 120; the contract suite, the two blocking CI steps and the full battery then follow. An order that names that repair as its scope, or confirms it is in scope for a continued WO-096, lets P6 finish without re-deriving any of this work: the fixture, the G01–G05 runner, the Chromium transport, the restoration guard and the measured failure are all reproducible from the committed script.
