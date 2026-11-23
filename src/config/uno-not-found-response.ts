@@ -36,12 +36,11 @@ export const UNO_APPROVED_404_HTML = [
   "",
 ].join("\n");
 
-/** The exact response headers of an approved refusal: never cached, never indexed, always a real 404. */
+/** The exact response headers of an approved refusal: never cached, always a real 404. */
 export const UNO_APPROVED_404_HEADERS: Readonly<Record<string, string>> = Object.freeze({
   "content-type": "text/html; charset=utf-8",
   "cache-control": "no-store, max-age=0, must-revalidate",
   "x-content-type-options": "nosniff",
-  "x-robots-tag": "noindex, nofollow",
   "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
 });
 
