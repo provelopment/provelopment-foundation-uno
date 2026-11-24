@@ -98,6 +98,28 @@ function analyseRunner(source) {
     add("runner:no-default-body");
   }
 
+  // 6. `UNO-WO-111 / R01`: the authored List destinations must be composed by the real adapter, proven per Site authority in
+  // both phases, and refused as a whole Page — with every temporary source mutation restored unconditionally.
+  if (!/composeUnoFoundationSubset/u.test(source)) add("runner:list-compose");
+  const compositions = (source.match(/await composedListSections\(/gu) ?? []).length;
+  if (compositions !== 3) add("runner:list-composed");
+  if (!/g06ListDestinations\(port\)/u.test(source)) add("runner:list-http-group");
+  if (!/g06ListRefusals\(port\)/u.test(source)) add("runner:list-refusal-group");
+  const probes = [
+    'await probe(corporate, "privacy", "cross-Site");',
+    'await probe(corporate, "brief", "cross-Facet");',
+    'await probe(services, "brief", "unlisted");',
+    'await probe(services, "draft", "draft");',
+  ];
+  for (const [index, probe] of probes.entries()) if (!source.includes(probe)) add(`runner:list-probe-${index}`);
+  if (!source.includes("G06 corporate/main refuses the whole Page for a wrong-locale List target")) {
+    add("runner:list-locale");
+  }
+  if (!/writeFileSync\(absolute, original\);/u.test(source)) add("runner:list-restore");
+  if (!source.includes('"G06 with no declared default each Site still projects its own authored List destinations"')) {
+    add("runner:list-no-default");
+  }
+
   return { ok: problems.length === 0, problems };
 }
 
@@ -370,6 +392,44 @@ test("the workflow contract rejects a missing Playwright browser path", () => {
 test("the detector is exercised by many mutations and inspects a real check surface", () => {
   assert.ok(MUTATION_LABELS.length >= 10);
   assert.ok((read(RUNNER).match(/\bcheck\(/gu) ?? []).length >= 100);
+});
+
+test("the runner contract rejects a hand-built List instead of the real composition", () => {
+  const mutated = mutate(read(RUNNER), "await composedListSections({", "await Promise.resolve([])(");
+  const verdict = analyseRunner(mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("runner:list-composed"));
+});
+
+test("the runner contract rejects a List destination proof that skips the whole-Page refusal matrix", () => {
+  const mutations = [
+    ['await probe(corporate, "privacy", "cross-Site");', ""],
+    ['await probe(corporate, "brief", "cross-Facet");', ""],
+    ['await probe(services, "brief", "unlisted");', ""],
+    ['await probe(services, "draft", "draft");', ""],
+  ];
+  for (const [index, [token, replacement]] of mutations.entries()) {
+    const verdict = analyseRunner(mutate(read(RUNNER), token, replacement));
+    assert.equal(verdict.ok, false, token);
+    assert.ok(verdict.problems.includes(`runner:list-probe-${index}`), `${token}: ${verdict.problems.join(",")}`);
+  }
+});
+
+test("the runner contract rejects a List mutation that is never restored", () => {
+  const verdict = analyseRunner(mutate(read(RUNNER), "writeFileSync(absolute, original);", ""));
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("runner:list-restore"));
+});
+
+test("the runner contract rejects dropping the no-default List destination proof", () => {
+  const mutated = mutate(
+    read(RUNNER),
+    '"G06 with no declared default each Site still projects its own authored List destinations"',
+    '"G06 no default"',
+  );
+  const verdict = analyseRunner(mutated);
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.problems.includes("runner:list-no-default"));
 });
 
 test("the committed serving composition satisfies every declared-alias routing rule", () => {

@@ -371,13 +371,25 @@ const PHASE_C_REQUIRED = Object.freeze([
   'const tableBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];',
   "if (tableLightOk) tableBrowserCases.add(`light:${width}`);",
   "if (darkTableOk) tableBrowserCases.add(`dark:${width}`);",
-  "A2_LOCAL_TABLE_LIST_EVIDENCE=14/14 (table credited, list uncredited, P6 pending)",
+  "A2_LOCAL_TABLE_LIST_EVIDENCE=14/14 (table and list credited; P6 destination proof in the three-Site gate)",
   "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table and divider",
   'JSON.stringify(closureFour.credited) === JSON.stringify(["prose", "callout", "table", "divider"])',
   "closureFour.parity === 4",
   "closureFour.proxy === 46",
   'closureFour.pending.includes("list")',
   "table: localA2.table,",
+  // `UNO-WO-111 / R01` (§3): the credited List's four-case browser conjunction and the earned A2 checkpoint, whose frozen
+  // target is `5/17` / `47/59` over exactly `table` and `list`.
+  "A2_LOCAL_BROWSER the rich list was observed at 390px and 1280px in light and dark/reduced motion with both proven anchors",
+  'const listBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];',
+  "if (darkListOk) listBrowserCases.add(`dark:${width}`);",
+  "list: localA2.list,",
+  'checkpoint: "A2",',
+  "U04_CLOSURE_ORACLE the A2 checkpoint credits exactly prose, callout, table, list and divider at 5/17 and 47/59",
+  'JSON.stringify(closureA2.credited) === JSON.stringify(["prose", "callout", "table", "list", "divider"])',
+  "closureA2.parity === 5",
+  "closureA2.proxy === 47",
+  'closureA2.labels.includes("PARITY_LIST=PASS")',
 ]);
 
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
@@ -1054,15 +1066,22 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ['closureFour.pending.includes("list")', "true"],
       ['JSON.stringify(closureFour.credited) === JSON.stringify(["prose", "callout", "table", "divider"])', "true"],
       ["closure.ok === true && closure.parity === 3 && closure.proxy === 45 && familyOk && dividerOk", "true"],
+      // `UNO-WO-111 / R01` (§3): the earned A2 credit and its List evidence cannot be neutered either.
+      ["closureA2.parity === 5", "true"],
+      ["closureA2.proxy === 47", "true"],
+      ['JSON.stringify(closureA2.credited) === JSON.stringify(["prose", "callout", "table", "list", "divider"])', "true"],
+      ["list: localA2.list,", ""],
+      ["if (darkListOk) listBrowserCases.add(`dark:${width}`);", ""],
     ];
     for (const [token, replacement] of mutations) {
       const mutated = source.split(token).join(replacement);
       assert.notEqual(mutated, source, token);
       assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
     }
-    // The four-family evaluation must stay checkpoint-omitted: a smuggled checkpoint would claim a row the Owner has not
-    // declared, so the frozen A2 target can never be printed from this credit.
-    assert.ok(!/checkpoint:\s*"A2"/u.test(source));
+    // The declared checkpoints are exactly the two earned rows — the A1 regression and the A2 delivery. A higher checkpoint
+    // would claim a row the Owner has not delivered, so it must never appear.
+    const declared = [...source.matchAll(/checkpoint:\s*"([A-Z0-9]+)",$/gmu)].map((match) => match[1]);
+    assert.deepEqual(declared, ["A1", "A2"]);
   });
 
   it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {

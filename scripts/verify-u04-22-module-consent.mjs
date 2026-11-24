@@ -132,9 +132,10 @@ const SOURCES = Object.freeze([
 
 // `UNO-WO-084 / R01` (checkpoint A1): where each newly proven family's executed evidence is recorded. Every flag starts
 // false and is only set by a check that actually ran, so a deleted probe can never leave a passing label behind.
-// `UNO-WO-108 / R01`: the fourteen local Table/List evidence dimensions. Distinct fresh records, still UNCLAIMED — the
-// unchanged A1 oracle remains the only parity voice, so `PARITY_TABLE`/`PARITY_LIST` stay PENDING until the three-Site P6
-// proof exists. Every flag is set only by a check that actually executed and passed in this run.
+// `UNO-WO-108 / R01`: the fourteen local Table/List evidence dimensions. Every flag is set only by a check that actually
+// executed and passed in this run. `UNO-WO-111 / R01` credits both families: the destinations themselves are proven under
+// each Site's own authority by the three-Site P6 gate (`scripts/verify-u03-multisite-http.mjs`), while these records feed
+// the A2 checkpoint evaluation at the end of this run.
 const localA2 = {
   table: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: false },
   list: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: false },
@@ -144,6 +145,8 @@ let refusalReasons = "";
 // `UNO-WO-110 / R01` (§2 `browser`): every key here is added only by a Chromium assertion that actually ran and passed at
 // that exact viewport and colour scheme, so `table.browser` cannot be satisfied by one superficial observation.
 const tableBrowserCases = new Set();
+// `UNO-WO-111 / R01`: the same keyed conjunction for the credited List — light and dark/reduced-motion at both viewports.
+const listBrowserCases = new Set();
 const a1Evidence = {
   prose: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
   callout: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
@@ -3613,12 +3616,11 @@ async function consentPhase(base) {
         JSON.stringify(textFiveSeen.filter((entry) => entry.id !== "family-3-faq")
           .map((entry) => [entry.id, entry.isStack, entry.ledeText, entry.ledeStrong, entry.ledeVisible,
             entry.headingBeforeLede, entry.ledeBeforeNative, entry.nativeTag, entry.h2Count, entry.controls])));
-      // `UNO-WO-108 / R01` (§4 `browser`): the list must show its two safe anchors and no other control; `UNO-WO-110 / R01`
-      // moved the table's own flag to the post-dark conjunction below, so one light pass can no longer set it.
+      // `UNO-WO-108 / R01` (§4 `browser`): the list must show its two safe anchors and no other control. `UNO-WO-111 / R01`
+      // records the pass under a per-viewport key instead of a sticky flag, so the credit rests on four executed cases.
       for (const entry of textFiveSeen) {
-        if (entry.id === "family-2-list") {
-          localA2.list.browser = localA2.list.browser
-            || (entry.safeAnchors === 2 && entry.controls === 2 && entry.nativeTag === "SECTION");
+        if (entry.id === "family-2-list" && entry.safeAnchors === 2 && entry.controls === 2 && entry.nativeTag === "SECTION") {
+          listBrowserCases.add(`light:${width}`);
         }
       }
 
@@ -3841,7 +3843,45 @@ async function consentPhase(base) {
         JSON.stringify(darkTable),
       );
       if (darkTableOk) tableBrowserCases.add(`dark:${width}`);
+      // `UNO-WO-111 / R01` (§2 `browser`): the rich List under dark and reduced motion at this viewport — its two proven
+      // anchors keep their hrefs and `rel`, the declared-but-inactive item stays inert text, and no declaration key leaks.
+      const darkList = await tab.evaluate(() => {
+        const section = document.getElementById("family-2-list-list");
+        const anchors = section === null ? [] : [...section.querySelectorAll("a.uno-json-list-link")];
+        return {
+          scheme: matchMedia("(prefers-color-scheme: dark)").matches,
+          reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+          surface: section?.getAttribute("data-uno-surface") ?? "",
+          count: anchors.length,
+          hrefs: anchors.map((anchor) => anchor.getAttribute("href")),
+          rels: anchors.map((anchor) => anchor.getAttribute("rel") ?? ""),
+          focusable: anchors.length > 0 && anchors.every((anchor) => anchor.tabIndex === 0),
+          inert: [...(section?.querySelectorAll("span") ?? [])].map((span) => (span.textContent ?? "").trim()),
+          leaks: section === null || section.innerHTML.includes("example.help"),
+          overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        };
+      });
+      const darkListOk = familyCheck(
+        `dark ${width}px the rich list keeps its two proven anchors, rel and inert label`,
+        darkList.scheme && darkList.reducedMotion && darkList.surface === "bordered"
+          && darkList.count === 2 && darkList.focusable
+          && darkList.hrefs.includes("https://example.org/notes")
+          && darkList.hrefs.includes("http://localhost:3000/en-001/wo108-target")
+          && darkList.rels.every((rel) => rel.includes("noopener") && rel.includes("noreferrer"))
+          && darkList.inert.includes("Help unavailable") && darkList.leaks === false && darkList.overflow === 0,
+        JSON.stringify(darkList),
+      );
+      if (darkListOk) listBrowserCases.add(`dark:${width}`);
     }
+    // `UNO-WO-111 / R01` (§2 `browser`): `list.browser` is the conjunction of the same four executed observations, so a
+    // deleted, skipped or superficial case can never leave the credited family true.
+    const listBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];
+    localA2.list.browser = listBrowserRequired.every((key) => listBrowserCases.has(key));
+    check(
+      "A2_LOCAL_BROWSER the rich list was observed at 390px and 1280px in light and dark/reduced motion with both proven anchors",
+      localA2.list.browser,
+      JSON.stringify(listBrowserRequired.map((key) => [key, listBrowserCases.has(key)])),
+    );
     // `UNO-WO-110 / R01` (§2 `browser`): `table.browser` is the conjunction of four executed observations — light and
     // dark/reduced-motion at 390px and 1280px — so a deleted, skipped or superficial case can never leave it true.
     const tableBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];
@@ -3887,7 +3927,7 @@ async function consentPhase(base) {
       {
         const flat = [...Object.values(localA2.list), ...Object.values(localA2.table)];
       check(
-        "A2_LOCAL_TABLE_LIST_EVIDENCE=14/14 (table credited, list uncredited, P6 pending)",
+        "A2_LOCAL_TABLE_LIST_EVIDENCE=14/14 (table and list credited; P6 destination proof in the three-Site gate)",
         Object.keys(localA2.list).length === 7
           && Object.keys(localA2.table).length === 7
           && flat.length === 14
@@ -4036,10 +4076,8 @@ async function consentPhase(base) {
       closure.ok === true && closure.parity === 3 && closure.proxy === 45 && familyOk && dividerOk,
       closure.ok ? `${closure.parity}/17 ${closure.proxy}/59` : String(closure.reason),
     );
-    // `UNO-WO-110 / R01` (§2): the fourth family is credited by a **separate**, checkpoint-omitted evaluation of those same
-    // executed records plus the executed `localA2.table`. No interim target is declared for four families, so the assertion
-    // is the exact credited set and the exact interim counts; `list` stays PENDING despite its executed local evidence, and
-    // the frozen A2 row (`5/17`, `47/59`) is not claimed here.
+    // `UNO-WO-110 / R01` (§2): the four-family row stays as a regression of the prior delivery — the same executed records
+    // plus `localA2.table`, checkpoint-omitted, must still be exactly `4/17` / `46/59` with `list` pending.
     const closureFour = evaluateU04FamilyClosure({
       families: {
         divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
@@ -4066,12 +4104,42 @@ async function consentPhase(base) {
         ? `${closureFour.parity}/17 ${closureFour.proxy}/59 ${closureFour.credited.join(",")}`
         : String(closureFour.reason),
     );
-    if (closureFour.ok) {
-      // Every printed label is re-derived from this four-family result's own credit set, so a label cannot appear without
-      // its reason and the A1 regression cannot print a fuller row.
-      const creditedNames = new Set(closureFour.credited.map((family) => `PARITY_${family.toUpperCase()}`));
-      const pendingNames = new Set(closureFour.pending.map((family) => `PARITY_${family.toUpperCase()}`));
-      for (const label of closureFour.labels) {
+    // `UNO-WO-111 / R01` (§3): the declared **A2 checkpoint** is now earnable. The same executed records plus the executed
+    // `localA2.table` and `localA2.list` go into one `checkpoint:"A2"` evaluation, whose frozen target is `5/17` / `47/59`
+    // over exactly `table` and `list`; the oracle itself is unchanged and refuses any other score.
+    const closureA2 = evaluateU04FamilyClosure({
+      families: {
+        divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
+        prose: a1Evidence.prose,
+        callout: a1Evidence.callout,
+        table: localA2.table,
+        list: localA2.list,
+      },
+      modules: UNO_RENDERABLE_MODULES.length,
+      zones: UNO_OWNED_MEDIA_ZONES.length,
+      browserMatrix: matrixCases.length,
+      checkpoint: "A2",
+    });
+    check(
+      "U04_CLOSURE_ORACLE the A2 checkpoint credits exactly prose, callout, table, list and divider at 5/17 and 47/59",
+      closureA2.ok === true
+        && JSON.stringify(closureA2.credited) === JSON.stringify(["prose", "callout", "table", "list", "divider"])
+        && closureA2.parity === 5
+        && closureA2.proxy === 47
+        && closureA2.labels.includes("PARITY_TABLE=PASS")
+        && closureA2.labels.includes("PARITY_LIST=PASS")
+        && familyOk
+        && dividerOk,
+      closureA2.ok
+        ? `${closureA2.parity}/17 ${closureA2.proxy}/59 ${closureA2.credited.join(",")}`
+        : String(closureA2.reason),
+    );
+    if (closureA2.ok) {
+      // Every printed label is re-derived from the A2 result's own credit set, so a label cannot appear without its reason
+      // and no earlier row can print a fuller one.
+      const creditedNames = new Set(closureA2.credited.map((family) => `PARITY_${family.toUpperCase()}`));
+      const pendingNames = new Set(closureA2.pending.map((family) => `PARITY_${family.toUpperCase()}`));
+      for (const label of closureA2.labels) {
         const equals = label.lastIndexOf("=");
         const name = label.slice(0, equals);
         const value = label.slice(equals + 1);
@@ -4080,9 +4148,9 @@ async function consentPhase(base) {
           : pendingNames.has(name)
             ? value === "PENDING"
             : name === "U04_PARITY"
-              ? value === `${closureFour.parity}/17`
+              ? value === `${closureA2.parity}/17`
               : name === "U04_PROXY"
-                ? value === `${closureFour.proxy}/59`
+                ? value === `${closureA2.proxy}/59`
                 : value === `${UNO_RENDERABLE_MODULES.length}/${UNO_RENDERABLE_MODULES.length}`
                   || value === `${UNO_OWNED_MEDIA_ZONES.length}/${UNO_OWNED_MEDIA_ZONES.length}`
                   || value === `${matrixCases.length}/${matrixCases.length}`;

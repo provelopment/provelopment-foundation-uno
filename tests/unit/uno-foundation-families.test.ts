@@ -2444,11 +2444,11 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/FAMILY_PARITY=17\/17/u);
     expect(ledger).toContain("ADAPT (divider semantic parity candidate)");
-    expect(ledger).toContain("three of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("five of seventeen fully parity-evidenced candidates");
     // `UNO-WO-071 / R01` normalizes the divider wording to its already independently accepted status.
     expect(ledger).toContain("independently accepted under `UNO-WO-069 / R01`");
     expect(ledger).not.toContain("awaiting independent Architect acceptance");
-    expect(ledger).toContain("fourteen still bounded");
+    expect(ledger).toContain("twelve still bounded");
     // `UNO-WO-070 / R01`: the two grid families gained a bounded authored-heading mode, which must never be recorded as
     // full parity, a second/third accepted family or a closed stage.
     expect(ledger).toContain("ADAPT (bounded grid plus authored section heading and plain-text lede)");
@@ -4171,7 +4171,7 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
     expect(ledger).toContain("lede-only");
     expect(ledger).toContain("no-lede");
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("three of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("five of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
@@ -4478,7 +4478,7 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
     expect(ledger.split("ADAPT (bounded authored plain-text heading/lede)").length - 1).toBe(2);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("three of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("five of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/stats[^.\n]*full semantic parity/u);
@@ -4884,14 +4884,17 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
 
   it("keeps the five-family subset recorded in the ledger without claiming further parity", () => {
     const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
-    // `UNO-WO-084 / R01` (A1): prose and callout are credited parity candidates now, so only three bounded families keep the
-    // earlier treatment.
-    expect(ledger.split("ADAPT (bounded plain-text heading/lede)").length - 1).toBe(3);
+    // `UNO-WO-084 / R01` (A1) credited prose and callout; `UNO-WO-110 / R01` credited table and `UNO-WO-111 / R01` credited
+    // list, so only `faq` keeps the earlier bounded authored-text treatment while the two new rows carry their own parity
+    // disposition and evidence.
+    expect(ledger.split("ADAPT (bounded plain-text heading/lede)").length - 1).toBe(1);
     expect(ledger.split("PARITY (A1, UNO-WO-084 / R01)").length - 1).toBe(2);
+    expect(ledger.split("PARITY (UNO-WO-110 / R01)").length - 1).toBe(1);
+    expect(ledger.split("PARITY (UNO-WO-111 / R01)").length - 1).toBe(1);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("three of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("five of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("sixteen still bounded");
-    expect(ledger).toContain("fourteen still bounded");
+    expect(ledger).toContain("twelve still bounded");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("6/17");
     expect(ledger).not.toMatch(/prose[^.\n]*full semantic parity/u);

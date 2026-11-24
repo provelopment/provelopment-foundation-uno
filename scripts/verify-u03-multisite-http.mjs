@@ -22,10 +22,27 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer, request as httpRequest } from "node:http";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmdirSync, writeFileSync } from "node:fs";
+import { registerHooks } from "node:module";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
 import { prepareUnoU03FixtureTransaction } from "./uno-u03-fixture-transaction.mjs";
+
+// `UNO-WO-111 / R01`: the authored Lists are composed by the real adapter, whose TypeScript modules import each other
+// without extensions. The same resolve hook the other production runners use lets Node's type stripping find them, so the
+// fixture installs genuine composer output rather than a hand-built list node.
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier.startsWith(".") && !/\.[a-z]+$/iu.test(specifier)) {
+      try {
+        return nextResolve(`${specifier}.ts`, context);
+      } catch {
+        return nextResolve(specifier, context);
+      }
+    }
+    return nextResolve(specifier, context);
+  },
+});
 
 const ROOT = process.cwd();
 const SCRATCH = resolve(ROOT, ".temp/uno-m1-096");
@@ -59,7 +76,7 @@ function contentFile(name, body) {
 
 
 /** One authored JSON Page document: a closed envelope with prose modules and an optional owned image. */
-function jsonDocument(title, visibility, lines, media) {
+function jsonDocument(title, visibility, lines, media, extra = []) {
   const sections = [
     { id: "lede", module: "content.heading", props: { text: lines[0], level: 2 } },
     { id: "body", module: "content.prose", props: { text: lines[1] } },
@@ -71,7 +88,35 @@ function jsonDocument(title, visibility, lines, media) {
       props: { asset: { zone: "page", path: media }, alt: "A synthetic owned sample plate", caption: lines[2] },
     });
   }
+  // `UNO-WO-111 / R01`: only the composer's own validated sections are appended, so the installed Page carries exactly the
+  // nodes the real adapter produced from an authored donor List — never a hand-built list shape.
+  for (const section of extra) sections.push(section);
   return `${JSON.stringify({ version: 1, title, description: lines[1], visibility, sections }, null, 2)}\n`;
+}
+
+/**
+ * `UNO-WO-111 / R01`: compose one donor-authored rich List and return the adapter's accepted Uno sections.
+ *
+ * The fixture must never hand-build a `variant:"list"` node: an authored donor section goes through the real
+ * `composeUnoFoundationSubset`, and a refusal here is a fixture bug that stops the run before anything is installed.
+ */
+async function composedListSections(spec) {
+  const { composeUnoFoundationSubset } = await import("../src/application/compose-uno-foundation-families.ts");
+  const outcome = composeUnoFoundationSubset({
+    version: 1,
+    title: spec.title,
+    sections: [
+      {
+        type: "list",
+        heading: spec.heading,
+        lede: spec.lede,
+        surface: "bordered",
+        items: spec.items,
+      },
+    ],
+  });
+  if (outcome.status !== "composed") throw new Error(`list composition refused: ${String(outcome.reason)}`);
+  return outcome.document.sections;
 }
 
 /** One authored Markdown Page document: a heading and two paragraphs. */
@@ -244,18 +289,50 @@ const CONFIG_NO_DEFAULT = {
 };
 
 /** The one synthetic publication the three Sites share: tiny, Site-specific, and never a demonstration Page. */
-function buildFixtureSources() {
+async function buildFixtureSources() {
   const plate = readFileSync(resolve(ROOT, PLATE_PATH));
   const mainPlate = `deployment/efs/capsule/${ENTITY_ID}/corporate/main/wo096-main-plate.png`;
   const docsPlate = `deployment/efs/capsule/${ENTITY_ID}/corporate/docs/wo096-docs-plate.png`;
   const servicesPlate = `deployment/efs/capsule/${ENTITY_ID}/services/main/wo096-services-plate.png`;
+  // `UNO-WO-111 / R01`: one authored List per Site, each with a destination that only that Site's own authority may
+  // resolve — an external safe `href`, a same-Site published `route`, and one inert label. The route targets differ per
+  // Site so a resolved URL can only come from the requesting Site's own graph: `about` at the root, `about` under the
+  // `/docs/` prefix, and the nested `field/notes` route on the unrelated Facet domain.
+  const corporateList = await composedListSections({
+    title: "Corporate Hauptseite (DE)",
+    heading: "Geprüfte Seitenverweise",
+    lede: "Diese Verweise gehören ausschliesslich dieser Seite.",
+    items: [
+      { label: "Externe Notizen", detail: "Ein externer, sicherer Verweis.", href: "https://example.org/notes" },
+      { label: "Ueber Corporate", route: "about" },
+      { label: "Ohne Ziel" },
+    ],
+  });
+  const docsList = await composedListSections({
+    title: "Dokumentation (DE)",
+    heading: "Dokumentationsverweise",
+    lede: "Der Verweis bleibt unter dem Präfix dieser Seite.",
+    items: [{ label: "Ueber die Dokumentation", route: "about" }],
+  });
+  const servicesList = await composedListSections({
+    title: "Services Home",
+    heading: "Service references",
+    lede: "One nested route on this Site only.",
+    items: [{ label: "Field notes", route: "field/notes" }],
+  });
   return [
     contentFile(
       "wo096-corp-main-home.de-DE.json",
-      jsonDocument("Corporate Hauptseite (DE)", "public", [
-        "Corporate auf abc.example",
-        "Diese Seite gehört ausschliesslich der Facette corporate/main an der Wurzel von abc.example.",
-      ]),
+      jsonDocument(
+        "Corporate Hauptseite (DE)",
+        "public",
+        [
+          "Corporate auf abc.example",
+          "Diese Seite gehört ausschliesslich der Facette corporate/main an der Wurzel von abc.example.",
+        ],
+        undefined,
+        corporateList,
+      ),
     ),
     contentFile(
       "wo096-corp-main-home.en-001.json",
@@ -279,10 +356,16 @@ function buildFixtureSources() {
     ),
     contentFile(
       "wo096-corp-docs-home.de-DE.json",
-      jsonDocument("Dokumentation (DE)", "public", [
-        "Dokumentation auf abc.example/docs",
-        "Diese Seite gehört der Facette corporate/docs unter dem Ganzsegment-Praefix /docs auf demselben Host.",
-      ]),
+      jsonDocument(
+        "Dokumentation (DE)",
+        "public",
+        [
+          "Dokumentation auf abc.example/docs",
+          "Diese Seite gehört der Facette corporate/docs unter dem Ganzsegment-Praefix /docs auf demselben Host.",
+        ],
+        undefined,
+        docsList,
+      ),
     ),
     contentFile(
       "wo096-corp-docs-about.de-DE.json",
@@ -322,6 +405,7 @@ function buildFixtureSources() {
           "The services Home owns this plate.",
         ],
         "wo096-services-plate.png",
+        servicesList,
       ),
     ),
     contentFile(
@@ -1210,9 +1294,228 @@ async function g05Browser(port) {
     await audit.page.waitForTimeout(250);
     check("G05 no console error and no request leaves the fixture authorities", offenders.length === 0, offenders.join(", "));
     await audit.context.close();
+
+    // `UNO-WO-111 / R01`: the authored List destinations as a real DOM, one Page per Site, so the href can only have come
+    // from that Site's own authority. The external anchor is proven safe and inert; the route anchor is the server's proven
+    // canonical, so the prefix-less, prefixed and unrelated-domain cases cannot be confused with one another.
+    for (const spec of LIST_EXPECTATIONS) {
+      const opened = await openFixturePage(browser, port, {}, spec.host, spec.path);
+      const dom = await opened.page.evaluate(() => {
+        const links = [...document.querySelectorAll("a.uno-json-list-link")];
+        const first = links[0] ?? null;
+        return {
+          count: links.length,
+          hrefs: links.map((anchor) => anchor.getAttribute("href")),
+          rels: links.map((anchor) => anchor.getAttribute("rel") ?? ""),
+          spans: [...document.querySelectorAll("span")].map((span) => (span.textContent ?? "").trim()),
+          firstVisible: first === null ? false : first.getBoundingClientRect().height > 0,
+          firstFocusable: first === null ? false : first.tabIndex === 0,
+          overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        };
+      });
+      check(
+        `G05 ${spec.path} projects its authored List destinations from its own authority`,
+        opened.status === 200
+          && dom.count === spec.anchors
+          && dom.hrefs.includes(spec.route)
+          && (spec.external === null || dom.hrefs.includes(spec.external))
+          && (spec.inert === null || dom.spans.includes(spec.inert))
+          && dom.rels.every((rel) => rel.includes("noopener") && rel.includes("noreferrer"))
+          && dom.firstVisible
+          && dom.firstFocusable
+          && dom.overflow === 0,
+        JSON.stringify(dom),
+      );
+      await opened.context.close();
+    }
   } finally {
     await browser.close();
   }
+}
+
+/**
+ * `UNO-WO-111 / R01`: one authored List per Site, and the only href that Site's own authority may project.
+ *
+ * `route` is the server's proven canonical for that Site — prefix-less at the root, prefixed under `/docs/`, and the nested
+ * route on the unrelated Facet domain — so a list whose anchor matches one Site's value cannot have come from another's.
+ */
+const LIST_EXPECTATIONS = Object.freeze([
+  {
+    site: "corporate/main",
+    host: HOST_ABC,
+    path: "/de-de",
+    canonical: `https://${HOST_ABC}/de-de`,
+    route: `https://${HOST_ABC}/de-de/about`,
+    external: "https://example.org/notes",
+    inert: "Ohne Ziel",
+    file: "deployment/efs/content/wo096-corp-main-home.de-DE.json",
+    heading: "Geprüfte Seitenverweise",
+    lede: "Diese Verweise gehören ausschliesslich dieser Seite.",
+    anchors: 2,
+  },
+  {
+    site: "corporate/docs",
+    host: HOST_ABC,
+    path: "/docs/de-de",
+    canonical: `https://${HOST_ABC}/docs/de-de`,
+    route: `https://${HOST_ABC}/docs/de-de/about`,
+    external: null,
+    inert: null,
+    file: "deployment/efs/content/wo096-corp-docs-home.de-DE.json",
+    heading: "Dokumentationsverweise",
+    lede: "Der Verweis bleibt unter dem Präfix dieser Seite.",
+    anchors: 1,
+  },
+  {
+    site: "services/main",
+    host: HOST_XYZ,
+    path: "/en-001",
+    canonical: `https://${HOST_XYZ}/en-001`,
+    route: `https://${HOST_XYZ}/en-001/field/notes`,
+    external: null,
+    inert: null,
+    file: "deployment/efs/content/wo096-svc-home.en-001.json",
+    heading: "Service references",
+    lede: "One nested route on this Site only.",
+    anchors: 1,
+  },
+]);
+
+/** The one served native list region of a Page, bounded by its own closing section tag. */
+function listRegionOf(body, id) {
+  const open = body.indexOf(`<section class="uno-json-list-section" id="${id}"`);
+  if (open < 0) return "";
+  const close = body.indexOf("</section>", open);
+  return close < 0 ? "" : body.slice(open, close + "</section>".length);
+}
+
+/** Parse the list anchors exactly as served: href and rel. */
+function listAnchorsOf(region) {
+  return [...region.matchAll(/<a class="uno-json-list-link" href="([^"]+)" rel="([^"]+)">/gu)].map((match) => ({
+    href: match[1],
+    rel: match[2],
+  }));
+}
+
+/** G06 — the authored List destinations as the real server projects them, one Site authority at a time. */
+async function g06ListDestinations(port) {
+  for (const spec of LIST_EXPECTATIONS) {
+    const response = await requestAs(port, spec.host, spec.path);
+    const region = listRegionOf(response.body, "family-0-list-list");
+    const anchors = listAnchorsOf(region);
+    check(
+      `G06 ${spec.site} serves its authored List with the route href projected from its own authority`,
+      response.status === 200
+        && canonicalOf(response) === spec.canonical
+        && region.includes('data-uno-surface="bordered"')
+        && response.body.includes(`<h2 class="uno-json-heading" id="family-0-list-heading">${spec.heading}</h2>`)
+        && response.body.includes(`<p class="uno-json-prose" id="family-0-list-lede">${spec.lede}</p>`)
+        && anchors.length === spec.anchors
+        && anchors.some((anchor) => anchor.href === spec.route)
+        && (spec.external === null || anchors.some((anchor) => anchor.href === spec.external))
+        && (spec.inert === null || region.includes(`<span>${spec.inert}</span>`))
+        && anchors.every((anchor) => anchor.rel === "noreferrer noopener"),
+      JSON.stringify({ status: response.status, canonical: canonicalOf(response), anchors, region: region.length }),
+    );
+    for (const other of LIST_EXPECTATIONS) {
+      if (other === spec) continue;
+      check(
+        `G06 ${spec.site} never carries ${other.site}'s projected route href`,
+        !response.body.includes(`href="${other.route}"`),
+        other.route,
+      );
+    }
+  }
+}
+
+/**
+ * Run one probe against temporarily replaced installed source bytes, then always restore the exact original file.
+ *
+ * The mutation is never concurrent and never survives the probe: a failure inside `run` still restores, and the caller
+ * re-requests the Page afterwards to prove the refusal came from the mutated target rather than from a broken fixture.
+ */
+async function withMutatedSource(file, mutate, run) {
+  const absolute = resolve(ROOT, file);
+  const original = readFileSync(absolute);
+  try {
+    const document = JSON.parse(original.toString("utf8"));
+    writeFileSync(absolute, `${JSON.stringify(mutate(document), null, 2)}\n`);
+    return await run();
+  } finally {
+    writeFileSync(absolute, original);
+  }
+}
+
+/** G06 — one whole-Page refusal per invalid or unauthorised List destination, then the restored Page serves again. */
+async function g06ListRefusals(port) {
+  const setTarget = (target) => (document) => {
+    const stack = document.sections.find((section) => section.id === "family-0-list");
+    const list = (stack?.children ?? []).find((child) => child.id === "family-0-list-list");
+    if (list === undefined) throw new Error("no composed List in the installed Page");
+    list.props.items = list.props.items.map((item) =>
+      "routeTarget" in item ? { ...item, routeTarget: target } : item,
+    );
+    return document;
+  };
+  const probe = async (spec, target, reason) => {
+    const refused = await withMutatedSource(spec.file, setTarget(target), async () => {
+      const response = await requestAs(port, spec.host, `${spec.path}?probe=${encodeURIComponent(target)}`);
+      return { response, body: response.body };
+    });
+    check(
+      `G06 ${spec.site} refuses the whole Page for a ${reason} List target`,
+      isApprovedRefusal(refused.response)
+        && !refused.body.includes("uno-json-list-link")
+        && !refused.body.includes(spec.route)
+        && !refused.body.includes("uno-json-list-section"),
+      `status ${refused.response.status} target ${target}`,
+    );
+    const restored = await requestAs(port, spec.host, `${spec.path}?restored=${encodeURIComponent(target)}`);
+    check(
+      `G06 ${spec.site} serves its List again once the ${reason} probe is restored`,
+      restored.status === 200 && canonicalOf(restored) === spec.canonical && restored.body.includes(`href="${spec.route}"`),
+      `status ${restored.status}`,
+    );
+  };
+
+  const corporate = LIST_EXPECTATIONS[0];
+  const services = LIST_EXPECTATIONS[2];
+  // A route that exists only on the sibling Site of the **same** Facet: `privacy` lives under corporate/docs.
+  await probe(corporate, "privacy", "cross-Site");
+  // A route that exists only in the **other** Facet: `brief` lives under services/main.
+  await probe(corporate, "brief", "cross-Facet");
+  // A destination the declaration does not publish: `brief` is unlisted and `draft` is declared draft.
+  await probe(services, "brief", "unlisted");
+  await probe(services, "draft", "draft");
+
+  // Wrong locale: `about` exists only in corporate/main's de-DE representation, so the same authored List transplanted onto
+  // that Site's en-001 representation must refuse the whole Page rather than link across a locale boundary.
+  const en = "deployment/efs/content/wo096-corp-main-home.en-001.json";
+  const transplant = (document) => {
+    const home = JSON.parse(readFileSync(resolve(ROOT, corporate.file), "utf8"));
+    const stack = home.sections.find((section) => section.id === "family-0-list");
+    if (stack === undefined) throw new Error("no composed List to transplant");
+    document.sections.push(structuredClone(stack));
+    return document;
+  };
+  const wrongLocale = await withMutatedSource(en, transplant, async () => {
+    const response = await requestAs(port, HOST_ABC, "/en-001?probe=locale");
+    return { response, body: response.body };
+  });
+  check(
+    "G06 corporate/main refuses the whole Page for a wrong-locale List target",
+    isApprovedRefusal(wrongLocale.response)
+      && !wrongLocale.body.includes("uno-json-list-link")
+      && !wrongLocale.body.includes(`https://${HOST_ABC}/de-de/about`)
+      && !wrongLocale.body.includes("uno-json-list-section"),
+    `status ${wrongLocale.response.status}`,
+  );
+  const enRestored = await requestAs(port, HOST_ABC, "/en-001?restored=locale");
+  check(
+    "G06 corporate/main's en-001 representation serves again without the transplanted List",
+    enRestored.status === 200 && !enRestored.body.includes("uno-json-list-section"),
+    `status ${enRestored.status}`,
+  );
 }
 
 /** SHA-256 of a repository-relative file, or `null` when it cannot be read. */
@@ -1358,7 +1661,7 @@ async function main() {
   }
 
   const plateBytes = readFileSync(resolve(ROOT, PLATE_PATH));
-  const sources = buildFixtureSources();
+  const sources = await buildFixtureSources();
   const buildBytes = (config) => `${JSON.stringify(config, null, 2)}\n`;
   const declarations = [
     { path: MANIFEST_PATH, digest: MANIFEST_SHA },
@@ -1424,6 +1727,11 @@ async function main() {
     const discovery = await guard("G03 discovery", () => g03Discovery(port));
     const hostile = await guard("G04 hostile", () => g04Hostile(port, plateBytes));
     await guard("G05 Chromium", () => g05Browser(port));
+    // `UNO-WO-111 / R01`: the authored List destinations, first as served HTTP for every Site, then one whole-Page refusal
+    // per invalid or unauthorised target. Both groups run after G05 because the refusal probes temporarily rewrite one
+    // installed source and restore it in a `finally`.
+    await guard("G06 list destinations", () => g06ListDestinations(port));
+    await guard("G06 list refusals", () => g06ListRefusals(port));
 
     check(
       "G01 the two shared-Host Sites are genuinely different documents",
@@ -1523,6 +1831,42 @@ async function main() {
                 String(noDefault.aliasQuery.headers.location ?? "") ===
                   `https://${HOST_ABC}/docs/de-de?ref=alpha%20beta&view=compact`,
               `status ${noDefault.aliasQuery.status} location ${String(noDefault.aliasQuery.headers.location ?? "")}`,
+            );
+            // `UNO-WO-111 / R01`: the same authored List destinations project from each Site's own authority with no declared
+            // default at all — the projection never borrows the declared default's Site, host or prefix.
+            check(
+              "G06 with no declared default each Site still projects its own authored List destinations",
+              noDefault.corporateRoot.body.includes(`href="https://${HOST_ABC}/de-de/about"`)
+                && noDefault.corporateRoot.body.includes('href="https://example.org/notes"')
+                && noDefault.corporateDocs.body.includes(`href="https://${HOST_ABC}/docs/de-de/about"`)
+                && !noDefault.corporateDocs.body.includes(`href="https://${HOST_ABC}/de-de/about"`)
+                && noDefault.servicesRoot.body.includes(`href="https://${HOST_XYZ}/en-001/field/notes"`),
+              "corporateRoot/corporateDocs/servicesRoot",
+            );
+            const noDefaultRefusal = await withMutatedSource(
+              LIST_EXPECTATIONS[0].file,
+              (document) => {
+                const stack = document.sections.find((section) => section.id === "family-0-list");
+                const list = (stack?.children ?? []).find((child) => child.id === "family-0-list-list");
+                if (list === undefined) throw new Error("no composed List in the installed Page");
+                list.props.items = list.props.items.map((item) =>
+                  "routeTarget" in item ? { ...item, routeTarget: "brief" } : item,
+                );
+                return document;
+              },
+              () => requestAs(secondPort, HOST_ABC, "/de-de?probe=no-default"),
+            );
+            check(
+              "G06 with no declared default an unauthorised List target still refuses the whole Page",
+              isApprovedRefusal(noDefaultRefusal) && !noDefaultRefusal.body.includes("uno-json-list-link"),
+              `status ${noDefaultRefusal.status}`,
+            );
+            const noDefaultRestored = await requestAs(secondPort, HOST_ABC, "/de-de?restored=no-default");
+            check(
+              "G06 with no declared default the restored Page serves its own List again",
+              noDefaultRestored.status === 200 &&
+                noDefaultRestored.body.includes(`href="https://${HOST_ABC}/de-de/about"`),
+              `status ${noDefaultRestored.status}`,
             );
           }
           await stopChild(child);
