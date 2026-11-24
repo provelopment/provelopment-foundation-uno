@@ -179,3 +179,72 @@ describe("U04 closure oracle — mutants are refused", () => {
     assert.equal(JSON.stringify(families), snapshot);
   });
 });
+
+describe("U04 closure oracle — A2 row and its mutation surface (WO-105 E3)", () => {
+  /** Evaluate one A2 attempt. */
+  function a2(families) {
+    return evaluateU04FamilyClosure({ families, ...U04_IMMUTABLE_BASELINE, checkpoint: "A2" });
+  }
+
+  /** The three accepted A1 families plus both A2 families. */
+  const credited = () => complete(["divider", "prose", "callout", "table", "list"]);
+
+  it("fixes the A2 row at 5/17 and 47/59 over table and list only", () => {
+    assert.deepEqual({ ...U04_CHECKPOINT_TARGETS.A2 }, { parity: 5, proxy: 47, families: ["table", "list"] });
+    const attempt = a2(credited());
+    assert.equal(attempt.ok, true);
+    assert.equal(attempt.parity, 5);
+    assert.equal(attempt.proxy, 47);
+  });
+
+  it("refuses A2 while either new family is still pending", () => {
+    for (const dropped of ["table", "list"]) {
+      const families = credited();
+      delete families[dropped];
+      const attempt = a2(families);
+      assert.equal(attempt.ok, false);
+      assert.equal(attempt.reason, "closure:checkpoint-parity-mismatch");
+    }
+  });
+
+  it("refuses A2 when any single dimension of either new family is false", () => {
+    for (const family of ["table", "list"]) {
+      for (const dimension of U04_EVIDENCE_DIMENSIONS) {
+        const families = credited();
+        families[family] = { ...families[family], [dimension]: false };
+        assert.equal(a2(families).ok, false, `${family}.${dimension} must be required`);
+      }
+    }
+  });
+
+  it("refuses A2 when a new family's evidence is crossed, incomplete or non-boolean", () => {
+    const crossed = credited();
+    const { source, ...withoutSource } = crossed.table;
+    assert.equal(typeof source, "boolean");
+    crossed.table = withoutSource;
+    assert.equal(a2(crossed).ok, false);
+
+    const truthy = credited();
+    truthy.list = { ...truthy.list, browser: "yes" };
+    assert.equal(a2(truthy).ok, false);
+
+    const extra = credited();
+    extra.table = { ...extra.table, screenshot: true };
+    assert.equal(a2(extra).ok, false);
+
+    const swapped = credited();
+    swapped.table = { ...swapped.table, source: true };
+    swapped.list = { ...swapped.list, source: false };
+    assert.equal(a2(swapped).ok, false);
+  });
+
+  it("refuses A2 with an inflated family set and cannot reach A2 from the A1 row", () => {
+    const inflated = complete(["divider", "prose", "callout", "table", "list", "hero"]);
+    assert.equal(a2(inflated).ok, false);
+    assert.equal(
+      evaluateU04FamilyClosure({ families: credited(), ...U04_IMMUTABLE_BASELINE, checkpoint: "A1" }).ok,
+      false,
+    );
+  });
+});
+
