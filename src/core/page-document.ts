@@ -196,12 +196,26 @@ export type UnoContentProseProps =
       readonly variant: "callout";
       readonly tone?: UnoProseCalloutTone;
     } & UnoContentProseBody)
-  | { readonly variant: "list"; readonly items: readonly UnoProseListItem[]; readonly ordered?: boolean }
+  | {
+      readonly variant: "list";
+      readonly items: readonly UnoProseListItem[];
+      readonly ordered?: boolean;
+      /** `UNO-WO-102 / R01`: an authored Markdown-capable lede, rendered before the native list. */
+      readonly lede?: string;
+      readonly surface?: UnoSectionSurface;
+      /** Set only when at least one authored field is Markdown; then `lede`/`detail` are the accepted AST. */
+      readonly markdown?: true;
+    }
   | {
       readonly variant: "table";
       readonly columns: readonly string[];
       readonly rows: readonly (readonly string[])[];
       readonly caption?: string;
+      /** `UNO-WO-102 / R01`: an authored Markdown-capable lede, rendered before the native table. */
+      readonly lede?: string;
+      readonly surface?: UnoSectionSurface;
+      /** Set only when the authored `caption` or `lede` is Markdown; cells always stay plain text. */
+      readonly markdown?: true;
     }
   | { readonly variant: "divider" };
 
@@ -1255,9 +1269,19 @@ function readProseProps(props: DataRecord): UnoContentProseProps {
   throw new RefusedDocument("document:invalid-props");
 }
 
-/** The bounded `list` variant: 1..12 label/detail entries in authored order, never a link or raw HTML shape. */
+/**
+ * The bounded `list` variant: 1..12 label/detail entries in authored order, never a raw HTML shape.
+ *
+ * `UNO-WO-102 / R01`: the donor's `lede` and item `detail` are Markdown-capable and it carries a closed `surface`. When
+ * any authored field is Markdown the whole variant switches to the accepted Markdown AST under the single `markdown`
+ * flag, so no field is silently printed as syntax. Destinations are **not** read here: `href`/`route`/`link` stay a
+ * feature refusal until this build's destination projections are implemented, so no unproven link can ever render.
+ */
 function readProseList(props: DataRecord): UnoContentProseProps {
-  if (!hasExactlyKeys(props, ["variant", "items"], ["ordered"])) throw new RefusedDocument("document:invalid-props");
+  if (!hasExactlyKeys(props, ["variant", "items"], ["ordered", "lede", "surface", "markdown"])) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const markdown = optionalProseMarkdown(props["markdown"]);
   const rawItems = props["items"];
   if (!Array.isArray(rawItems) || rawItems.length < 1 || rawItems.length > 12) {
     throw new RefusedDocument("document:invalid-props");
@@ -1275,12 +1299,31 @@ function readProseList(props: DataRecord): UnoContentProseProps {
       false,
       false,
     );
-    const detail = optionalProseText(entry["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints);
+    const detail =
+      entry["detail"] === undefined
+        ? undefined
+        : markdown === true
+          ? requireFamilyMarkdown(entry["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints)
+          : optionalProseText(entry["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints);
     items.push(detail === undefined ? { label } : { label, detail });
   }
   const ordered = props["ordered"];
   if (ordered !== undefined && typeof ordered !== "boolean") throw new RefusedDocument("document:invalid-props");
-  return ordered === undefined ? { variant: "list", items } : { variant: "list", items, ordered };
+  const lede =
+    props["lede"] === undefined
+      ? undefined
+      : markdown === true
+        ? requireFamilyMarkdown(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
+        : optionalProseText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints);
+  const surface = optionalProseSurface(props["surface"]);
+  return {
+    variant: "list",
+    items,
+    ...(ordered === undefined ? {} : { ordered }),
+    ...(lede === undefined ? {} : { lede }),
+    ...(surface === undefined ? {} : { surface }),
+    ...(markdown === undefined ? {} : { markdown }),
+  };
 }
 
 /**
@@ -1289,9 +1332,10 @@ function readProseList(props: DataRecord): UnoContentProseProps {
  * A ragged, sparse, empty or non-array row refuses the document; nothing is sorted, padded or reinterpreted.
  */
 function readProseTable(props: DataRecord): UnoContentProseProps {
-  if (!hasExactlyKeys(props, ["variant", "columns", "rows"], ["caption"])) {
+  if (!hasExactlyKeys(props, ["variant", "columns", "rows"], ["caption", "lede", "surface", "markdown"])) {
     throw new RefusedDocument("document:invalid-props");
   }
+  const markdown = optionalProseMarkdown(props["markdown"]);
   const rawColumns = props["columns"];
   const rawRows = props["rows"];
   if (!Array.isArray(rawColumns) || rawColumns.length < 1 || rawColumns.length > 6) {
@@ -1332,8 +1376,28 @@ function readProseTable(props: DataRecord): UnoContentProseProps {
     }
     rows.push(row);
   }
-  const caption = optionalProseText(props["caption"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints);
-  return caption === undefined ? { variant: "table", columns, rows } : { variant: "table", columns, rows, caption };
+  const caption =
+    props["caption"] === undefined
+      ? undefined
+      : markdown === true
+        ? requireFamilyMarkdown(props["caption"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints)
+        : optionalProseText(props["caption"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints);
+  const lede =
+    props["lede"] === undefined
+      ? undefined
+      : markdown === true
+        ? requireFamilyMarkdown(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
+        : optionalProseText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints);
+  const surface = optionalProseSurface(props["surface"]);
+  return {
+    variant: "table",
+    columns,
+    rows,
+    ...(caption === undefined ? {} : { caption }),
+    ...(lede === undefined ? {} : { lede }),
+    ...(surface === undefined ? {} : { surface }),
+    ...(markdown === undefined ? {} : { markdown }),
+  };
 }
 
 /** The closed optional surface of the three new content modules. */

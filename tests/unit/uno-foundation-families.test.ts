@@ -430,12 +430,16 @@ describe("composeUnoFoundationSubset — malformed accepted fields and Markdown 
     expect(calloutMarkdown).toContain('<strong class="uno-family-md-strong">note</strong>');
     // Families without a Markdown contract still refuse its punctuation rather than printing it as faithful text.
     expectRefusal(envelope({ type: "list", items: ["**bold label**"] }), "family:unsupported-feature");
-    expectRefusal(envelope({ type: "list", items: [{ label: "A", detail: "`code`" }] }), "family:unsupported-feature");
     expectRefusal(
       envelope({ type: "table", columns: ["A"], rows: [["[x](https://example.org)"]] }),
       "family:unsupported-feature",
     );
-    expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], caption: "`c`" }), "family:unsupported-feature");
+    // `UNO-WO-102 / R01`: the donor's Markdown-capable list `detail` and table `caption` now compose as accepted Markdown
+    // instead of refusing, while a table cell stays plain text.
+    const listDetail = composed(envelope({ type: "list", items: [{ label: "A", detail: "`code`" }] }));
+    expect(render(listDetail)).toContain('<code class="uno-family-md-code">code</code>');
+    const captionMarkdown = composed(envelope({ type: "table", columns: ["A"], rows: [["1"]], caption: "`c`" }));
+    expect(render(captionMarkdown)).toContain('<code class="uno-family-md-code">c</code>');
     // A construct Uno cannot render safely refuses the whole source instead of degrading to apparent text.
     expectRefusal(envelope({ type: "prose", body: "![alt](https://example.org/a.png)" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "prose", body: "See [x](javascript:alert(1))" }), "family:unsupported-feature");
@@ -4811,7 +4815,12 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
       // `UNO-WO-084 / R01` widens only `prose` and `callout`; the other three still refuse the closed presentation fields.
       if (type !== "prose" && type !== "callout") {
         expectRefusal(fivePage(type, { align: "center" }), "family:unsupported-feature");
-        expectRefusal(fivePage(type, { surface: "muted" }), "family:unsupported-feature");
+        // `UNO-WO-102 / R01`: `table` and `list` now carry the donor's closed `surface`; `faq` still refuses it.
+        if (type === "faq") {
+          expectRefusal(fivePage(type, { surface: "muted" }), "family:unsupported-feature");
+        } else {
+          expect(composeUnoFoundationSubset(fivePage(type, { surface: "muted" })).status).toBe("composed");
+        }
       }
       expectRefusal(fivePage(type, { eyebrow: "X" }), "family:unsupported-feature");
       expectRefusal(fivePage(type, { heading: "Valid", markdown: "# no" }), "family:unsupported-feature");
@@ -5233,4 +5242,89 @@ describe("the three donor heading outlines (`UNO-WO-080 / R01`)", () => {
     expect(changed).toEqual(["family-3-faq", "family-11-steps", "family-14-columns"]);
   });
 
+});
+
+// `UNO-WO-102 / R01` D1: the donor's rich `table` and `list` surface — Markdown caption/detail, closed `surface` and a
+// Markdown `markdown` flag — composing to native semantic markup while every malformed or unsafe form still refuses the
+// whole source with no partial render.
+describe("rich table and list (WO-102 D1)", () => {
+  it("composes and renders a Markdown caption and closed surface on the native table", () => {
+    const html = render(
+      composed(
+        envelope({
+          type: "table",
+          columns: ["Item", "Note"],
+          rows: [
+            ["First", "Kept"],
+            ["Second", "Kept"],
+          ],
+          caption: "A **safe** caption.",
+          surface: "muted",
+        }),
+      ),
+    );
+    expect(html).toContain('<section class="uno-json-table-section"');
+    expect(html).toContain('data-uno-surface="muted"');
+    expect(html).toContain("<caption>");
+    expect(html).toContain('<strong class="uno-family-md-strong">safe</strong>');
+    expect((html.match(/<th scope="col">/gu) ?? []).length).toBe(2);
+    expect((html.match(/<td>/gu) ?? []).length).toBe(4);
+    expect(html).toContain("uno-json-table-scroll");
+  });
+
+  it("composes and renders Markdown detail and a closed surface on a native list", () => {
+    const html = render(
+      composed(
+        envelope({
+          type: "list",
+          ordered: true,
+          surface: "bordered",
+          items: [{ label: "First", detail: "**Safe** detail." }, "Plain entry"],
+        }),
+      ),
+    );
+    expect(html).toContain('<section class="uno-json-list-section"');
+    expect(html).toContain('data-uno-surface="bordered"');
+    expect((html.match(/<li>/gu) ?? []).length).toBe(2);
+    expect(html).toContain('<strong class="uno-family-md-strong">Safe</strong>');
+    expect(html.indexOf("First")).toBeLessThan(html.indexOf("Plain entry"));
+    expect(html).not.toContain("<a ");
+  });
+
+  it("keeps the exact legacy props and markup when no rich field is authored", () => {
+    const legacyTable = composed(envelope({ type: "table", columns: ["A"], rows: [["1"]], caption: "Plain" }));
+    expect(legacyTable.sections[0]?.props).toEqual({ variant: "table", columns: ["A"], rows: [["1"]], caption: "Plain" });
+    expect(render(legacyTable)).toContain('<div class="uno-json-table-scroll" id="family-0-table" tabindex="0">');
+    const legacyList = composed(envelope({ type: "list", items: [{ label: "Only", detail: "Plain" }] }));
+    expect(legacyList.sections[0]?.props).toEqual({ variant: "list", items: [{ label: "Only", detail: "Plain" }] });
+  });
+
+  it("refuses every malformed, unsafe or out-of-subset rich form", () => {
+    expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], surface: "raised" }), "family:target-refused");
+    expectRefusal(
+      envelope({ type: "table", columns: ["A"], rows: [["1"]], caption: "Text <b>x</b>" }),
+      "family:unsupported-feature",
+    );
+    expectRefusal(
+      envelope({ type: "table", columns: ["A"], rows: [["1"]], caption: "![alt](https://example.org/a.png)" }),
+      "family:unsupported-feature",
+    );
+    expectRefusal(
+      envelope({ type: "table", columns: ["A"], rows: [["1"]], caption: "[x](javascript:alert(1))" }),
+      "family:unsupported-feature",
+    );
+    expectRefusal(
+      envelope({ type: "table", columns: ["A"], rows: [["1"]], caption: "x".repeat(321) }),
+      "family:target-refused",
+    );
+    expectRefusal(envelope({ type: "list", items: [{ label: "A", detail: "x".repeat(321) }] }), "family:target-refused");
+    expectRefusal(
+      envelope({ type: "list", items: [{ label: "A", href: "https://example.org" }] }),
+      "family:unsupported-feature",
+    );
+    expectRefusal(envelope({ type: "list", items: [{ label: "A", route: "about" }] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "list", items: [{ label: "A", link: "contact" }] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], markdown: true }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], caption: " Padded" }), "family:target-refused");
+  });
 });

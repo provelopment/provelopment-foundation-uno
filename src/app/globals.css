@@ -837,6 +837,42 @@ main {
   background-color: var(--uno-surface);
 }
 
+/* `UNO-WO-102 / R01`: the rich table/list wrappers keep the same native semantics and add only a surface and a lede. */
+.uno-json-table-section,
+.uno-json-list-section {
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.uno-json-table-section[data-uno-surface="muted"],
+.uno-json-list-section[data-uno-surface="muted"] {
+  background-color: var(--uno-surface);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.uno-json-table-section[data-uno-surface="bordered"],
+.uno-json-list-section[data-uno-surface="bordered"] {
+  border: 1px solid var(--uno-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.uno-json-table-lede,
+.uno-json-list-lede {
+  margin: 0;
+  color: var(--uno-muted);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.uno-json-list > li > .uno-json-list-detail,
+.uno-json-table caption .uno-json-table-caption {
+  margin: 0.125rem 0 0;
+}
+
 /* A grid list stays a native list: the marker is reset for layout only, and `role="list"` retains the semantics. */
 .uno-json-grid[data-uno-item-semantics="list"] {
   margin: 0;

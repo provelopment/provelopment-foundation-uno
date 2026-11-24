@@ -559,7 +559,19 @@ function readFamilyBody(value: PlainValue | undefined, codePointLimit: number): 
   return value;
 }
 
-/** Read one donor Markdown-capable **lede** field, keeping the documented unpadded and bounded plain-text rules. */
+/** One authored Markdown-capable field read at its own bounded limit, refusing anything the shared reader refuses. */
+function readRichFamilyText(value: PlainValue | undefined, codePointLimit: number): string {
+  if (typeof value !== "string") refuseUnsupportedFeature();
+  if (value.length === 0) refuseTarget();
+  if (value.trim() !== value) refuseTarget();
+  if (codePointLength(value) > codePointLimit) refuseTarget();
+  if (!readUnoFamilyMarkdown(value).ok) refuseUnsupportedFeature();
+  return value;
+}
+
+/**
+ * Read one donor Markdown-capable **lede** field, keeping the documented unpadded and bounded plain-text rules.
+ */
 function readFamilyLede(value: PlainValue | undefined): string {
   if (typeof value !== "string") refuseUnsupportedFeature();
   if (value.length === 0) refuseTarget();
@@ -743,9 +755,10 @@ function composeSection(
       return { id, module: "content.prose", props };
     }
     case "table": {
-      // The donor table also spreads `headingFields`; spans, merged cells, `surface`, unsafe captions and Markdown stay
-      // outside the subset, and the authored heading/lede precede the native table rather than entering its caption.
-      requireExactKeys(record, ["type", "columns", "rows"], ["caption", "heading", "lede"]);
+      // `UNO-WO-102 / R01`: the donor table also spreads `headingFields` and a closed `surface`, and its `caption` is
+      // Markdown-capable. Spans, merged cells and Markdown *cells* stay outside the subset; the caption and surface now
+      // compose, and an authored heading/lede still precede the native table exactly as before.
+      requireExactKeys(record, ["type", "columns", "rows"], ["caption", "heading", "lede", "surface"]);
       const columns = record["columns"];
       const rows = record["rows"];
       if (!Array.isArray(columns) || !Array.isArray(rows)) refuseUnsupportedFeature();
@@ -755,20 +768,20 @@ function composeSection(
         refuseMarkdownArray(row);
       }
       const props: Record<string, unknown> = { variant: "table", columns, rows };
-      if (ownsKey(record, "caption")) {
-        const caption = record["caption"];
-        if (typeof caption === "string") refuseMarkdown(caption);
-        props["caption"] = caption;
-      }
+      if (ownsKey(record, "caption")) props["caption"] = readRichFamilyText(record["caption"], 320);
+      if (ownsKey(record, "surface")) props["surface"] = record["surface"];
+      if (typeof props["caption"] === "string" && hasFamilyMarkdown(props["caption"] as string)) props["markdown"] = true;
       const table: CandidateSection = { id, module: "content.prose", props };
       return wrapAuthoredText(record, id, table, "table");
     }
     case "list": {
-      // The donor list also spreads `headingFields`; item destinations, `surface` and Markdown remain outside the subset.
-      requireExactKeys(record, ["type", "items"], ["ordered", "heading", "lede"]);
+      // `UNO-WO-102 / R01`: the donor list also spreads `headingFields` and `surface`, and each item's `detail` is
+      // Markdown-capable. Item destinations (`href`/`route`/`link`) remain outside this subset, so no link is composed.
+      requireExactKeys(record, ["type", "items"], ["ordered", "heading", "lede", "surface"]);
       const items = record["items"];
       if (!Array.isArray(items)) refuseUnsupportedFeature();
       const normalized: Record<string, unknown>[] = [];
+      let detailMarkdown = false;
       for (const item of items) {
         if (typeof item === "string") {
           refuseMarkdown(item);
@@ -781,11 +794,17 @@ function composeSection(
         requireExactKeys(entry, ["label"], ["detail"]);
         const label = readDonorText(entry["label"], true);
         const output: Record<string, unknown> = { label };
-        if (ownsKey(entry, "detail")) output["detail"] = readDonorText(entry["detail"], true);
+        if (ownsKey(entry, "detail")) {
+          const detail = readRichFamilyText(entry["detail"], 320);
+          if (hasFamilyMarkdown(detail)) detailMarkdown = true;
+          output["detail"] = detail;
+        }
         normalized.push(output);
       }
       const props: Record<string, unknown> = { variant: "list", items: normalized };
       if (ownsKey(record, "ordered")) props["ordered"] = record["ordered"];
+      if (ownsKey(record, "surface")) props["surface"] = record["surface"];
+      if (detailMarkdown) props["markdown"] = true;
       const list: CandidateSection = { id, module: "content.prose", props };
       return wrapAuthoredText(record, id, list, "list");
     }

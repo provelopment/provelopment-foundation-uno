@@ -114,6 +114,16 @@ function MediaItemFigure({
 
 /** Render one validated section node, or nothing when the node is somehow not renderable. */
 /** True when a prose body carries any donor-rich field; otherwise the original plain-text element is kept byte-exact. */
+/**
+ * One authored Markdown field of the rich `table`/`list` variants, parsed only when the document carries the accepted
+ * Markdown form. A field the reader already refused can never reach here; `null` means "render the plain text instead".
+ */
+function parseFamilyMarkdown(text: string | undefined) {
+  if (text === undefined) return null;
+  const parsed = readUnoFamilyMarkdown(text);
+  return parsed.ok ? parsed.blocks : null;
+}
+
 function isRichProseBody(body: UnoContentProseBody): boolean {
   return body.heading !== undefined || body.lede !== undefined || body.markdown === true;
 }
@@ -276,43 +286,91 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
       // Exactly four validated presentation variants; the legacy `{text}` form keeps its original `<p>` output.
       if (prose.variant === "divider") return <hr className="uno-json-divider" id={node.id} />;
       if (prose.variant === "table") {
-        return (
-          <div className="uno-json-table-scroll" id={node.id} tabIndex={0}>
-            <table className="uno-json-table">
-              {prose.caption === undefined ? null : <caption>{prose.caption}</caption>}
-              <thead>
-                <tr>
-                  {prose.columns.map((column, columnIndex) => (
-                    <th key={columnIndex} scope="col">
-                      {column}
-                    </th>
+        const captionParsed = prose.markdown === true ? parseFamilyMarkdown(prose.caption) : null;
+        const table = (
+          <table className="uno-json-table">
+            {prose.caption === undefined ? null : captionParsed === null ? (
+              <caption>{prose.caption}</caption>
+            ) : (
+              <caption>
+                <UnoFamilyMarkdown blocks={captionParsed} className="uno-json-table-caption" />
+              </caption>
+            )}
+            <thead>
+              <tr>
+                {prose.columns.map((column, columnIndex) => (
+                  <th key={columnIndex} scope="col">
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {prose.rows.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {row.map((cell, cellIndex) => (
+                    <td key={cellIndex}>{cell}</td>
                   ))}
                 </tr>
-              </thead>
-              <tbody>
-                {prose.rows.map((row, rowIndex) => (
-                  <tr key={rowIndex}>
-                    {row.map((cell, cellIndex) => (
-                      <td key={cellIndex}>{cell}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
+        );
+        // `UNO-WO-102 / R01`: an authored lede or surface frames the same native table; with neither, the exact
+        // previously committed scroll wrapper is returned unchanged.
+        if (prose.lede === undefined && prose.surface === undefined && prose.markdown !== true) {
+          return (
+            <div className="uno-json-table-scroll" id={node.id} tabIndex={0}>
+              {table}
+            </div>
+          );
+        }
+        const ledeParsed = prose.markdown === true ? parseFamilyMarkdown(prose.lede) : null;
+        return (
+          <section className="uno-json-table-section" id={node.id} data-uno-surface={prose.surface}>
+            {ledeParsed === null ? null : (
+              <UnoFamilyMarkdown blocks={ledeParsed} className="uno-json-table-lede" />
+            )}
+            <div className="uno-json-table-scroll" tabIndex={0}>
+              {table}
+            </div>
+          </section>
         );
       }
       if (prose.variant === "list") {
         const ListTag = prose.ordered === true ? "ol" : "ul";
-        return (
-          <ListTag className="uno-json-list" id={node.id}>
-            {prose.items.map((item, itemIndex) => (
-              <li key={itemIndex}>
-                <span>{item.label}</span>
-                {item.detail === undefined ? null : <p>{item.detail}</p>}
-              </li>
-            ))}
+        const list = (
+          <ListTag className="uno-json-list">
+            {prose.items.map((item, itemIndex) => {
+              const detailParsed = prose.markdown === true ? parseFamilyMarkdown(item.detail) : null;
+              return (
+                <li key={itemIndex}>
+                  <span>{item.label}</span>
+                  {item.detail === undefined ? null : detailParsed === null ? (
+                    <p>{item.detail}</p>
+                  ) : (
+                    <UnoFamilyMarkdown blocks={detailParsed} className="uno-json-list-detail" />
+                  )}
+                </li>
+              );
+            })}
           </ListTag>
+        );
+        if (prose.lede === undefined && prose.surface === undefined && prose.markdown !== true) {
+          return (
+            <ListTag className="uno-json-list" id={node.id}>
+              {list.props.children}
+            </ListTag>
+          );
+        }
+        const ledeParsed = prose.markdown === true ? parseFamilyMarkdown(prose.lede) : null;
+        return (
+          <section className="uno-json-list-section" id={node.id} data-uno-surface={prose.surface}>
+            {ledeParsed === null ? null : (
+              <UnoFamilyMarkdown blocks={ledeParsed} className="uno-json-list-lede" />
+            )}
+            {list}
+          </section>
         );
       }
       if (prose.variant === "callout") {
