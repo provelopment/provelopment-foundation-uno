@@ -53,6 +53,8 @@ const CONTACT_FIELD_LABELS = Object.freeze({
 export interface UnoPageSectionsProps {
   readonly document: UnoPageDocument;
   readonly media?: UnoPageMedia;
+  /** UNO-WO-104 / R01: proven canonical URLs only; this component never computes one. */
+  readonly routeHrefs?: ReadonlyMap<string, string>;
 }
 
 /** The resolved media of one section, or an empty record when the Page published none for it. */
@@ -163,7 +165,15 @@ function prosePresentation(body: UnoContentProseBody): Record<string, string> {
   };
 }
 
-function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly media: UnoPageMedia | undefined }) {
+function SectionNode({
+  node,
+  media,
+  routeHrefs,
+}: {
+  readonly node: UnoSectionNode;
+  readonly media: UnoPageMedia | undefined;
+  readonly routeHrefs?: ReadonlyMap<string, string>;
+}) {
 
 
   switch (node.module) {
@@ -172,7 +182,7 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
       return (
         <div className="uno-json-stack" data-uno-gap={gap} id={node.id}>
           {node.children.map((child) => (
-            <SectionNode key={child.id} media={media} node={child} />
+            <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} />
           ))}
         </div>
       );
@@ -192,7 +202,7 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
           >
             {node.children.map((child) => (
               <li className="uno-json-cell" data-uno-cell-id={child.id} key={child.id}>
-                <SectionNode media={media} node={child} />
+                <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
               </li>
             ))}
           </ul>
@@ -209,11 +219,11 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
           {node.children.map((child) =>
             semantics === "article" ? (
               <article className="uno-json-card" data-uno-card-id={child.id} key={child.id}>
-                <SectionNode media={media} node={child} />
+                <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
               </article>
             ) : (
               <div className="uno-json-cell" data-uno-cell-id={child.id} key={child.id}>
-                <SectionNode media={media} node={child} />
+                <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
               </div>
             ),
           )}
@@ -241,13 +251,13 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
                   data-uno-tile-span={span}
                   key={child.id}
                 >
-                  <SectionNode media={media} node={child} />
+                  <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
                 </article>
               );
             }
             return (
               <div className="uno-json-tile" data-uno-tile-id={child.id} data-uno-tile-span={span} key={child.id}>
-                <SectionNode media={media} node={child} />
+                <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
               </div>
             );
           })}
@@ -267,7 +277,7 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
         >
           {node.children.map((child) => (
             <div className="uno-json-layer" data-uno-layer-id={child.id} key={child.id}>
-              <SectionNode media={media} node={child} />
+              <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
             </div>
           ))}
         </div>
@@ -346,13 +356,16 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
               // `UNO-WO-103 / R01`: a proven-classifier `href` becomes one ordinary anchor; a declared but inactive
               // application `linkId` renders as inert label text — never an anchor, key, URL or request.
               const href = "href" in item ? item.href : undefined;
-              const inert = "linkId" in item;
+              // `UNO-WO-104 / R01`: render a route anchor only through a server-proven projection.
+              const routeHref = "routeTarget" in item ? routeHrefs?.get(`${node.id}:${itemIndex}`) : undefined;
+              const resolvedHref = href ?? routeHref;
+              const inert = "linkId" in item || ("routeTarget" in item && routeHref === undefined);
               return (
                 <li key={itemIndex}>
-                  {href === undefined ? (
+                  {resolvedHref === undefined ? (
                     <span className={inert ? "uno-json-list-application-label" : undefined}>{item.label}</span>
                   ) : (
-                    <a className="uno-json-list-link" href={href} rel="noreferrer noopener">
+                    <a className="uno-json-list-link" href={resolvedHref} rel="noreferrer noopener">
                       {item.label}
                     </a>
                   )}
@@ -722,13 +735,13 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
           id={node.id}
         >
           {node.children.map((child) => (
-            <SectionNode key={child.id} media={media} node={child} />
+            <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} />
           ))}
         </div>
       );
     }
     case "interaction.tabs": {
-      const panels = node.children.map((child) => <SectionNode key={child.id} media={media} node={child} />);
+      const panels = node.children.map((child) => <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} />);
       return <UnoTabsIsland id={node.id} label={node.props.label} panels={panels} tabs={node.props.tabs} />;
     }
     case "interaction.accordion": {
@@ -749,7 +762,7 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
                 )}
               </summary>
               <div className="uno-json-disclosure-body">
-                <SectionNode media={media} node={child} />
+                <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
               </div>
             </details>
           ))}
@@ -758,7 +771,7 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
     }
 
     case "interaction.modal": {
-      const content = node.children.map((child) => <SectionNode key={child.id} media={media} node={child} />);
+      const content = node.children.map((child) => <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} />);
       return (
         <UnoModalIsland
           closeLabel={node.props.closeLabel}
@@ -842,14 +855,14 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
  * The sections are wrapped in one `div` so the App Router page keeps its own `main` and heading structure. An invalid
  * document — which the serving gate should already have refused — renders nothing rather than a partial Page.
  */
-export function UnoPageSections({ document, media }: UnoPageSectionsProps) {
+export function UnoPageSections({ document, media, routeHrefs }: UnoPageSectionsProps) {
   const validated = readUnoPageDocument(document);
   if (!validated.accepted) return null;
 
   return (
     <div className="uno-json" data-uno-document-version={validated.document.version}>
       {validated.document.sections.map((section) => (
-        <SectionNode key={section.id} media={media} node={section} />
+        <SectionNode key={section.id} media={media} node={section} routeHrefs={routeHrefs} />
       ))}
     </div>
   );

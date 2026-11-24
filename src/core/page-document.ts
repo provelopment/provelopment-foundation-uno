@@ -38,6 +38,7 @@
 import { readUnoOwnedAssetRef, type UnoOwnedAssetRef, type UnoOwnedMediaPurpose } from "./assets/uno-owned-media";
 import { isUnoVideoProvider, readUnoVideoEmbed, type UnoVideoProvider } from "./video/uno-video-embeds";
 import { isCapabilityId } from "./modules/capability-registry";
+import { isPageRoutePath } from "./page-route-path";
 import { classifyAuthorDestination } from "./safe-author-url";
 
 /** The only document version this build accepts. An unknown version refuses; it is never upgraded. */
@@ -181,7 +182,8 @@ export interface UnoApplicationLink {
 export type UnoProseListItem =
   | { readonly label: string; readonly detail?: string }
   | { readonly label: string; readonly detail?: string; readonly href: string }
-  | { readonly label: string; readonly detail?: string; readonly linkId: string };
+  | { readonly label: string; readonly detail?: string; readonly linkId: string }
+  | { readonly label: string; readonly detail?: string; readonly routeTarget: string };
 
 /**
  * One bounded `content.prose` body: plain authored text, or — when `markdown` is the literal `true` — donor-authored
@@ -1371,11 +1373,13 @@ function readProseList(props: DataRecord, state: WalkState): UnoContentProseProp
   const items: UnoProseListItem[] = [];
   for (let index = 0; index < rawItems.length; index += 1) {
     const entry = readPlainData(ownArrayItem(rawItems, index));
-    if (entry === null || !hasExactlyKeys(entry, ["label"], ["detail", "href", "linkId"])) {
+    if (entry === null || !hasExactlyKeys(entry, ["label"], ["detail", "href", "linkId", "routeTarget"])) {
       throw new RefusedDocument("document:invalid-props");
     }
     // Exactly one destination form, or none: two destinations on one item is a crossed shape and is refused.
-    const destinations = ["href", "linkId"].filter((name) => Object.prototype.hasOwnProperty.call(entry, name));
+    const destinations = ["href", "linkId", "routeTarget"].filter((name) =>
+      Object.prototype.hasOwnProperty.call(entry, name),
+    );
     if (destinations.length > 1) throw new RefusedDocument("document:invalid-props");
     const label = readBoundedText(
       entry["label"],
@@ -1399,6 +1403,16 @@ function readProseList(props: DataRecord, state: WalkState): UnoContentProseProp
       const linkId = readListItemLinkId(entry["linkId"]);
       state.linkIds.push(linkId);
       items.push({ ...base, linkId });
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(entry, "routeTarget")) {
+      // `UNO-WO-104 / R01`: a purely lexical site-local intent. It never becomes an `href` here; the serving boundary must
+      // prove the same-Site, same-locale, public publication separately or refuse the whole Page.
+      const routeTarget = entry["routeTarget"];
+      if (typeof routeTarget !== "string" || !isPageRoutePath(routeTarget)) {
+        throw new RefusedDocument("document:invalid-props");
+      }
+      items.push({ ...base, routeTarget });
       continue;
     }
     items.push(base);

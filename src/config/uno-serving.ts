@@ -48,6 +48,7 @@ import {
   type UnoSiteRouteCandidate,
 } from "../core/efs/uno-route-address";
 import { HOME_CONTENT_SLUG } from "../core/page-content";
+import type { UnoSectionNode } from "../core/page-document";
 
 /** The closed refusal vocabulary of this boundary: one literal per failure family. */
 export type UnoServingRefusal =
@@ -65,6 +66,8 @@ export type UnoServingPageOutcome =
       readonly page: UnoPublishedPageAccepted;
       readonly media?: UnoPageMedia;
       readonly assets?: UnoPageAssetPlan;
+      /** `UNO-WO-104 / R01`: proven, server-only canonical URLs keyed `${section.id}:${itemIndex}`. */
+      readonly routeHrefs?: ReadonlyMap<string, string>;
     }
   | { readonly status: "not-served"; readonly reason: UnoServingRefusal };
 
@@ -75,7 +78,12 @@ export type UnoServingAliasOutcome =
 
 /** One request decision, as the document, metadata, route and refusal responder each need it. */
 export type UnoServingDecision =
-  | { readonly kind: "page"; readonly page: UnoPublishedPageAccepted; readonly media?: UnoPageMedia }
+  | {
+      readonly kind: "page";
+      readonly page: UnoPublishedPageAccepted;
+      readonly media?: UnoPageMedia;
+      readonly routeHrefs?: ReadonlyMap<string, string>;
+    }
   | { readonly kind: "redirect"; readonly location: string }
   | { readonly kind: "refused"; readonly reason: UnoServingRefusal };
 
@@ -406,8 +414,39 @@ function sameQualifiedPage(page: UnoPublishedPageAccepted, candidate: UnoSiteRou
   );
 }
 
+/** One authored `routeTarget` occurrence, keyed by its already validated section id and item index. */
+interface UnoRouteIntent {
+  readonly key: string;
+  readonly target: string;
+}
+
+/**
+ * `UNO-WO-104 / R01`: collect every authored site-local route intent in one accepted Page, walking nested layout
+ * children rather than only a top-level list. The key is deterministic `${section.id}:${itemIndex}`.
+ */
+function collectRouteIntents(nodes: readonly UnoSectionNode[], out: UnoRouteIntent[]): void {
+  for (const node of nodes) {
+    if (node.module === "content.prose") {
+      const props = node.props as { readonly variant?: unknown; readonly items?: unknown };
+      if (props.variant === "list" && Array.isArray(props.items)) {
+        props.items.forEach((item: unknown, index: number) => {
+          if (item === null || typeof item !== "object") return;
+          const routeTarget = (item as { readonly routeTarget?: unknown }).routeTarget;
+          if (typeof routeTarget === "string") out.push({ key: `${node.id}:${index}`, target: routeTarget });
+        });
+      }
+    }
+    const children = (node as { readonly children?: readonly UnoSectionNode[] }).children;
+    if (Array.isArray(children)) collectRouteIntents(children, out);
+  }
+}
+
 /** Finish one accepted plan: the renderer gate, then the all-or-nothing owned-media preflight. */
-function finishPage(root: string, planned: UnoPublishedPageAccepted): UnoServingPageOutcome {
+function finishPage(
+  root: string,
+  planned: UnoPublishedPageAccepted,
+  routeHrefs?: ReadonlyMap<string, string>,
+): UnoServingPageOutcome {
   if (planned.document.kind !== "json") return { status: "served", page: planned };
   if (planned.document.pageDocument === undefined) {
     return { status: "not-served", reason: "serving:renderer-unavailable" };
@@ -416,7 +455,138 @@ function finishPage(root: string, planned: UnoPublishedPageAccepted): UnoServing
   if (assets.status !== "planned") return { status: "not-served", reason: "serving:media-unavailable" };
   const resolved = resolvePageMedia(root, planned, assets.plan);
   if (!resolved.ok) return { status: "not-served", reason: "serving:media-unavailable" };
-  return { status: "served", page: planned, media: resolved.media, assets: assets.plan };
+  return routeHrefs === undefined
+    ? { status: "served", page: planned, media: resolved.media, assets: assets.plan }
+    : { status: "served", page: planned, media: resolved.media, assets: assets.plan, routeHrefs };
+}
+
+/**
+ * `UNO-WO-104 / R01`: prove one authored route intent on the **same** qualified Site as the source Page.
+ *
+ * Nothing is derived from request authority: candidate, host, prefix and canonical all come from the stored declaration,
+ * and `planUnoPublishedPage()` remains the sole publication authority. A missing, draft, unlisted, wrong-Facet,
+ * wrong-Site, wrong-locale, ambiguous or mismatching target yields one closed refusal, so the whole source Page is
+ * refused rather than a partially linked list.
+ */
+async function projectQualifiedRouteTarget(
+  authority: Extract<ServingAuthority, { readonly mode: "qualified" }>,
+  source: UnoPublishedPageAccepted,
+  target: string,
+): Promise<string | null> {
+  const index = buildUnoSiteRouteIndex(authority.manifest, authority.selection);
+  if (!index.accepted) return null;
+  const matches = index.candidates.filter(
+    (candidate) =>
+      candidate.entityId === source.identity.entityId &&
+      candidate.facetId === source.identity.facetId &&
+      candidate.siteId === source.identity.siteId &&
+      candidate.localeTag === source.identity.localeTag &&
+      candidate.routePath === target,
+  );
+  if (matches.length !== 1) return null;
+  const candidate = matches[0];
+  if (candidate === undefined) return null;
+  const storedPathname = `${candidate.pathPrefix}${candidate.pathname}`;
+  const loaded = await loadUnoCandidateSource({
+    repoRoot: authority.root,
+    host: candidate.host,
+    pathname: storedPathname,
+  });
+  if (!loaded.accepted || !sameQualifiedCandidate(loaded.candidate, candidate)) return null;
+  const planned = planUnoPublishedPage({
+    manifest: authority.manifest,
+    selection: authority.selection,
+    site: { facetId: candidate.facetId, siteId: candidate.siteId },
+    host: candidate.host,
+    pathname: storedPathname,
+    loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
+  });
+  if (!planned.accepted) return null;
+  if (
+    !planned.delivery.public ||
+    !sameQualifiedPage(planned, candidate) ||
+    planned.identity.entityId !== source.identity.entityId ||
+    planned.identity.facetId !== source.identity.facetId ||
+    planned.identity.siteId !== source.identity.siteId ||
+    planned.identity.localeTag !== source.identity.localeTag ||
+    planned.identity.routePath !== target ||
+    planned.delivery.canonicalUrl !== candidate.address
+  ) {
+    return null;
+  }
+  return planned.delivery.canonicalUrl;
+}
+
+/** The legacy one-Site proof: same accepted Site and full locale, exact relative route, `public`, stored base only. */
+async function projectLegacyRouteTarget(
+  authority: Extract<ServingAuthority, { readonly mode: "legacy" }>,
+  source: UnoPublishedPageAccepted,
+  target: string,
+): Promise<string | null> {
+  const index = buildUnoCandidateRouteIndex(authority.manifest, authority.selection);
+  if (!index.accepted) return null;
+  const matches = index.candidates.filter(
+    (candidate) =>
+      candidate.entityId === source.identity.entityId &&
+      candidate.facetId === source.identity.facetId &&
+      candidate.siteId === source.identity.siteId &&
+      candidate.localeTag === source.identity.localeTag &&
+      candidate.routePath === target,
+  );
+  if (matches.length !== 1) return null;
+  const candidate = matches[0];
+  if (candidate === undefined) return null;
+  const loaded = await loadUnoCandidateSource({ repoRoot: authority.root, pathname: candidate.pathname });
+  if (!loaded.accepted) return null;
+  const planned = planUnoPublishedPage({
+    manifest: authority.manifest,
+    selection: authority.selection,
+    base: { canonical: authority.canonical, aliases: [...authority.aliases] },
+    pathname: candidate.pathname,
+    loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
+  });
+  if (!planned.accepted || !planned.delivery.public) return null;
+  if (
+    planned.identity.entityId !== source.identity.entityId ||
+    planned.identity.facetId !== source.identity.facetId ||
+    planned.identity.siteId !== source.identity.siteId ||
+    planned.identity.localeTag !== source.identity.localeTag ||
+    planned.identity.routePath !== target
+  ) {
+    return null;
+  }
+  return planned.delivery.canonicalUrl;
+}
+
+/**
+ * Project every authored route intent of one accepted source Page, or refuse the whole Page.
+ *
+ * Each distinct target is proven once per request; nothing is cached across requests and no caller may supply a URL.
+ */
+async function projectRouteTargets(
+  authority: ServingAuthority,
+  source: UnoPublishedPageAccepted,
+): Promise<ReadonlyMap<string, string> | null> {
+  if (authority.mode === "refused") return null;
+  if (source.document.kind !== "json" || source.document.pageDocument === undefined) return new Map();
+  const intents: UnoRouteIntent[] = [];
+  collectRouteIntents(source.document.pageDocument.sections, intents);
+  if (intents.length === 0) return new Map();
+  const proven = new Map<string, string>();
+  const byTarget = new Map<string, string | null>();
+  for (const intent of intents) {
+    if (!byTarget.has(intent.target)) {
+      const url =
+        authority.mode === "qualified"
+          ? await projectQualifiedRouteTarget(authority, source, intent.target)
+          : await projectLegacyRouteTarget(authority, source, intent.target);
+      byTarget.set(intent.target, url);
+    }
+    const url = byTarget.get(intent.target);
+    if (url === undefined || url === null) return null;
+    proven.set(intent.key, url);
+  }
+  return proven;
 }
 
 /**
@@ -457,7 +627,9 @@ export async function planUnoServingPage(request: unknown, pathnameInput?: unkno
     if (!sameQualifiedPage(planned, matched.candidate)) {
       return { status: "not-served", reason: "serving:publication-refused" };
     }
-    return finishPage(authority.root, planned);
+    const routeHrefs = await projectRouteTargets(authority, planned);
+    if (routeHrefs === null) return { status: "not-served", reason: "serving:publication-refused" };
+    return finishPage(authority.root, planned, routeHrefs);
   }
 
   const loaded = await loadUnoCandidateSource({ repoRoot: authority.root, pathname });
@@ -471,7 +643,9 @@ export async function planUnoServingPage(request: unknown, pathnameInput?: unkno
     loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
   });
   if (!planned.accepted) return { status: "not-served", reason: "serving:publication-refused" };
-  return finishPage(authority.root, planned);
+  const routeHrefs = await projectRouteTargets(authority, planned);
+  if (routeHrefs === null) return { status: "not-served", reason: "serving:publication-refused" };
+  return finishPage(authority.root, planned, routeHrefs);
 }
 
 /**
@@ -517,9 +691,9 @@ export async function resolveUnoServingRequest(request: unknown, pathnameInput?:
 
   const served = await planUnoServingPage({ host, pathname });
   if (served.status === "served") {
-    return served.media === undefined
-      ? { kind: "page", page: served.page }
-      : { kind: "page", page: served.page, media: served.media };
+    return served.routeHrefs === undefined
+      ? { kind: "page", page: served.page, media: served.media }
+      : { kind: "page", page: served.page, media: served.media, routeHrefs: served.routeHrefs };
   }
 
   const aliased = await redirectThroughAlias(host, pathname);

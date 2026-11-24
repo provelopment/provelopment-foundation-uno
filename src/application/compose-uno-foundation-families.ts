@@ -823,8 +823,8 @@ function composeSection(
         if (item === null || typeof item !== "object" || Array.isArray(item)) refuseUnsupportedFeature();
         const entry = item as PlainRecord;
         // Each object entry is `{label, detail?, href?, link?, route?}` with at most one destination. `href` is forwarded
-        // for the strict reader's classifier; `link` becomes a validated `linkId` that stays inert; `route` is refused
-        // until a server publication proof exists, so no guessed anchor can be composed.
+        // for the strict reader's classifier; `link` becomes a validated `linkId` that stays inert; `route` becomes a
+        // lexical `routeTarget` intent only — the serving boundary proves or refuses it, and no URL is assembled here.
         requireExactKeys(entry, ["label"], ["detail", "href", "link", "route"]);
         const destinations = ["href", "link", "route"].filter((name) => ownsKey(entry, name));
         if (destinations.length > 1) refuseUnsupportedFeature();
@@ -837,7 +837,7 @@ function composeSection(
         }
         if (ownsKey(entry, "href")) output["href"] = readDonorText(entry["href"], false);
         if (ownsKey(entry, "link")) output["linkId"] = readDonorText(entry["link"], false);
-        if (ownsKey(entry, "route")) refuseUnsupportedFeature();
+        if (ownsKey(entry, "route")) output["routeTarget"] = readDonorText(entry["route"], false);
         normalized.push(output);
       }
       const props: Record<string, unknown> = { variant: "list", items: normalized };

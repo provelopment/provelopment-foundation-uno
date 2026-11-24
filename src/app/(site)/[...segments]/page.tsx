@@ -80,11 +80,15 @@ export async function generateMetadata({ params }: { params: Promise<CatchAllRou
 }
 
 /** Render one visible `h1`, the optional description and exactly one body: inert Markdown or the JSON Page. */
-function renderPage(page: UnoPublishedPageAccepted, media: UnoPageMedia | undefined): ReactNode {
+function renderPage(
+  page: UnoPublishedPageAccepted,
+  media: UnoPageMedia | undefined,
+  routeHrefs?: ReadonlyMap<string, string>,
+): ReactNode {
   let body: ReactNode;
   if (page.document.kind === 'json') {
     if (page.document.pageDocument === undefined) notFound();
-    body = <UnoPageSections document={page.document.pageDocument} media={media} />;
+    body = <UnoPageSections document={page.document.pageDocument} media={media} routeHrefs={routeHrefs} />;
   } else {
     const parsed = parseUnoSafeMarkdown(page.document.markdownBody);
     if (!parsed.ok) notFound();
@@ -108,5 +112,5 @@ export default async function SitePage({ params }: { params: Promise<CatchAllRou
   if (decision.kind === 'redirect') redirect(decision.location);
   if (decision.kind === 'refused') notFound();
 
-  return renderPage(decision.page, decision.media);
+  return renderPage(decision.page, decision.media, decision.routeHrefs);
 }

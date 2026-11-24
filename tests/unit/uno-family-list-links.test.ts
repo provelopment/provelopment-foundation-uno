@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { composeUnoFoundationSubset } from "../../src/application/compose-uno-foundation-families";
 import { UnoPageSections } from "../../src/components/uno-page-sections";
 import { readUnoPageDocument, type UnoPageDocument } from "../../src/core/page-document";
 
@@ -15,8 +16,8 @@ function listDocument(items: readonly unknown[], links?: unknown) {
   };
 }
 
-function render(document: UnoPageDocument): string {
-  return renderToStaticMarkup(createElement(UnoPageSections, { document }));
+function render(document: UnoPageDocument, routeHrefs?: ReadonlyMap<string, string>): string {
+  return renderToStaticMarkup(createElement(UnoPageSections, { document, routeHrefs }));
 }
 
 function accepted(source: unknown): UnoPageDocument {
@@ -132,5 +133,65 @@ describe("UNO-WO-103 / R01 — document-local application links and list destina
       '<div class="uno-json" data-uno-document-version="1">' +
         '<ul class="uno-json-list" id="links"><li><span>Only</span><p>Plain</p></li></ul></div>',
     );
+  });
+
+  it("accepts a lexical routeTarget intent, never turning it into an href", () => {
+    const document = accepted(listDocument([{ label: "Notes", routeTarget: "notes" }]));
+    const props = document.sections[0]?.module === "content.prose" ? document.sections[0].props : null;
+    expect(JSON.stringify(props)).toBe('{"variant":"list","items":[{"label":"Notes","routeTarget":"notes"}]}');
+    const html = render(document);
+    expect(html).toContain("Notes");
+    expect(html).not.toContain("<a");
+    expect(html).not.toContain("routeTarget");
+  });
+
+  it("renders a route anchor only from the exact server-proven projection key", () => {
+    const document = accepted(listDocument([{ label: "Notes", routeTarget: "notes" }]));
+    const proven = render(document, new Map([["links:0", "https://abc.example/de-de/notes"]]));
+    expect(proven).toContain(
+      '<a class="uno-json-list-link" href="https://abc.example/de-de/notes" rel="noreferrer noopener">Notes</a>',
+    );
+    // A projection under any other key, and the absence of one, must not invent an anchor.
+    expect(render(document, new Map([["links:1", "https://abc.example/de-de/notes"]]))).not.toContain("<a");
+    expect(render(document, new Map())).not.toContain("<a");
+  });
+
+  it("refuses malformed and crossed route intents", () => {
+    for (const routeTarget of [
+      "/notes",
+      "../notes",
+      "notes?x",
+      "notes#x",
+      "Notes",
+      "a/b/c/d/e",
+      "a%2fb",
+      "",
+      " notes",
+      "notes\\x",
+    ]) {
+      expect(refusal(listDocument([{ label: "A", routeTarget }]))).toBe("document:invalid-props");
+    }
+    expect(refusal(listDocument([{ label: "A", href: "/x", routeTarget: "notes" }]))).toBe("document:invalid-props");
+    expect(
+      refusal(
+        listDocument(
+          [{ label: "A", linkId: "c", routeTarget: "notes" }],
+          { c: { reference: "applicationLink", key: "k" } },
+        ),
+      ),
+    ).toBe("document:invalid-props");
+  });
+
+  it("composes a donor route as a bounded intent and never as a URL", () => {
+    const composed = composeUnoFoundationSubset({
+      version: 1,
+      title: "Synthetic route specimen",
+      sections: [{ type: "list", items: [{ label: "Notes", route: "notes" }] }],
+    });
+    expect(composed.status).toBe("composed");
+    const json = JSON.stringify(composed);
+    expect(json).toContain('"routeTarget":"notes"');
+    expect(json).not.toContain("http");
+    expect(json).not.toContain('"href"');
   });
 });

@@ -370,7 +370,7 @@ describe("composeUnoFoundationSubset — envelope, family and feature refusal", 
     expectRefusal(envelope({ type: "prose", body: "A", onClick: "go()" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "callout", body: "A", style: "color:red" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "callout", body: "A", href: "/x" }), "family:unsupported-feature");
-    expectRefusal(envelope({ type: "list", items: [{ label: "A", route: "/x" }] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "list", items: [{ label: "A", route: "/x" }] }), "family:target-refused");
     expectRefusal(envelope({ type: "list", items: [{ label: "A", destination: "/x" }] }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "list", items: ["A"], extra: true }), "family:unsupported-feature");
   });
@@ -4828,7 +4828,7 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     // The newly accepted presentation fields stay closed: an unlisted value is still refused by the Uno reader.
     expectRefusal(envelope({ type: "prose", body: "A", align: "right" }), "family:target-refused");
     expectRefusal(envelope({ type: "prose", body: "A", surface: "shadow" }), "family:target-refused");
-    expectRefusal(envelope({ type: "list", items: [{ label: "Linked", route: "about" }] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "list", items: [{ label: "Linked", route: "../about" }] }), "family:target-refused");
     expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], align: "center" }), "family:unsupported-feature");
     // The two new optional keys stay family-specific: unmapped neighbouring families still refuse them.
     expectRefusal(envelope({ type: "divider", heading: "X" }), "family:unsupported-feature");
@@ -5322,7 +5322,7 @@ describe("rich table and list (WO-102 D1)", () => {
       envelope({ type: "list", items: [{ label: "A", link: "contact" }] }),
       "family:target-refused",
     );
-    expectRefusal(envelope({ type: "list", items: [{ label: "A", route: "about" }] }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "list", items: [{ label: "A", route: "about?x" }] }), "family:target-refused");
     expectRefusal(
       envelope({ type: "list", items: [{ label: "A", href: "/x", link: "contact" }] }),
       "family:unsupported-feature",
