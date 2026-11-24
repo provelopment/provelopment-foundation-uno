@@ -655,6 +655,7 @@ function wrapAuthoredText(
   id: string,
   child: CandidateSection,
   childSuffix: string,
+  options: { readonly markdownLede?: boolean } = {},
 ): CandidateSection {
   const headingAuthored = ownsKey(record, "heading");
   const ledeAuthored = ownsKey(record, "lede");
@@ -668,7 +669,18 @@ function wrapAuthoredText(
     });
   }
   if (ledeAuthored) {
-    wrapped.push({ id: `${id}-lede`, module: "content.prose", props: { text: readSectionLede(record["lede"]) } });
+    // `UNO-WO-113 / R01`: the credited `stats` family reads its lede at the donor's own Markdown-capable surface, so the one
+    // shared Markdown renderer draws it. A plain lede keeps the byte-identical `content.prose {text}` child.
+    if (options.markdownLede === true) {
+      const lede = readRichFamilyText(record["lede"], 4000);
+      wrapped.push({
+        id: `${id}-lede`,
+        module: "content.prose",
+        props: hasFamilyMarkdown(lede) ? { text: lede, markdown: true } : { text: lede },
+      });
+    } else {
+      wrapped.push({ id: `${id}-lede`, module: "content.prose", props: { text: readSectionLede(record["lede"]) } });
+    }
   }
   wrapped.push({ ...child, id: `${id}-${childSuffix}` });
   return { id, module: "layout.stack", props: {}, children: wrapped };
@@ -904,12 +916,13 @@ function composeSection(
       return { id, module: "content.hero", props };
     }
     case "stats": {
-      // `UNO-WO-072 / R01`: the donor spreads `headingFields` into `statsSectionSchema`, so both the optional plain-text
-      // heading and the optional plain-text lede become representable here. `surface` stays unsupported for `stats`.
-      requireExactKeys(record, ["type", "items"], ["heading", "lede"]);
+      // `UNO-WO-113 / R01`: the donor's full Stats surface — the optional plain heading, a **Markdown-capable** lede, the
+      // donor's own closed `surface`, and **Markdown-capable** item details (`statItemSchema.detail` is `markdownTextSchema`).
+      requireExactKeys(record, ["type", "items"], ["heading", "lede", "surface"]);
       const items = record["items"];
       if (!Array.isArray(items)) refuseUnsupportedFeature();
       const output: Record<string, unknown>[] = [];
+      let markdownDetails = false;
       for (const raw of items) {
         if (raw === null || typeof raw !== "object" || Array.isArray(raw)) refuseUnsupportedFeature();
         const entry = raw as PlainRecord;
@@ -919,11 +932,19 @@ function composeSection(
           value: readDonorText(entry["value"], true),
           label: readDonorText(entry["label"], true),
         };
-        if (ownsKey(entry, "detail")) item["detail"] = readDonorText(entry["detail"], true);
+        if (ownsKey(entry, "detail")) {
+          // The donor's `detail` is Markdown-capable; it is read at its own bounded limit and switches the node's own form.
+          const detail = readRichFamilyText(entry["detail"], 320);
+          item["detail"] = detail;
+          if (hasFamilyMarkdown(detail)) markdownDetails = true;
+        }
         output.push(item);
       }
-      const stats: CandidateSection = { id, module: "content.stats", props: { items: output } };
-      return wrapAuthoredText(record, id, stats, "stats");
+      const props: Record<string, unknown> = { items: output };
+      if (ownsKey(record, "surface")) props["surface"] = record["surface"];
+      if (markdownDetails) props["markdown"] = true;
+      const stats: CandidateSection = { id, module: "content.stats", props };
+      return wrapAuthoredText(record, id, stats, "stats", { markdownLede: true });
     }
     case "steps": {
       // The donor `steps` family also spreads `headingFields`. `UNO-WO-072 / R01` adds its optional plain-text heading and

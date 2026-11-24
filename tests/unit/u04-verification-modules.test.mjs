@@ -37,6 +37,14 @@ import {
   heroRegionOf,
   heroServed,
 } from "../../scripts/u04/hero-evidence.mjs";
+import {
+  STATS_EXPECTED,
+  STATS_REFUSAL_CASES,
+  statsNodeProps,
+  statsPairsOf,
+  statsRegionOf,
+  statsServed,
+} from "../../scripts/u04/stats-evidence.mjs";
 import { freeLoopbackPort, killChild, nextBinPath, runChild, waitForServer } from "../../scripts/u04/serving-harness.mjs";
 
 const ROOT = process.cwd();
@@ -202,6 +210,91 @@ describe("the extracted serving harness module", () => {
       intervalMs: 10,
     });
     expect(ready).toBe(false);
+  });
+});
+
+
+/** A served stats stack shaped exactly as the renderer emits it, used only to prove the parser and the predicate. */
+function servedStatsRegion(overrides = {}) {
+  const pairs = STATS_EXPECTED.items
+    .map((item) => {
+      const detail =
+        item.detail === ""
+          ? ""
+          : overrides.plainDetail === true
+            ? `<span class="uno-json-stat-detail">${item.detail.replace(/\*\*/gu, "")}</span>`
+            : `<div class="uno-json-stat-detail"><div class="uno-family-md"><p class="uno-family-md-paragraph">${item.detail.replace(
+                /\*\*(.+?)\*\*/gu,
+                '<strong class="uno-family-md-strong">$1</strong>',
+              )}</p></div></div>`;
+      return `<div class="uno-json-stat"><dt class="uno-json-stat-label">${item.label}</dt><dd class="uno-json-stat-value">${item.value}${detail}</dd></div>`;
+    })
+    .join("");
+  return [
+    `<div class="uno-json-stack" data-uno-gap="normal" id="${STATS_EXPECTED.id}">`,
+    `<h2 class="uno-json-heading" id="${STATS_EXPECTED.id}-heading">${STATS_EXPECTED.heading}</h2>`,
+    `<section class="uno-json-prose" id="${STATS_EXPECTED.id}-lede"><div class="uno-family-md"><p class="uno-family-md-paragraph">${STATS_EXPECTED.lede.replace(
+      /\*\*(.+?)\*\*/gu,
+      '<strong class="uno-family-md-strong">$1</strong>',
+    )}</p></div></section>`,
+    `<section class="uno-json-stats" data-uno-surface="${overrides.surface ?? STATS_EXPECTED.surface}" id="${STATS_EXPECTED.id}-stats">`,
+    `<dl class="uno-json-stats-list">${pairs}</dl></section></div>`,
+    `<div class="uno-json-stack" data-uno-gap="normal" id="family-11-steps"></div>`,
+  ].join("");
+}
+
+describe("the extracted Stats evidence module", () => {
+  it("derives the expected surface and the native node props from the one fixture definition", () => {
+    expect(STATS_EXPECTED.id).toBe("family-10-stats");
+    expect(STATS_EXPECTED.heading).toBe("Synthetic numbers");
+    expect(STATS_EXPECTED.surface).toBe("muted");
+    expect(STATS_EXPECTED.lede).toContain("**summarise**");
+    expect(STATS_EXPECTED.items).toHaveLength(2);
+    expect(STATS_EXPECTED.items[0].detailStrong).toBe("only");
+    expect(STATS_EXPECTED.items[1].detail).toBe("");
+    expect(statsNodeProps()).toEqual({
+      items: [
+        { value: "13", label: "Sampled sections", detail: "Fixture **only**." },
+        { value: "4", label: "New examples" },
+      ],
+      surface: "muted",
+      markdown: true,
+    });
+    // Every call returns its own objects, so a caller can never mutate the frozen fixture through it.
+    expect(statsNodeProps().items).not.toBe(statsNodeProps().items);
+  });
+
+  it("extracts the stats region and its served pairs", () => {
+    const region = servedStatsRegion();
+    expect(statsRegionOf(`<main>${region}</main>`)).toBe(
+      region.slice(0, region.indexOf('<div class="uno-json-stack" data-uno-gap="normal" id="family-11-steps">')),
+    );
+    expect(statsRegionOf("<main>no stats</main>")).toBe("");
+    const pairs = statsPairsOf(region);
+    expect(pairs).toHaveLength(2);
+    expect(pairs[0]).toMatchObject({ label: "Sampled sections", value: "13", markdownDetail: true });
+    expect(pairs[0].detail).toContain('<strong class="uno-family-md-strong">only</strong>');
+    expect(pairs[1]).toMatchObject({ label: "New examples", value: "4", detail: "", markdownDetail: false });
+  });
+
+  it("accepts the approved surface and rejects a plain detail, a lost surface, a control or a currency", () => {
+    expect(statsServed(servedStatsRegion()).ok).toBe(true);
+    expect(statsServed(servedStatsRegion({ plainDetail: true })).ok).toBe(false);
+    expect(statsServed(servedStatsRegion({ surface: "plain" })).ok).toBe(false);
+    expect(statsServed(`${servedStatsRegion()}<button>Go</button>`).ok).toBe(false);
+    expect(statsServed(`${servedStatsRegion()}$12`).ok).toBe(false);
+  });
+
+  it("refuses every malformed stats source with the documented reason and no partial Page", () => {
+    for (const probe of STATS_REFUSAL_CASES) {
+      const source = familySource();
+      probe.mutate(source);
+      const outcome = composeUnoFoundationSubset(source, familyBindings());
+      expect(outcome.status, probe.label).toBe("refused");
+      if (outcome.status !== "refused") continue;
+      expect(outcome.reason, probe.label).toBe(probe.expected);
+      expect(Object.prototype.hasOwnProperty.call(outcome, "document"), probe.label).toBe(false);
+    }
   });
 });
 

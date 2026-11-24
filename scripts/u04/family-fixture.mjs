@@ -26,6 +26,22 @@ export const HERO_ACTIONS = Object.freeze([
   Object.freeze({ label: "Write to the desk", href: "mailto:desk@example.org", variant: "secondary" }),
 ]);
 
+/**
+ * `UNO-WO-113 / R01`: the donated Stats surface, exactly as authored — a plain heading, a Markdown-capable lede, the donor's
+ * own closed `surface`, and one Markdown-capable item detail. The Hero's actions are exported the same way, so the fixture
+ * and every expectation read one definition.
+ */
+export const STATS_SOURCE = Object.freeze({
+  type: "stats",
+  heading: "Synthetic numbers",
+  lede: "Synthetic numbers **summarise** the sample.",
+  surface: "muted",
+  items: Object.freeze([
+    Object.freeze({ value: "13", label: "Sampled sections", detail: "Fixture **only**." }),
+    Object.freeze({ value: "4", label: "New examples" }),
+  ]),
+});
+
 /** The exact top-level ids the unchanged adapter must produce for the fixture below, in document order. */
 export const FAMILY_IDS = Object.freeze([
   "family-0-prose",
@@ -132,14 +148,10 @@ export function familySource() {
         actions: HERO_ACTIONS.map((action) => ({ ...action })),
       },
       {
-        type: "stats",
         // `UNO-WO-072 / R01`: the authored heading and lede are the only source change at index 10.
-        heading: "Synthetic numbers",
-        lede: "Synthetic numbers summarise the sample.",
-        items: [
-          { value: "13", label: "Sampled sections", detail: "Fixture only" },
-          { value: "4", label: "New examples" },
-        ],
+        // `UNO-WO-113 / R01`: index 10 now authors the donor's full Stats surface from the single exported definition.
+        ...STATS_SOURCE,
+        items: STATS_SOURCE.items.map((item) => ({ ...item })),
       },
 
       {

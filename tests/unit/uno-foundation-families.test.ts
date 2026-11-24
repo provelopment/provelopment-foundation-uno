@@ -771,12 +771,26 @@ describe("composeUnoFoundationSubset — hero and stats refusal", () => {
     );
   });
 
-  it("refuses stats fields, links and Markdown outside the bounded subset", () => {
+  it("refuses stats fields and links outside the bounded subset", () => {
     // `UNO-WO-072 / R01` accepts the donor's optional authored `heading`/`lede` here, so they are no longer extra keys;
     // their own strictness, refusal reasons and byte-compatible absence are proved in the dedicated sequence section.
+    // `UNO-WO-113 / R01`: the donor's `detail` is Markdown-capable, so a classified link now renders; markup and unsafe
+    // constructs are still refused.
     expectRefusal(envelope({ type: "stats", items: [{ value: "1", label: "X", href: "/x" }] }), "family:unsupported-feature");
-    expectRefusal(
+    const linked = composeUnoFoundationSubset(
       envelope({ type: "stats", items: [{ value: "1", label: "X", detail: "[x](https://example.org)" }] }),
+    );
+    expect(linked.status).toBe("composed");
+    if (linked.status === "composed") {
+      const node = linked.document.sections[0];
+      expect(node?.module).toBe("content.stats");
+      if (node?.module === "content.stats") {
+        expect(node.props.markdown).toBe(true);
+        expect(node.props.items[0]?.detail).toBe("[x](https://example.org)");
+      }
+    }
+    expectRefusal(
+      envelope({ type: "stats", items: [{ value: "1", label: "X", detail: "<script>alert(1)</script>" }] }),
       "family:unsupported-feature",
     );
     expectRefusal(envelope({ type: "stats", items: "not-an-array" }), "family:unsupported-feature");
@@ -2513,11 +2527,11 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/FAMILY_PARITY=17\/17/u);
     expect(ledger).toContain("ADAPT (divider semantic parity candidate)");
-    expect(ledger).toContain("six of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("seven of seventeen fully parity-evidenced candidates");
     // `UNO-WO-071 / R01` normalizes the divider wording to its already independently accepted status.
     expect(ledger).toContain("independently accepted under `UNO-WO-069 / R01`");
     expect(ledger).not.toContain("awaiting independent Architect acceptance");
-    expect(ledger).toContain("eleven still bounded");
+    expect(ledger).toContain("ten still bounded");
     // `UNO-WO-070 / R01`: the two grid families gained a bounded authored-heading mode, which must never be recorded as
     // full parity, a second/third accepted family or a closed stage.
     expect(ledger).toContain("ADAPT (bounded grid plus authored section heading and plain-text lede)");
@@ -4240,7 +4254,7 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
     expect(ledger).toContain("lede-only");
     expect(ledger).toContain("no-lede");
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("six of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("seven of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
@@ -4434,29 +4448,74 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
       ["   ", "family:target-refused"],
       [" Padded", "family:target-refused"],
       ["Padded ", "family:target-refused"],
-      ["**Bold**", "family:unsupported-feature"],
-      ["_Italic_", "family:unsupported-feature"],
-      ["`code`", "family:unsupported-feature"],
-      ["[label](https://example.com)", "family:unsupported-feature"],
       ["![alt](https://example.com/i.png)", "family:unsupported-feature"],
-      ["# Heading", "family:unsupported-feature"],
-      ["- entry", "family:unsupported-feature"],
-      ["> quote", "family:unsupported-feature"],
-      ["a < b", "family:unsupported-feature"],
       ["<script>alert(1)</script>", "family:unsupported-feature"],
-      ["Two\nlines", "family:unsupported-feature"],
       ["Carriage\rreturn", "family:unsupported-feature"],
       ["Tabbed\ttext", "family:unsupported-feature"],
       ["Nul\u0000text", "family:unsupported-feature"],
       ["Lead \uD800 tail", "family:target-refused"],
     ];
-    for (const type of ["stats", "steps"] as const) {
+    // `UNO-WO-113 / R01`: the `stats` lede is Markdown-capable, so only `stats.heading` and every `steps` field keep the
+    // plain-text matrix below; the Markdown cases are proved separately.
+    for (const [value, reason] of cases) {
+      expectRefusal(sequencePage("stats", { heading: value }), reason);
       for (const field of ["heading", "lede"] as const) {
-        for (const [value, reason] of cases) {
-          expectRefusal(sequencePage(type, { [field]: value }), reason);
-        }
+        expectRefusal(sequencePage("steps", { [field]: value }), reason);
       }
     }
+    const plainMarkdownCases: Array<[string, string]> = [
+      ["**Bold**", "family:unsupported-feature"],
+      ["_Italic_", "family:unsupported-feature"],
+      ["`code`", "family:unsupported-feature"],
+      ["[label](https://example.com)", "family:unsupported-feature"],
+      ["# Heading", "family:unsupported-feature"],
+      ["- entry", "family:unsupported-feature"],
+      ["> quote", "family:unsupported-feature"],
+      ["Two\nlines", "family:unsupported-feature"],
+    ];
+    for (const [value, reason] of plainMarkdownCases) {
+      expectRefusal(sequencePage("stats", { heading: value }), reason);
+      for (const field of ["heading", "lede"] as const) {
+        expectRefusal(sequencePage("steps", { [field]: value }), reason);
+      }
+    }
+  });
+
+  it("accepts the Markdown-capable stats lede the donor authors, and refuses what the shared reader refuses", () => {
+    // `UNO-WO-113 / R01`: `statsSectionSchema.lede` is `markdownTextSchema`, so the same shared reader that serves the rich
+    // `prose`, `table`, `list` and `hero` families decides this one too — accepted constructs compose, refused ones refuse.
+    for (const lede of ["**Bold**", "_Italic_", "`code`", "[label](https://example.com)", "Two\nlines", "a < b"]) {
+      const outcome = composeUnoFoundationSubset(sequencePage("stats", { lede }));
+      expect(outcome.status, lede).toBe("composed");
+    }
+    for (const lede of ["![alt](https://example.com/i.png)", "<script>alert(1)</script>", ""]) {
+      const outcome = composeUnoFoundationSubset(sequencePage("stats", { lede }));
+      expect(outcome.status, lede).toBe("refused");
+    }
+    const rich = composeUnoFoundationSubset(sequencePage("stats", { lede: "A **bounded** lede." }));
+    expect(rich.status).toBe("composed");
+    if (rich.status !== "composed") return;
+    const stack = rich.document.sections[0];
+    expect(stack?.module).toBe("layout.stack");
+    if (stack?.module !== "layout.stack") return;
+    expect(stack.children[0]).toEqual({
+      id: "family-0-stats-lede",
+      module: "content.prose",
+      props: { text: "A **bounded** lede.", markdown: true },
+    });
+    expect(stack.children[1]?.module).toBe("content.stats");
+    // A plain lede keeps the byte-identical child, so every previously accepted composition is unchanged.
+    const plain = composeUnoFoundationSubset(sequencePage("stats", { lede: "A plain lede." }));
+    expect(plain.status).toBe("composed");
+    if (plain.status !== "composed") return;
+    const plainStack = plain.document.sections[0];
+    expect(plainStack?.module).toBe("layout.stack");
+    if (plainStack?.module !== "layout.stack") return;
+    expect(plainStack.children[0]).toEqual({
+      id: "family-0-stats-lede",
+      module: "content.prose",
+      props: { text: "A plain lede." },
+    });
   });
 
 
@@ -4491,8 +4550,15 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
       expectRefusal(sequencePage(type, { eyebrow: "X" }), "family:unsupported-feature");
       expectRefusal(sequencePage(type, { align: "center" }), "family:unsupported-feature");
     }
-    // `surface` stays unsupported for `stats` while remaining an accepted closed literal for `steps`.
-    expectRefusal(sequencePage("stats", { surface: "muted" }), "family:unsupported-feature");
+    // `UNO-WO-113 / R01`: `stats` now accepts the donor's own closed `surface` literal, while `steps` keeps its accepted form.
+    const statsSurface = composeUnoFoundationSubset(sequencePage("stats", { surface: "muted" }));
+    expect(statsSurface.status).toBe("composed");
+    if (statsSurface.status === "composed") {
+      const node = statsSurface.document.sections[0];
+      expect(node?.module).toBe("content.stats");
+      if (node?.module === "content.stats") expect(node.props.surface).toBe("muted");
+    }
+    expectRefusal(sequencePage("stats", { surface: "loud" }), "family:target-refused");
     expect(composed(sequencePage("steps", { surface: "bordered" })).sections[0]!.props).toEqual({
       items: [{ title: "Draft", description: "Prepare the fixture source." }, { title: "Review" }],
       surface: "bordered",
@@ -4545,9 +4611,9 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
 
   it("keeps the stats and steps subset recorded in the ledger without claiming further parity", () => {
     const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
-    expect(ledger.split("ADAPT (bounded authored plain-text heading/lede)").length - 1).toBe(2);
+    expect(ledger.split("ADAPT (bounded authored plain-text heading/lede)").length - 1).toBe(1);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("six of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("seven of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/stats[^.\n]*full semantic parity/u);
@@ -4961,14 +5027,15 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     expect(ledger.split("PARITY (UNO-WO-110 / R01)").length - 1).toBe(1);
     expect(ledger.split("PARITY (UNO-WO-111 / R01)").length - 1).toBe(1);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("six of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("seven of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("sixteen still bounded");
-    expect(ledger).toContain("eleven still bounded");
+    expect(ledger).toContain("ten still bounded");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("16/17");
     // `UNO-WO-112 / R01`: the ledger now records the earned six-family row; what it must never claim is the B1 row or any
     // later one, so those counts stay forbidden while the delivered count is pinned positively.
     expect(ledger).toContain("6/17");
+    expect(ledger).toContain("7/17");
     expect(ledger).not.toContain("8/17");
     expect(ledger).not.toContain("11/17");
     expect(ledger).not.toContain("17/17 full semantic parity");

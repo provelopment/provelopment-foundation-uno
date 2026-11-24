@@ -505,7 +505,7 @@ function SectionNode({
       );
     }
     case "content.stats": {
-      const { items, heading, level, surface } = node.props;
+      const { items, heading, level, surface, markdown } = node.props;
       const Tag = level === undefined ? null : HEADING_TAGS[level];
       const headingId = `${node.id}-title`;
       return (
@@ -521,17 +521,26 @@ function SectionNode({
             </Tag>
           )}
           <dl className="uno-json-stats-list">
-            {items.map((item, index) => (
-              <div className="uno-json-stat" key={`${item.label}:${index}`}>
-                <dt className="uno-json-stat-label">{item.label}</dt>
-                <dd className="uno-json-stat-value">
-                  {item.value}
-                  {item.detail === undefined ? null : (
-                    <span className="uno-json-stat-detail">{item.detail}</span>
-                  )}
-                </dd>
-              </div>
-            ))}
+            {items.map((item, index) => {
+              // `UNO-WO-113 / R01`: the donor's `detail` is Markdown-capable, so an adapter-flagged node draws it with the one
+              // shared family renderer; an unflagged node keeps the byte-identical escaped `<span>`.
+              const detailBlocks = markdown === true ? parseFamilyMarkdown(item.detail) : null;
+              return (
+                <div className="uno-json-stat" key={`${item.label}:${index}`}>
+                  <dt className="uno-json-stat-label">{item.label}</dt>
+                  <dd className="uno-json-stat-value">
+                    {item.value}
+                    {item.detail === undefined ? null : detailBlocks === null ? (
+                      <span className="uno-json-stat-detail">{item.detail}</span>
+                    ) : (
+                      <div className="uno-json-stat-detail">
+                        <UnoFamilyMarkdown blocks={detailBlocks} />
+                      </div>
+                    )}
+                  </dd>
+                </div>
+              );
+            })}
           </dl>
         </section>
       );

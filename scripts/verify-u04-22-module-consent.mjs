@@ -40,6 +40,14 @@ import {
 } from "./u04/family-fixture.mjs";
 import { conjunction, conjunctionDetail, createFamilyEvidence, isCreditable } from "./u04/family-evidence.mjs";
 import { HERO_EXPECTED, HERO_REFUSAL_CASES, heroActionsOf, heroRegionOf, heroServed } from "./u04/hero-evidence.mjs";
+import {
+  STATS_EXPECTED,
+  STATS_REFUSAL_CASES,
+  statsNodeProps,
+  statsPairsOf,
+  statsRegionOf,
+  statsServed,
+} from "./u04/stats-evidence.mjs";
 import { freeLoopbackPort, killChild, nextBinPath, runChild, waitForServer } from "./u04/serving-harness.mjs";
 
 registerHooks({
@@ -148,6 +156,7 @@ const localA2 = {
   table: createFamilyEvidence(),
   list: createFamilyEvidence(),
   hero: createFamilyEvidence(),
+  stats: createFamilyEvidence(),
 };
 // Diagnostics only: the executed refusal codes, so a red `refusal` dimension names its own reason.
 let refusalReasons = "";
@@ -158,6 +167,9 @@ const tableBrowserCases = new Set();
 const listBrowserCases = new Set();
 // `UNO-WO-112 / R01`: and for the credited Hero, whose Markdown bodies and two static actions must hold in all four cases.
 const heroBrowserCases = new Set();
+// `UNO-WO-113 / R01`: and for the credited Stats family, whose Markdown lede, Markdown detail and `<dl>` pairs must hold in
+// all four cases at both viewports.
+const statsBrowserCases = new Set();
 const a1Evidence = {
   prose: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
   callout: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
@@ -936,7 +948,7 @@ async function main() {
     // zero-invocation accessor probe. Each probe mutates exactly one authored text field.
     const sequenceProbes = [
       ["stats heading Markdown emphasis", "family:unsupported-feature", (s) => { s.sections[10].heading = "**Bold** heading"; }],
-      ["stats lede Markdown link", "family:unsupported-feature", (s) => { s.sections[10].lede = "[label](https://example.test)"; }],
+      ["stats lede Markdown image", "family:unsupported-feature", (s) => { s.sections[10].lede = "![alt](https://example.test/i.png)"; }],
       ["stats heading markup", "family:unsupported-feature", (s) => { s.sections[10].heading = "<b>bold</b>"; }],
       ["stats lede wrong type", "family:unsupported-feature", (s) => { s.sections[10].lede = 7; }],
       ["steps heading blank", "family:target-refused", (s) => { s.sections[11].heading = ""; }],
@@ -1351,17 +1363,9 @@ async function main() {
     }
     // `UNO-WO-072 / R01`: the authored heading and lede on the two bounded sequence families.
     {
-      const sequenceEvidence = (index, type, childSuffix, expectedHeading, expectedLede, expectedChildModule) => {
+      const sequenceEvidence = (index, type, childSuffix, expectedHeading, expectedLedeProps, expectedChildModule, expectedChildProps) => {
         const section = familyAccepted.sections[index];
-        const original = type === "stats"
-          ? { items: [{ value: "13", label: "Sampled sections", detail: "Fixture only" }, { value: "4", label: "New examples" }] }
-          : {
-              items: [{ title: "Draft", description: "Prepare the fixture source." }, { title: "Review" }],
-              surface: "muted",
-              // `UNO-WO-080 / R01`: the steps child keeps its documented level-3 item outline switch.
-              itemHeadingLevel: 3,
-            };
-        const expectedChild = { id: `family-${index}-${type}-${childSuffix}`, module: expectedChildModule, props: original };
+        const expectedChild = { id: `family-${index}-${type}-${childSuffix}`, module: expectedChildModule, props: expectedChildProps };
         const shapeOk = section !== undefined
           && section.module === "layout.stack"
           && section.id === `family-${index}-${type}`
@@ -1372,18 +1376,29 @@ async function main() {
           && JSON.stringify(section.children[0]?.props) === JSON.stringify({ text: expectedHeading, level: 2 })
           && section.children[1]?.module === "content.prose"
           && section.children[1]?.id === `family-${index}-${type}-lede`
-          && JSON.stringify(section.children[1]?.props) === JSON.stringify({ text: expectedLede })
+          && JSON.stringify(section.children[1]?.props) === JSON.stringify(expectedLedeProps)
           && JSON.stringify(section.children[2]) === JSON.stringify(expectedChild);
         return {
           ok: shapeOk && Object.isFrozen(section) && Object.isFrozen(section.children),
           detail: shapeOk ? `${section.id} ok` : `${String(section?.id)} ${JSON.stringify(section?.children?.map((child) => child.id))}`,
         };
       };
+      // `UNO-WO-113 / R01`: the stats family now composes the donor's Markdown-capable lede and its own closed `surface`, so
+      // its expected lede props and native node props come from the extracted stats module rather than being retyped here.
       const statsEvidence = sequenceEvidence(
-        10, "stats", "stats", "Synthetic numbers", "Synthetic numbers summarise the sample.", "content.stats",
+        10, "stats", "stats", STATS_EXPECTED.heading,
+        { text: STATS_EXPECTED.lede, markdown: true },
+        "content.stats", statsNodeProps(),
       );
       const stepsEvidence = sequenceEvidence(
-        11, "steps", "timeline", "Synthetic sequence", "Synthetic steps keep the authored order.", "content.timeline",
+        11, "steps", "timeline", "Synthetic sequence", { text: "Synthetic steps keep the authored order." },
+        "content.timeline",
+        {
+          items: [{ title: "Draft", description: "Prepare the fixture source." }, { title: "Review" }],
+          surface: "muted",
+          // `UNO-WO-080 / R01`: the steps child keeps its documented level-3 item outline switch.
+          itemHeadingLevel: 3,
+        },
       );
       check(
         "FAMILY_STATS_STEPS_SOURCE stats compose one authored heading and lede before the unchanged stat list",
@@ -1519,6 +1534,14 @@ async function main() {
         && familyAccepted.sections[9]?.id === HERO_EXPECTED.id
         && familyAccepted.sections[9]?.props?.markdown === true
         && JSON.stringify(familyAccepted.sections[9]?.props?.actions) === JSON.stringify(HERO_EXPECTED.actions);
+      // `UNO-WO-113 / R01`: the stats family's accepted composition — one authored stack whose heading precedes the
+      // Markdown-capable lede and the native stats node carrying the donor's `surface` and Markdown detail switch.
+      localA2.stats.source = familyAccepted.sections[10]?.module === "layout.stack"
+        && familyAccepted.sections[10]?.id === STATS_EXPECTED.id
+        && familyAccepted.sections[10]?.children?.[0]?.id === `${STATS_EXPECTED.id}-heading`
+        && JSON.stringify(familyAccepted.sections[10]?.children?.[1]?.props)
+          === JSON.stringify({ text: STATS_EXPECTED.lede, markdown: true })
+        && JSON.stringify(familyAccepted.sections[10]?.children?.[2]?.props) === JSON.stringify(statsNodeProps());
       // `UNO-WO-108 / R01` (R4): the strict reader is compared field by field, because a re-read record may order its own
       // keys differently. The composed props and the re-read props must still describe exactly the same authored surface.
       {
@@ -1585,6 +1608,21 @@ async function main() {
           && sameKeys(rereadHero, composedHero)
           && Object.isFrozen(familyReparsed.document);
         localA2.hero.reader = heroReaderOk;
+        // `UNO-WO-113 / R01`: the strict reader round-trip of the stats family — the Markdown-lede child re-reads with its own
+        // switch, and the native node re-reads with exactly the authored items, surface and Markdown detail flag.
+        const rereadStats = familyReparsed.accepted === true ? familyReparsed.document.sections[10] : undefined;
+        const rereadStatsNode = rereadStats?.module === "layout.stack" ? rereadStats.children?.[2] : undefined;
+        const statsReaderOk = rereadStats !== undefined
+          && rereadStats.module === "layout.stack"
+          && rereadStats.children?.[0]?.module === "content.heading"
+          && rereadStats.children?.[1]?.module === "content.prose"
+          && JSON.stringify(rereadStats.children?.[1]?.props)
+            === JSON.stringify({ text: STATS_EXPECTED.lede, markdown: true })
+          && rereadStatsNode?.module === "content.stats"
+          && JSON.stringify(rereadStatsNode.props) === JSON.stringify(statsNodeProps())
+          && sameKeys(rereadStatsNode.props, familyAccepted.sections[10]?.children?.[2]?.props)
+          && Object.isFrozen(familyReparsed.document);
+        localA2.stats.reader = statsReaderOk;
         // `UNO-WO-108 / R01` (§4 `refusal`): two real refusals are executed against the authored source — an undeclared
         // `link` id and an unsafe URL scheme — and the rich list depends on them.
         const undeclaredLink = familySource();
@@ -1644,22 +1682,44 @@ async function main() {
           heroRefusalOk,
           JSON.stringify(heroRefusalProbes),
         );
+        localA2.list.refusal = refusalOk;
+        localA2.table.refusal = tableRefusalOk;
+        localA2.hero.refusal = heroRefusalOk;
+        // `UNO-WO-113 / R01`: the stats family's whole-source refusal matrix, executed from the extracted module's own cases.
+        const statsRefusalProbes = STATS_REFUSAL_CASES.map((probe) => {
+          const source = familySource();
+          probe.mutate(source);
+          const outcome = composeUnoFoundationSubset(source, familyBindings());
+          return {
+            label: probe.label,
+            expected: probe.expected,
+            reason: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+            partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+          };
+        });
+        const statsRefusalOk = statsRefusalProbes.every(
+          (probe) => probe.reason === probe.expected && probe.partial === false,
+        );
+        check(
+          "A2_LOCAL_REFUSAL every malformed stats family refuses the whole source Page with the family's own reason",
+          statsRefusalOk,
+          JSON.stringify(statsRefusalProbes),
+        );
+        localA2.stats.refusal = statsRefusalOk;
         refusalReasons = JSON.stringify({
           undeclared: undeclaredLinkOutcome.status === "refused" ? undeclaredLinkOutcome.reason : undeclaredLinkOutcome.status,
           unsafeHref: unsafeHrefOutcome.status === "refused" ? unsafeHrefOutcome.reason : unsafeHrefOutcome.status,
           table: tableRefusalProbes,
           hero: heroRefusalProbes,
+          stats: statsRefusalProbes,
         });
-        localA2.list.refusal = refusalOk;
-        localA2.table.refusal = tableRefusalOk;
-        localA2.hero.refusal = heroRefusalOk;
         const links = familyReparsed.accepted === true ? familyReparsed.document.links : undefined;
         check(
           "A2_LOCAL_READER the installed bytes re-read to the same rich list, table and hero, with the one approved declaration",
-          listReaderOk && tableReaderOk && heroReaderOk
+          listReaderOk && tableReaderOk && heroReaderOk && statsReaderOk
             && JSON.stringify(links) === JSON.stringify({ help: { reference: "applicationLink", key: "example.help" } })
             && JSON.stringify(familyReparsed.document.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS),
-          JSON.stringify({ list: localA2.list.reader, table: localA2.table.reader, hero: localA2.hero.reader, links }),
+          JSON.stringify({ list: localA2.list.reader, table: localA2.table.reader, hero: localA2.hero.reader, stats: localA2.stats.reader, links }),
         );
       }
       check(
@@ -2099,6 +2159,8 @@ async function main() {
       );
     }
     // `UNO-WO-072 / R01`: the two authored-text sequence families exactly as served, in one scoped check each.
+    // `UNO-WO-113 / R01`: the stats family is no longer a plain `<p>` lede — it authors the donor's Markdown-capable lede and
+    // its own closed surface — so its served proof is the extracted `statsServed` predicate, and this helper covers steps.
     {
       const sequenceServedOk = (id, headingText, ledeText, innerId, innerOpen, listOpen) => {
         const region = familyRegionOf(id);
@@ -2117,15 +2179,8 @@ async function main() {
           && !/<main\b|<h1\b|<h4\b|<script\b|<a\b|<iframe\b|<form\b|<button\b|<input\b/iu.test(region);
       };
       check(
-        "FAMILY_STATS_STEPS_HTTP each sequence family serves one heading and one lede before its unchanged list",
-        sequenceServedOk(
-          "family-10-stats",
-          "Synthetic numbers",
-          "Synthetic numbers summarise the sample.",
-          "family-10-stats-stats",
-          '<section class="uno-json-stats" data-uno-surface="plain" id="family-10-stats-stats">',
-          '<dl class="uno-json-stats-list">',
-        )
+        "FAMILY_STATS_STEPS_HTTP each sequence family serves its authored text before its unchanged list",
+        statsServed(statsRegionOf(familyHtml)).ok
           && sequenceServedOk(
             "family-11-steps",
             "Synthetic sequence",
@@ -2134,7 +2189,8 @@ async function main() {
             '<section class="uno-json-timeline" data-uno-surface="muted" id="family-11-steps-timeline">',
             '<ol class="uno-json-timeline-list">',
           )
-          && (familyHtml.match(/<p class="uno-json-prose" id="family-1[01]-(?:stats|steps)-lede"/gu) ?? []).length === 2
+          && (familyHtml.match(/<section class="uno-json-prose" id="family-10-stats-lede"/gu) ?? []).length === 1
+          && (familyHtml.match(/<p class="uno-json-prose" id="family-11-steps-lede"/gu) ?? []).length === 1
           && (familyHtml.match(/<h2 class="uno-json-heading" id="family-1[01]-(?:stats|steps)-heading"/gu) ?? []).length === 2
           && new Set([...familyHtml.matchAll(/id="(family-\d+-[a-z]+)"/gu)].map((match) => match[1])).size
             === (familyHtml.match(/id="family-\d+-[a-z]+"/gu) ?? []).length,
@@ -2418,33 +2474,31 @@ async function main() {
           && heroServedActions[index].rel === "noreferrer noopener"),
       JSON.stringify(heroServedActions),
     );
-    const statsRegion = familyRegionOf("family-10-stats");
-    const statsInner = statsRegion.slice(statsRegion.indexOf('<section class="uno-json-stats"'));
-    const statsDetailAt = statsRegion.indexOf('<span class="uno-json-stat-detail">Fixture only</span>');
+    // `UNO-WO-113 / R01` (§2 `renderer`/`http`/`rights`): the stats family's served proof is the extracted predicate — the
+    // authored heading, the Markdown lede, the closed surface, one native `<dl>` with exactly the authored pairs, the first
+    // item's Markdown detail, and no invented heading, currency, control or frame. The pairs are asserted directly as well.
+    const statsRegion = statsRegionOf(familyHtml);
+    const statsFacts = statsServed(statsRegion);
+    const statsPairs = statsPairsOf(statsRegion);
+    localA2.stats.renderer = statsRegion.length > 0 && statsFacts.ok;
+    localA2.stats.http = familyHtmlResponse.status === 200 && statsFacts.ok;
+    localA2.stats.rights = !familyHtml.includes(FAMILY_DONOR_SOURCE)
+      && !statsRegion.includes("example.help")
+      && !statsRegion.includes("wo066-donor")
+      && (statsRegion.match(/class="uno-json-stat-detail"/gu) ?? []).length === 1;
     check(
-      "FAMILY_STATS_HTTP the stats region is one definition list with two authored pairs in order",
-      statsRegion.includes('<div class="uno-json-stack" data-uno-gap="normal" id="family-10-stats">')
-        && statsRegion.includes('<h2 class="uno-json-heading" id="family-10-stats-heading">Synthetic numbers</h2>')
-        && statsRegion.includes('<p class="uno-json-prose" id="family-10-stats-lede">Synthetic numbers summarise the sample.</p>')
-        && statsRegion.indexOf("family-10-stats-heading") < statsRegion.indexOf("family-10-stats-lede")
-        && statsRegion.indexOf("family-10-stats-lede") < statsRegion.indexOf("family-10-stats-stats")
-        && statsInner.includes('class="uno-json-stats"') && statsInner.includes('<dl class="uno-json-stats-list">')
-        && (statsRegion.match(/<dt class="uno-json-stat-label">/gu) ?? []).length === 2
-        && (statsRegion.match(/<dd class="uno-json-stat-value">/gu) ?? []).length === 2
-        && statsRegion.includes(">Sampled sections</dt>") && statsRegion.includes('>13<span class="uno-json-stat-detail">')
-        && statsRegion.includes(">New examples</dt>") && statsRegion.includes(">4</dd>")
-        && statsRegion.indexOf("Sampled sections") < statsRegion.indexOf("New examples"),
-      statsRegion.slice(0, 200),
+      "FAMILY_STATS_HTTP the served stats family carries its heading, Markdown lede, closed surface, pairs and Markdown detail",
+      localA2.stats.http,
+      statsFacts.detail,
     );
     check(
-      "FAMILY_STATS_HTTP exactly one detail span, attached to the first item, with no invented stat heading or currency",
-      statsDetailAt > 0
-        && statsDetailAt < statsRegion.indexOf('<dt class="uno-json-stat-label">New examples</dt>')
-        && (statsRegion.match(/uno-json-stat-detail/gu) ?? []).length === 1
-        && !/uno-json-stats-heading|aria-labelledby|[$€£]/iu.test(statsInner)
-        && (statsRegion.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
-        && !/<h1\b|<h3/iu.test(statsRegion),
-      statsRegion.slice(0, 200),
+      "FAMILY_STATS_HTTP the stats pairs are exactly the authored values, labels and detail in order",
+      statsPairs.length === STATS_EXPECTED.items.length
+        && STATS_EXPECTED.items.every(
+          (item, index) => statsPairs[index].label === item.label && statsPairs[index].value === item.value,
+        )
+        && statsPairs[0]?.markdownDetail === true,
+      JSON.stringify(statsPairs),
     );
     check(
       "FAMILY_CONTACT_OFF_HTTP the contact subtree carries no form, control, handler or destination",
@@ -2991,11 +3045,22 @@ async function consentPhase(base) {
             const lede = region?.querySelector("#family-10-stats-lede") ?? null;
             const ledeRect = lede?.getBoundingClientRect();
             const list = region?.querySelector(".uno-json-stats-list") ?? null;
+            const native = region?.querySelector(".uno-json-stats") ?? null;
+            const detail = region?.querySelector(".uno-json-stat .uno-json-stat-detail") ?? null;
             return {
               dts: [...(region?.querySelectorAll("dt") ?? [])].map((node) => node.textContent ?? ""),
               dds: [...(region?.querySelectorAll("dd") ?? [])].map((node) => node.textContent ?? ""),
               details: region?.querySelectorAll(".uno-json-stat-detail").length ?? -1,
-              firstItemDetail: region?.querySelector(".uno-json-stat .uno-json-stat-detail")?.textContent ?? "",
+              firstItemDetail: detail?.textContent ?? "",
+              // `UNO-WO-113 / R01`: the donor's Markdown-capable detail renders through the shared family renderer, so the
+              // detail is a block container carrying a real `<strong>`; a plain detail would stay an escaped `<span>`.
+              detailTag: detail?.tagName ?? "",
+              detailStrong: detail?.querySelector("strong.uno-family-md-strong")?.textContent ?? "",
+              ledeStrong: lede?.querySelector("strong.uno-family-md-strong")?.textContent ?? "",
+              surface: native?.getAttribute("data-uno-surface") ?? "",
+              pairs: region?.querySelectorAll(".uno-json-stat").length ?? -1,
+              controls: region?.querySelectorAll("button, form, iframe, input, select, textarea, a").length ?? -1,
+              overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
               heading: region?.querySelectorAll("h1, h2, h3, h4, h5, h6").length ?? -1,
               headingTag: authored?.tagName ?? "",
               headingText: authored?.textContent ?? "",
@@ -3235,27 +3300,38 @@ async function consentPhase(base) {
           && seen.hero.controls === 0 && seen.hero.overflow === 0,
         JSON.stringify(seen.hero));
       if (heroLightOk) heroBrowserCases.add(`light:${width}`);
-      familyCheck(`${width}px stats show two authored pairs with one detail on the first item`,
-        seen.stats.dts.length === 2 && seen.stats.dds.length === 2
-          && seen.stats.dts[0] === "Sampled sections" && seen.stats.dts[1] === "New examples"
-          && seen.stats.dds[0].replace("Fixture only", "") === "13" && seen.stats.dds[1] === "4"
-          && seen.stats.details === 1 && seen.stats.firstItemDetail === "Fixture only" && seen.stats.heading === 1,
+      // `UNO-WO-113 / R01`: the credited stats surface in the browser — both Markdown bodies through the shared renderer, the
+      // closed surface, and exactly the authored value/label pairs with one Markdown detail on the first item.
+      const statsLightOk = familyCheck(`${width}px stats show both Markdown bodies, the closed surface and two authored pairs`,
+        seen.stats.dts.length === STATS_EXPECTED.items.length && seen.stats.dds.length === STATS_EXPECTED.items.length
+          && STATS_EXPECTED.items.every((item, index) =>
+            seen.stats.dts[index] === item.label
+            && seen.stats.dds[index].replace(item.detail === "" ? "" : item.detail.replace(/\*\*/gu, ""), "").trim() === item.value)
+          && seen.stats.details === 1 && seen.stats.detailTag === "DIV"
+          && seen.stats.detailStrong === STATS_EXPECTED.items[0].detailStrong
+          && seen.stats.ledeStrong === STATS_EXPECTED.ledeStrong
+          && seen.stats.surface === STATS_EXPECTED.surface
+          && seen.stats.heading === 1 && seen.stats.headingTag === "H2"
+          && seen.stats.controls === 0 && seen.stats.overflow === 0,
         JSON.stringify(seen.stats));
+      if (statsLightOk) statsBrowserCases.add(`light:${width}`);
       familyCheck(`${width}px steps show two ordered titles and one description with no invented status`,
         seen.steps.items === 2 && seen.steps.titles[0] === "Draft" && seen.steps.titles[1] === "Review"
           && seen.steps.descriptions === 1 && seen.steps.ariaCurrent === 0 && seen.steps.statuses === 0 && seen.steps.dates === 0,
         JSON.stringify(seen.steps));
       // `UNO-WO-072 / R01`: the authored heading and lede as the browser lays them out at this viewport.
+      // `UNO-WO-113 / R01`: the stats lede is now Markdown-capable, so it is the prose `<section>` around the shared renderer
+      // rather than the plain sibling `<p>` the still-bounded steps family keeps.
       sequenceCheck(`${width}px each sequence family shows its authored heading and one visible lede before its list`,
         [seen.stats, seen.steps].every((family) =>
           family.headingTag === "H2"
           && family.headingText.length > 0
-          && family.ledeTag === "P"
           && family.ledeVisible
           && family.ledeAfterHeading
           && family.ledeBeforeList)
-          && seen.stats.headingText === "Synthetic numbers"
-          && seen.stats.ledeText === "Synthetic numbers summarise the sample."
+          && seen.stats.ledeTag === "SECTION" && seen.steps.ledeTag === "P"
+          && seen.stats.headingText === STATS_EXPECTED.heading
+          && seen.stats.ledeText === STATS_EXPECTED.lede.replace(/\*\*/gu, "")
           && seen.steps.headingText === "Synthetic sequence"
           && seen.steps.ledeText === "Synthetic steps keep the authored order."
           && seen.mains === 1 && seen.h1s === 1 && seen.overflow === 0,
@@ -3780,6 +3856,39 @@ async function consentPhase(base) {
         JSON.stringify(darkHero),
       );
       if (darkHeroOk) heroBrowserCases.add(`dark:${width}`);
+      // `UNO-WO-113 / R01` (§2 `browser`): the credited stats family under dark and reduced motion at this viewport — both
+      // Markdown bodies through the shared renderer, the closed surface, the authored pairs and no control or overflow.
+      const darkStats = await tab.evaluate((expected) => {
+        const region = document.querySelector("#family-10-stats");
+        const native = region?.querySelector(".uno-json-stats") ?? null;
+        const detail = region?.querySelector(".uno-json-stat .uno-json-stat-detail") ?? null;
+        return {
+          scheme: matchMedia("(prefers-color-scheme: dark)").matches,
+          reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+          surface: native?.getAttribute("data-uno-surface") ?? "",
+          ledeStrong: region?.querySelector("#family-10-stats-lede strong.uno-family-md-strong")?.textContent ?? "",
+          detailTag: detail?.tagName ?? "",
+          detailStrong: detail?.querySelector("strong.uno-family-md-strong")?.textContent ?? "",
+          dts: [...(region?.querySelectorAll("dt") ?? [])].map((node) => node.textContent ?? ""),
+          dds: [...(region?.querySelectorAll("dd") ?? [])].map((node) => node.textContent ?? ""),
+          pairs: region?.querySelectorAll(".uno-json-stat").length ?? -1,
+          details: region?.querySelectorAll(".uno-json-stat-detail").length ?? -1,
+          controls: region?.querySelectorAll("button, form, iframe, input, select, textarea, a").length ?? -1,
+          overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+          expectedLabels: expected,
+        };
+      }, STATS_EXPECTED.items.map((item) => item.label));
+      const darkStatsOk = familyCheck(
+        `dark ${width}px the stats family keeps both Markdown bodies, the closed surface and its pairs`,
+        darkStats.scheme && darkStats.reducedMotion && darkStats.surface === STATS_EXPECTED.surface
+          && darkStats.ledeStrong === STATS_EXPECTED.ledeStrong
+          && darkStats.detailTag === "DIV" && darkStats.detailStrong === STATS_EXPECTED.items[0].detailStrong
+          && darkStats.pairs === STATS_EXPECTED.items.length && darkStats.details === 1
+          && JSON.stringify(darkStats.dts) === JSON.stringify(darkStats.expectedLabels)
+          && darkStats.controls === 0 && darkStats.overflow === 0,
+        JSON.stringify(darkStats),
+      );
+      if (darkStatsOk) statsBrowserCases.add(`dark:${width}`);
     }
     // `UNO-WO-111 / R01` (§2 `browser`): `list.browser` is the conjunction of the same four executed observations, so a
     // deleted, skipped or superficial case can never leave the credited family true. `UNO-WO-112 / R01` moves the rule into
@@ -3805,6 +3914,14 @@ async function consentPhase(base) {
       "A2_LOCAL_BROWSER the rich hero was observed at 390px and 1280px in light and dark/reduced motion with both actions intact",
       localA2.hero.browser,
       conjunctionDetail(heroBrowserCases),
+    );
+    // `UNO-WO-113 / R01` (§2 `browser`): the credited stats family's four-case conjunction, each key added only by a real
+    // Chromium assertion that its Markdown lede, Markdown detail, closed surface and pairs survived that case.
+    localA2.stats.browser = conjunction(statsBrowserCases);
+    check(
+      "A2_LOCAL_BROWSER the rich stats family was observed at 390px and 1280px in light and dark/reduced motion with both Markdown bodies",
+      localA2.stats.browser,
+      conjunctionDetail(statsBrowserCases),
     );
     await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
     familyCheck("the family Page raised no new console or page error", consoleErrors.length === errorsBefore,
@@ -3839,12 +3956,12 @@ async function consentPhase(base) {
     // complete when all seven dimensions executed. `isCreditable()` is the one definition of "complete", so a missing or
     // mistyped dimension can never be counted here.
     {
-      const records = { list: localA2.list, table: localA2.table, hero: localA2.hero };
+      const records = { list: localA2.list, table: localA2.table, hero: localA2.hero, stats: localA2.stats };
       const dimensions = Object.values(records).reduce((total, record) => total + Object.keys(record).length, 0);
       check(
-        "A2_LOCAL_TABLE_LIST_HERO_EVIDENCE=21/21 (table, list and hero credited; P6 destination proof in the three-Site gate)",
-        records.list && records.table && records.hero
-          && dimensions === 21
+        "A2_LOCAL_TABLE_LIST_HERO_STATS_EVIDENCE=28/28 (table, list, hero and stats credited; P6 destination proof in the three-Site gate)",
+        records.list && records.table && records.hero && records.stats
+          && dimensions === 28
           && Object.values(localA2).every((record) => isCreditable(record)),
         JSON.stringify({ ...records, refusalReasons }),
       );
@@ -4044,10 +4161,10 @@ async function consentPhase(base) {
         ? `${closureA2.parity}/17 ${closureA2.proxy}/59 ${closureA2.credited.join(",")}`
         : String(closureA2.reason),
     );
-    // `UNO-WO-112 / R01` (§3): the newly credited **Hero** completes the six-family interim row. The same executed records
-    // plus the executed `localA2.hero` go into one checkpoint-omitted evaluation whose exact credited set is asserted, so the
-    // score can only come from real evidence. The full B1 `8/17` row is *not* claimed: `stats` and `steps` stay pending.
-    const closureSix = evaluateU04FamilyClosure({
+    // `UNO-WO-113 / R01` (§3): the newly credited **Stats** family extends the interim row to seven. The same executed records
+    // plus the executed `localA2.stats` go into one checkpoint-omitted evaluation whose exact credited set is asserted, so the
+    // score can only come from real evidence. The full B1 `8/17` row is *not* claimed: `steps` stays pending.
+    const closureSeven = evaluateU04FamilyClosure({
       families: {
         divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
         prose: a1Evidence.prose,
@@ -4055,35 +4172,34 @@ async function consentPhase(base) {
         table: localA2.table,
         list: localA2.list,
         hero: localA2.hero,
+        stats: localA2.stats,
       },
       modules: UNO_RENDERABLE_MODULES.length,
       zones: UNO_OWNED_MEDIA_ZONES.length,
       browserMatrix: matrixCases.length,
     });
     check(
-      "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table, list, hero and divider at 6/17 and 48/59",
-      closureSix.ok === true
-        && JSON.stringify(closureSix.credited)
-          === JSON.stringify(["prose", "callout", "table", "list", "hero", "divider"])
-        && closureSix.parity === 6
-        && closureSix.proxy === 48
-        && closureSix.pending.includes("stats")
-        && closureSix.pending.includes("steps")
-        && closureSix.labels.includes("PARITY_HERO=PASS")
-        && closureSix.labels.includes("PARITY_STATS=PENDING")
-        && closureSix.labels.includes("PARITY_STEPS=PENDING")
+      "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table, list, hero, stats and divider at 7/17 and 49/59",
+      closureSeven.ok === true
+        && JSON.stringify(closureSeven.credited)
+          === JSON.stringify(["prose", "callout", "table", "list", "hero", "stats", "divider"])
+        && closureSeven.parity === 7
+        && closureSeven.proxy === 49
+        && closureSeven.pending.includes("steps")
+        && closureSeven.labels.includes("PARITY_STATS=PASS")
+        && closureSeven.labels.includes("PARITY_STEPS=PENDING")
         && familyOk
         && dividerOk,
-      closureSix.ok
-        ? `${closureSix.parity}/17 ${closureSix.proxy}/59 ${closureSix.credited.join(",")}`
-        : String(closureSix.reason),
+      closureSeven.ok
+        ? `${closureSeven.parity}/17 ${closureSeven.proxy}/59 ${closureSeven.credited.join(",")}`
+        : String(closureSeven.reason),
     );
-    if (closureSix.ok) {
-      // Every printed label is re-derived from the six-family result's own credit set, so a label cannot appear without its
+    if (closureSeven.ok) {
+      // Every printed label is re-derived from the seven-family result's own credit set, so a label cannot appear without its
       // reason and no earlier row can print a fuller one.
-      const creditedNames = new Set(closureSix.credited.map((family) => `PARITY_${family.toUpperCase()}`));
-      const pendingNames = new Set(closureSix.pending.map((family) => `PARITY_${family.toUpperCase()}`));
-      for (const label of closureSix.labels) {
+      const creditedNames = new Set(closureSeven.credited.map((family) => `PARITY_${family.toUpperCase()}`));
+      const pendingNames = new Set(closureSeven.pending.map((family) => `PARITY_${family.toUpperCase()}`));
+      for (const label of closureSeven.labels) {
         const equals = label.lastIndexOf("=");
         const name = label.slice(0, equals);
         const value = label.slice(equals + 1);
@@ -4092,9 +4208,9 @@ async function consentPhase(base) {
           : pendingNames.has(name)
             ? value === "PENDING"
             : name === "U04_PARITY"
-              ? value === `${closureSix.parity}/17`
+              ? value === `${closureSeven.parity}/17`
               : name === "U04_PROXY"
-                ? value === `${closureSix.proxy}/59`
+                ? value === `${closureSeven.proxy}/59`
                 : value === `${UNO_RENDERABLE_MODULES.length}/${UNO_RENDERABLE_MODULES.length}`
                   || value === `${UNO_OWNED_MEDIA_ZONES.length}/${UNO_OWNED_MEDIA_ZONES.length}`
                   || value === `${matrixCases.length}/${matrixCases.length}`;

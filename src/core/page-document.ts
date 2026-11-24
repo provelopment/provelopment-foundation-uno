@@ -314,12 +314,16 @@ export interface UnoStatItem {
 /**
  * `content.stats` props: 1–6 authored figures and an optional section heading. `level` is required exactly when a
  * heading is present, so a stray level can never imply a heading that does not exist.
+ *
+ * `UNO-WO-113 / R01`: `markdown` is the adapter's own switch for Markdown-capable item details, and `surface` is the
+ * unchanged closed section surface the donor authors on this family.
  */
 export interface UnoContentStatsProps {
   readonly items: readonly UnoStatItem[];
   readonly heading?: string;
   readonly level?: 2 | 3 | 4 | 5 | 6;
   readonly surface?: UnoSectionSurface;
+  readonly markdown?: true;
 }
 
 /** One authored quotation with optional attribution and role. Absent fields stay absent; none is ever invented. */
@@ -2136,11 +2140,15 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "content.stats") {
-    if (!hasExactlyKeys(props, ["items"], ["heading", "level", "surface"])) {
+    if (!hasExactlyKeys(props, ["items"], ["heading", "level", "surface", "markdown"])) {
       throw new RefusedDocument("document:invalid-props");
     }
     const items = readStatItems(props["items"]);
     const surface = optionalSurface(props["surface"]);
+    // `UNO-WO-113 / R01`: the closed Markdown switch for item details — only ever the literal `true`.
+    if (props["markdown"] !== undefined && props["markdown"] !== true) {
+      throw new RefusedDocument("document:invalid-props");
+    }
     // Items first, then surface, then heading: a stats item refusal always outranks a heading-level refusal.
     const { heading, level } = readOptionalHeading(props, state);
     return {
@@ -2151,6 +2159,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
         ...(heading === undefined ? {} : { heading }),
         ...(level === undefined ? {} : { level }),
         ...(surface === undefined ? {} : { surface }),
+        ...(props["markdown"] === undefined ? {} : { markdown: true as const }),
       },
     };
   }

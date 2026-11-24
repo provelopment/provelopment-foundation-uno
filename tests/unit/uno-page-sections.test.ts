@@ -389,6 +389,51 @@ describe("UnoPageSections — hero, statistics and testimonials", () => {
     expect(markup).not.toContain("uno-json-stats-heading");
   });
 
+  it("renders a Markdown detail through the shared renderer while the plain detail stays byte-identical", () => {
+    // `UNO-WO-113 / R01`: the donor's `detail` is Markdown-capable, so an adapter-flagged node draws it with the one shared
+    // family renderer; an unflagged node keeps the escaped `<span>` the earlier accepted output used.
+    const plain = render(
+      accept({
+        version: 1,
+        title: "Plain detail",
+        sections: [
+          {
+            id: "figures",
+            module: "content.stats",
+            props: { items: [{ value: "3", label: "New modules", detail: "Hero, stats, testimonials." }] },
+          },
+        ],
+      }),
+    );
+    expect(plain).toContain('<span class="uno-json-stat-detail">Hero, stats, testimonials.</span>');
+
+    const rich = render(
+      accept({
+        version: 1,
+        title: "Markdown detail",
+        sections: [
+          {
+            id: "figures",
+            module: "content.stats",
+            props: {
+              markdown: true,
+              items: [
+                { value: "3", label: "New modules", detail: "A **bounded** note." },
+                { value: "8", label: "Renderable IDs" },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    expect(rich).toContain('<div class="uno-json-stat-detail">');
+    expect(rich).toContain('<strong class="uno-family-md-strong">bounded</strong>');
+    expect(rich).not.toContain('<span class="uno-json-stat-detail">');
+    expect((rich.match(/<dt class="uno-json-stat-label">/gu) ?? []).length).toBe(2);
+    expect((rich.match(/<dd class="uno-json-stat-value">/gu) ?? []).length).toBe(2);
+    expect(rich).not.toContain("<a ");
+  });
+
   it("renders quotations as figure, blockquote and an optional caption", () => {
     const document = accept({
       version: 1,
