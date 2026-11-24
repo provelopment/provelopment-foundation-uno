@@ -861,16 +861,45 @@ function composeSection(
       return { id, module: "content.prose", props: { variant: "divider" } };
     }
     case "hero": {
-      // This subset's hero always needs an authored `lede`: a hero-only `support`/`eyebrow` form is not this subset.
-      requireExactKeys(record, ["type", "lede"], ["eyebrow", "support", "align", "surface"]);
-      const props: Record<string, unknown> = { lede: readDonorText(record["lede"], true) };
-      for (const field of ["eyebrow", "support", "align", "surface"] as const) {
-        if (!ownsKey(record, field)) continue;
-        const value = record[field];
-        // Text fields are Markdown-refusing bounded text; `align`/`surface` are copied as authored closed literals and
-        // the Uno reader refuses any value outside its own enumeration. Absent optionals stay truly absent.
-        if (field === "eyebrow" || field === "support") props[field] = readDonorText(value, true);
-        else props[field] = value;
+      // `UNO-WO-112 / R01`: the approved donor Hero surface. A plain eyebrow, at least one of the two Markdown-capable
+      // body fields, the closed `align`/`surface` pair and 1–3 actions whose single destination is the donor's static
+      // safe `href` with its optional closed variant. A `route` or `link` action destination stays outside this subset:
+      // site-local route projection belongs to the serving boundary, and an application link is inert elsewhere.
+      requireExactKeys(record, ["type"], ["eyebrow", "lede", "support", "align", "surface", "actions"]);
+      const props: Record<string, unknown> = {};
+      if (ownsKey(record, "eyebrow")) props["eyebrow"] = readDonorText(record["eyebrow"], true);
+      const lede = ownsKey(record, "lede") ? readRichFamilyText(record["lede"], 4000) : undefined;
+      const support = ownsKey(record, "support") ? readRichFamilyText(record["support"], 4000) : undefined;
+      // The Uno target itself refuses a body-less hero, so a hero-only eyebrow form is not this subset.
+      if (lede === undefined && support === undefined) refuseUnsupportedFeature();
+      if (lede !== undefined) props["lede"] = lede;
+      if (support !== undefined) props["support"] = support;
+      // One switch for both Markdown-capable fields, set only when one of them actually authors Markdown.
+      if (hasFamilyMarkdown(lede ?? "") || hasFamilyMarkdown(support ?? "")) props["markdown"] = true;
+      for (const field of ["align", "surface"] as const) {
+        // Copied as authored closed literals; the Uno reader refuses any value outside its own enumeration.
+        if (ownsKey(record, field)) props[field] = record[field];
+      }
+      if (ownsKey(record, "actions")) {
+        const actions = record["actions"];
+        if (!Array.isArray(actions) || actions.length < 1 || actions.length > 3) refuseUnsupportedFeature();
+        const output: Record<string, unknown>[] = [];
+        for (const raw of actions) {
+          if (raw === null || typeof raw !== "object" || Array.isArray(raw)) refuseUnsupportedFeature();
+          const entry = raw as PlainRecord;
+          requireExactKeys(entry, ["label"], ["href", "route", "link", "variant"]);
+          const destinations = ["href", "route", "link"].filter((name) => ownsKey(entry, name));
+          if (destinations.length !== 1) refuseUnsupportedFeature();
+          if (!ownsKey(entry, "href")) refuseUnsupportedFeature();
+          // `href` is forwarded for the strict reader's own classifier; `variant` is copied as an authored closed literal.
+          const action: Record<string, unknown> = {
+            label: readDonorText(entry["label"], true),
+            href: readDonorText(entry["href"], false),
+          };
+          if (ownsKey(entry, "variant")) action["variant"] = entry["variant"];
+          output.push(action);
+        }
+        props["actions"] = output;
       }
       return { id, module: "content.hero", props };
     }

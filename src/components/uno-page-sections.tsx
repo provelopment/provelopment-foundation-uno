@@ -453,7 +453,11 @@ function SectionNode({
       );
 
     case "content.hero": {
-      const { eyebrow, lede, support, align, surface, actions } = node.props;
+      const { eyebrow, lede, support, align, surface, actions, markdown } = node.props;
+      // `UNO-WO-112 / R01`: the donor marks both body fields Markdown-capable, so the adapter's own switch selects the
+      // shared Markdown renderer; without it the served markup stays byte-identical to the earlier plain form.
+      const ledeBlocks = markdown === true ? parseFamilyMarkdown(lede) : null;
+      const supportBlocks = markdown === true ? parseFamilyMarkdown(support) : null;
       return (
         <section
           className="uno-json-hero"
@@ -462,19 +466,41 @@ function SectionNode({
           id={node.id}
         >
           {eyebrow === undefined ? null : <p className="uno-json-eyebrow">{eyebrow}</p>}
-          {lede === undefined ? null : <p className="uno-json-hero-lede">{lede}</p>}
+          {lede === undefined ? null : ledeBlocks === null ? (
+            <p className="uno-json-hero-lede">{lede}</p>
+          ) : (
+            <div className="uno-json-hero-lede">
+              <UnoFamilyMarkdown blocks={ledeBlocks} />
+            </div>
+          )}
           {actions === undefined ? null : (
             <ul className="uno-json-actions uno-json-hero-actions">
-              {actions.map((item, index) => (
-                <li className="uno-json-action-item" key={`${item.targetId}:${index}`}>
-                  <a className="uno-json-action" href={`#${item.targetId}`}>
-                    {item.label}
-                  </a>
-                </li>
-              ))}
+              {actions.map((item, index) => {
+                // `UNO-WO-112 / R01`: a same-document fragment keeps its `#<section-id>` anchor; the donor's static
+                // outbound form is one ordinary safe anchor with the same `rel` the list and prose links already carry.
+                const outbound = "href" in item;
+                return (
+                  <li className="uno-json-action-item" key={index}>
+                    <a
+                      className="uno-json-action"
+                      href={outbound ? item.href : `#${item.targetId}`}
+                      rel={outbound ? "noreferrer noopener" : undefined}
+                      data-uno-variant={item.variant}
+                    >
+                      {item.label}
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
           )}
-          {support === undefined ? null : <p className="uno-json-hero-support">{support}</p>}
+          {support === undefined ? null : supportBlocks === null ? (
+            <p className="uno-json-hero-support">{support}</p>
+          ) : (
+            <div className="uno-json-hero-support">
+              <UnoFamilyMarkdown blocks={supportBlocks} />
+            </div>
+          )}
         </section>
       );
     }

@@ -563,12 +563,57 @@ describe("readUnoPageDocument — per-module props and hostile input", () => {
     });
     expect(hostileResult.accepted).toBe(false);
 
-    // `content.hero` keeps its original fragment-only bound: an outbound action there is a props refusal.
+    // `UNO-WO-112 / R01`: the hero's outbound form is now the donor's own approved action — one static `mailto`/`https`
+    // anchor with its closed optional variant — while a mixed entry stays a props refusal and an unsafe scheme a link
+    // refusal. The fragment form keeps its `#<section-id>` anchor and still registers its target.
+    const outboundHero = readUnoPageDocument({
+      ...minimal(),
+      sections: [
+        section("hero", "content.hero", {
+          lede: "Lead.",
+          actions: [{ label: "Go", href: "https://example.invalid/x", variant: "primary" }],
+        }),
+      ],
+    });
+    expect(outboundHero.accepted).toBe(true);
+    if (outboundHero.accepted) {
+      const node = outboundHero.document.sections[0];
+      expect(node?.module).toBe("content.hero");
+      if (node?.module === "content.hero") {
+        expect(node.props.actions).toEqual([
+          { label: "Go", href: "https://example.invalid/x", variant: "primary" },
+        ]);
+      }
+    }
     expectRefusal(
       {
         ...minimal(),
         sections: [
-          section("hero", "content.hero", { lede: "Lead.", actions: [{ label: "Go", href: "https://example.invalid/x" }] }),
+          section("hero", "content.hero", {
+            lede: "Lead.",
+            actions: [{ label: "Go", targetId: "probe", href: "https://example.invalid/x" }],
+          }),
+        ],
+      },
+      "document:invalid-props",
+    );
+    expectRefusal(
+      {
+        ...minimal(),
+        sections: [
+          section("hero", "content.hero", { lede: "Lead.", actions: [{ label: "Go", href: "javascript:alert(1)" }] }),
+        ],
+      },
+      "document:unsafe-link",
+    );
+    expectRefusal(
+      {
+        ...minimal(),
+        sections: [
+          section("hero", "content.hero", {
+            lede: "Lead.",
+            actions: [{ label: "Go", href: "https://example.invalid/x", variant: "loud" }],
+          }),
         ],
       },
       "document:invalid-props",

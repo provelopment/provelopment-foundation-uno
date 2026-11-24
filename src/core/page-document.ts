@@ -257,6 +257,25 @@ export interface UnoOutboundActionItem {
 /** One entry of a stand-alone `content.actions` list: a same-document fragment or a static outbound link. */
 export type UnoContentActionEntry = UnoActionItem | UnoOutboundActionItem;
 
+/**
+ * `UNO-WO-112 / R01`: the three closed hero-action variants the donor authors, adopted as values.
+ *
+ * A variant is presentation only. It never changes a destination, adds a transport, or grants a capability.
+ */
+export const UNO_HERO_ACTION_VARIANTS = ["primary", "secondary", "link"] as const;
+export type UnoHeroActionVariant = (typeof UNO_HERO_ACTION_VARIANTS)[number];
+
+/**
+ * `UNO-WO-112 / R01`: one authored hero action.
+ *
+ * Either the unchanged same-document fragment (`targetId`, registered as an in-page anchor) or one static outbound link
+ * admitted only through the unchanged safe-destination classifier, plus an optional closed variant. The two destination
+ * forms are mutually exclusive: an entry that carried both, or neither, is a props refusal rather than a guess.
+ */
+export type UnoHeroActionItem =
+  | (UnoActionItem & { readonly variant?: UnoHeroActionVariant })
+  | (UnoOutboundActionItem & { readonly variant?: UnoHeroActionVariant });
+
 /** `content.actions` props: one bounded list of same-document anchors and static outbound links. */
 export interface UnoContentActionsProps {
   readonly items: readonly UnoContentActionEntry[];
@@ -271,6 +290,9 @@ export type UnoSectionAlign = "start" | "center";
 /**
  * `content.hero` props: an optional eyebrow, at least one authored body field, closed styling and optional
  * same-document actions. A hero is content, not a publication declaration, and it never carries a heading level.
+ *
+ * `UNO-WO-112 / R01`: `actions` admits the donor's static outbound form with its closed variant, and `markdown` is set
+ * only by the adapter when one of the two Markdown-capable body fields actually authors Markdown.
  */
 export interface UnoContentHeroProps {
   readonly eyebrow?: string;
@@ -278,7 +300,8 @@ export interface UnoContentHeroProps {
   readonly support?: string;
   readonly align?: UnoSectionAlign;
   readonly surface?: UnoSectionSurface;
-  readonly actions?: readonly UnoActionItem[];
+  readonly actions?: readonly UnoHeroActionItem[];
+  readonly markdown?: true;
 }
 
 /** One factual statistic: a value, the label that names it, and optional bounded detail. */
@@ -1044,22 +1067,32 @@ function readChildren(
   return children;
 }
 
-/** One closed `content.actions` list: bounded, plain, and every target a valid identifier shape. */
+/**
+ * One closed hero action list: bounded, plain, and exactly one destination per entry.
+ *
+ * `UNO-WO-112 / R01`: the entry is either the unchanged same-document fragment `{label,targetId}` — which still registers
+ * its target for the existing anchor check — or one static outbound `{label,href}` admitted only through the unchanged
+ * `classifyAuthorDestination` as exactly `mailto` or `https`. Both forms accept the closed optional `variant`. A mixed or
+ * destination-less entry is a props refusal before any label is read, so a malformed entry can never be reinterpreted.
+ */
 function readActionItems(
   value: unknown,
   state: WalkState,
   max: number = UNO_PAGE_DOCUMENT_LIMITS.actionItems,
-): UnoActionItem[] {
+): UnoHeroActionItem[] {
   if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
   if (value.length < 1 || value.length > max) {
     throw new RefusedDocument("document:invalid-props");
   }
-  const items: UnoActionItem[] = [];
+  const items: UnoHeroActionItem[] = [];
   for (let index = 0; index < value.length; index += 1) {
     if (!(index in value)) throw new RefusedDocument("document:invalid-props");
     const item = readPlainData(value[index]);
     if (item === null) throw new RefusedDocument("document:invalid-props");
-    if (!hasExactlyKeys(item, ["label", "targetId"], [])) throw new RefusedDocument("document:invalid-props");
+    const isFragment = hasExactlyKeys(item, ["label", "targetId"], ["variant"]);
+    const isOutbound = hasExactlyKeys(item, ["label", "href"], ["variant"]);
+    // Exactly one destination shape, never both and never neither.
+    if (isFragment === isOutbound) throw new RefusedDocument("document:invalid-props");
     const label = readBoundedText(
       item["label"],
       UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
@@ -1067,14 +1100,35 @@ function readActionItems(
       false,
       false,
     );
-    const targetId = item["targetId"];
-    if (typeof targetId !== "string" || !SECTION_ID.test(targetId)) {
+    const variant = optionalHeroActionVariant(item["variant"]);
+    if (isFragment) {
+      const targetId = item["targetId"];
+      if (typeof targetId !== "string" || !SECTION_ID.test(targetId)) {
+        throw new RefusedDocument("document:unsafe-link");
+      }
+      items.push({ label, targetId, ...(variant === undefined ? {} : { variant }) });
+      state.targets.push(targetId);
+      continue;
+    }
+    // A destination that is not even a string is a *shape* refusal; only a string can be an unsafe-link refusal.
+    const href = item["href"];
+    if (typeof href !== "string") throw new RefusedDocument("document:invalid-props");
+    const verdict = classifyAuthorDestination(href);
+    if (!verdict.accepted || (verdict.category !== "mailto" && verdict.category !== "https")) {
       throw new RefusedDocument("document:unsafe-link");
     }
-    items.push({ label, targetId });
-    state.targets.push(targetId);
+    items.push({ label, href: verdict.href, ...(variant === undefined ? {} : { variant }) });
   }
   return items;
+}
+
+/** The closed optional hero-action variant, or a props refusal for any other value. */
+function optionalHeroActionVariant(value: unknown): UnoHeroActionVariant | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !(UNO_HERO_ACTION_VARIANTS as readonly string[]).includes(value)) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  return value as UnoHeroActionVariant;
 }
 /**
  * `UNO-WO-081 / R01`: one closed stand-alone `content.actions` list that accepts a strictly disjoint union.
@@ -2046,7 +2100,9 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "content.hero") {
-    if (!hasExactlyKeys(props, [], ["eyebrow", "lede", "support", "align", "surface", "actions"])) {
+    if (
+      !hasExactlyKeys(props, [], ["eyebrow", "lede", "support", "align", "surface", "actions", "markdown"])
+    ) {
       throw new RefusedDocument("document:invalid-props");
     }
     const eyebrow = optionalBoundedText(props["eyebrow"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, false);
@@ -2056,6 +2112,10 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
     if (lede === undefined && support === undefined) throw new RefusedDocument("document:invalid-props");
     const align = optionalAlign(props["align"]);
     const surface = optionalSurface(props["surface"]);
+    // `UNO-WO-112 / R01`: the closed Markdown switch — only ever the literal `true`, never a truthy stand-in.
+    if (props["markdown"] !== undefined && props["markdown"] !== true) {
+      throw new RefusedDocument("document:invalid-props");
+    }
     const actions =
       props["actions"] === undefined
         ? undefined
@@ -2070,6 +2130,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
         ...(align === undefined ? {} : { align }),
         ...(surface === undefined ? {} : { surface }),
         ...(actions === undefined ? {} : { actions }),
+        ...(props["markdown"] === undefined ? {} : { markdown: true as const }),
       },
     };
   }

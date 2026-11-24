@@ -21,13 +21,26 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, rmdirSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
-import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { deflateSync } from "node:zlib";
 
 import { prepareUnoU03FixtureTransaction } from "./uno-u03-fixture-transaction.mjs";
 import { evaluateU04FamilyClosure } from "./verify-u04-family-closure.mjs";
+// `UNO-WO-112 / R01`: the cohesive verification modules this entrypoint orchestrates. The fixture, the Hero expectations,
+// the seven-dimension record and the process harness each live in one testable file under `scripts/u04/`.
+import {
+  FAMILY_DONOR_SOURCE,
+  FAMILY_IDS,
+  FAMILY_PLATE,
+  FAMILY_ROUTE,
+  composeFamilyFixture,
+  familyBindings,
+  familySource,
+} from "./u04/family-fixture.mjs";
+import { conjunction, conjunctionDetail, createFamilyEvidence, isCreditable } from "./u04/family-evidence.mjs";
+import { HERO_EXPECTED, HERO_REFUSAL_CASES, heroActionsOf, heroRegionOf, heroServed } from "./u04/hero-evidence.mjs";
+import { freeLoopbackPort, killChild, nextBinPath, runChild, waitForServer } from "./u04/serving-harness.mjs";
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
@@ -43,7 +56,6 @@ registerHooks({
 });
 
 const HOST = "127.0.0.1";
-const READY_TIMEOUT_MS = 120_000;
 const BUILD_TIMEOUT_MS = 600_000;
 const ROOT = process.cwd();
 const CONTENT = "deployment/efs/content";
@@ -54,12 +66,8 @@ const ALL_ROUTE = ["wo044-all-modules"];
 const INVALID_ROUTE = ["wo044-invalid"];
 /** `UNO-WO-053 / R01`: a separately published Page whose generated asset carries a well-formed but wrong digest. */
 const BAD_ROUTE = ["wo053-bad-generated"];
-/** `UNO-WO-066 / R01`: one temporary Page whose document is produced by the real family adapter, never authored here. */
-const FAMILY_ROUTE = ["wo066-family-composition"];
-/** The one Page-owned plate the composed Page references; generated, published and deleted only inside this gate. */
-const FAMILY_PLATE = "wo066-family-plate.png";
-/** The donor migration identity the composed source names. It is a binding key, never an emitted or served URL. */
-const FAMILY_DONOR_SOURCE = "/assets/wo066-donor-plate.png";
+// `UNO-WO-112 / R01`: `FAMILY_ROUTE`, `FAMILY_PLATE`, `FAMILY_DONOR_SOURCE`, the authored source and its bindings are now
+// imported from `scripts/u04/family-fixture.mjs`, where the composition can also be asserted on its own.
 
 /** `UNO-WO-052 / R01`: the exclusive `wo052-*` ledger of named original synthetic inputs across four owned zones. */
 const THEME_DIR = "deployment/content/assets";
@@ -132,21 +140,24 @@ const SOURCES = Object.freeze([
 
 // `UNO-WO-084 / R01` (checkpoint A1): where each newly proven family's executed evidence is recorded. Every flag starts
 // false and is only set by a check that actually ran, so a deleted probe can never leave a passing label behind.
-// `UNO-WO-108 / R01`: the fourteen local Table/List evidence dimensions. Every flag is set only by a check that actually
-// executed and passed in this run. `UNO-WO-111 / R01` credits both families: the destinations themselves are proven under
-// each Site's own authority by the three-Site P6 gate (`scripts/verify-u03-multisite-http.mjs`), while these records feed
-// the A2 checkpoint evaluation at the end of this run.
+// `UNO-WO-108 / R01`: the local Table/List evidence dimensions. `UNO-WO-111 / R01` credits both families: the destinations
+// themselves are proven under each Site's own authority by the three-Site P6 gate
+// (`scripts/verify-u03-multisite-http.mjs`). `UNO-WO-112 / R01` adds the credited Hero's own record, and every record is
+// built by the extracted `createFamilyEvidence()` so the seven-dimension contract has exactly one definition.
 const localA2 = {
-  table: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: false },
-  list: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: false },
+  table: createFamilyEvidence(),
+  list: createFamilyEvidence(),
+  hero: createFamilyEvidence(),
 };
 // Diagnostics only: the executed refusal codes, so a red `refusal` dimension names its own reason.
 let refusalReasons = "";
 // `UNO-WO-110 / R01` (§2 `browser`): every key here is added only by a Chromium assertion that actually ran and passed at
-// that exact viewport and colour scheme, so `table.browser` cannot be satisfied by one superficial observation.
+// that exact viewport and colour scheme, so `browser` cannot be satisfied by one superficial observation.
 const tableBrowserCases = new Set();
 // `UNO-WO-111 / R01`: the same keyed conjunction for the credited List — light and dark/reduced-motion at both viewports.
 const listBrowserCases = new Set();
+// `UNO-WO-112 / R01`: and for the credited Hero, whose Markdown bodies and two static actions must hold in all four cases.
+const heroBrowserCases = new Set();
 const a1Evidence = {
   prose: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
   callout: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
@@ -378,196 +389,6 @@ function allModulesDocument(generatedIntegrity) {
   };
 }
 
-/**
- * `UNO-WO-066 / R01`: one deterministic donor-shaped source, in the exact order this proof depends on. Every string is
- * original synthetic test copy; no donor text, asset or code is reproduced. The adapter — not this file — decides the
- * resulting Uno ids, modules and props.
- */
-function familySource() {
-  return {
-    version: 1,
-    title: "Bounded family composition proof",
-    // `UNO-WO-108 / R01`: one approved document-local declaration. It authorizes the `help` reference, so the list item
-    // at index 2 must resolve it while the media/contact families stay OFF.
-    links: { help: { reference: "applicationLink", key: "example.help" } },
-    sections: [
-      // `UNO-WO-084 / R01` (checkpoint A1): indices 0 and 1 now author the donor's full surface for these two families —
-      // a real Markdown lede/body, the closed `align`/`surface` pair, and a callout whose heading and lede sit inside its
-      // accent. Indices 2, 3 and 13 keep the earlier bounded heading/lede treatment.
-      {
-        type: "prose",
-        heading: "Synthetic prose heading",
-        lede: "Synthetic prose introduction & \"quoted\" wording, with *emphasis*.",
-        body: "The body carries **strong** emphasis, `inline code` and a [safe link](https://example.org/notes).",
-        align: "center",
-        surface: "muted",
-      },
-      {
-        type: "callout",
-        heading: "Synthetic callout heading",
-        lede: "Synthetic callout introduction.",
-        body: "A synthetic warning for the publication proof, with a **bounded** body.",
-        tone: "warning",
-        align: "start",
-        surface: "bordered",
-      },
-      {
-        // `UNO-WO-108 / R01`: the rich A2 list surface — classified `href`, a same-Site route and one authorized-but-OFF
-        // `link` declaration — so the runner can observe real safe-reference behaviour instead of a plain two-item list.
-        type: "list",
-        heading: "Synthetic list heading",
-        lede: "A **bounded list** on one published Page.",
-        surface: "bordered",
-        ordered: true,
-        items: [
-          "Prepare",
-          { label: "Reference", href: "https://example.org/notes", detail: "An *authored* note." },
-          { label: "Target", route: "wo108-target", detail: "A **published** Page." },
-          { label: "Help unavailable", link: "help" },
-        ],
-      },
-      {
-        type: "faq",
-        heading: "Synthetic FAQ heading",
-        lede: "Synthetic FAQ introduction.",
-        items: [{ question: "Can this contact notice send anything?", answer: "No. Delivery is off." }],
-      },
-      { type: "media", image: { src: FAMILY_DONOR_SOURCE, alt: "Synthetic blue image plate" } },
-      {
-        type: "gallery",
-        columns: 2,
-        items: [
-          { image: { src: FAMILY_DONOR_SOURCE, alt: "Synthetic first gallery image" }, caption: "First fixture image" },
-          { image: { src: FAMILY_DONOR_SOURCE, alt: "Synthetic second gallery image" } },
-        ],
-      },
-      { type: "contactForm", formRef: "wo066-contact" },
-      {
-        type: "actions",
-        actions: [
-          { label: "See the image", href: "#family-4-media" },
-          { label: "Contact notice", href: "#family-6-contactform" },
-        ],
-      },
-      { type: "divider" },
-      // `UNO-WO-067 / R01`: appended after the unchanged nine; still donor-shaped input, never a hand-authored Uno node.
-      {
-        type: "hero",
-        eyebrow: "Synthetic introduction",
-        lede: "The composed Page is visible.",
-        support: "This is a bounded, original fixture example.",
-        align: "center",
-        surface: "muted",
-      },
-      {
-        type: "stats",
-        // `UNO-WO-072 / R01`: the authored heading and lede are the only source change at index 10.
-        heading: "Synthetic numbers",
-        lede: "Synthetic numbers summarise the sample.",
-        items: [
-          { value: "13", label: "Sampled sections", detail: "Fixture only" },
-          { value: "4", label: "New examples" },
-        ],
-      },
-      {
-        type: "steps",
-        // `UNO-WO-072 / R01`: the authored heading and lede are the only source change at index 11; `surface` and the
-        // item sequence stay exactly as before.
-        heading: "Synthetic sequence",
-        lede: "Synthetic steps keep the authored order.",
-        surface: "muted",
-        items: [
-          { title: "Draft", body: "Prepare the fixture source." },
-          { title: "Review" },
-        ],
-      },
-      {
-        type: "quote",
-        body: "The fixture does not establish full parity.",
-        attribution: "Synthetic contributor",
-        role: "Reviewer",
-        align: "center",
-        surface: "bordered",
-      },
-      // `UNO-WO-068 / R03`: appended after the unchanged thirteen; still donor-shaped input to the real adapter.
-      {
-        type: "table",
-        // `UNO-WO-075 / R01`: the authored heading and lede are the only source change at index 13.
-        // `UNO-WO-108 / R01`: index 13 becomes the rich A2 table — Markdown caption and lede plus an authored surface.
-        heading: "Synthetic table heading",
-        lede: "The **table** explains synthetic totals.",
-        surface: "muted",
-        columns: ["Phase", "Count"],
-        rows: [["First", "1"], ["Second", "2"]],
-        caption: "Two **synthetic** records",
-      },
-      {
-        type: "columns",
-        ratio: "start-wide",
-        items: [
-          { title: "Left column", body: "The left text." },
-          { title: "Right column", items: ["Check one", "Check two"] },
-        ],
-      },
-      {
-        type: "cards",
-        // `UNO-WO-070 / R01` added the authored heading; `UNO-WO-071 / R01` adds the authored plain-text lede. Columns,
-        // items and bodies stay exactly as committed.
-        heading: "Synthetic cards",
-        lede: "Synthetic cards explain the choices.",
-        columns: 2,
-        items: [
-          { title: "Card one", body: "First card body." },
-          { title: "Card two" },
-        ],
-      },
-      {
-        type: "features",
-        // `UNO-WO-070 / R01` added the authored heading; `UNO-WO-071 / R01` adds the authored plain-text lede.
-        heading: "Synthetic features",
-        lede: "Synthetic features describe the work.",
-        columns: 3,
-        items: [
-          { title: "Feature one", body: "First feature body." },
-          { title: "Feature two" },
-        ],
-      },
-    ],
-  };
-}
-
-/**
- * The separate migration binding for that source: one owned Page plate for the single donor image identity, and one
- * exact `delivery-off` acknowledgement. Neither key is publication, asset-servability or delivery authority.
- */
-function familyBindings() {
-  return {
-    images: [{ source: FAMILY_DONOR_SOURCE, owned: plate(FAMILY_PLATE) }],
-    contactForms: [{ formRef: "wo066-contact", mode: "delivery-off" }],
-  };
-}
-
-/** The exact top-level ids the unchanged adapter must produce for the fixture above, in document order. */
-const FAMILY_IDS = Object.freeze([
-  "family-0-prose",
-  "family-1-callout",
-  "family-2-list",
-  "family-3-faq",
-  "family-4-media",
-  "family-5-gallery",
-  "family-6-contactform",
-  "family-7-actions",
-  "family-8-divider",
-  "family-9-hero",
-  "family-10-stats",
-  "family-11-steps",
-  "family-12-quote",
-  "family-13-table",
-  "family-14-columns",
-  "family-15-cards",
-  "family-16-features",
-]);
-
 /** Recursively frozen: an accepted Page must not be rewritten after composition. */
 function deepFrozen(value) {
   if (value === null || typeof value !== "object") return true;
@@ -696,41 +517,6 @@ function fixturePlan(allModulesJsonBytes, badJsonBytes, familyJsonBytes) {
   };
 }
 
-
-function nextBinPath() {
-  for (const candidate of [resolve(ROOT, "node_modules/next/dist/bin/next"), resolve(ROOT, "node_modules/next/dist/bin/next.js")]) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return null;
-}
-
-function freeLoopbackPort() {
-  return new Promise((resolvePort, rejectPort) => {
-    const server = createServer();
-    server.once("error", rejectPort);
-    server.listen(0, HOST, () => {
-      const { port } = server.address();
-      server.close(() => resolvePort(port));
-    });
-  });
-}
-
-function runChild(args, timeoutMs) {
-  return new Promise((resolveRun) => {
-    const childProcess = spawn(process.execPath, args, {
-      cwd: ROOT,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, NODE_ENV: "production" },
-      windowsHide: true,
-    });
-    let output = "";
-    const timer = setTimeout(() => childProcess.kill("SIGKILL"), timeoutMs);
-    childProcess.stdout.on("data", (chunk) => { output += chunk.toString(); });
-    childProcess.stderr.on("data", (chunk) => { output += chunk.toString(); });
-    childProcess.on("close", (code) => { clearTimeout(timer); resolveRun({ code, output }); });
-  });
-}
-
 /** `UNO-WO-053 / R01` Phase A: exact-bytes transport helpers, all driven by the served occurrence ledger. */
 const asBytes = async (response) => Buffer.from(await response.arrayBuffer());
 
@@ -815,19 +601,6 @@ async function expectClosed404(url, label, init = {}) {
     `${response.status} ${body.length} bytes`);
 }
 
-async function waitForServer(base, childProcess) {
-  const deadline = Date.now() + READY_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    if (childProcess.exitCode !== null) return false;
-    try {
-      const response = await fetch(`${base}/en-001/wo044-all-modules`, { redirect: "manual" });
-      if (response.status > 0) return true;
-    } catch {
-      await delay(250);
-    }
-  }
-  return false;
-}
 
 const PROVIDER_CASES = Object.freeze([
   { provider: "youtube", videoId: "dQw4w9WgXcQ" },
@@ -843,7 +616,7 @@ let child = null;
 let browser = null;
 
 async function main() {
-  const nextBin = nextBinPath();
+  const nextBin = nextBinPath(ROOT);
   if (!check("the pinned local Next.js CLI is present", nextBin !== null)) return 1;
 
   for (const [path, digest] of PINNED_DECLARATIONS) {
@@ -920,7 +693,7 @@ async function main() {
   // single UTF-8 buffer that is then the only authority for installation, loading, serving and HTTP.
   const { composeUnoFoundationSubset } = await import("../src/application/compose-uno-foundation-families.ts");
   const { projectUnoSelectedPageHeader } = await import("../src/core/efs/uno-page-header.ts");
-  const familyComposed = composeUnoFoundationSubset(familySource(), familyBindings());
+  const familyComposed = composeFamilyFixture(composeUnoFoundationSubset);
   const familyAccepted = familyComposed.status === "composed" ? familyComposed.document : null;
   check(
     "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the seventeen-section source once",
@@ -1000,9 +773,11 @@ async function main() {
     // fresh source, mutates one value, and must refuse with the adapter's own vocabulary and no own `document` key.
     const familyProbes = [
       {
-        label: "hero actions with a route destination",
+        // `UNO-WO-112 / R01`: the hero's own matrix now covers its route, unsafe and malformed cases exhaustively; this
+        // representative probe keeps one appended-family example of a destination form the composed subset still refuses.
+        label: "hero actions with an application link",
         expected: "family:unsupported-feature",
-        mutate: (source) => { source.sections[9].actions = [{ label: "Open", href: "/outside" }]; },
+        mutate: (source) => { source.sections[9].actions = [{ label: "Open", link: "help" }]; },
       },
       {
         label: "stats item carrying a remote href",
@@ -1735,9 +1510,15 @@ async function main() {
           evidence.detail,
         );
       }
-      // `UNO-WO-108 / R01` (R4 + §4): the fourteen local dimensions start with the adapter's own accepted source.
+      // `UNO-WO-108 / R01` (R4 + §4): the local dimensions start with the adapter's own accepted source.
       localA2.list.source = textFiveEvidence.find((evidence) => evidence.id === "family-2-list")?.ok === true;
       localA2.table.source = textFiveEvidence.find((evidence) => evidence.id === "family-13-table")?.ok === true;
+      // `UNO-WO-112 / R01`: the hero's own accepted composition — one native `content.hero` carrying the two Markdown body
+      // fields, the closed switch and exactly the two approved static actions.
+      localA2.hero.source = familyAccepted.sections[9]?.module === "content.hero"
+        && familyAccepted.sections[9]?.id === HERO_EXPECTED.id
+        && familyAccepted.sections[9]?.props?.markdown === true
+        && JSON.stringify(familyAccepted.sections[9]?.props?.actions) === JSON.stringify(HERO_EXPECTED.actions);
       // `UNO-WO-108 / R01` (R4): the strict reader is compared field by field, because a re-read record may order its own
       // keys differently. The composed props and the re-read props must still describe exactly the same authored surface.
       {
@@ -1781,6 +1562,29 @@ async function main() {
           && Object.isFrozen(familyReparsed.document);
         localA2.list.reader = listReaderOk;
         localA2.table.reader = tableReaderOk;
+        // `UNO-WO-112 / R01`: the hero is one native node rather than a stack, so its re-read props are compared field by
+        // field against what was authored — including both actions' exact static destinations and closed variants.
+        const composedHero = familyAccepted.sections[9]?.props;
+        const rereadHero = familyReparsed.accepted === true ? familyReparsed.document.sections[9]?.props : null;
+        const rereadHeroActions = rereadHero?.actions ?? [];
+        const heroReaderOk = rereadHero !== null
+          && familyReparsed.accepted === true
+          && familyReparsed.document.sections[9]?.module === "content.hero"
+          && rereadHero.eyebrow === HERO_EXPECTED.eyebrow
+          && rereadHero.lede === HERO_EXPECTED.lede
+          && rereadHero.support === HERO_EXPECTED.support
+          && rereadHero.markdown === true
+          && rereadHero.align === HERO_EXPECTED.align
+          && rereadHero.surface === HERO_EXPECTED.surface
+          && rereadHeroActions.length === HERO_EXPECTED.actions.length
+          && HERO_EXPECTED.actions.every((action, index) =>
+            rereadHeroActions[index]?.label === action.label
+            && rereadHeroActions[index]?.href === action.href
+            && rereadHeroActions[index]?.variant === action.variant
+            && rereadHeroActions[index]?.targetId === undefined)
+          && sameKeys(rereadHero, composedHero)
+          && Object.isFrozen(familyReparsed.document);
+        localA2.hero.reader = heroReaderOk;
         // `UNO-WO-108 / R01` (§4 `refusal`): two real refusals are executed against the authored source — an undeclared
         // `link` id and an unsafe URL scheme — and the rich list depends on them.
         const undeclaredLink = familySource();
@@ -1819,20 +1623,43 @@ async function main() {
           tableRefusalOk,
           JSON.stringify(tableRefusalProbes),
         );
+        // `UNO-WO-112 / R01`: the hero's whole-source refusal matrix, executed by the extracted module's own cases so the
+        // fixture, the runner and the unit tests cannot disagree about what a malformed hero is.
+        const heroRefusalProbes = HERO_REFUSAL_CASES.map((probe) => {
+          const source = familySource();
+          probe.mutate(source);
+          const outcome = composeUnoFoundationSubset(source, familyBindings());
+          return {
+            label: probe.label,
+            expected: probe.expected,
+            reason: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+            partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+          };
+        });
+        const heroRefusalOk = heroRefusalProbes.every(
+          (probe) => probe.reason === probe.expected && probe.partial === false,
+        );
+        check(
+          "A2_LOCAL_REFUSAL every malformed hero refuses the whole source Page with the family's own reason",
+          heroRefusalOk,
+          JSON.stringify(heroRefusalProbes),
+        );
         refusalReasons = JSON.stringify({
           undeclared: undeclaredLinkOutcome.status === "refused" ? undeclaredLinkOutcome.reason : undeclaredLinkOutcome.status,
           unsafeHref: unsafeHrefOutcome.status === "refused" ? unsafeHrefOutcome.reason : unsafeHrefOutcome.status,
           table: tableRefusalProbes,
+          hero: heroRefusalProbes,
         });
         localA2.list.refusal = refusalOk;
         localA2.table.refusal = tableRefusalOk;
+        localA2.hero.refusal = heroRefusalOk;
         const links = familyReparsed.accepted === true ? familyReparsed.document.links : undefined;
         check(
-          "A2_LOCAL_READER the installed bytes re-read to the same rich list and table, with the one approved declaration",
-          listReaderOk && tableReaderOk
+          "A2_LOCAL_READER the installed bytes re-read to the same rich list, table and hero, with the one approved declaration",
+          listReaderOk && tableReaderOk && heroReaderOk
             && JSON.stringify(links) === JSON.stringify({ help: { reference: "applicationLink", key: "example.help" } })
             && JSON.stringify(familyReparsed.document.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS),
-          JSON.stringify({ list: localA2.list.reader, table: localA2.table.reader, links }),
+          JSON.stringify({ list: localA2.list.reader, table: localA2.table.reader, hero: localA2.hero.reader, links }),
         );
       }
       check(
@@ -1875,14 +1702,14 @@ async function main() {
   }
 
   rmSync(resolve(ROOT, ".next"), { recursive: true, force: true });
-  const build = await runChild([nextBin, "build"], BUILD_TIMEOUT_MS);
+  const build = await runChild({ root: ROOT, args: [nextBin, "build"], timeoutMs: BUILD_TIMEOUT_MS });
   if (!check("the production build of the fixture succeeds", build.code === 0, `exit ${build.code}`)) {
     process.stderr.write(build.output.slice(-3000));
     return 1;
   }
   check("the fixture build reports no build error", !/Failed to compile/iu.test(build.output));
 
-  const port = await freeLoopbackPort();
+  const port = await freeLoopbackPort(HOST);
   const base = `http://${HOST}:${port}`;
   child = spawn(process.execPath, [nextBin, "start", "-H", HOST, "-p", String(port)], {
     cwd: ROOT,
@@ -1892,7 +1719,7 @@ async function main() {
   });
   child.stdout.on("data", () => {});
   child.stderr.on("data", () => {});
-  if (!check("the production server answers on loopback", await waitForServer(base, child))) return 1;
+  if (!check("the production server answers on loopback", await waitForServer({ base, child, readyPath: "/en-001/wo044-all-modules" }))) return 1;
 
   const pageResponse = await fetch(`${base}/en-001/wo044-all-modules`);
   const html = await pageResponse.text();
@@ -2557,21 +2384,39 @@ async function main() {
     );
     check("FAMILY_HTTP=200 the divider is rendered", familyHtml.includes('id="family-8-divider"') && /<hr\b/u.test(familyHtml));
 
-    const heroRegion = familyRegionOf("family-9-hero");
+    // `UNO-WO-112 / R01` (§2 `http`/`renderer`/`rights`): the hero dimension is the real production response — the authored
+    // alignment and surface, both Markdown bodies through the shared renderer, and exactly the two approved static actions
+    // with their `rel` and variants — evaluated by the extracted predicate rather than by one attribute.
+    const heroRegion = heroRegionOf(familyHtml);
+    const heroFacts = heroServed(heroRegion);
+    localA2.hero.renderer = heroRegion.length > 0 && heroFacts.ok;
+    localA2.hero.http = familyHtmlResponse.status === 200 && heroFacts.ok;
+    localA2.hero.rights = !familyHtml.includes(FAMILY_DONOR_SOURCE)
+      && !heroRegion.includes("example.help")
+      && !heroRegion.includes("wo066-donor")
+      && (heroRegion.match(/rel="noreferrer noopener"/gu) ?? []).length === HERO_EXPECTED.actions.length;
     check(
-      "FAMILY_HERO_HTTP the hero region carries the authored alignment, surface and text in order",
-      heroRegion.startsWith('<section class="uno-json-hero" data-uno-align="center" data-uno-surface="muted" id="family-9-hero">')
-        && heroRegion.includes('<p class="uno-json-eyebrow">Synthetic introduction</p>')
-        && heroRegion.includes('<p class="uno-json-hero-lede">The composed Page is visible.</p>')
-        && heroRegion.includes('<p class="uno-json-hero-support">This is a bounded, original fixture example.</p>')
-        && heroRegion.indexOf("Synthetic introduction") < heroRegion.indexOf("The composed Page is visible.")
-        && heroRegion.indexOf("The composed Page is visible.") < heroRegion.indexOf("This is a bounded, original fixture example."),
-      heroRegion.slice(0, 160),
+      "FAMILY_HERO_HTTP the served hero carries its authored surface, both Markdown bodies and both approved actions",
+      localA2.hero.http,
+      heroFacts.detail,
     );
     check(
-      "FAMILY_HERO_HTTP the hero region holds no link, action list, control or frame",
-      heroRegion.length > 0 && !/<a\b|<ul\b|<iframe\b|<button\b|<form\b/iu.test(heroRegion),
-      heroRegion.slice(0, 160),
+      "FAMILY_HERO_HTTP the hero holds no donor identity, declaration key, form control or frame",
+      localA2.hero.rights && !/<button\b|<form\b|<iframe\b/iu.test(heroRegion),
+      heroRegion.slice(0, 200),
+    );
+    // The extracted parser is asserted directly too, so the served order, labels, variants and `rel` are proven even if the
+    // composite predicate were ever weakened.
+    const heroServedActions = heroActionsOf(heroRegion);
+    check(
+      "FAMILY_HERO_HTTP the hero serves exactly its two approved actions in authored order",
+      heroServedActions.length === HERO_EXPECTED.actions.length
+        && HERO_EXPECTED.actions.every((action, index) =>
+          heroServedActions[index].href === action.href
+          && heroServedActions[index].label === action.label
+          && heroServedActions[index].variant === action.variant
+          && heroServedActions[index].rel === "noreferrer noopener"),
+      JSON.stringify(heroServedActions),
     );
     const statsRegion = familyRegionOf("family-10-stats");
     const statsInner = statsRegion.slice(statsRegion.indexOf('<section class="uno-json-stats"'));
@@ -3118,14 +2963,26 @@ async function consentPhase(base) {
           })(),
           hero: (() => {
             const region = document.querySelector("#family-9-hero");
+            const links = [...(region?.querySelectorAll("ul.uno-json-hero-actions a.uno-json-action") ?? [])];
+            const box = region?.getBoundingClientRect();
             return {
               align: region?.getAttribute("data-uno-align") ?? "",
               surface: region?.getAttribute("data-uno-surface") ?? "",
               eyebrow: region?.querySelector(".uno-json-eyebrow")?.textContent ?? "",
-              lede: region?.querySelector(".uno-json-hero-lede")?.textContent ?? "",
-              support: region?.querySelector(".uno-json-hero-support")?.textContent ?? "",
-              anchors: region?.querySelectorAll("a, ul, iframe, button").length ?? -1,
-              visible: region === null ? false : region.getBoundingClientRect().height > 0,
+              ledeStrong: region?.querySelector(".uno-json-hero-lede strong.uno-family-md-strong")?.textContent ?? "",
+              supportEm: region?.querySelector(".uno-json-hero-support em.uno-family-md-em")?.textContent ?? "",
+              // `UNO-WO-112 / R01`: exactly the two approved static actions, each an ordinary focusable anchor with its own
+              // `rel`, closed variant and visible label — and no other control anywhere in the hero.
+              actions: links.map((anchor) => ({
+                href: anchor.getAttribute("href"),
+                rel: anchor.getAttribute("rel") ?? "",
+                variant: anchor.getAttribute("data-uno-variant") ?? "",
+                label: (anchor.textContent ?? "").trim(),
+                focusable: anchor.tabIndex === 0 && anchor.getBoundingClientRect().height > 0,
+              })),
+              controls: region?.querySelectorAll("button, form, iframe, input, select, textarea").length ?? -1,
+              overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+              visible: box === undefined ? false : box.height > 0,
             };
           })(),
           stats: (() => {
@@ -3360,11 +3217,24 @@ async function consentPhase(base) {
         String(seen.actionCount));
 
       // `UNO-WO-067 / R01`: hero, stats, steps and quote are each verified inside their own composed section only.
-      familyCheck(`${width}px hero shows the authored eyebrow, lede and support with no action control`,
+      // `UNO-WO-112 / R01`: the hero check is now the credited surface — both Markdown bodies through the shared renderer
+      // and exactly the two approved static actions, each focusable with its own `rel` and variant — and it records the
+      // per-viewport key the four-case conjunction is built from.
+      const heroLightOk = familyCheck(`${width}px hero shows both Markdown bodies and both approved static actions`,
         seen.hero.align === "center" && seen.hero.surface === "muted" && seen.hero.visible
-          && seen.hero.eyebrow === "Synthetic introduction" && seen.hero.lede === "The composed Page is visible."
-          && seen.hero.support === "This is a bounded, original fixture example." && seen.hero.anchors === 0,
+          && seen.hero.eyebrow === HERO_EXPECTED.eyebrow
+          && seen.hero.ledeStrong === HERO_EXPECTED.ledeStrong
+          && seen.hero.supportEm === HERO_EXPECTED.supportEm
+          && seen.hero.actions.length === HERO_EXPECTED.actions.length
+          && HERO_EXPECTED.actions.every((action, index) =>
+            seen.hero.actions[index].href === action.href
+            && seen.hero.actions[index].label === action.label
+            && seen.hero.actions[index].variant === action.variant
+            && seen.hero.actions[index].rel === "noreferrer noopener"
+            && seen.hero.actions[index].focusable)
+          && seen.hero.controls === 0 && seen.hero.overflow === 0,
         JSON.stringify(seen.hero));
+      if (heroLightOk) heroBrowserCases.add(`light:${width}`);
       familyCheck(`${width}px stats show two authored pairs with one detail on the first item`,
         seen.stats.dts.length === 2 && seen.stats.dds.length === 2
           && seen.stats.dts[0] === "Sampled sections" && seen.stats.dts[1] === "New examples"
@@ -3872,24 +3742,69 @@ async function consentPhase(base) {
         JSON.stringify(darkList),
       );
       if (darkListOk) listBrowserCases.add(`dark:${width}`);
+      // `UNO-WO-112 / R01` (§2 `browser`): the credited hero under dark and reduced motion at this viewport — both Markdown
+      // bodies still render through the shared renderer, and both approved static actions keep their href, `rel`, variant
+      // and a real focus box, with no control and no overflow.
+      const darkHero = await tab.evaluate(() => {
+        const region = document.querySelector("#family-9-hero");
+        const links = [...(region?.querySelectorAll("ul.uno-json-hero-actions a.uno-json-action") ?? [])];
+        return {
+          scheme: matchMedia("(prefers-color-scheme: dark)").matches,
+          reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+          surface: region?.getAttribute("data-uno-surface") ?? "",
+          ledeStrong: region?.querySelector(".uno-json-hero-lede strong.uno-family-md-strong")?.textContent ?? "",
+          supportEm: region?.querySelector(".uno-json-hero-support em.uno-family-md-em")?.textContent ?? "",
+          actions: links.map((anchor) => ({
+            href: anchor.getAttribute("href"),
+            rel: anchor.getAttribute("rel") ?? "",
+            variant: anchor.getAttribute("data-uno-variant") ?? "",
+            label: (anchor.textContent ?? "").trim(),
+            focusable: anchor.tabIndex === 0 && anchor.getBoundingClientRect().height > 0,
+          })),
+          controls: region?.querySelectorAll("button, form, iframe, input, select, textarea").length ?? -1,
+          overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        };
+      });
+      const darkHeroOk = familyCheck(
+        `dark ${width}px the hero keeps both Markdown bodies and both approved static actions`,
+        darkHero.scheme && darkHero.reducedMotion && darkHero.surface === "muted"
+          && darkHero.ledeStrong === HERO_EXPECTED.ledeStrong && darkHero.supportEm === HERO_EXPECTED.supportEm
+          && darkHero.actions.length === HERO_EXPECTED.actions.length
+          && HERO_EXPECTED.actions.every((action, index) =>
+            darkHero.actions[index].href === action.href
+            && darkHero.actions[index].label === action.label
+            && darkHero.actions[index].variant === action.variant
+            && darkHero.actions[index].rel === "noreferrer noopener"
+            && darkHero.actions[index].focusable)
+          && darkHero.controls === 0 && darkHero.overflow === 0,
+        JSON.stringify(darkHero),
+      );
+      if (darkHeroOk) heroBrowserCases.add(`dark:${width}`);
     }
     // `UNO-WO-111 / R01` (§2 `browser`): `list.browser` is the conjunction of the same four executed observations, so a
-    // deleted, skipped or superficial case can never leave the credited family true.
-    const listBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];
-    localA2.list.browser = listBrowserRequired.every((key) => listBrowserCases.has(key));
+    // deleted, skipped or superficial case can never leave the credited family true. `UNO-WO-112 / R01` moves the rule into
+    // the extracted `conjunction()` helper so all three credited families share one definition.
+    localA2.list.browser = conjunction(listBrowserCases);
     check(
       "A2_LOCAL_BROWSER the rich list was observed at 390px and 1280px in light and dark/reduced motion with both proven anchors",
       localA2.list.browser,
-      JSON.stringify(listBrowserRequired.map((key) => [key, listBrowserCases.has(key)])),
+      conjunctionDetail(listBrowserCases),
     );
     // `UNO-WO-110 / R01` (§2 `browser`): `table.browser` is the conjunction of four executed observations — light and
     // dark/reduced-motion at 390px and 1280px — so a deleted, skipped or superficial case can never leave it true.
-    const tableBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];
-    localA2.table.browser = tableBrowserRequired.every((key) => tableBrowserCases.has(key));
+    localA2.table.browser = conjunction(tableBrowserCases);
     check(
       "A2_LOCAL_BROWSER the rich table was observed at 390px and 1280px in light and dark/reduced motion with its scroll control focused",
       localA2.table.browser,
-      JSON.stringify(tableBrowserRequired.map((key) => [key, tableBrowserCases.has(key)])),
+      conjunctionDetail(tableBrowserCases),
+    );
+    // `UNO-WO-112 / R01` (§2 `browser`): `hero.browser` is the same four-case conjunction, and each key is added only by a
+    // real Chromium assertion that the hero's Markdown bodies and its two approved static actions survived that case.
+    localA2.hero.browser = conjunction(heroBrowserCases);
+    check(
+      "A2_LOCAL_BROWSER the rich hero was observed at 390px and 1280px in light and dark/reduced motion with both actions intact",
+      localA2.hero.browser,
+      conjunctionDetail(heroBrowserCases),
     );
     await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
     familyCheck("the family Page raised no new console or page error", consoleErrors.length === errorsBefore,
@@ -3920,23 +3835,18 @@ async function consentPhase(base) {
       familyOk && ledeBrowserOk && ledeBrowserChecks === 2 && sequenceBrowserOk && sequenceBrowserChecks === 2
         && textFiveBrowserOk && textFiveBrowserChecks === 2 && outlineBrowserOk && outlineBrowserChecks === 12,
     );
-    // `UNO-WO-108 / R01` (§4 `refusal` / `rights`): the two rich families share the family-level refusal machinery, whose
-    // executed codes are asserted here, together with the no-donor-copy and no-opaque-key invariants already measured.
-      // `UNO-WO-108 / R01` (§4 `refusal` / `rights`): both dimensions were executed above — the refusals against the
-      // authored source and the served no-donor-copy / no-opaque-key invariants — so this block only totals them.
-      {
-        const flat = [...Object.values(localA2.list), ...Object.values(localA2.table)];
+    // `UNO-WO-112 / R01`: every credited family's record is built by the extracted `createFamilyEvidence()` and can only be
+    // complete when all seven dimensions executed. `isCreditable()` is the one definition of "complete", so a missing or
+    // mistyped dimension can never be counted here.
+    {
+      const records = { list: localA2.list, table: localA2.table, hero: localA2.hero };
+      const dimensions = Object.values(records).reduce((total, record) => total + Object.keys(record).length, 0);
       check(
-        "A2_LOCAL_TABLE_LIST_EVIDENCE=14/14 (table and list credited; P6 destination proof in the three-Site gate)",
-        Object.keys(localA2.list).length === 7
-          && Object.keys(localA2.table).length === 7
-          && flat.length === 14
-          && flat.every((value) => value === true),
-        JSON.stringify({
-          table: localA2.table,
-          list: localA2.list,
-          refusalReasons,
-        }),
+        "A2_LOCAL_TABLE_LIST_HERO_EVIDENCE=21/21 (table, list and hero credited; P6 destination proof in the three-Site gate)",
+        records.list && records.table && records.hero
+          && dimensions === 21
+          && Object.values(localA2).every((record) => isCreditable(record)),
+        JSON.stringify({ ...records, refusalReasons }),
       );
     }
     check(
@@ -4134,12 +4044,46 @@ async function consentPhase(base) {
         ? `${closureA2.parity}/17 ${closureA2.proxy}/59 ${closureA2.credited.join(",")}`
         : String(closureA2.reason),
     );
-    if (closureA2.ok) {
-      // Every printed label is re-derived from the A2 result's own credit set, so a label cannot appear without its reason
-      // and no earlier row can print a fuller one.
-      const creditedNames = new Set(closureA2.credited.map((family) => `PARITY_${family.toUpperCase()}`));
-      const pendingNames = new Set(closureA2.pending.map((family) => `PARITY_${family.toUpperCase()}`));
-      for (const label of closureA2.labels) {
+    // `UNO-WO-112 / R01` (§3): the newly credited **Hero** completes the six-family interim row. The same executed records
+    // plus the executed `localA2.hero` go into one checkpoint-omitted evaluation whose exact credited set is asserted, so the
+    // score can only come from real evidence. The full B1 `8/17` row is *not* claimed: `stats` and `steps` stay pending.
+    const closureSix = evaluateU04FamilyClosure({
+      families: {
+        divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
+        prose: a1Evidence.prose,
+        callout: a1Evidence.callout,
+        table: localA2.table,
+        list: localA2.list,
+        hero: localA2.hero,
+      },
+      modules: UNO_RENDERABLE_MODULES.length,
+      zones: UNO_OWNED_MEDIA_ZONES.length,
+      browserMatrix: matrixCases.length,
+    });
+    check(
+      "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table, list, hero and divider at 6/17 and 48/59",
+      closureSix.ok === true
+        && JSON.stringify(closureSix.credited)
+          === JSON.stringify(["prose", "callout", "table", "list", "hero", "divider"])
+        && closureSix.parity === 6
+        && closureSix.proxy === 48
+        && closureSix.pending.includes("stats")
+        && closureSix.pending.includes("steps")
+        && closureSix.labels.includes("PARITY_HERO=PASS")
+        && closureSix.labels.includes("PARITY_STATS=PENDING")
+        && closureSix.labels.includes("PARITY_STEPS=PENDING")
+        && familyOk
+        && dividerOk,
+      closureSix.ok
+        ? `${closureSix.parity}/17 ${closureSix.proxy}/59 ${closureSix.credited.join(",")}`
+        : String(closureSix.reason),
+    );
+    if (closureSix.ok) {
+      // Every printed label is re-derived from the six-family result's own credit set, so a label cannot appear without its
+      // reason and no earlier row can print a fuller one.
+      const creditedNames = new Set(closureSix.credited.map((family) => `PARITY_${family.toUpperCase()}`));
+      const pendingNames = new Set(closureSix.pending.map((family) => `PARITY_${family.toUpperCase()}`));
+      for (const label of closureSix.labels) {
         const equals = label.lastIndexOf("=");
         const name = label.slice(0, equals);
         const value = label.slice(equals + 1);
@@ -4148,9 +4092,9 @@ async function consentPhase(base) {
           : pendingNames.has(name)
             ? value === "PENDING"
             : name === "U04_PARITY"
-              ? value === `${closureA2.parity}/17`
+              ? value === `${closureSix.parity}/17`
               : name === "U04_PROXY"
-                ? value === `${closureA2.proxy}/59`
+                ? value === `${closureSix.proxy}/59`
                 : value === `${UNO_RENDERABLE_MODULES.length}/${UNO_RENDERABLE_MODULES.length}`
                   || value === `${UNO_OWNED_MEDIA_ZONES.length}/${UNO_OWNED_MEDIA_ZONES.length}`
                   || value === `${matrixCases.length}/${matrixCases.length}`;
@@ -4176,7 +4120,7 @@ try {
   exitCode = 1;
 } finally {
   try { if (browser) await browser.close(); } catch { /* best effort */ }
-  if (child && child.exitCode === null) { try { child.kill("SIGKILL"); } catch { /* best effort */ } }
+  killChild(child);
   if (transaction) {
     try { await transaction.restore(); } catch (error) { check("the fixture restores", false, String(error)); }
     try { await transaction.dispose(); } catch { /* best effort */ }

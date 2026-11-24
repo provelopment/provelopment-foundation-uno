@@ -14,7 +14,14 @@ import { describe, it } from "node:test";
 
 const ROOT = process.cwd();
 const RUNNER = resolve(ROOT, "scripts/verify-u04-22-module-consent.mjs");
-const source = readFileSync(RUNNER, "utf8");
+/**
+ * `UNO-WO-112 / R01`: the gate's contract now spans its entrypoint **and** the extracted fixture module it orchestrates, so
+ * the audited text is the pair. A fixture-shape token is still asserted — mutation-sensitive — but now against the file
+ * that actually owns it, which is what keeps the extraction from becoming a place where a contract silently disappears.
+ */
+const RUNNER_SOURCE = readFileSync(RUNNER, "utf8");
+const FIXTURE_SOURCE = readFileSync(resolve(ROOT, "scripts/u04/family-fixture.mjs"), "utf8");
+const source = `${RUNNER_SOURCE}\n${FIXTURE_SOURCE}`;
 
 /** The invariants that must survive any future edit to the runner. */
 const REQUIRED = Object.freeze([
@@ -127,7 +134,7 @@ const PINNED = Object.freeze([
  */
 const PHASE_C_REQUIRED = Object.freeze([
   'await import("../src/application/compose-uno-foundation-families.ts")',
-  "composeUnoFoundationSubset(familySource(), familyBindings())",
+  "return compose(familySource(), familyBindings());",
   "FAMILY_COMPOSE_ACCEPTED the real adapter accepts the seventeen-section source once",
   "FAMILY_COMPOSE_ACCEPTED exact source-index ids and no extra section",
   "FAMILY_COMPOSE_ACCEPTED the accepted document is deeply frozen",
@@ -135,7 +142,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_SOURCE_NOT_SERIALIZED the donor identity and the acknowledgement never reach the Page",
   "FAMILY_SOURCE_NOT_SERIALIZED the Page carries the real Uno modules and the owned ref, not a donor path",
   "FAMILY_BINDING_REFUSED the identical source refuses with every incomplete binding",
-  'const FAMILY_ROUTE = ["wo066-family-composition"];',
+  'FAMILY_ROUTE = Object.freeze(["wo066-family-composition"]);',
   "wo066-family-composition.en-001.json",
   "wo066-family-plate.png",
   "{ path: SOURCES[4], bytes: familyJsonBytes }",
@@ -163,11 +170,11 @@ const PHASE_C_REQUIRED = Object.freeze([
   '"family-12-quote"',
   "FAMILY_FOUR_REFUSALS each appended-family probe refuses the whole Page with its documented reason",
   "composeUnoFoundationSubset(probeSource, familyBindings())",
-  "FAMILY_HERO_HTTP the hero region carries the authored alignment, surface and text in order",
+  "FAMILY_HERO_HTTP the served hero carries its authored surface, both Markdown bodies and both approved actions",
   "FAMILY_STATS_HTTP the stats region is one definition list with two authored pairs in order",
   "FAMILY_STEPS_HTTP the steps region is one authored heading, one lede and one ordered list of two items",
   "FAMILY_QUOTE_HTTP the quote region is one figure, blockquote and caption with separate attribution and role",
-  "${width}px hero shows the authored eyebrow, lede and support with no action control",
+  "${width}px hero shows both Markdown bodies and both approved static actions",
   "${width}px stats show two authored pairs with one detail on the first item",
   "${width}px steps show two ordered titles and one description with no invented status",
   "${width}px quote shows one figure, blockquote and caption with separate attribution and role",
@@ -368,10 +375,10 @@ const PHASE_C_REQUIRED = Object.freeze([
   '["columns not an array", (source) => { source.sections[13].columns = "Phase"; }]',
   "localA2.table.http = familyHtmlResponse.status === 200",
   "A2_LOCAL_BROWSER the rich table was observed at 390px and 1280px in light and dark/reduced motion with its scroll control focused",
-  'const tableBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];',
+  'localA2.table.browser = conjunction(tableBrowserCases);',
   "if (tableLightOk) tableBrowserCases.add(`light:${width}`);",
   "if (darkTableOk) tableBrowserCases.add(`dark:${width}`);",
-  "A2_LOCAL_TABLE_LIST_EVIDENCE=14/14 (table and list credited; P6 destination proof in the three-Site gate)",
+  "A2_LOCAL_TABLE_LIST_HERO_EVIDENCE=21/21 (table, list and hero credited; P6 destination proof in the three-Site gate)",
   "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table and divider",
   'JSON.stringify(closureFour.credited) === JSON.stringify(["prose", "callout", "table", "divider"])',
   "closureFour.parity === 4",
@@ -381,15 +388,45 @@ const PHASE_C_REQUIRED = Object.freeze([
   // `UNO-WO-111 / R01` (§3): the credited List's four-case browser conjunction and the earned A2 checkpoint, whose frozen
   // target is `5/17` / `47/59` over exactly `table` and `list`.
   "A2_LOCAL_BROWSER the rich list was observed at 390px and 1280px in light and dark/reduced motion with both proven anchors",
-  'const listBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];',
+  'localA2.list.browser = conjunction(listBrowserCases);',
   "if (darkListOk) listBrowserCases.add(`dark:${width}`);",
   "list: localA2.list,",
+  "hero: localA2.hero,",
   'checkpoint: "A2",',
   "U04_CLOSURE_ORACLE the A2 checkpoint credits exactly prose, callout, table, list and divider at 5/17 and 47/59",
   'JSON.stringify(closureA2.credited) === JSON.stringify(["prose", "callout", "table", "list", "divider"])',
   "closureA2.parity === 5",
   "closureA2.proxy === 47",
   'closureA2.labels.includes("PARITY_LIST=PASS")',
+  // `UNO-WO-112 / R01` (§2–§3): the four extracted modules the entrypoint orchestrates, the credited Hero's own executed
+  // dimensions, the shared conjunction/record helpers and the six-family checkpoint-omitted row.
+  'from "./u04/family-fixture.mjs";',
+  'from "./u04/family-evidence.mjs";',
+  'from "./u04/hero-evidence.mjs";',
+  'from "./u04/serving-harness.mjs";',
+  "composeFamilyFixture(composeUnoFoundationSubset)",
+  "table: createFamilyEvidence(),",
+  "list: createFamilyEvidence(),",
+  "hero: createFamilyEvidence(),",
+  "localA2.hero.browser = conjunction(heroBrowserCases);",
+  "localA2.hero.source = familyAccepted.sections[9]?.module === \"content.hero\"",
+  "localA2.hero.reader = heroReaderOk;",
+  "localA2.hero.refusal = heroRefusalOk;",
+  "localA2.hero.http = familyHtmlResponse.status === 200 && heroFacts.ok;",
+  "Object.values(localA2).every((record) => isCreditable(record))",
+  "const heroRegion = heroRegionOf(familyHtml);",
+  "const heroFacts = heroServed(heroRegion);",
+  "const heroServedActions = heroActionsOf(heroRegion);",
+  "A2_LOCAL_BROWSER the rich hero was observed at 390px and 1280px in light and dark/reduced motion with both actions intact",
+  "A2_LOCAL_REFUSAL every malformed hero refuses the whole source Page with the family's own reason",
+  "A2_LOCAL_READER the installed bytes re-read to the same rich list, table and hero, with the one approved declaration",
+  "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table, list, hero and divider at 6/17 and 48/59",
+  'JSON.stringify(closureSix.credited)',
+  "closureSix.parity === 6",
+  "closureSix.proxy === 48",
+  'closureSix.pending.includes("stats")',
+  'closureSix.pending.includes("steps")',
+  'closureSix.labels.includes("PARITY_HERO=PASS")',
 ]);
 
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
@@ -564,11 +601,11 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
   it("the audit genuinely fails when the real adapter is replaced by a hand-authored Page", () => {
     const mutated = source
       .replace('await import("../src/application/compose-uno-foundation-families.ts")', "await import(\"../src/core/page-document.ts\")")
-      .replace("composeUnoFoundationSubset(familySource(), familyBindings())", "({ status: \"composed\", document: familySource() })");
+      .replace("composeFamilyFixture(composeUnoFoundationSubset)", "({ status: \"composed\", document: familySource() })");
     assert.notEqual(mutated, source);
     const missing = audit(mutated);
     assert.ok(missing.some((entry) => entry.includes("compose-uno-foundation-families.ts")), missing.join(","));
-    assert.ok(missing.some((entry) => entry.includes("composeUnoFoundationSubset(familySource(), familyBindings())")), missing.join(","));
+    assert.ok(missing.some((entry) => entry.includes("composeFamilyFixture(composeUnoFoundationSubset)")), missing.join(","));
   });
 
   it("the audit genuinely fails when the fifth fixture source is not installed from the composed buffer", () => {
@@ -648,7 +685,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ],
       [
         source.replace(
-          "FAMILY_HERO_HTTP the hero region carries the authored alignment, surface and text in order",
+          "FAMILY_HERO_HTTP the served hero carries its authored surface, both Markdown bodies and both approved actions",
           "hero region unchecked",
         ),
         "FAMILY_HERO_HTTP",
@@ -678,10 +715,10 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ],
       [
         source.replace(
-          "${width}px hero shows the authored eyebrow, lede and support with no action control",
+          "${width}px hero shows both Markdown bodies and both approved static actions",
           "${width}px hero unverified",
         ),
-        "${width}px hero shows the authored eyebrow",
+        "${width}px hero shows both Markdown bodies",
       ],
     ];
     for (const [mutated, contract] of shapes) {
@@ -1058,7 +1095,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       // The table's own refusal witness replaced by the list's, the HTTP proof weakened, the browser conjunction collapsed.
       ["localA2.table.refusal = tableRefusalOk;", "localA2.table.refusal = refusalOk;"],
       ["localA2.table.http = familyHtmlResponse.status === 200", "localA2.table.http = true"],
-      ['const tableBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];', "const tableBrowserRequired = [];"],
+      ["localA2.table.browser = conjunction(tableBrowserCases);", "localA2.table.browser = true;"],
       ["table: localA2.table,", ""],
       // The four-family credit weakened to an unconditional pass, and the A1 regression weakened in the same way.
       ["closureFour.parity === 4", "true"],
@@ -1072,6 +1109,13 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ['JSON.stringify(closureA2.credited) === JSON.stringify(["prose", "callout", "table", "list", "divider"])', "true"],
       ["list: localA2.list,", ""],
       ["if (darkListOk) listBrowserCases.add(`dark:${width}`);", ""],
+      // `UNO-WO-112 / R01`: the credited Hero, its shared conjunction and the six-family row cannot be neutered either.
+      ["hero: localA2.hero,", ""],
+      ["localA2.hero.http = familyHtmlResponse.status === 200 && heroFacts.ok;", "localA2.hero.http = true;"],
+      ["localA2.hero.browser = conjunction(heroBrowserCases);", "localA2.hero.browser = true;"],
+      ["closureSix.parity === 6", "true"],
+      ["closureSix.proxy === 48", "true"],
+      ["composeFamilyFixture(composeUnoFoundationSubset)", "composeUnoFoundationSubset(familySource(), familyBindings())"],
     ];
     for (const [token, replacement] of mutations) {
       const mutated = source.split(token).join(replacement);

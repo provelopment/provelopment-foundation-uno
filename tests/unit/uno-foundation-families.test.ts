@@ -682,24 +682,93 @@ describe("composeUnoFoundationSubset — bounded steps and quote", () => {
 });
 
 describe("composeUnoFoundationSubset — hero and stats refusal", () => {
-  it("refuses hero fields and Markdown outside the bounded subset", () => {
+  it("accepts the approved hero surface and refuses every out-of-subset hero field", () => {
+    // `UNO-WO-112 / R01`: the donor's static `href` action composes; a `route` or `link` destination stays outside this
+    // subset, an extra field is still refused, and Markdown in the plain eyebrow is still refused.
+    const composed = composeUnoFoundationSubset(
+      envelope({
+        type: "hero",
+        eyebrow: "Introduction",
+        lede: "A **Markdown** lede.",
+        support: "Plain support.",
+        align: "center",
+        surface: "muted",
+        actions: [{ label: "Read the notes", href: "https://example.org/notes", variant: "primary" }],
+      }),
+    );
+    expect(composed.status).toBe("composed");
+    if (composed.status === "composed") {
+      expect(composed.document.sections[0]?.props).toEqual({
+        eyebrow: "Introduction",
+        lede: "A **Markdown** lede.",
+        support: "Plain support.",
+        markdown: true,
+        align: "center",
+        surface: "muted",
+        actions: [{ label: "Read the notes", href: "https://example.org/notes", variant: "primary" }],
+      });
+    }
     expectRefusal(
-      envelope({ type: "hero", lede: "A", actions: [{ label: "X", href: "/x" }] }),
+      envelope({ type: "hero", lede: "A", actions: [{ label: "X", route: "target" }] }),
       "family:unsupported-feature",
     );
-    expectRefusal(envelope({ type: "hero", support: "Only support" }), "family:unsupported-feature");
-    expectRefusal(envelope({ type: "hero", lede: "**bold**" }), "family:unsupported-feature");
+    expectRefusal(
+      envelope({ type: "hero", lede: "A", actions: [{ label: "X", link: "help" }] }),
+      "family:unsupported-feature",
+    );
+    expectRefusal(
+      envelope({ type: "hero", lede: "A", actions: [{ label: "X", href: "https://example.org/a", route: "b" }] }),
+      "family:unsupported-feature",
+    );
+    expectRefusal(
+      envelope({ type: "hero", lede: "A", actions: [{ label: "X", targetId: "probe" }] }),
+      "family:unsupported-feature",
+    );
     expectRefusal(envelope({ type: "hero", lede: "A", eyebrow: "[x](https://example.org)" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "hero", eyebrow: "Only an eyebrow" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "hero", lede: "A", href: "/x" }), "family:unsupported-feature");
     expectRefusal(envelope({ type: "hero", lede: "A", route: "/en" }), "family:unsupported-feature");
+    expectRefusal(envelope({ type: "hero", lede: "A", actions: [] }), "family:unsupported-feature");
   });
 
-  it("refuses malformed hero values through the Uno target", () => {
+  it("supports a hero without a lede and refuses every malformed hero value through the Uno target", () => {
+    // The donor's `lede` is optional; one authored body field is the Uno target's own minimum.
+    const supportOnly = composeUnoFoundationSubset(envelope({ type: "hero", support: "Only support" }));
+    expect(supportOnly.status).toBe("composed");
+    if (supportOnly.status === "composed") {
+      expect(supportOnly.document.sections[0]?.props).toEqual({ support: "Only support" });
+    }
     expectRefusal(envelope({ type: "hero", lede: "" }), "family:target-refused");
     expectRefusal(envelope({ type: "hero", lede: "A", align: "end" }), "family:target-refused");
     expectRefusal(envelope({ type: "hero", lede: "A", surface: "loud" }), "family:target-refused");
     expectRefusal(envelope({ type: "hero", lede: "x".repeat(4001) }), "family:target-refused");
     expectRefusal(envelope({ type: "hero", lede: "A", eyebrow: "x".repeat(161) }), "family:target-refused");
+    // An unsafe or non-string action destination and an unknown variant refuse the whole source, never a partial Page.
+    expectRefusal(
+      envelope({ type: "hero", lede: "A", actions: [{ label: "X", href: "javascript:alert(1)" }] }),
+      "family:target-refused",
+    );
+    expectRefusal(
+      envelope({ type: "hero", lede: "A", actions: [{ label: "X", href: "/relative" }] }),
+      "family:target-refused",
+    );
+    expectRefusal(
+      envelope({ type: "hero", lede: "A", actions: [{ label: "X", href: "https://example.org/a", variant: "loud" }] }),
+      "family:target-refused",
+    );
+    expectRefusal(
+      envelope({
+        type: "hero",
+        lede: "A",
+        actions: [
+          { label: "A", href: "https://example.org/a" },
+          { label: "B", href: "https://example.org/b" },
+          { label: "C", href: "https://example.org/c" },
+          { label: "D", href: "https://example.org/d" },
+        ],
+      }),
+      "family:unsupported-feature",
+    );
   });
 
   it("refuses stats fields, links and Markdown outside the bounded subset", () => {
@@ -2444,11 +2513,11 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/FAMILY_PARITY=17\/17/u);
     expect(ledger).toContain("ADAPT (divider semantic parity candidate)");
-    expect(ledger).toContain("five of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("six of seventeen fully parity-evidenced candidates");
     // `UNO-WO-071 / R01` normalizes the divider wording to its already independently accepted status.
     expect(ledger).toContain("independently accepted under `UNO-WO-069 / R01`");
     expect(ledger).not.toContain("awaiting independent Architect acceptance");
-    expect(ledger).toContain("twelve still bounded");
+    expect(ledger).toContain("eleven still bounded");
     // `UNO-WO-070 / R01`: the two grid families gained a bounded authored-heading mode, which must never be recorded as
     // full parity, a second/third accepted family or a closed stage.
     expect(ledger).toContain("ADAPT (bounded grid plus authored section heading and plain-text lede)");
@@ -4171,7 +4240,7 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
     expect(ledger).toContain("lede-only");
     expect(ledger).toContain("no-lede");
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("five of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("six of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
@@ -4478,7 +4547,7 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
     expect(ledger.split("ADAPT (bounded authored plain-text heading/lede)").length - 1).toBe(2);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("five of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("six of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/stats[^.\n]*full semantic parity/u);
@@ -4892,11 +4961,17 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     expect(ledger.split("PARITY (UNO-WO-110 / R01)").length - 1).toBe(1);
     expect(ledger.split("PARITY (UNO-WO-111 / R01)").length - 1).toBe(1);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("five of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("six of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("sixteen still bounded");
-    expect(ledger).toContain("twelve still bounded");
+    expect(ledger).toContain("eleven still bounded");
     expect(ledger).not.toContain("2/17");
-    expect(ledger).not.toContain("6/17");
+    expect(ledger).not.toContain("16/17");
+    // `UNO-WO-112 / R01`: the ledger now records the earned six-family row; what it must never claim is the B1 row or any
+    // later one, so those counts stay forbidden while the delivered count is pinned positively.
+    expect(ledger).toContain("6/17");
+    expect(ledger).not.toContain("8/17");
+    expect(ledger).not.toContain("11/17");
+    expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/prose[^.\n]*full semantic parity/u);
     expect(ledger).not.toMatch(/table[^.\n]*full semantic parity/u);
   });

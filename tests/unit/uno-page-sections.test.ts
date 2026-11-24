@@ -272,6 +272,77 @@ describe("UnoPageSections — hero, statistics and testimonials", () => {
     expect((markup.match(/<section /gu) ?? []).length).toBe(1);
   });
 
+  it("renders the approved hero actions: one safe outbound anchor with its variant beside a same-page anchor", () => {
+    // `UNO-WO-112 / R01`: the donor's static `href` action is one ordinary anchor carrying the same `rel` the other safe
+    // links use, the closed variant is a data attribute, and the unchanged fragment action keeps its `#<section-id>` form.
+    const document = accept({
+      version: 1,
+      title: "Hero actions",
+      sections: [
+        {
+          id: "opening",
+          module: "content.hero",
+          props: {
+            lede: "Choose a destination.",
+            actions: [
+              { label: "Read the notes", href: "https://example.org/notes", variant: "primary" },
+              { label: "Write to the desk", href: "mailto:desk@example.org", variant: "secondary" },
+              { label: "Jump to the figures", targetId: "figures" },
+            ],
+          },
+        },
+        { id: "figures", module: "content.stats", props: { items: [{ value: "1", label: "Figure" }] } },
+      ],
+    });
+    const markup = render(document);
+    expect(markup).toContain(
+      '<a class="uno-json-action" href="https://example.org/notes" rel="noreferrer noopener" data-uno-variant="primary">Read the notes</a>',
+    );
+    expect(markup).toContain(
+      '<a class="uno-json-action" href="mailto:desk@example.org" rel="noreferrer noopener" data-uno-variant="secondary">Write to the desk</a>',
+    );
+    expect(markup).toContain('<a class="uno-json-action" href="#figures">Jump to the figures</a>');
+    expect((markup.match(/rel="noreferrer noopener"/gu) ?? []).length).toBe(2);
+    expect(markup).not.toContain("<form");
+    expect(markup).not.toContain("<button");
+  });
+
+  it("renders the hero's Markdown body through the shared renderer while the plain form stays byte-identical", () => {
+    const plain = render(
+      accept({
+        version: 1,
+        title: "Plain hero",
+        sections: [{ id: "opening", module: "content.hero", props: { lede: "Body only.", support: "Support only." } }],
+      }),
+    );
+    expect(plain).toContain('<p class="uno-json-hero-lede">Body only.</p>');
+    expect(plain).toContain('<p class="uno-json-hero-support">Support only.</p>');
+
+    const rich = render(
+      accept({
+        version: 1,
+        title: "Markdown hero",
+        sections: [
+          {
+            id: "opening",
+            module: "content.hero",
+            props: {
+              lede: "A **strong** introduction.",
+              support: "With *emphasis* and `code`.",
+              markdown: true,
+            },
+          },
+        ],
+      }),
+    );
+    expect(rich).toContain('<div class="uno-json-hero-lede">');
+    expect(rich).toContain('<strong class="uno-family-md-strong">strong</strong>');
+    expect(rich).toContain('<div class="uno-json-hero-support">');
+    expect(rich).toContain('<em class="uno-family-md-em">emphasis</em>');
+    expect(rich).toContain('<code class="uno-family-md-code">code</code>');
+    expect(rich).not.toContain('<p class="uno-json-hero-lede">');
+  });
+
   it("renders statistics as a real description list linked to its heading", () => {
     const document = accept({
       version: 1,
