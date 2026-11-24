@@ -1,45 +1,72 @@
-# Execution Report — UNO-WO-109 / R01
+# Execution Report — UNO-WO-110 / R01
 
-**Outcome: STOPPED before any write. `4/17` / `46/59` was NOT delivered.** The installed order's own mandatory Git pin and its scope prohibitions contradict the committed state of this checkout, so the run could not lawfully begin. This is a governance-conflict STOP required by `AGENTS.md` and by the implementation SOP's pre-write guard, **not** a capacity stop and **not** a claim of delivery.
+**Outcome: DELIVERED — `4/17` credited families, `46/59` proxy, with `table` newly credited and `list` still `PENDING`, proven at the exact product SHA on both hosted operating systems.**
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-109 / R01`, `FINAL — EXECUTE` |
-| ACTIVE | **29,673 bytes**, SHA-256 `8c43d9678ccd94e411898bc73c17b42cd789920fa4a87651695f39e7a21b3e92` — matches the activation exactly; private, ignored, never staged |
-| Start SHA required by the order | `edc0dc238f19d4679252d43bf99a0ae6a48758e6` |
-| Actual `HEAD` = `main` = `origin/main` = `git ls-remote origin refs/heads/main` | **`e0a6910174bb0c387b3a4935cec3ad17db5594fb`** |
-| Files changed by this run (product, test, oracle, workflow, declaration, architecture) | **none** |
-| Credited families | unchanged at **3/17**, `45/59` — no credit claimed, none spent |
+| Order | `UNO-WO-110 / R01`, `FINAL — EXECUTE` |
+| ACTIVE | **4,040 bytes**, SHA-256 `3ee574bf09be9a03478ee1f6ee951b8f0fd03ba835d74606b559eabf0fd8ff5d` — matched the activation exactly; private, ignored, never staged |
+| Start SHA | `caa45811d98c737f4080bf1e3c2f4014812066d5` (`HEAD` = `main` = `origin/main` = `ls-remote`, clean tree, one worktree, one Uno `origin`) |
+| Product SHA | **`0184a12a0c18400cda79d96399b952e24b785679`** |
+| Credited families | `prose`, `callout`, **`table`**, `divider` → **`U04_PARITY=4/17`**, **`U04_PROXY=46/59`** |
+| Still pending | `list` (its executed local evidence is retained but uncredited), plus `hero`, `stats`, `steps`, `quote`, `faq`, `columns`, `media`, `gallery`, `cards`, `features`, `actions`, `contactForm` |
+| Frozen `A2` row (`5/17`, `47/59`) | **not claimed**; the oracle and its `A2` checkpoint are unmodified |
+| WO-108 work | preserved in full: rich four-item `list`, `links.help`, `wo108-target` Page, six fixture sources, the rich `table` with lede `The **table** explains synthetic totals.` |
 
-## 1. Blocker A — the mandated Git start pin does not hold
+## 1. What was implemented
 
-Order §1 requires, verbatim, `HEAD == main == origin/main == git ls-remote origin refs/heads/main == edc0dc238f19d4679252d43bf99a0ae6a48758e6`. The measured state is `e0a6910174bb0c387b3a4935cec3ad17db5594fb` on all four, because **two commits already exist on top of `edc0dc2`**:
+Only the two authorized product paths changed: `scripts/verify-u04-22-module-consent.mjs` and `tests/deployment/u04-22-module-consent.test.mjs`.
 
-- `9e03936` `test(u04): prove rich list/table A2 evidence in real HTTP and Chromium`
-- `e0a6910` `docs(report): publish the single sanitized WO-108 report`
+- **`table.refusal` now comes from malformed tables, not the list's link refusals.** Four probes mutate exactly one authored table field — Markdown in a cell, a non-array row, non-array `columns`, and a whitespace-only `lede` — and each must refuse the whole source Page with a `family:*` reason and **no** partial document (`A2_LOCAL_REFUSAL`). The list's two link refusals remain as its own witness.
+- **`table.http` is the real production response.** The flag now requires HTTP 200 from the family Page *and* the checked rich table DOM as served: `uno-json-table-section` with `data-uno-surface="muted"`, a `tabindex="0"` scroll wrapper, the Markdown lede, a Markdown `<caption>` carrying `<strong>synthetic</strong>`, two `<th scope="col">` headers and four `<td>` cells.
+- **`table.browser` is a four-case conjunction, not one observation.** A case is recorded only by an assertion that actually ran and passed: light at 390 px and 1280 px (heading, Markdown lede, caption, two columns, four cells, zero links, scroll control focused) and dark + `prefers-reduced-motion: reduce` at both widths (same DOM, `data-uno-surface`, `tabindex="0"`, focus actually landing on the scroll control, no overflow). The flag is set after the dark sweep only when all four keys exist (`A2_LOCAL_BROWSER`).
+- **The fourth credit is a separate, checkpoint-omitted evaluation.** The `checkpoint:"A1"` call stays as a regression assertion and is now pinned to `3/17`, `45/59`. A second `evaluateU04FamilyClosure` call passes the same three executed records **plus `localA2.table`** with no checkpoint, and must return `ok`, the exact credited set `prose,callout,table,divider`, `parity===4`, `proxy===46`, `list` pending, `PARITY_TABLE=PASS` and `PARITY_LIST=PENDING`. Every printed `PARITY_*` / `U04_*` label is re-derived from that four-family result, so the A1 regression can no longer print the row. The oracle file itself is untouched.
+- **The deployment guard follows the new evidence.** Fifteen new tokens pin the malformed-table refusal, the HTTP predicate, the four-case browser conjunction, the 14/14 local total and the four-family credit, and one A1 predicate is re-pinned from `closure.ok === true && familyOk && dividerOk` to the exact `3/17` / `45/59` row; a new mutant test proves each can be neutered only into a failing audit, and asserts no `checkpoint: "A2"` can appear.
 
-The runner at the required start SHA is blob **`bbc228b053621e7f91acfc1151bc39a72959be6e`** — the exact blob WO-109 §2 names. The runner at `HEAD` is blob **`00bb80d7b09c1b9788a10d0be82714768b1399c4`**. The order was therefore authored against a tree that no longer exists, and no authorized operation can restore it: force-push, history rewrite and unauthorised overwrite of delivered work are all forbidden, and reverting the two commits would discard product that a prior Owner activation explicitly authorized and that has since passed both hosted workflows.
+## 2. Local gates (all green)
 
-## 2. Blocker B — the order declares "unactivated" a work order this repository shows as activated and delivered
+| Gate | Result |
+| --- | --- |
+| `verify-u04-22-module-consent.mjs` (real `next build`, `next start`, Chromium) | **818 passed / 0 failed**, declarations restored, fixture sources removed |
+| `tests/deployment/u04-22-module-consent.test.mjs` + `u04-family-closure.test.mjs` | **65 passed / 0 failed** |
+| `pnpm test` | **1,287 / 1,287** |
+| `pnpm test:architecture` | **47 / 0** |
 
-WO-109's header states: *"Supersedes: unactivated WO-108/R01; prior agent WO-107/R01 produced only a report at the starting SHA."* That is not what the recorded history shows. The previous turn carried an explicit **`OWNER ACTIVATION — UNO-WO-108 / R01 — FINAL — EXECUTE`** with its own ACTIVE size (`32,035` bytes) and SHA-256 (`186d9637…61fd8d1`), and produced two commits that are now on `origin/main` and hosted-green.
+## 3. Hosted proof at `0184a12`
 
-The two activations cannot both be true. Worse, WO-109 §0/§2 then prohibit precisely what that activated order lawfully committed and what is present at `HEAD`:
+Both required workflows were green at the exact product SHA, on both hosted operating systems:
 
-- §2: *"Keep list index 2 exactly as currently committed: two ordinary items, plain lede, no destination or new target."* — index 2 at `HEAD` is the four-entry rich list (`Prepare`, a classified `https` note, a published same-Site route item, one authorized-but-OFF `link`).
-- §0/§2: *"Do NOT create `wo106-target`, `wo108-target`, a sixth source, a `links.help` declaration…"* — `HEAD` already contains `${CONTENT}/wo108-target.en-001.json` as a sixth source, `links: { help: { reference: "applicationLink", key: "example.help" } }`, the `wo108-target` published Page and its route item.
+| Workflow | Run | `ubuntu-24.04` | `windows-2025` |
+| --- | --- | --- | --- |
+| `Verify U01 baseline` | **45358299201** | success | success |
+| `Uno Bootstrap Verify` | **45358299221** | success | success |
 
-Delivering `4/17` on the current tree therefore required either violating those explicit prohibitions, or silently reverting a delivered, hosted-green product commit. Neither is authorized, and either would be an unreviewable scope breach. The table itself also differs: the order specifies `lede: "Synthetic table introduction with *emphasis*."`, while the committed table carries `lede: "The **table** explains synthetic totals."`.
+The four required lines were read out of the **actual** `Verify U01 baseline` step log, in the `Verify U04 22-module and four-provider consent (real production HTTP and Chromium)` step, on each OS:
 
+```text
+verify (ubuntu-24.04)   PASS  U04_LABEL PARITY_TABLE=PASS
+verify (ubuntu-24.04)   PASS  U04_LABEL PARITY_LIST=PENDING
+verify (ubuntu-24.04)   PASS  U04_LABEL U04_PARITY=4/17
+verify (ubuntu-24.04)   PASS  U04_LABEL U04_PROXY=46/59
+verify (ubuntu-24.04)   verify-u04-22-module-consent: 818 passed, 0 failed
 
-## 3. What was verified before stopping
+verify (windows-2025)   PASS  U04_LABEL PARITY_TABLE=PASS
+verify (windows-2025)   PASS  U04_LABEL PARITY_LIST=PENDING
+verify (windows-2025)   PASS  U04_LABEL U04_PARITY=4/17
+verify (windows-2025)   PASS  U04_LABEL U04_PROXY=46/59
+verify (windows-2025)   verify-u04-22-module-consent: 818 passed, 0 failed
+```
 
-The ACTIVE file matched its activation byte-for-byte and by digest; there is one checkout, one worktree, on `main`, with a single `origin` pointing only at the Uno repository; the tracked and index state was clean (`dirty=0`) and no scratch was staged. Frozen surfaces are unchanged: `AGENTS.md` `94f962d1…`, `README.md` `690f0870…`, `.documents/SOP/sop-implementation.md` `f30d6590…`, `verify-u01.yml` `8d19319d…`, `verify-bootstrap.yml` `caac7d65…`, the closure oracle `f6a54850…`, and both committed declarations `b6213ed6…` / `58011c43…`. No build, runner, Chromium, mutation or recovery transaction was started, and `.documents/Architecture/u04-family-parity.md` was deliberately left untouched because §2 permits its table row only in the report commit that follows proven hosted product green.
+The same hosted logs also report the untouched regression gates at this SHA: `verify-u01-http` 105/0, `verify-u03-http` 135/0, `verify-u03-published-http` 999/0, `verify-u03-multisite-http` 154/0 and `verify-u04-json-slice` 477/0 on both operating systems.
 
-## 4. What the Owner must decide
+## 4. Documentation
 
-1. **Re-pin and keep WO-108's list.** Re-issue the order against `e0a6910` (or its successor), withdraw the "unactivated WO-108" premise, delete §0/§2's list prohibitions, and keep the table-only scope: earn `source`, `reader`, `renderer`, `http`, `browser`, `refusal`, `rights` for `table`, leave `list` `PENDING`, and take the interim no-checkpoint `4/17` / `46/59` from the unchanged oracle. Only the table lede wording would need re-pinning to the committed value (or the committed lede changed deliberately).
-2. **Authorize a revert instead.** Explicitly authorize reverting `9e03936` (with `e0a6910` superseded) so the runner returns to `bbc228b0` and WO-109 `§2` applies literally. This discards a delivered, hosted-green A2 evidence commit and must be named as such by the Owner.
-3. **Amend the scope.** Keep the rich list committed and authorize table credit alongside it, with the list's local evidence remaining uncredited until the separate P6 order.
+Exactly one row changed in `.documents/Architecture/u04-family-parity.md`: `table`'s disposition now records the `UNO-WO-110 / R01` credit at the interim `4/17` / `46/59` row, its accepted fields now name the Markdown `caption`, the closed `surface`, the plain-text `heading` and the Markdown `lede`, its unsupported list now names Markdown **cells** instead of `surface`/caption Markdown, and its proof column names the reader round-trip, four malformed-table whole-Page refusals, the served-HTTP rich DOM and the four 390/1280 light and dark/reduced-motion Chromium observations. No other family row was touched.
 
-**Disposition:** no code, test, oracle, workflow or declaration was modified; `PARITY_TABLE` stays `PENDING` and the tally stays `3/17` / `45/59`; delivery of `4/17` is recorded as **not achieved**, caused by the conflict above. The run stops here for the Owner's corrected order and independent Architect review.
+**Disclosed limitation.** The ledger's aggregate sentence still reads `three of seventeen … fourteen still bounded`, and the `table` row keeps its original `ADAPT (bounded plain-text heading/lede)` clause ahead of the new credit, because `tests/unit/uno-foundation-families.test.ts` pins those exact strings (three occurrences of the `ADAPT` clause, two of `PARITY (A1, …)`, the `three of seventeen` phrase and `fourteen still bounded`) and the unit test file is **outside** this order's authorized edit list. Rewriting the aggregate is a one-line change for a future order that authorizes that test; the authoritative, evidence-derived counts for this delivery are the printed `4/17` / `46/59` and the per-row credit above. The unit suite is green (1,287/1,287) with the row as recorded.
+
+## 5. State and next
+
+`U04` remains **OPEN** at `4/17`. The frozen `A2` checkpoint (`5/17`, `47/59` over `table` + `list`) is **not** claimed: `list` keeps its executed local evidence but stays `PENDING` until the separate three-Site P6 proof and a later Owner order. No stage closure, merge, release, deployment, provider, DNS or settings operation was performed; only the two product files and the two authorized documentation paths changed, and the product commit was pushed non-force. This report is the single sanitized record; the run stops here for independent Architect review.
+
+| `pnpm typecheck`, `pnpm lint` | exit 0 |
