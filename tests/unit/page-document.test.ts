@@ -2070,7 +2070,12 @@ describe("content.prose variants and layout.grid list/ratio — closed refusals"
     },
     { name: "an empty list label", props: { variant: "list", items: [{ label: "  " }] }, reason: "document:invalid-props" },
     { name: "a non-string list label", props: { variant: "list", items: [{ label: 5 }] }, reason: "document:invalid-props" },
-    { name: "a list item href", props: { variant: "list", items: [{ label: "A", href: "/x" }] }, reason: "document:invalid-props" },
+    { name: "a list item href of the wrong type", props: { variant: "list", items: [{ label: "A", href: 5 }] }, reason: "document:invalid-props" },
+    // `UNO-WO-103 / R01`: an authored `href` now composes, but only through the unchanged classifier; two destination
+    // forms on one item, an unsafe scheme and an undeclared `linkId` all still refuse the whole Page.
+    { name: "two list item destinations", props: { variant: "list", items: [{ label: "A", href: "/x", linkId: "contact" }] }, reason: "document:invalid-props" },
+    { name: "a script list item href", props: { variant: "list", items: [{ label: "A", href: "javascript:alert(1)" }] }, reason: "document:unsafe-link" },
+    { name: "an undeclared list item linkId", props: { variant: "list", items: [{ label: "A", linkId: "contact" }] }, reason: "document:unresolved-target" },
     {
       name: "a string ordered flag",
       props: { variant: "list", ordered: "true", items: [{ label: "A" }] },

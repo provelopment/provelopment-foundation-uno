@@ -675,6 +675,28 @@ function wrapAuthoredText(
 }
 
 /**
+ * `UNO-WO-103 / R01`: a heading-only wrapper for the rich `table`/`list` variants, whose **Markdown** lede now stays
+ * inside the family so its accepted AST renders. A plain lede keeps the byte-identical hoisted `content.prose` form.
+ */
+function wrapAuthoredHeadingOnly(
+  record: PlainRecord,
+  id: string,
+  child: CandidateSection,
+  childSuffix: string,
+): CandidateSection {
+  if (!ownsKey(record, "heading")) return child;
+  return {
+    id,
+    module: "layout.stack",
+    props: {},
+    children: [
+      { id: `${id}-heading`, module: "content.heading", props: { text: readSectionHeading(record["heading"]), level: 2 } },
+      { ...child, id: `${id}-${childSuffix}` },
+    ],
+  };
+}
+
+/**
  * Map one donor section to exactly one Uno `content.prose` node.
  *
  * The donor family is decided by the closed `type` literal. An unsupported family refuses the whole source and is
@@ -771,6 +793,16 @@ function composeSection(
       if (ownsKey(record, "caption")) props["caption"] = readRichFamilyText(record["caption"], 320);
       if (ownsKey(record, "surface")) props["surface"] = record["surface"];
       if (typeof props["caption"] === "string" && hasFamilyMarkdown(props["caption"] as string)) props["markdown"] = true;
+      // `UNO-WO-103 / R01`: an authored **Markdown** lede now renders as accepted Markdown inside the family; a plain
+      // lede still hoists byte-identically, so no previously committed table changes.
+      if (ownsKey(record, "lede")) {
+        const lede = readFamilyLede(record["lede"]);
+        if (hasFamilyMarkdown(lede)) {
+          props["lede"] = lede;
+          props["markdown"] = true;
+          return wrapAuthoredHeadingOnly(record, id, { id, module: "content.prose", props }, "table");
+        }
+      }
       const table: CandidateSection = { id, module: "content.prose", props };
       return wrapAuthoredText(record, id, table, "table");
     }
@@ -790,8 +822,12 @@ function composeSection(
         }
         if (item === null || typeof item !== "object" || Array.isArray(item)) refuseUnsupportedFeature();
         const entry = item as PlainRecord;
-        // Each object entry is EXACTLY `{label, detail?}`: a destination, link or any other key is a feature refusal.
-        requireExactKeys(entry, ["label"], ["detail"]);
+        // Each object entry is `{label, detail?, href?, link?, route?}` with at most one destination. `href` is forwarded
+        // for the strict reader's classifier; `link` becomes a validated `linkId` that stays inert; `route` is refused
+        // until a server publication proof exists, so no guessed anchor can be composed.
+        requireExactKeys(entry, ["label"], ["detail", "href", "link", "route"]);
+        const destinations = ["href", "link", "route"].filter((name) => ownsKey(entry, name));
+        if (destinations.length > 1) refuseUnsupportedFeature();
         const label = readDonorText(entry["label"], true);
         const output: Record<string, unknown> = { label };
         if (ownsKey(entry, "detail")) {
@@ -799,12 +835,24 @@ function composeSection(
           if (hasFamilyMarkdown(detail)) detailMarkdown = true;
           output["detail"] = detail;
         }
+        if (ownsKey(entry, "href")) output["href"] = readDonorText(entry["href"], false);
+        if (ownsKey(entry, "link")) output["linkId"] = readDonorText(entry["link"], false);
+        if (ownsKey(entry, "route")) refuseUnsupportedFeature();
         normalized.push(output);
       }
       const props: Record<string, unknown> = { variant: "list", items: normalized };
       if (ownsKey(record, "ordered")) props["ordered"] = record["ordered"];
       if (ownsKey(record, "surface")) props["surface"] = record["surface"];
       if (detailMarkdown) props["markdown"] = true;
+      // `UNO-WO-103 / R01`: identical Markdown-lede rule for the list; the plain-lede hoist is untouched.
+      if (ownsKey(record, "lede")) {
+        const lede = readFamilyLede(record["lede"]);
+        if (hasFamilyMarkdown(lede)) {
+          props["lede"] = lede;
+          props["markdown"] = true;
+          return wrapAuthoredHeadingOnly(record, id, { id, module: "content.prose", props }, "list");
+        }
+      }
       const list: CandidateSection = { id, module: "content.prose", props };
       return wrapAuthoredText(record, id, list, "list");
     }
@@ -1175,7 +1223,9 @@ export function composeUnoFoundationSubset(input: unknown, bindings?: unknown): 
     const envelope = source as PlainRecord;
 
     // The envelope is exactly `{version, title, sections}`: a donor envelope variant with any other key is refused.
-    requireExactKeys(envelope, ["version", "title", "sections"], []);
+    // `UNO-WO-103 / R01`: an optional donor `links` record is the only new envelope member; it is forwarded to the
+    // strict Uno reader, never interpreted here.
+    requireExactKeys(envelope, ["version", "title", "sections"], ["links"]);
     if (envelope["version"] !== 1) refuseUnsupportedFeature();
 
     const title = envelope["title"];
@@ -1231,9 +1281,15 @@ export function composeUnoFoundationSubset(input: unknown, bindings?: unknown): 
       }
     }
 
-    // Exactly the Uno envelope: the same title, `version: 1` and one node per source section. No description,
-    // visibility, route, locale, Site or publication field is invented, and the 22 module IDs are untouched.
-    const candidate = { version: 1, title, sections: nodes };
+    // Exactly the Uno envelope: the same title, `version: 1` and one node per source section. `UNO-WO-103 / R01`: an
+    // authored donor `links` record is forwarded verbatim so the strict Uno reader remains the sole authority on its
+    // closed shape; an undeclared reference therefore refuses the whole Page here rather than activating anything. No
+    // description, visibility, route, locale, Site or publication field is invented, and the 22 module IDs are untouched.
+    const authoredLinks = Object.prototype.hasOwnProperty.call(envelope, "links") ? envelope["links"] : undefined;
+    const candidate =
+      authoredLinks === undefined
+        ? { version: 1, title, sections: nodes }
+        : { version: 1, title, sections: nodes, links: authoredLinks };
 
     // The Uno reader applies its 64 KiB source cap to JSON *text* only, so an object candidate is measured here with
     // the same UTF-8 byte rule; the candidate is this module's own plain data, so serializing it runs no source code.

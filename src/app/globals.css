@@ -873,6 +873,21 @@ main {
   margin: 0.125rem 0 0;
 }
 
+/* `UNO-WO-103 / R01`: one ordinary anchor per proven `href`; an inactive application link is inert label text. */
+.uno-json-list-link {
+  color: var(--uno-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.uno-json-list-link:focus-visible {
+  outline: 2px solid var(--uno-focus);
+  outline-offset: 2px;
+}
+
+.uno-json-list-application-label {
+  color: var(--uno-foreground);
+}
 /* A grid list stays a native list: the marker is reset for layout only, and `role="list"` retains the semantics. */
 .uno-json-grid[data-uno-item-semantics="list"] {
   margin: 0;

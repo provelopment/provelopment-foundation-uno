@@ -164,11 +164,24 @@ export interface UnoContentHeadingProps {
 /** The three closed callout tones of a `content.prose` callout. */
 export type UnoProseCalloutTone = "note" | "info" | "warning";
 
-/** One bounded entry of a `content.prose` list variant: a required label and optional detail, never a link. */
-export interface UnoProseListItem {
-  readonly label: string;
-  readonly detail?: string;
+/** One document-local application-link declaration: an opaque key only, never a URL and never a resolver. */
+export interface UnoApplicationLink {
+  readonly reference: "applicationLink";
+  readonly key: string;
 }
+
+/**
+ * One bounded entry of a `content.prose` list variant: a required label and optional detail, plus at most one closed
+ * destination form.
+ *
+ * `UNO-WO-103 / R01`: `href` is an authored string the reader has already classified; `linkId` names a validated
+ * document-local declaration and stays **inert** in a build without an authorised resolver. A site-local route intent is
+ * not readable yet: it needs the server publication proof, so `route` remains refused rather than rendered as a guess.
+ */
+export type UnoProseListItem =
+  | { readonly label: string; readonly detail?: string }
+  | { readonly label: string; readonly detail?: string; readonly href: string }
+  | { readonly label: string; readonly detail?: string; readonly linkId: string };
 
 /**
  * One bounded `content.prose` body: plain authored text, or — when `markdown` is the literal `true` — donor-authored
@@ -592,6 +605,8 @@ export interface UnoPageDocument {
   readonly description?: string;
   readonly visibility: UnoPageVisibility;
   readonly sections: readonly UnoSectionNode[];
+  /** `UNO-WO-103 / R01`: closed document-local application-link declarations, inert without a resolver. */
+  readonly links?: Readonly<Record<string, UnoApplicationLink>>;
 }
 
 /**
@@ -695,7 +710,13 @@ class RefusedDocument extends Error {
 const DOCUMENT_REQUIRED_KEYS: readonly string[] = Object.freeze(["version", "title", "sections"]);
 
 /** The two optional top-level keys of the v1 envelope. */
-const DOCUMENT_OPTIONAL_KEYS: readonly string[] = Object.freeze(["description", "visibility"]);
+const DOCUMENT_OPTIONAL_KEYS: readonly string[] = Object.freeze(["description", "visibility", "links"]);
+
+/** `UNO-WO-103 / R01`: one declaration id — a lowercase hyphenated content slug, at most 64 code points. */
+const APPLICATION_LINK_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+
+/** One declared opaque application key: lowercase ASCII words separated by a single dot or hyphen, at most 96. */
+const APPLICATION_LINK_KEY_PATTERN = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/u;
 
 /**
  * The modules that own typed children: the four layouts, `design.motion`, and the three child-bearing interactions.
@@ -993,6 +1014,8 @@ class StrictJsonReader {
 interface WalkState {
   readonly ids: Set<string>;
   readonly targets: string[];
+  /** `UNO-WO-103 / R01`: every `linkId` actually used, checked against the document's own declarations. */
+  readonly linkIds: string[];
   nodes: number;
   lastHeadingLevel: number;
 }
@@ -1233,7 +1256,7 @@ function readProseBody(props: DataRecord): UnoContentProseBody {
  * variant is a crossed shape and is refused. Every variant requires exactly its own keys, so a `table` carrying
  * `text`, a `divider` carrying content, or any extra `href`/`html`/`style` prop refuses the whole document.
  */
-function readProseProps(props: DataRecord): UnoContentProseProps {
+function readProseProps(props: DataRecord, state: WalkState): UnoContentProseProps {
   if (!Object.prototype.hasOwnProperty.call(props, "variant")) {
     if (!hasExactlyKeys(props, ["text"], ["heading", "lede", "align", "surface", "markdown"])) {
       throw new RefusedDocument("document:invalid-props");
@@ -1263,10 +1286,69 @@ function readProseProps(props: DataRecord): UnoContentProseProps {
     return tone === undefined ? { variant: "callout", ...body } : { variant: "callout", ...body, tone };
   }
 
-  if (variant === "list") return readProseList(props);
+  if (variant === "list") return readProseList(props, state);
   if (variant === "table") return readProseTable(props);
 
   throw new RefusedDocument("document:invalid-props");
+}
+
+/**
+ * `UNO-WO-103 / R01`: one authored list-item `href`, admitted only through the unchanged `classifyAuthorDestination`.
+ *
+ * The reserved `#link:` marker namespace is refused, including percent-encoded and numeric-character-reference
+ * obfuscation, so a declared application link can never be laundered into a clickable fragment that merely looks local.
+ */
+function readListItemHref(value: unknown): string {
+  if (typeof value !== "string") throw new RefusedDocument("document:invalid-props");
+  const verdict = classifyAuthorDestination(value);
+  if (!verdict.accepted) throw new RefusedDocument("document:unsafe-link");
+  const probe = verdict.href
+    .replace(/&#x([0-9a-f]{1,6});/giu, (_, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#([0-9]{1,7});/gu, (_, decimal: string) => String.fromCodePoint(Number.parseInt(decimal, 10)))
+    .replace(/%([0-9a-f]{2})/giu, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
+    .toLowerCase();
+  if (probe.includes("#link:")) throw new RefusedDocument("document:unsafe-link");
+  return verdict.href;
+}
+
+/** One `linkId`: a bounded lowercase content slug, never a URL, key, host or scheme. */
+function readListItemLinkId(value: unknown): string {
+  if (typeof value !== "string") throw new RefusedDocument("document:invalid-props");
+  if (value.length === 0 || value.length > 64) throw new RefusedDocument("document:invalid-props");
+  if (!APPLICATION_LINK_ID_PATTERN.test(value)) throw new RefusedDocument("document:invalid-props");
+  return value;
+}
+
+/**
+ * `UNO-WO-103 / R01`: the document-local `links` record — at most 32 closed `applicationLink` declarations.
+ *
+ * A declaration carries only an opaque lowercase key; it can never name a Site, Facet, route, locale, publication state
+ * or resolver. Duplicate ids are impossible in an own-data record, and any duplicate JSON member was already refused by
+ * the strict reader before this function ran. A declaration nobody references is legal and simply never activates.
+ */
+function readDocumentLinks(value: unknown): Readonly<Record<string, UnoApplicationLink>> | undefined {
+  if (value === undefined) return undefined;
+  const record = readPlainData(value);
+  if (record === null) throw new RefusedDocument("document:invalid-props");
+  const ids = Object.keys(record);
+  if (ids.length > 32) throw new RefusedDocument("document:invalid-props");
+  const links: Record<string, UnoApplicationLink> = {};
+  for (const id of ids) {
+    if (id.length === 0 || id.length > 64 || !APPLICATION_LINK_ID_PATTERN.test(id)) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const entry = readPlainData(record[id]);
+    if (entry === null || !hasExactlyKeys(entry, ["reference", "key"], [])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    if (entry["reference"] !== "applicationLink") throw new RefusedDocument("document:invalid-props");
+    const key = entry["key"];
+    if (typeof key !== "string" || key.length === 0 || key.length > 96 || !APPLICATION_LINK_KEY_PATTERN.test(key)) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    links[id] = Object.freeze({ reference: "applicationLink" as const, key });
+  }
+  return Object.freeze(links);
 }
 
 /**
@@ -1277,7 +1359,7 @@ function readProseProps(props: DataRecord): UnoContentProseProps {
  * flag, so no field is silently printed as syntax. Destinations are **not** read here: `href`/`route`/`link` stay a
  * feature refusal until this build's destination projections are implemented, so no unproven link can ever render.
  */
-function readProseList(props: DataRecord): UnoContentProseProps {
+function readProseList(props: DataRecord, state: WalkState): UnoContentProseProps {
   if (!hasExactlyKeys(props, ["variant", "items"], ["ordered", "lede", "surface", "markdown"])) {
     throw new RefusedDocument("document:invalid-props");
   }
@@ -1289,9 +1371,12 @@ function readProseList(props: DataRecord): UnoContentProseProps {
   const items: UnoProseListItem[] = [];
   for (let index = 0; index < rawItems.length; index += 1) {
     const entry = readPlainData(ownArrayItem(rawItems, index));
-    if (entry === null || !hasExactlyKeys(entry, ["label"], ["detail"])) {
+    if (entry === null || !hasExactlyKeys(entry, ["label"], ["detail", "href", "linkId"])) {
       throw new RefusedDocument("document:invalid-props");
     }
+    // Exactly one destination form, or none: two destinations on one item is a crossed shape and is refused.
+    const destinations = ["href", "linkId"].filter((name) => Object.prototype.hasOwnProperty.call(entry, name));
+    if (destinations.length > 1) throw new RefusedDocument("document:invalid-props");
     const label = readBoundedText(
       entry["label"],
       UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
@@ -1305,7 +1390,18 @@ function readProseList(props: DataRecord): UnoContentProseProps {
         : markdown === true
           ? requireFamilyMarkdown(entry["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints)
           : optionalProseText(entry["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints);
-    items.push(detail === undefined ? { label } : { label, detail });
+    const base = detail === undefined ? { label } : { label, detail };
+    if (Object.prototype.hasOwnProperty.call(entry, "href")) {
+      items.push({ ...base, href: readListItemHref(entry["href"]) });
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(entry, "linkId")) {
+      const linkId = readListItemLinkId(entry["linkId"]);
+      state.linkIds.push(linkId);
+      items.push({ ...base, linkId });
+      continue;
+    }
+    items.push(base);
   }
   const ordered = props["ordered"];
   if (ordered !== undefined && typeof ordered !== "boolean") throw new RefusedDocument("document:invalid-props");
@@ -1925,7 +2021,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "content.prose") {
-    return { id, module: "content.prose", props: readProseProps(props) };
+    return { id, module: "content.prose", props: readProseProps(props, state) };
   }
 
   if (moduleName === "content.actions") {
@@ -2427,6 +2523,7 @@ export function readUnoPageDocument(
 
     const state: WalkState = {
       ids: new Set<string>(),
+      linkIds: [],
       targets: [],
       nodes: 0,
       lastHeadingLevel: 1,
@@ -2443,10 +2540,23 @@ export function readUnoPageDocument(
       if (!state.ids.has(target)) return refuseDocument("document:unresolved-target");
     }
 
-    const document: UnoPageDocument =
-      description === undefined
-        ? { version: UNO_PAGE_DOCUMENT_VERSION, title, visibility, sections }
-        : { version: UNO_PAGE_DOCUMENT_VERSION, title, description, visibility, sections };
+    // `UNO-WO-103 / R01`: every used `linkId` must name a declaration this same document carries. An undeclared
+    // reference refuses the whole Page; an unused declaration is inert and is never activated by the document alone.
+    const links = readDocumentLinks(record["links"]);
+    for (const linkId of state.linkIds) {
+      if (links === undefined || !Object.prototype.hasOwnProperty.call(links, linkId)) {
+        return refuseDocument("document:unresolved-target");
+      }
+    }
+
+    const document: UnoPageDocument = {
+      version: UNO_PAGE_DOCUMENT_VERSION,
+      title,
+      ...(description === undefined ? {} : { description }),
+      visibility,
+      sections,
+      ...(links === undefined ? {} : { links }),
+    };
 
     return Object.freeze({ accepted: true as const, document: deepFreeze(document) });
   } catch (error) {

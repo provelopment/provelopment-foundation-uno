@@ -343,9 +343,19 @@ function SectionNode({ node, media }: { readonly node: UnoSectionNode; readonly 
           <ListTag className="uno-json-list">
             {prose.items.map((item, itemIndex) => {
               const detailParsed = prose.markdown === true ? parseFamilyMarkdown(item.detail) : null;
+              // `UNO-WO-103 / R01`: a proven-classifier `href` becomes one ordinary anchor; a declared but inactive
+              // application `linkId` renders as inert label text — never an anchor, key, URL or request.
+              const href = "href" in item ? item.href : undefined;
+              const inert = "linkId" in item;
               return (
                 <li key={itemIndex}>
-                  <span>{item.label}</span>
+                  {href === undefined ? (
+                    <span className={inert ? "uno-json-list-application-label" : undefined}>{item.label}</span>
+                  ) : (
+                    <a className="uno-json-list-link" href={href} rel="noreferrer noopener">
+                      {item.label}
+                    </a>
+                  )}
                   {item.detail === undefined ? null : detailParsed === null ? (
                     <p>{item.detail}</p>
                   ) : (
