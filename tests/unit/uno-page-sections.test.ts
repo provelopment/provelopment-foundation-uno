@@ -652,6 +652,50 @@ describe("UnoPageSections — bento, pricing and timeline", () => {
     expect(markup).not.toContain("<main");
   });
 
+  it("renders a Markdown milestone body through the shared renderer while a plain body stays byte-identical", () => {
+    // `UNO-WO-114 / R01`: the donor's step `body` is Markdown-capable, so an adapter-flagged node draws it with the one shared
+    // family renderer; an unflagged node keeps the escaped `<p>` the earlier accepted output used.
+    const plain = render(
+      accept({
+        version: 1,
+        title: "Plain body",
+        sections: [
+          {
+            id: "road",
+            module: "content.timeline",
+            props: { itemHeadingLevel: 3, items: [{ title: "Draft", description: "Prepare the source." }] },
+          },
+        ],
+      }),
+    );
+    expect(plain).toContain('<p class="uno-json-timeline-description">Prepare the source.</p>');
+
+    const rich = render(
+      accept({
+        version: 1,
+        title: "Markdown body",
+        sections: [
+          {
+            id: "road",
+            module: "content.timeline",
+            props: {
+              itemHeadingLevel: 3,
+              markdown: true,
+              items: [{ title: "Draft", description: "Prepare the **source**." }, { title: "Review" }],
+            },
+          },
+        ],
+      }),
+    );
+    expect(rich).toContain('<div class="uno-json-timeline-description">');
+    expect(rich).toContain('<strong class="uno-family-md-strong">source</strong>');
+    expect(rich).not.toContain('<p class="uno-json-timeline-description">');
+    expect((rich.match(/<li class="uno-json-timeline-item"/gu) ?? []).length).toBe(2);
+    expect((rich.match(/<h3 class="uno-json-timeline-title">/gu) ?? []).length).toBe(2);
+    expect(rich).not.toContain("aria-current");
+    expect(rich).not.toContain("<a ");
+  });
+
   it("renders a timeline with no status at all without inventing aria-current or a status token", () => {
     const document = accept({
       version: 1,

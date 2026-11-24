@@ -612,7 +612,7 @@ function SectionNode({
       );
     }
     case "content.timeline": {
-      const { items, heading, level, surface, itemHeadingLevel } = node.props;
+      const { items, heading, level, surface, itemHeadingLevel, markdown } = node.props;
       const Tag = level === undefined ? null : HEADING_TAGS[level];
       // `UNO-WO-080 / R01`: only an explicitly authored literal `3` turns the milestone title into a heading; every
       // timeline authored before that switch keeps the original `<p>` unchanged.
@@ -631,26 +631,35 @@ function SectionNode({
             </Tag>
           )}
           <ol className="uno-json-timeline-list">
-            {items.map((item, index) => (
-              <li
-                className="uno-json-timeline-item"
-                // Only an explicitly authored `current` milestone is announced as the current step. An unauthored or
-                // non-current milestone carries no `aria-current` at all rather than an invented one.
-                aria-current={item.status === "current" ? "step" : undefined}
-                data-uno-status={item.status}
-                key={`${item.title}:${index}`}
-              >
-                {/* Decorative marker: it repeats nothing, and the ordered list already narrates position. */}
-                <span aria-hidden="true" className="uno-json-timeline-marker" />
-                {item.dateLabel === undefined ? null : (
-                  <span className="uno-json-timeline-date">{item.dateLabel}</span>
-                )}
-                <TitleTag className="uno-json-timeline-title">{item.title}</TitleTag>
-                {item.description === undefined ? null : (
-                  <p className="uno-json-timeline-description">{item.description}</p>
-                )}
-              </li>
-            ))}
+            {items.map((item, index) => {
+              // `UNO-WO-114 / R01`: the donor's step `body` is Markdown-capable, so an adapter-flagged node draws each authored
+              // body through the one shared family renderer; an unflagged node keeps the byte-identical escaped `<p>`.
+              const descriptionBlocks = markdown === true ? parseFamilyMarkdown(item.description) : null;
+              return (
+                <li
+                  className="uno-json-timeline-item"
+                  // Only an explicitly authored `current` milestone is announced as the current step. An unauthored or
+                  // non-current milestone carries no `aria-current` at all rather than an invented one.
+                  aria-current={item.status === "current" ? "step" : undefined}
+                  data-uno-status={item.status}
+                  key={`${item.title}:${index}`}
+                >
+                  {/* Decorative marker: it repeats nothing, and the ordered list already narrates position. */}
+                  <span aria-hidden="true" className="uno-json-timeline-marker" />
+                  {item.dateLabel === undefined ? null : (
+                    <span className="uno-json-timeline-date">{item.dateLabel}</span>
+                  )}
+                  <TitleTag className="uno-json-timeline-title">{item.title}</TitleTag>
+                  {item.description === undefined ? null : descriptionBlocks === null ? (
+                    <p className="uno-json-timeline-description">{item.description}</p>
+                  ) : (
+                    <div className="uno-json-timeline-description">
+                      <UnoFamilyMarkdown blocks={descriptionBlocks} />
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ol>
         </section>
       );

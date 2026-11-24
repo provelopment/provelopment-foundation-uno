@@ -397,7 +397,12 @@ export interface UnoTimelineItem {
   readonly status?: UnoTimelineStatus;
 }
 
-/** `content.timeline` props: 1–12 ordered authored milestones and an optional section heading. */
+/**
+ * `content.timeline` props: 1–12 ordered authored milestones and an optional section heading.
+ *
+ * `UNO-WO-114 / R01`: `markdown` is the adapter's own switch for Markdown-capable milestone descriptions, matching the
+ * donor's `body: markdownTextSchema`. No status, date, icon or destination is ever manufactured from it.
+ */
 export interface UnoContentTimelineProps {
   readonly items: readonly UnoTimelineItem[];
   readonly heading?: string;
@@ -408,6 +413,7 @@ export interface UnoContentTimelineProps {
    * Only the literal `3` is accepted, and only when it is authored; an absent value keeps the original `<p>` title.
    */
   readonly itemHeadingLevel?: 3;
+  readonly markdown?: true;
 }
 
 /** The two closed `layout.layers` modes. */
@@ -2198,11 +2204,15 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "content.timeline") {
-    if (!hasExactlyKeys(props, ["items"], ["heading", "level", "surface", "itemHeadingLevel"])) {
+    if (!hasExactlyKeys(props, ["items"], ["heading", "level", "surface", "itemHeadingLevel", "markdown"])) {
       throw new RefusedDocument("document:invalid-props");
     }
     const items = readTimelineItems(props["items"]);
     const surface = optionalSurface(props["surface"]);
+    // `UNO-WO-114 / R01`: the closed Markdown switch for milestone descriptions — only ever the literal `true`.
+    if (props["markdown"] !== undefined && props["markdown"] !== true) {
+      throw new RefusedDocument("document:invalid-props");
+    }
     const { heading, level } = readOptionalHeading(props, state);
     const itemHeadingLevel = optionalLevelThree(props, "itemHeadingLevel");
     return {
@@ -2214,6 +2224,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
         ...(level === undefined ? {} : { level }),
         ...(surface === undefined ? {} : { surface }),
         ...(itemHeadingLevel === undefined ? {} : { itemHeadingLevel }),
+        ...(props["markdown"] === undefined ? {} : { markdown: true as const }),
       },
     };
   }

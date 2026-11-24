@@ -172,11 +172,11 @@ const PHASE_C_REQUIRED = Object.freeze([
   "composeUnoFoundationSubset(probeSource, familyBindings())",
   "FAMILY_HERO_HTTP the served hero carries its authored surface, both Markdown bodies and both approved actions",
   "FAMILY_STATS_HTTP the served stats family carries its heading, Markdown lede, closed surface, pairs and Markdown detail",
-  "FAMILY_STEPS_HTTP the steps region is one authored heading, one lede and one ordered list of two items",
+  "FAMILY_STEPS_HTTP the steps region is one authored heading, Markdown lede and one ordered list of two titled items",
   "FAMILY_QUOTE_HTTP the quote region is one figure, blockquote and caption with separate attribution and role",
   "${width}px hero shows both Markdown bodies and both approved static actions",
   "${width}px stats show both Markdown bodies, the closed surface and two authored pairs",
-  "${width}px steps show two ordered titles and one description with no invented status",
+  "${width}px steps show both Markdown bodies, the closed surface and two ordered titles",
   "${width}px quote shows one figure, blockquote and caption with separate attribution and role",
   "FAMILY_BROWSER ${label}",
   "${width}px the contact action stays in the same document and reaches its target",
@@ -293,14 +293,14 @@ const PHASE_C_REQUIRED = Object.freeze([
   'heading: "Synthetic numbers",',
   'lede: "Synthetic numbers **summarise** the sample.",',
   'heading: "Synthetic sequence",',
-  'lede: "Synthetic steps keep the authored order.",',
+  'lede: "Synthetic steps keep the **authored** order.",',
   "FAMILY_STATS_STEPS_SOURCE stats compose one authored heading and lede before the unchanged stat list",
   "FAMILY_STATS_STEPS_SOURCE steps compose the same ordered text before the unchanged timeline node",
   "FAMILY_STATS_STEPS_SOURCE the authored-text families keep the seventeen ids and no other family changes",
   "FAMILY_STATS_STEPS_SOURCE the sequence JSON matches the installed buffer and the caller source is unmutated",
   "FAMILY_STATS_STEPS_REFUSALS each sequence probe refuses the whole Page with its documented reason",
   "FAMILY_STATS_STEPS_REFUSALS an authored steps heading getter yields family:unsafe-source with zero invocations",
-  "FAMILY_STATS_STEPS_HTTP each sequence family serves its authored text before its unchanged list",
+  "FAMILY_STATS_STEPS_HTTP each sequence family serves its authored Markdown lede before its unchanged native list",
   "FAMILY_STATS_STEPS_BROWSER the sequence headings and ledes were measured in real Chromium at both viewports",
   "${width}px each sequence family shows its authored heading and one visible lede before its list",
   'section.children[0]?.id === `family-${index}-${type}-heading`',
@@ -378,7 +378,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   'localA2.table.browser = conjunction(tableBrowserCases);',
   "if (tableLightOk) tableBrowserCases.add(`light:${width}`);",
   "if (darkTableOk) tableBrowserCases.add(`dark:${width}`);",
-  "A2_LOCAL_TABLE_LIST_HERO_STATS_EVIDENCE=28/28 (table, list, hero and stats credited; P6 destination proof in the three-Site gate)",
+  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_EVIDENCE=35/35 (table, list, hero, stats and steps credited; P6 destination proof in the three-Site gate)",
   "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table and divider",
   'JSON.stringify(closureFour.credited) === JSON.stringify(["prose", "callout", "table", "divider"])',
   "closureFour.parity === 4",
@@ -393,6 +393,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "list: localA2.list,",
   "hero: localA2.hero,",
   "stats: localA2.stats,",
+  "steps: localA2.steps,",
   'checkpoint: "A2",',
   "U04_CLOSURE_ORACLE the A2 checkpoint credits exactly prose, callout, table, list and divider at 5/17 and 47/59",
   'JSON.stringify(closureA2.credited) === JSON.stringify(["prose", "callout", "table", "list", "divider"])',
@@ -421,13 +422,13 @@ const PHASE_C_REQUIRED = Object.freeze([
   "A2_LOCAL_BROWSER the rich hero was observed at 390px and 1280px in light and dark/reduced motion with both actions intact",
   "A2_LOCAL_REFUSAL every malformed hero refuses the whole source Page with the family's own reason",
   "A2_LOCAL_READER the installed bytes re-read to the same rich list, table and hero, with the one approved declaration",
-  "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table, list, hero, stats and divider at 7/17 and 49/59",
-  'JSON.stringify(closureSeven.credited)',
-  "closureSeven.parity === 7",
-  "closureSeven.proxy === 49",
-  'closureSeven.labels.includes("PARITY_STATS=PASS")',
-  'closureSeven.pending.includes("steps")',
-  'closureSeven.labels.includes("PARITY_STEPS=PENDING")',
+  "U04_CLOSURE_ORACLE the unchanged oracle credits exactly prose, callout, table, list, hero, stats, steps and divider at B1 8/17 and 50/59",
+  'JSON.stringify(closureB1.credited)',
+  "closureB1.parity === 8",
+  "closureB1.proxy === 50",
+  'closureB1.labels.includes("PARITY_STATS=PASS")',
+  'closureB1.labels.includes("PARITY_HERO=PASS")',
+  'closureB1.labels.includes("PARITY_STEPS=PASS")',
   // `UNO-WO-113 / R01` (§2–§3): the extracted Stats module, the credited family's own executed dimensions, and the
   // seven-family checkpoint-omitted row.
   'from "./u04/stats-evidence.mjs";',
@@ -448,12 +449,32 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_STATS_HTTP the stats pairs are exactly the authored values, labels and detail in order",
   "${width}px stats show both Markdown bodies, the closed surface and two authored pairs",
   "dark ${width}px the stats family keeps both Markdown bodies, the closed surface and its pairs",
-  "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table, list, hero, stats and divider at 7/17 and 49/59",
-  "closureSeven.parity === 7",
-  "closureSeven.proxy === 49",
+  "U04_CLOSURE_ORACLE the unchanged oracle credits exactly prose, callout, table, list, hero, stats, steps and divider at B1 8/17 and 50/59",
+  "closureB1.parity === 8",
+  "closureB1.proxy === 50",
+  // `UNO-WO-114 / R01` (§1–§3): the extracted Steps module, the credited family's own executed dimensions, and the declared
+  // B1 checkpoint row the unchanged oracle enforces.
+  'from "./u04/steps-evidence.mjs";',
+  "steps: createFamilyEvidence(),",
+  "localA2.steps.source = familyAccepted.sections[11]?.module === \"layout.stack\"",
+  "localA2.steps.reader = stepsReaderOk;",
+  "localA2.steps.refusal = stepsRefusalOk;",
+  "localA2.steps.http = familyHtmlResponse.status === 200 && stepsFacts.ok;",
+  "localA2.steps.browser = conjunction(stepsBrowserCases);",
+  "localA2.steps.rights = !familyHtml.includes(FAMILY_DONOR_SOURCE)",
+  "const stepsRegion = stepsRegionOf(familyHtml);",
+  "const stepsFacts = stepsServed(stepsRegion);",
+  "const stepsItems = stepsItemsOf(stepsRegion);",
+  "JSON.stringify(familyAccepted.sections[11]?.children?.[2]?.props) === JSON.stringify(stepsNodeProps())",
+  "A2_LOCAL_BROWSER the rich steps family was observed at 390px and 1280px in light and dark/reduced motion with both Markdown bodies",
+  "A2_LOCAL_REFUSAL every malformed steps family refuses the whole source Page with the family's own reason",
+  "FAMILY_STEPS_HTTP the served steps family carries its heading, Markdown lede, closed surface, ordered titles and Markdown body",
+  "FAMILY_STEPS_HTTP the step titles and body are exactly the authored ones in order, with no invented status, current step or date",
+  "${width}px steps show both Markdown bodies, the closed surface and two ordered titles",
+  "dark ${width}px the steps family keeps its ordered titles and both Markdown bodies with no invented state",
+  '  checkpoint: "B1",',
   "composeFamilyFixture(composeUnoFoundationSubset)",
 ]);
-
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
 function audit(text) {
   const missing = [];
@@ -703,7 +724,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     const shapes = [
       [
         source.replace(
-          "FAMILY_STEPS_HTTP the steps region is one authored heading, one lede and one ordered list of two items",
+          "FAMILY_STEPS_HTTP the steps region is one authored heading, Markdown lede and one ordered list of two titled items",
           "steps region unchecked",
         ),
         "FAMILY_STEPS_HTTP",
@@ -1031,7 +1052,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ['heading: "Synthetic numbers",', ""],
       ['lede: "Synthetic numbers **summarise** the sample.",', ""],
       ['heading: "Synthetic sequence",', ""],
-      ['lede: "Synthetic steps keep the authored order.",', ""],
+      ['lede: "Synthetic steps keep the **authored** order.",', ""],
       // The composed shape comparisons turned unconditional.
       ["section.children[0]?.id === `family-${index}-${type}-heading`", "true"],
       ["JSON.stringify(section.children[1]?.props) === JSON.stringify(expectedLedeProps)", "true"],
@@ -1051,7 +1072,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     for (const label of [
       "FAMILY_STATS_STEPS_SOURCE stats compose one authored heading and lede before the unchanged stat list",
       "FAMILY_STATS_STEPS_REFUSALS each sequence probe refuses the whole Page with its documented reason",
-      "FAMILY_STATS_STEPS_HTTP each sequence family serves its authored text before its unchanged list",
+      "FAMILY_STATS_STEPS_HTTP each sequence family serves its authored Markdown lede before its unchanged native list",
       "FAMILY_STATS_STEPS_BROWSER the sequence headings and ledes were measured in real Chromium at both viewports",
     ]) {
       const mutated = source.split(label).join("sequence evidence removed");
@@ -1138,13 +1159,18 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ["hero: localA2.hero,", ""],
       ["localA2.hero.http = familyHtmlResponse.status === 200 && heroFacts.ok;", "localA2.hero.http = true;"],
       ["localA2.hero.browser = conjunction(heroBrowserCases);", "localA2.hero.browser = true;"],
-      ["closureSeven.parity === 7", "true"],
-      ["closureSeven.proxy === 49", "true"],
+      ["closureB1.parity === 8", "true"],
+      ["closureB1.proxy === 50", "true"],
       // `UNO-WO-113 / R01`: the credited Stats family, its shared predicates and its conjunction cannot be neutered either.
       ["stats: localA2.stats,", ""],
       ["localA2.stats.http = familyHtmlResponse.status === 200 && statsFacts.ok;", "localA2.stats.http = true;"],
       ["localA2.stats.browser = conjunction(statsBrowserCases);", "localA2.stats.browser = true;"],
       ["const statsFacts = statsServed(statsRegion);", "const statsFacts = { ok: true, detail: \"\" };"],
+      // `UNO-WO-114 / R01`: the credited Steps family, its shared predicates and its conjunction cannot be neutered either.
+      ["steps: localA2.steps,", ""],
+      ["localA2.steps.http = familyHtmlResponse.status === 200 && stepsFacts.ok;", "localA2.steps.http = true;"],
+      ["localA2.steps.browser = conjunction(stepsBrowserCases);", "localA2.steps.browser = true;"],
+      ["const stepsFacts = stepsServed(stepsRegion);", "const stepsFacts = { ok: true, detail: \"\" };"],
       ["composeFamilyFixture(composeUnoFoundationSubset)", "composeUnoFoundationSubset(familySource(), familyBindings())"],
     ];
     for (const [token, replacement] of mutations) {
@@ -1152,10 +1178,10 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       assert.notEqual(mutated, source, token);
       assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
     }
-    // The declared checkpoints are exactly the two earned rows — the A1 regression and the A2 delivery. A higher checkpoint
-    // would claim a row the Owner has not delivered, so it must never appear.
+    // The declared checkpoints are exactly the earned rows — the A1 regression, the A2 delivery and now the B1 row this order
+    // delivered. A higher checkpoint would claim a row the Owner has not delivered, so it must never appear.
     const declared = [...source.matchAll(/checkpoint:\s*"([A-Z0-9]+)",$/gmu)].map((match) => match[1]);
-    assert.deepEqual(declared, ["A1", "A2"]);
+    assert.deepEqual(declared, ["A1", "A2", "B1"]);
   });
 
   it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {

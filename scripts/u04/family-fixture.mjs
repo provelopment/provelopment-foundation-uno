@@ -27,6 +27,22 @@ export const HERO_ACTIONS = Object.freeze([
 ]);
 
 /**
+ * `UNO-WO-114 / R01`: the donated Steps surface, exactly as authored — a plain heading, a Markdown-capable lede, the donor's
+ * own closed `surface`, and one Markdown-capable item body beside an authored item without one. The Hero's actions and the
+ * Stats surface are exported the same way, so the fixture and every expectation read one definition.
+ */
+export const STEPS_SOURCE = Object.freeze({
+  type: "steps",
+  heading: "Synthetic sequence",
+  lede: "Synthetic steps keep the **authored** order.",
+  surface: "muted",
+  items: Object.freeze([
+    Object.freeze({ title: "Draft", body: "Prepare the fixture **source**." }),
+    Object.freeze({ title: "Review" }),
+  ]),
+});
+
+/**
  * `UNO-WO-113 / R01`: the donated Stats surface, exactly as authored — a plain heading, a Markdown-capable lede, the donor's
  * own closed `surface`, and one Markdown-capable item detail. The Hero's actions are exported the same way, so the fixture
  * and every expectation read one definition.
@@ -155,16 +171,11 @@ export function familySource() {
       },
 
       {
-        type: "steps",
         // `UNO-WO-072 / R01`: the authored heading and lede are the only source change at index 11; `surface` and the
         // item sequence stay exactly as before.
-        heading: "Synthetic sequence",
-        lede: "Synthetic steps keep the authored order.",
-        surface: "muted",
-        items: [
-          { title: "Draft", body: "Prepare the fixture source." },
-          { title: "Review" },
-        ],
+        // `UNO-WO-114 / R01`: index 11 now authors the donor's full Steps surface from the single exported definition.
+        ...STEPS_SOURCE,
+        items: STEPS_SOURCE.items.map((item) => ({ ...item })),
       },
       {
         type: "quote",

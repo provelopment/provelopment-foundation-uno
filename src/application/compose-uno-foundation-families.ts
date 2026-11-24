@@ -947,12 +947,13 @@ function composeSection(
       return wrapAuthoredText(record, id, stats, "stats", { markdownLede: true });
     }
     case "steps": {
-      // The donor `steps` family also spreads `headingFields`. `UNO-WO-072 / R01` adds its optional plain-text heading and
-      // lede; the item sequence, `surface` literal and every lifecycle gap stay exactly as before.
+      // `UNO-WO-114 / R01`: the donor's full Steps surface — optional plain `heading`, **Markdown-capable** `lede`, 1–12
+      // ordered `{title, body?}` items whose `body` is `markdownTextSchema`, and the donor's closed `surface`.
       requireExactKeys(record, ["type", "items"], ["surface", "heading", "lede"]);
       const items = record["items"];
       if (!Array.isArray(items)) refuseUnsupportedFeature();
       const output: Record<string, unknown>[] = [];
+      let markdownBodies = false;
       for (const raw of items) {
         if (raw === null || typeof raw !== "object" || Array.isArray(raw)) refuseUnsupportedFeature();
         const entry = raw as PlainRecord;
@@ -960,7 +961,11 @@ function composeSection(
         requireExactKeys(entry, ["title"], ["body"]);
         const item: Record<string, unknown> = { title: readNewFamilyText(entry["title"]) };
         // Donor `body` becomes Uno `description`: no date, lifecycle status or completion is ever manufactured.
-        if (ownsKey(entry, "body")) item["description"] = readNewFamilyText(entry["body"]);
+        if (ownsKey(entry, "body")) {
+          const description = readRichFamilyText(entry["body"], 320);
+          item["description"] = description;
+          if (hasFamilyMarkdown(description)) markdownBodies = true;
+        }
         output.push(item);
       }
       const props: Record<string, unknown> = { items: output };
@@ -968,8 +973,10 @@ function composeSection(
       // `UNO-WO-080 / R01`: the donor's step titles are level-3 headings inside the native ordered list, so the composed
       // timeline always carries the closed literal switch. It is target presentation only — no donor field is accepted.
       props["itemHeadingLevel"] = 3;
+      // `UNO-WO-114 / R01`: one node-level switch, set only when an authored body actually carries Markdown.
+      if (markdownBodies) props["markdown"] = true;
       const timeline: CandidateSection = { id, module: "content.timeline", props };
-      return wrapAuthoredText(record, id, timeline, "timeline");
+      return wrapAuthoredText(record, id, timeline, "timeline", { markdownLede: true });
     }
     case "quote": {
       requireExactKeys(record, ["type", "body"], ["attribution", "role", "align", "surface"]);

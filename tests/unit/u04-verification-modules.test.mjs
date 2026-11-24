@@ -45,6 +45,14 @@ import {
   statsRegionOf,
   statsServed,
 } from "../../scripts/u04/stats-evidence.mjs";
+import {
+  STEPS_EXPECTED,
+  STEPS_REFUSAL_CASES,
+  stepsItemsOf,
+  stepsNodeProps,
+  stepsRegionOf,
+  stepsServed,
+} from "../../scripts/u04/steps-evidence.mjs";
 import { freeLoopbackPort, killChild, nextBinPath, runChild, waitForServer } from "../../scripts/u04/serving-harness.mjs";
 
 const ROOT = process.cwd();
@@ -287,6 +295,91 @@ describe("the extracted Stats evidence module", () => {
 
   it("refuses every malformed stats source with the documented reason and no partial Page", () => {
     for (const probe of STATS_REFUSAL_CASES) {
+      const source = familySource();
+      probe.mutate(source);
+      const outcome = composeUnoFoundationSubset(source, familyBindings());
+      expect(outcome.status, probe.label).toBe("refused");
+      if (outcome.status !== "refused") continue;
+      expect(outcome.reason, probe.label).toBe(probe.expected);
+      expect(Object.prototype.hasOwnProperty.call(outcome, "document"), probe.label).toBe(false);
+    }
+  });
+});
+
+
+/** A served steps stack shaped exactly as the renderer emits it, used only to prove the parser and the predicate. */
+function servedStepsRegion(overrides = {}) {
+  const items = STEPS_EXPECTED.items
+    .map((item) => {
+      const body =
+        item.body === ""
+          ? ""
+          : overrides.plainBody === true
+            ? `<p class="uno-json-timeline-description">${item.body.replace(/\*\*/gu, "")}</p>`
+            : `<div class="uno-json-timeline-description"><div class="uno-family-md"><p class="uno-family-md-paragraph">${item.body.replace(
+                /\*\*(.+?)\*\*/gu,
+                '<strong class="uno-family-md-strong">$1</strong>',
+              )}</p></div></div>`;
+      return `<li class="uno-json-timeline-item"><span aria-hidden="true" class="uno-json-timeline-marker"></span><h3 class="uno-json-timeline-title">${item.title}</h3>${body}</li>`;
+    })
+    .join("");
+  return [
+    `<div class="uno-json-stack" data-uno-gap="normal" id="${STEPS_EXPECTED.id}">`,
+    `<h2 class="uno-json-heading" id="${STEPS_EXPECTED.id}-heading">${STEPS_EXPECTED.heading}</h2>`,
+    `<section class="uno-json-prose" id="${STEPS_EXPECTED.id}-lede"><div class="uno-family-md"><p class="uno-family-md-paragraph">${STEPS_EXPECTED.lede.replace(
+      /\*\*(.+?)\*\*/gu,
+      '<strong class="uno-family-md-strong">$1</strong>',
+    )}</p></div></section>`,
+    `<section class="uno-json-timeline" data-uno-surface="${overrides.surface ?? STEPS_EXPECTED.surface}" id="${STEPS_EXPECTED.id}-timeline">`,
+    `<ol class="uno-json-timeline-list">${items}</ol></section></div>`,
+    `<section class="uno-json-testimonials" id="family-12-quote"></section>`,
+  ].join("");
+}
+
+describe("the extracted Steps evidence module", () => {
+  it("derives the expected surface and the native node props from the one fixture definition", () => {
+    expect(STEPS_EXPECTED.id).toBe("family-11-steps");
+    expect(STEPS_EXPECTED.heading).toBe("Synthetic sequence");
+    expect(STEPS_EXPECTED.surface).toBe("muted");
+    expect(STEPS_EXPECTED.lede).toContain("**authored**");
+    expect(STEPS_EXPECTED.items).toHaveLength(2);
+    expect(STEPS_EXPECTED.items[0].bodyStrong).toBe("source");
+    expect(STEPS_EXPECTED.items[1].body).toBe("");
+    expect(stepsNodeProps()).toEqual({
+      items: [
+        { title: "Draft", description: "Prepare the fixture **source**." },
+        { title: "Review" },
+      ],
+      surface: "muted",
+      itemHeadingLevel: 3,
+      markdown: true,
+    });
+    expect(stepsNodeProps().items).not.toBe(stepsNodeProps().items);
+  });
+
+  it("extracts the steps region and its ordered items", () => {
+    const region = servedStepsRegion();
+    expect(stepsRegionOf(`<main>${region}</main>`)).toBe(
+      region.slice(0, region.indexOf('<section class="uno-json-testimonials" id="family-12-quote">')),
+    );
+    expect(stepsRegionOf("<main>no steps</main>")).toBe("");
+    const items = stepsItemsOf(region);
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatchObject({ title: "Draft", description: "", hasStatus: false, ariaCurrent: false, hasDate: false });
+    expect(items[0].markdownDescription).toContain('<strong class="uno-family-md-strong">source</strong>');
+    expect(items[1]).toMatchObject({ title: "Review", description: "", markdownDescription: "", hasMarker: true });
+  });
+
+  it("accepts the approved surface and rejects a plain body, a lost surface, a control or an invented status", () => {
+    expect(stepsServed(servedStepsRegion()).ok).toBe(true);
+    expect(stepsServed(servedStepsRegion({ plainBody: true })).ok).toBe(false);
+    expect(stepsServed(servedStepsRegion({ surface: "plain" })).ok).toBe(false);
+    expect(stepsServed(servedStepsRegion().replace("<li class=\"uno-json-timeline-item\">", '<li class="uno-json-timeline-item" data-uno-status="current">')).ok).toBe(false);
+    expect(stepsServed(`${servedStepsRegion()}<a href="https://example.org">Go</a>`).ok).toBe(false);
+  });
+
+  it("refuses every malformed steps source with the documented reason and no partial Page", () => {
+    for (const probe of STEPS_REFUSAL_CASES) {
       const source = familySource();
       probe.mutate(source);
       const outcome = composeUnoFoundationSubset(source, familyBindings());
