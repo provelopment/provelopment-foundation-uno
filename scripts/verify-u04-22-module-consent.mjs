@@ -127,10 +127,20 @@ const SOURCES = Object.freeze([
   `${CONTENT}/wo044-invalid.en-001.json`,
   `${CONTENT}/wo053-bad-generated.en-001.json`,
   `${CONTENT}/wo066-family-composition.en-001.json`,
+  `${CONTENT}/wo108-target.en-001.json`,
 ]);
 
 // `UNO-WO-084 / R01` (checkpoint A1): where each newly proven family's executed evidence is recorded. Every flag starts
 // false and is only set by a check that actually ran, so a deleted probe can never leave a passing label behind.
+// `UNO-WO-108 / R01`: the fourteen local Table/List evidence dimensions. Distinct fresh records, still UNCLAIMED — the
+// unchanged A1 oracle remains the only parity voice, so `PARITY_TABLE`/`PARITY_LIST` stay PENDING until the three-Site P6
+// proof exists. Every flag is set only by a check that actually executed and passed in this run.
+const localA2 = {
+  table: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: false },
+  list: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: false },
+};
+// Diagnostics only: the executed refusal codes, so a red `refusal` dimension names its own reason.
+let refusalReasons = "";
 const a1Evidence = {
   prose: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
   callout: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
@@ -371,6 +381,9 @@ function familySource() {
   return {
     version: 1,
     title: "Bounded family composition proof",
+    // `UNO-WO-108 / R01`: one approved document-local declaration. It authorizes the `help` reference, so the list item
+    // at index 2 must resolve it while the media/contact families stay OFF.
+    links: { help: { reference: "applicationLink", key: "example.help" } },
     sections: [
       // `UNO-WO-084 / R01` (checkpoint A1): indices 0 and 1 now author the donor's full surface for these two families —
       // a real Markdown lede/body, the closed `align`/`surface` pair, and a callout whose heading and lede sit inside its
@@ -393,11 +406,19 @@ function familySource() {
         surface: "bordered",
       },
       {
+        // `UNO-WO-108 / R01`: the rich A2 list surface — classified `href`, a same-Site route and one authorized-but-OFF
+        // `link` declaration — so the runner can observe real safe-reference behaviour instead of a plain two-item list.
         type: "list",
         heading: "Synthetic list heading",
-        lede: "Synthetic list introduction.",
+        lede: "A **bounded list** on one published Page.",
+        surface: "bordered",
         ordered: true,
-        items: ["Prepare", "Publish"],
+        items: [
+          "Prepare",
+          { label: "Reference", href: "https://example.org/notes", detail: "An *authored* note." },
+          { label: "Target", route: "wo108-target", detail: "A **published** Page." },
+          { label: "Help unavailable", link: "help" },
+        ],
       },
       {
         type: "faq",
@@ -466,11 +487,13 @@ function familySource() {
       {
         type: "table",
         // `UNO-WO-075 / R01`: the authored heading and lede are the only source change at index 13.
+        // `UNO-WO-108 / R01`: index 13 becomes the rich A2 table — Markdown caption and lede plus an authored surface.
         heading: "Synthetic table heading",
-        lede: "Synthetic table introduction.",
+        lede: "The **table** explains synthetic totals.",
+        surface: "muted",
         columns: ["Phase", "Count"],
         rows: [["First", "1"], ["Second", "2"]],
-        caption: "Synthetic table",
+        caption: "Two **synthetic** records",
       },
       {
         type: "columns",
@@ -612,6 +635,13 @@ function fixtureManifest() {
                     publication: "published",
                     representations: [representation("en-001", [jsonSource(SOURCES[4])])],
                   },
+                  {
+                    // `UNO-WO-108 / R01`: the published same-Site Page that the authored route item resolves to.
+                    id: "wo108-target",
+                    route: ["wo108-target"],
+                    publication: "published",
+                    representations: [representation("en-001", [jsonSource(SOURCES[5])])],
+                  },
                 ],
               },
             ],
@@ -645,6 +675,17 @@ function fixturePlan(allModulesJsonBytes, badJsonBytes, familyJsonBytes) {
       { path: SOURCES[2], bytes: Buffer.from(`${JSON.stringify(invalidDocument(), null, 2)}\n`, "utf8") },
       { path: SOURCES[3], bytes: badJsonBytes },
       { path: SOURCES[4], bytes: familyJsonBytes },
+      {
+        // `UNO-WO-108 / R01`: the same-Site published target for the authored route item, installed and removed by the
+        // same recovery-armed transaction as the other five fixture sources.
+        path: SOURCES[5],
+        bytes: Buffer.from(`${JSON.stringify({
+          version: 1,
+          title: "Synthetic local A2 target",
+          visibility: "public",
+          sections: [{ id: "body", module: "content.prose", props: { text: "Same-Site published target." } }],
+        }, null, 2)}\n`, "utf8"),
+      },
     ],
   };
 }
@@ -1603,8 +1644,45 @@ async function main() {
         [3, "faq", "accordion"],
         [13, "table", "table"],
       ];
+      // `UNO-WO-108 / R01` (R1): the rich families intentionally compose a heading-only outer stack (two children) and
+      // carry the Markdown lede inside their native node, so the earlier three-child heading/plain-lede/native equality
+      // is retained verbatim for the unchanged FAQ at index 3 and replaced by field-level proof for indices 2 and 13.
+      const richItemKeys = (item) => Object.keys(item ?? {}).sort().join(",");
+      const richFieldsOk = (index, child) => {
+        const props = child?.props ?? {};
+        const surface = index === 2 ? "bordered" : "muted";
+        const common = props.variant === (index === 2 ? "list" : "table")
+          && props.markdown === true
+          && props.lede === (index === 2
+            ? "A **bounded list** on one published Page."
+            : "The **table** explains synthetic totals.")
+          && props.surface === surface
+          && Object.isFrozen(props);
+        if (index === 2) {
+          const items = props.items ?? [];
+          return common
+            && props.ordered === true
+            && items.length === 4
+            && richItemKeys(items[0]) === "label" && items[0].label === "Prepare"
+            && items[1].label === "Reference"
+            && items[1].href === "https://example.org/notes"
+            && items[1].detail === "An *authored* note."
+            && richItemKeys(items[2]) === "detail,label,routeTarget"
+            && items[2].routeTarget === "wo108-target"
+            && items[2].detail === "A **published** Page."
+            && richItemKeys(items[3]) === "label,linkId"
+            && items[3].linkId === "help"
+            && items[3].label === "Help unavailable"
+            && items.every((item) => typeof item.url !== "string");
+        }
+        return common
+          && JSON.stringify(props.columns) === JSON.stringify(["Phase", "Count"])
+          && JSON.stringify(props.rows) === JSON.stringify([["First", "1"], ["Second", "2"]])
+          && props.caption === "Two **synthetic** records";
+      };
       const textFiveEvidence = TEXT_FIVE.map(([index, type, suffix]) => {
         const id = `family-${index}-${type}`;
+        const rich = index === 2 || index === 13;
         const source = familySource();
         const section = familyAccepted.sections[index];
         const headingText = source.sections[index].heading;
@@ -1616,27 +1694,32 @@ async function main() {
         const nativeChild = nativeOutcome.status === "composed" ? nativeOutcome.document.sections[index] : null;
         const expected = nativeChild === null ? null : JSON.parse(JSON.stringify(nativeChild));
         if (expected !== null) expected.id = `${id}-${suffix}`;
-        const shapeOk = section?.module === "layout.stack"
+        const child = (section?.children ?? [])[rich ? 1 : 2];
+        const common = section?.module === "layout.stack"
           && section.id === id
           && JSON.stringify(section.props) === "{}"
-          && (section.children ?? []).length === 3
+          && (section.children ?? []).length === (rich ? 2 : 3)
           && section.children[0]?.module === "content.heading"
           && section.children[0]?.id === `${id}-heading`
           && JSON.stringify(section.children[0]?.props) === JSON.stringify({ text: headingText, level: 2 })
-          && section.children[1]?.module === "content.prose"
-          && section.children[1]?.id === `${id}-lede`
-          && JSON.stringify(section.children[1]?.props) === JSON.stringify({ text: ledeText })
-          && expected !== null
-          && JSON.stringify(section.children[2]) === JSON.stringify(expected)
           && Object.isFrozen(section)
           && Object.isFrozen(section.children)
-          && Object.isFrozen(section.children[0]?.props)
-          && Object.isFrozen(section.children[1]?.props)
-          && Object.isFrozen(section.children[2]?.props);
+          && section.children.every((node) => Object.isFrozen(node) && Object.isFrozen(node.props));
+        const richOK = child?.module === "content.prose"
+          && child.id === `${id}-${suffix}`
+          && richFieldsOk(index, child);
+        const faqLede = (section?.children ?? [])[1];
+        const faqExactOK = faqLede?.module === "content.prose"
+          && faqLede.id === `${id}-lede`
+          && JSON.stringify(faqLede.props) === JSON.stringify({ text: ledeText })
+          && section.children[2]?.id === `${id}-${suffix}`
+          && expected !== null
+          && JSON.stringify(section.children[2]) === JSON.stringify(expected);
+        const shapeOk = common && (rich ? richOK : faqExactOK);
         return {
           id,
           ok: shapeOk,
-          detail: shapeOk ? `${id} ok` : `${id} ${JSON.stringify(section?.children?.map((child) => child.id))}`,
+          detail: shapeOk ? `${id} ok` : `${id} ${JSON.stringify(section?.children?.map((node) => node.id))}`,
         };
       });
       for (const evidence of textFiveEvidence) {
@@ -1644,6 +1727,79 @@ async function main() {
           `FAMILY_TEXT_FIVE_SOURCE ${evidence.id} composes one frozen stack with the authored heading, the authored lede and the unchanged native node`,
           evidence.ok,
           evidence.detail,
+        );
+      }
+      // `UNO-WO-108 / R01` (R4 + §4): the fourteen local dimensions start with the adapter's own accepted source.
+      localA2.list.source = textFiveEvidence.find((evidence) => evidence.id === "family-2-list")?.ok === true;
+      localA2.table.source = textFiveEvidence.find((evidence) => evidence.id === "family-13-table")?.ok === true;
+      // `UNO-WO-108 / R01` (R4): the strict reader is compared field by field, because a re-read record may order its own
+      // keys differently. The composed props and the re-read props must still describe exactly the same authored surface.
+      {
+        const composedOf = (index) => familyAccepted.sections[index]?.children?.[1]?.props;
+        const rereadOf = (index) => (familyReparsed.accepted === true
+          ? familyReparsed.document.sections[index]?.children?.[1]?.props
+          : null);
+        const composedList = composedOf(2);
+        const rereadList = rereadOf(2);
+        const composedTable = composedOf(13);
+        const rereadTable = rereadOf(13);
+        const sameKeys = (actual, expected) => JSON.stringify(Object.keys(actual ?? {}).sort())
+          === JSON.stringify(Object.keys(expected ?? {}).sort());
+        const listItems = rereadList?.items ?? [];
+        const listReaderOk = rereadList !== null
+          && rereadList.variant === "list"
+          && rereadList.surface === "bordered"
+          && rereadList.markdown === true
+          && rereadList.lede === "A **bounded list** on one published Page."
+          && rereadList.ordered === true
+          && listItems.length === 4
+          && JSON.stringify(listItems[0]) === "{\"label\":\"Prepare\"}"
+          && listItems[1]?.href === "https://example.org/notes"
+          && listItems[1]?.detail === "An *authored* note."
+          && listItems[2]?.routeTarget === "wo108-target"
+          && listItems[2]?.detail === "A **published** Page."
+          && listItems[2]?.url === undefined && listItems[2]?.href === undefined
+          && listItems[3]?.linkId === "help"
+          && Object.keys(listItems[3] ?? {}).sort().join(",") === "label,linkId"
+          && sameKeys(rereadList, composedList)
+          && Object.isFrozen(familyReparsed.document);
+        const tableReaderOk = rereadTable !== null
+          && rereadTable.variant === "table"
+          && rereadTable.surface === "muted"
+          && rereadTable.markdown === true
+          && rereadTable.lede === "The **table** explains synthetic totals."
+          && rereadTable.caption === "Two **synthetic** records"
+          && JSON.stringify(rereadTable.columns) === JSON.stringify(["Phase", "Count"])
+          && JSON.stringify(rereadTable.rows) === JSON.stringify([["First", "1"], ["Second", "2"]])
+          && sameKeys(rereadTable, composedTable)
+          && Object.isFrozen(familyReparsed.document);
+        localA2.list.reader = listReaderOk;
+        localA2.table.reader = tableReaderOk;
+        // `UNO-WO-108 / R01` (§4 `refusal`): two real refusals are executed against the authored source — an undeclared
+        // `link` id and an unsafe URL scheme — and both rich families depend on them.
+        const undeclaredLink = familySource();
+        undeclaredLink.sections[2].items[3] = { label: "Help unavailable", link: "absent" };
+        const undeclaredLinkOutcome = composeUnoFoundationSubset(undeclaredLink, familyBindings());
+        const unsafeHref = familySource();
+        unsafeHref.sections[2].items[1] = { label: "Reference", href: "javascript:alert(1)" };
+        const unsafeHrefOutcome = composeUnoFoundationSubset(unsafeHref, familyBindings());
+        const refusalOk = undeclaredLinkOutcome.status === "refused"
+          && unsafeHrefOutcome.status === "refused"
+          && [undeclaredLinkOutcome.reason, unsafeHrefOutcome.reason]
+            .every((reason) => typeof reason === "string" && reason.startsWith("family:"));
+        refusalReasons = JSON.stringify({
+          undeclared: undeclaredLinkOutcome.status === "refused" ? undeclaredLinkOutcome.reason : undeclaredLinkOutcome.status,
+          unsafeHref: unsafeHrefOutcome.status === "refused" ? unsafeHrefOutcome.reason : unsafeHrefOutcome.status,
+        });
+        localA2.list.refusal = refusalOk;
+        localA2.table.refusal = refusalOk;
+        const links = familyReparsed.accepted === true ? familyReparsed.document.links : undefined;
+        check(
+          "A2_LOCAL_READER the installed bytes re-read to the same rich list and table, with the one approved declaration",
+          listReaderOk && tableReaderOk
+            && JSON.stringify(links) === JSON.stringify({ help: { reference: "applicationLink", key: "example.help" } })
+            && JSON.stringify(familyReparsed.document.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS),
+          JSON.stringify({ list: localA2.list.reader, table: localA2.table.reader, links }),
         );
       }
       check(
@@ -1822,12 +1978,29 @@ async function main() {
         && familyHtml.includes('<h2 class="uno-json-prose-heading">Synthetic callout heading</h2>')
         && familyHtml.includes('<strong class="uno-family-md-strong">bounded</strong>'),
     );
-    const listStart = familyHtml.indexOf('<ol class="uno-json-list" id="family-2-list-list">');
-    const listMarkup = listStart < 0 ? "" : familyHtml.slice(listStart, familyHtml.indexOf("</ol>", listStart));
+    // `UNO-WO-108 / R01` (R2): the rich list is bounded by its authoring section, carries four authored entries and
+    // exactly the two safe destinations — the authored `https` note and the stored same-Site canonical for the route
+    // item — while the authorized-but-OFF `help` declaration stays inert and leaks no opaque key.
+    const listRegion = familyRegionOf("family-2-list");
+    const listAnchors = listRegion.match(/<a class="uno-json-list-link"[^>]*>/gu) ?? [];
     check(
-      "FAMILY_HTTP=200 the ordered list carries exactly the two authored entries",
-      listStart >= 0 && (listMarkup.match(/<li>/gu) ?? []).length === 2
-        && listMarkup.includes("<span>Prepare</span>") && listMarkup.includes("<span>Publish</span>"),
+      "FAMILY_HTTP=200 the ordered list carries exactly the four authored entries and two safe destinations",
+      listRegion.includes('<section class="uno-json-list-section" id="family-2-list-list" data-uno-surface="bordered">')
+        && listRegion.includes('<ol class="uno-json-list"')
+        && (listRegion.match(/<li>/gu) ?? []).length === 4
+        && listRegion.indexOf("Prepare") < listRegion.indexOf("Reference")
+        && listRegion.indexOf("Reference") < listRegion.indexOf("Target")
+        && listRegion.indexOf("Target") < listRegion.indexOf("Help unavailable")
+        && listAnchors.length === 2
+        && listAnchors.every((anchor) => anchor.includes("noopener") && anchor.includes("noreferrer"))
+        && listRegion.includes('href="https://example.org/notes"')
+        && listRegion.includes("en-001/wo108-target")
+        && listRegion.includes("Help unavailable")
+        && !listRegion.includes("example.help")
+        && listRegion.includes("uno-json-list-lede")
+        && listRegion.includes(">bounded list</strong>")
+        && listRegion.includes(">authored</em>")
+        && listRegion.includes(">published</strong>")
     );
     check(
       "FAMILY_HTTP=200 the FAQ renders as a native disclosure with the authored question",
@@ -1855,7 +2028,7 @@ async function main() {
     // `UNO-WO-067 / R01`: each appended family is inspected only inside its own top-level region, so an older module can
     // never satisfy a new claim. `UNO-WO-072 / R01` adds one case: an authored-text family is a `layout.stack` wrapper, so
     // that region starts at the wrapper and ends at the next top-level family anchor instead of an inner `</section>`.
-    const familyRegionOf = (id) => {
+    function familyRegionOf(id) {
       const at = familyHtml.indexOf(`id="${id}"`);
       if (at < 0) return "";
       const wrapperOpen = familyHtml.lastIndexOf('<div class="uno-json-stack" data-uno-gap="normal"', at);
@@ -1931,16 +2104,15 @@ async function main() {
     // `UNO-WO-068 / R03`: the last four families. The table nests no container, so its own close tag bounds it; the two
     // grids nest cells and stacks, so each is bounded by the next top-level id and its direct-child counts are checked
     // only on the classes that belong to that grid (exact child structure is proved by the scoped Chromium assertions).
-    const tableRegionStart = familyHtml.indexOf('<div class="uno-json-table-scroll" id="family-13-table-table" tabindex="0">');
-    const tableRegionEnd = tableRegionStart < 0 ? -1 : familyHtml.indexOf("</table></div>", tableRegionStart);
-    const tableRegion = tableRegionStart < 0 || tableRegionEnd < 0
-      ? ""
-      : familyHtml.slice(tableRegionStart, tableRegionEnd + "</table></div>".length);
+    // `UNO-WO-108 / R01` (R2): the rich table is now a native section that owns the surface; the scroll control lives
+    // inside it without an id of its own, so the region is bounded by the family id and its nested scroll is inspected.
+    const tableRegion = familyRegionOf("family-13-table");
     check(
       "FAMILY_TABLE_HTTP the table region is one scroll wrapper with a genuine captioned two-column table",
-      tableRegion.length > 0
+      tableRegion.includes('<section class="uno-json-table-section" id="family-13-table-table" data-uno-surface="muted">')
+        && tableRegion.includes('<div class="uno-json-table-scroll" tabindex="0">')
         && tableRegion.includes('<table class="uno-json-table">')
-        && (tableRegion.match(/<caption>Synthetic table<\/caption>/gu) ?? []).length === 1
+        && /<caption>[\s\S]*?<strong[^>]*>synthetic<\/strong>[\s\S]*?<\/caption>/u.test(tableRegion)
         && (tableRegion.match(/<th scope="col">/gu) ?? []).length === 2
         && tableRegion.indexOf("<th scope=\"col\">Phase</th>") < tableRegion.indexOf("<th scope=\"col\">Count</th>")
         && tableRegion.includes("<tbody>")
@@ -1948,6 +2120,7 @@ async function main() {
         && (tableRegion.match(/<td>/gu) ?? []).length === 4
         && tableRegion.indexOf("<td>First</td><td>1</td>") > 0
         && tableRegion.indexOf("<td>Second</td><td>2</td>") > tableRegion.indexOf("<td>First</td><td>1</td>")
+        && /<strong class="uno-family-md-strong">table<\/strong>/u.test(tableRegion)
         && !/<a\b|<img\b|<script\b|<form\b|<button\b/iu.test(tableRegion),
       tableRegion.slice(0, 200),
     );
@@ -2111,46 +2284,111 @@ async function main() {
     // `UNO-WO-075 / R01`: the five authored-text families exactly as served, one scoped check each plus a whole-Page one.
     {
       const servedFive = [
-        [2, "list", "Synthetic list heading", "Synthetic list introduction.",
-          '<ol class="uno-json-list" id="family-2-list-list">'],
-        [3, "faq", "Synthetic FAQ heading", "Synthetic FAQ introduction.",
-          '<div class="uno-json-accordion" id="family-3-faq-accordion">'],
-        [13, "table", "Synthetic table heading", "Synthetic table introduction.",
-          '<div class="uno-json-table-scroll" id="family-13-table-table" tabindex="0">'],
+        [2, "list", "Synthetic list heading", '<ol class="uno-json-list">'],
+        [3, "faq", "Synthetic FAQ heading", '<div class="uno-json-accordion" id="family-3-faq-accordion">'],
+        [13, "table", "Synthetic table heading", '<div class="uno-json-table-scroll" tabindex="0">'],
       ];
-      const servedFiveOk = (index, type, headingText, ledeText, nativeOpen) => {
+      // `UNO-WO-108 / R01` (R2): three distinct arms, because the rich list and table carry the Markdown lede inside a
+      // native section while the unchanged FAQ keeps its plain sibling `<p id="…-lede">`. No arm is skipped.
+      const servedFiveOk = (index, type, headingText, nativeOpen) => {
         const id = `family-${index}-${type}`;
         const region = familyRegionOf(id);
-        return region.startsWith(`<div class="uno-json-stack" data-uno-gap="normal" id="${id}">`)
-          && (region.match(new RegExp(`id="${id}-heading"`, "gu")) ?? []).length === 1
-          && (region.match(new RegExp(`id="${id}-lede"`, "gu")) ?? []).length === 1
+        const common = region.startsWith(`<div class="uno-json-stack" data-uno-gap="normal" id="${id}">`)
           && region.includes(`<h2 class="uno-json-heading" id="${id}-heading">${headingText}</h2>`)
-          && region.includes(`<p class="uno-json-prose" id="${id}-lede">${ledeText}</p>`)
-          && region.indexOf(`${id}-heading`) < region.indexOf(`${id}-lede`)
-          && region.indexOf(`${id}-lede`) < region.indexOf(nativeOpen)
+          && region.indexOf(`${id}-heading`) < region.indexOf(nativeOpen)
           && region.includes(nativeOpen)
           && (region.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
-          // `UNO-WO-080 / R01`: the fixture FAQ authors one question, so one level-3 heading; the other four carry none.
-          && (region.match(/<h3[\s>]/giu) ?? []).length === (type === "faq" ? 1 : 0)
-          && !/<main\b|<h1\b|<h4\b|<script\b|<iframe\b|<form\b|<button\b|<input\b|<a\b/iu.test(region);
+          && !/<main\b|<h1\b|<h4\b|<script\b|<iframe\b|<form\b|<button\b|<input\b/iu.test(region);
+        if (index === 3) {
+          return common
+            && (region.match(new RegExp(`id="${id}-lede"`, "gu")) ?? []).length === 1
+            && region.includes(`<p class="uno-json-prose" id="${id}-lede">Synthetic FAQ introduction.</p>`)
+            && region.indexOf(`${id}-lede`) < region.indexOf(nativeOpen)
+            && (region.match(/<h3[\s>]/giu) ?? []).length === 1
+            && !/<a\b/iu.test(region);
+        }
+        if (index === 2) {
+          return common
+            && region.includes('<section class="uno-json-list-section" id="family-2-list-list" data-uno-surface="bordered">')
+            && region.includes("uno-json-list-lede")
+            && (region.match(/<li>/gu) ?? []).length === 4
+            && (region.match(/<a class="uno-json-list-link"/gu) ?? []).length === 2
+            && region.includes("Help unavailable") && !region.includes("example.help")
+            && region.includes(">bounded list</strong>")
+            && region.indexOf(`${id}-heading`) < region.indexOf("uno-json-list-lede");
+        }
+        return common
+          && region.includes('<section class="uno-json-table-section" id="family-13-table-table" data-uno-surface="muted">')
+          && region.includes("uno-json-table-lede")
+          && /<caption>[\s\S]*?<strong[^>]*>synthetic<\/strong>[\s\S]*?<\/caption>/u.test(region)
+          && (region.match(/<td>/gu) ?? []).length === 4
+          && region.includes(">table</strong>")
+          && !/<a\b|<img\b/iu.test(region);
       };
-      for (const [index, type, headingText, ledeText, nativeOpen] of servedFive) {
+      for (const [index, type, headingText, nativeOpen] of servedFive) {
+        const servedOK = servedFiveOk(index, type, headingText, nativeOpen);
+        // `UNO-WO-108 / R01` (§4): `renderer` is the scoped semantic DOM contract exactly as served for these two families.
+        if (type === "list" || type === "table") localA2[type].renderer = servedOK;
         check(
           `FAMILY_TEXT_FIVE_HTTP family-${index}-${type} serves one authored h2 and one lede before its native node`,
-          servedFiveOk(index, type, headingText, ledeText, nativeOpen),
-          familyRegionOf(`family-${index}-${type}`).slice(0, 160),
+          servedOK,
+          JSON.stringify((() => {
+            const region = familyRegionOf(`family-${index}-${type}`);
+            const id = `family-${index}-${type}`;
+            return {
+              stack: region.startsWith(`<div class="uno-json-stack" data-uno-gap="normal" id="${id}">`),
+              heading: region.includes(`<h2 class="uno-json-heading" id="${id}-heading">${headingText}</h2>`),
+              beforeNative: region.indexOf(`${id}-heading`) < region.indexOf(nativeOpen),
+              native: region.includes(nativeOpen),
+              h2Once: (region.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1,
+              clean: !/<main\b|<h1\b|<h4\b|<script\b|<iframe\b|<form\b|<button\b|<input\b/iu.test(region),
+              section: region.includes('<section class="uno-json-list-section" id="family-2-list-list" data-uno-surface="bordered">'),
+              lede: region.includes("uno-json-list-lede"),
+              items: (region.match(/<li>/gu) ?? []).length,
+              anchors: (region.match(/<a class="uno-json-list-link"/gu) ?? []).length,
+              help: region.includes("Help unavailable"),
+              leak: region.includes("example.help"),
+              bounded: region.includes(">bounded list</strong>"),
+              order: region.indexOf(`${id}-heading`) < region.indexOf("uno-json-list-lede"),
+            };
+          })()),
+        );
+      }
+      // `UNO-WO-108 / R01` (§4 `http`): the stored Site-qualified target answers from the ephemeral test base, and an
+      // undeclared route stays a closed 404 — no Page is invented by the router.
+      {
+        const targetResponse = await fetch(`${base}/en-001/wo108-target`);
+        const targetHtml = await targetResponse.text();
+        const missingResponse = await fetch(`${base}/en-001/wo108-absent`);
+        const missingHtml = await missingResponse.text();
+        localA2.list.http = listRegion.includes('href="http://localhost:3000/en-001/wo108-target"')
+          && !listRegion.includes("example.help");
+        localA2.table.http = tableRegion.includes('data-uno-surface="muted"')
+          && tableRegion.includes('tabindex="0"');
+        // `UNO-WO-108 / R01` (§4 `rights`): no donor copy, no opaque declaration key and no off-origin destination.
+        localA2.list.rights = !familyHtml.includes(FAMILY_DONOR_SOURCE) && !listRegion.includes("example.help");
+        localA2.table.rights = !familyHtml.includes(FAMILY_DONOR_SOURCE) && !tableRegion.includes("example.help");
+        check(
+          "A2_LOCAL_HTTP the published same-Site target answers 200 and an undeclared route stays a closed 404",
+          targetResponse.status === 200
+            && targetHtml.includes("Same-Site published target.")
+            && missingResponse.status === 404
+            && !missingHtml.includes("Same-Site published target."),
+          `${targetResponse.status}/${missingResponse.status}`,
         );
       }
       check(
         "FAMILY_TEXT_FIVE_HTTP the three remaining authored-text families add seven stacks and three headings with no duplicate id, extra main or external destination",
         (familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length === 7
           && (familyHtml.match(/<h2 class="uno-json-heading" id="family-(?:2-list|3-faq|13-table)-heading"/gu) ?? []).length === 3
-          && (familyHtml.match(/<p class="uno-json-prose" id="family-(?:2-list|3-faq|13-table)-lede"/gu) ?? []).length === 3
-          && servedFive.every(([index, type, headingText, ledeText, nativeOpen]) => servedFiveOk(index, type, headingText, ledeText, nativeOpen))
+          && (familyHtml.match(/<p class="uno-json-prose" id="family-3-faq-lede"/gu) ?? []).length === 1
+          && (familyHtml.match(/<div class="uno-family-md uno-json-list-lede">/gu) ?? []).length === 1
+          && (familyHtml.match(/<div class="uno-family-md uno-json-table-lede">/gu) ?? []).length === 1
+          && servedFive.every(([index, type, headingText, nativeOpen]) => servedFiveOk(index, type, headingText, nativeOpen))
           && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
           && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
           && !familyHtml.includes(FAMILY_DONOR_SOURCE),
-        `stacks=${(familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length}`,
+        `stacks=${(familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length} h2=${(familyHtml.match(/<h2 class="uno-json-heading" id="family-(?:2-list|3-faq|13-table)-heading"/gu) ?? []).length} faqLede=${(familyHtml.match(/<p class="uno-json-prose" id="family-3-faq-lede"/gu) ?? []).length} listLede=${(familyHtml.match(/uno-json-list-lede/gu) ?? []).length} tableLede=${(familyHtml.match(/uno-json-table-lede/gu) ?? []).length} main=${(familyHtml.match(/<main[\s>]/giu) ?? []).length} h1=${(familyHtml.match(/<h1[\s>]/giu) ?? []).length} donor=${familyHtml.includes(FAMILY_DONOR_SOURCE)}`,
       );
       // `UNO-WO-084 / R01` (A1): the two rich families exactly as served, and only once each.
       const proseServed = familyRegionOf("family-0-prose");
@@ -2766,6 +3004,16 @@ async function consentPhase(base) {
           calloutText: (callout?.textContent ?? "").trim(),
           calloutTone: callout?.getAttribute("data-uno-tone") ?? "",
           listItems: [...document.querySelectorAll("#family-2-list-list li")].map((item) => item.textContent?.trim() ?? ""),
+          // `UNO-WO-108 / R01` (R3): the two safe destinations are measured as real anchors, and the OFF declaration
+          // must leave no anchor and no opaque key anywhere in the rich list.
+          listAnchors: document.querySelectorAll("#family-2-list-list a.uno-json-list-link").length,
+          listAnchorHrefs: [...document.querySelectorAll("#family-2-list-list a.uno-json-list-link")]
+            .map((anchor) => anchor.getAttribute("href") ?? ""),
+          listAnchorRels: [...document.querySelectorAll("#family-2-list-list a.uno-json-list-link")]
+            .map((anchor) => anchor.getAttribute("rel") ?? ""),
+          listHelpAnchors: [...document.querySelectorAll("#family-2-list-list a")]
+            .filter((anchor) => (anchor.textContent ?? "").includes("Help unavailable")).length,
+          listLeaksKey: (document.querySelector("#family-2-list-list")?.outerHTML ?? "").includes("example.help"),
           gallerySources: galleryImages.map((image) => image.getAttribute("src") ?? ""),
           galleryAlts: galleryImages.map((image) => image.getAttribute("alt") ?? ""),
           galleryDecoded: galleryImages.map((image) => image.naturalWidth),
@@ -2888,18 +3136,23 @@ async function consentPhase(base) {
             };
           })(),
           table: (() => {
+            // `UNO-WO-108 / R01` (R3): the family id is on the authored section, so the scroll control and the native
+            // table are reached through it; every semantic probe below is unchanged.
             const region = document.querySelector("#family-13-table-table");
-            const wrapper = region?.firstElementChild ?? null;
+            const scroll = region?.querySelector(".uno-json-table-scroll") ?? null;
+            const table = scroll?.querySelector("table.uno-json-table") ?? null;
             return {
-              isScroll: region?.classList.contains("uno-json-table-scroll") ?? false,
-              focusable: region?.getAttribute("tabindex") ?? "",
-              wrapperTag: wrapper?.tagName ?? "",
-              wrapperClass: wrapper?.classList.contains("uno-json-table") ?? false,
-              captions: [...(region?.querySelectorAll("table > caption") ?? [])].map((node) => node.textContent ?? ""),
-              headers: [...(region?.querySelectorAll("thead th") ?? [])].map((node) => ({
+              isSection: region?.classList.contains("uno-json-table-section") ?? false,
+              isScroll: scroll?.classList.contains("uno-json-table-scroll") ?? false,
+              focusable: scroll?.getAttribute("tabindex") ?? "",
+              wrapperTag: table?.tagName ?? "",
+              wrapperClass: table?.classList.contains("uno-json-table") ?? false,
+              captions: [...(table?.querySelectorAll(":scope > caption") ?? [])].map((node) => node.textContent ?? ""),
+              captionStrong: table?.querySelector("caption strong")?.textContent ?? "",
+              headers: [...(table?.querySelectorAll("thead th") ?? [])].map((node) => ({
                 text: node.textContent ?? "", scope: node.getAttribute("scope") ?? "",
               })),
-              rows: [...(region?.querySelectorAll("tbody tr") ?? [])].map((row) => [...row.querySelectorAll("td")].map((cell) => cell.textContent ?? "")),
+              rows: [...(table?.querySelectorAll("tbody tr") ?? [])].map((row) => [...row.querySelectorAll("td")].map((cell) => cell.textContent ?? "")),
               links: region?.querySelectorAll("a, img, form, button").length ?? -1,
             };
           })(),
@@ -3003,9 +3256,10 @@ async function consentPhase(base) {
             };
           })(),
           tableFocus: (() => {
-            const region = document.querySelector("#family-13-table-table");
-            region?.focus();
-            return document.activeElement === region;
+            // `UNO-WO-108 / R01` (R3): the keyboard stop is the inner scroll control, not the authored section.
+            const scroll = document.querySelector("#family-13-table-table")?.querySelector(".uno-json-table-scroll");
+            scroll?.focus();
+            return document.activeElement === scroll;
           })(),
           quote: (() => {
             const region = document.querySelector("#family-12-quote");
@@ -3032,8 +3286,18 @@ async function consentPhase(base) {
         seen.proseText.length > 0 && seen.proseVisible === "visible" && seen.calloutTone === "warning"
           && seen.calloutText.includes("A synthetic warning"),
         JSON.stringify({ proseText: seen.proseText, proseVisible: seen.proseVisible, calloutTone: seen.calloutTone }));
-      familyCheck(`${width}px the ordered list shows both authored entries`,
-        seen.listItems.length === 2 && seen.listItems[0] === "Prepare" && seen.listItems[1] === "Publish", seen.listItems.join(","));
+      familyCheck(`${width}px the ordered list shows all four authored entries and two safe destinations`,
+        seen.listItems.length === 4
+          && seen.listItems[0] === "Prepare"
+          && seen.listItems[1].startsWith("Reference") && seen.listItems[1].includes("An authored note.")
+          && seen.listItems[2].startsWith("Target") && seen.listItems[2].includes("A published Page.")
+          && seen.listItems[3] === "Help unavailable"
+          && seen.listAnchors === 2
+          && seen.listHelpAnchors === 0 && seen.listLeaksKey === false
+          && seen.listAnchorHrefs.includes("https://example.org/notes")
+          && seen.listAnchorHrefs.includes("http://localhost:3000/en-001/wo108-target")
+          && seen.listAnchorRels.every((rel) => rel.includes("noopener") && rel.includes("noreferrer")),
+        JSON.stringify({ items: seen.listItems, hrefs: seen.listAnchorHrefs }));
       const ownedLocator = /^\/uno-media\/en-001\/wo066-family-composition\/\d+$/u;
       familyCheck(`${width}px two gallery images use server-owned locators with alt text`,
         seen.gallerySources.length === 2 && seen.gallerySources.every((source) => ownedLocator.test(source))
@@ -3097,10 +3361,11 @@ async function consentPhase(base) {
           && seen.quote.anchors === 0,
         JSON.stringify(seen.quote));
       // `UNO-WO-068 / R03`: the last four families, each scoped to its own composed region.
-      familyCheck(`${width}px table shows a captioned two-column table and its wrapper takes focus`,
-        seen.table.isScroll && seen.table.focusable === "0" && seen.tableFocus
+      familyCheck(`${width}px table shows a captioned two-column table and its scroll control takes focus`,
+        seen.table.isSection && seen.table.isScroll && seen.table.focusable === "0" && seen.tableFocus
           && seen.table.wrapperTag === "TABLE" && seen.table.wrapperClass
-          && JSON.stringify(seen.table.captions) === JSON.stringify(["Synthetic table"])
+          && JSON.stringify(seen.table.captions) === JSON.stringify(["Two synthetic records"])
+          && seen.table.captionStrong === "synthetic"
           && JSON.stringify(seen.table.headers) === JSON.stringify([
             { text: "Phase", scope: "col" }, { text: "Count", scope: "col" },
           ])
@@ -3237,9 +3502,16 @@ async function consentPhase(base) {
         const ids = ["family-2-list", "family-3-faq", "family-13-table"];
         return ids.map((id) => {
           const root = document.getElementById(id);
+          const rich = id === "family-2-list" || id === "family-13-table";
+          const nativeId = `${id}-${id === "family-2-list" ? "list" : "table"}`;
           const heading = root?.querySelector(":scope > h2.uno-json-heading") ?? null;
-          const lede = root?.querySelector(":scope > p.uno-json-prose") ?? null;
-          const native = root?.lastElementChild ?? null;
+          // `UNO-WO-108 / R01` (R3): the rich families carry their Markdown lede inside the native section, so the lede and
+          // the native node are read there; the unchanged FAQ keeps its plain sibling lede and last-child native node.
+          const native = rich ? (root?.querySelector(`#${nativeId}`) ?? null) : (root?.lastElementChild ?? null);
+          const lede = rich
+            ? (native?.querySelector(id === "family-2-list" ? ".uno-json-list-lede" : ".uno-json-table-lede") ?? null)
+            : (root?.querySelector(":scope > p.uno-json-prose") ?? null);
+          const insideNative = rich ? (native?.querySelector("ol, .uno-json-table-scroll") ?? null) : null;
           const headingBox = heading?.getBoundingClientRect() ?? null;
           const ledeBox = lede?.getBoundingClientRect() ?? null;
           return {
@@ -3249,25 +3521,36 @@ async function consentPhase(base) {
             headingVisible: headingBox !== null && headingBox.height > 0 && headingBox.width > 0,
             ledeText: lede?.textContent ?? "",
             ledeVisible: ledeBox !== null && ledeBox.height > 0 && ledeBox.width > 0,
-            headingBeforeLede: heading !== null && lede !== null
-              && (heading.compareDocumentPosition(lede) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-            ledeBeforeNative: lede !== null && native !== null && native !== lede
-              && (lede.compareDocumentPosition(native) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            ledeStrong: lede?.querySelector("strong")?.textContent ?? "",
+            headingBeforeLede: rich
+              ? heading !== null && native !== null
+                && (heading.compareDocumentPosition(native) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+              : heading !== null && lede !== null
+                && (heading.compareDocumentPosition(lede) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            ledeBeforeNative: rich
+              ? lede !== null && insideNative !== null
+                && (lede.compareDocumentPosition(insideNative) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+              : lede !== null && native !== null && native !== lede
+                && (lede.compareDocumentPosition(native) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
             nativeId: native?.id ?? "",
             nativeTag: native?.tagName ?? "",
             h2Count: root?.querySelectorAll("h2").length ?? -1,
             controls: root?.querySelectorAll("a, button, input, select, textarea, iframe").length ?? -1,
+            safeAnchors: root?.querySelectorAll("a.uno-json-list-link").length ?? 0,
           };
         });
       });
       const expectedFive = [
-        ["family-2-list", "Synthetic list heading", "Synthetic list introduction.", "family-2-list-list", "OL"],
-        ["family-3-faq", "Synthetic FAQ heading", "Synthetic FAQ introduction.", "family-3-faq-accordion", "DIV"],
-        ["family-13-table", "Synthetic table heading", "Synthetic table introduction.", "family-13-table-table", "DIV"],
+        ["family-2-list", "Synthetic list heading", "A bounded list on one published Page.",
+          "family-2-list-list", "SECTION", "bounded list", 2],
+        ["family-3-faq", "Synthetic FAQ heading", "Synthetic FAQ introduction.",
+          "family-3-faq-accordion", "DIV", "", 0],
+        ["family-13-table", "Synthetic table heading", "The table explains synthetic totals.",
+          "family-13-table-table", "SECTION", "table", 0],
       ];
       textFiveCheck(`${width}px the three remaining authored-text families show a visible heading and lede before their native node`,
         textFiveSeen.length === 3
-          && expectedFive.every(([id, headingText, ledeText, nativeId, nativeTag]) => {
+          && expectedFive.every(([id, headingText, ledeText, nativeId, nativeTag, ledeStrong, safeAnchors]) => {
             const found = textFiveSeen.find((entry) => entry.id === id);
             return found !== undefined
               && found.isStack
@@ -3275,15 +3558,31 @@ async function consentPhase(base) {
               && found.headingVisible
               && found.ledeText === ledeText
               && found.ledeVisible
+              && found.ledeStrong === ledeStrong
               && found.headingBeforeLede
               && found.ledeBeforeNative
               && found.nativeId === nativeId
               && found.nativeTag === nativeTag
               && found.h2Count === 1
-              && (id === "family-3-faq" || found.controls === 0);
+              && found.safeAnchors === safeAnchors
+              && found.controls === safeAnchors;
           })
           && seen.overflow === 0,
-        JSON.stringify(textFiveSeen.map((entry) => `${entry.id}:${entry.nativeId}:${entry.h2Count}:${entry.controls}`)));
+        JSON.stringify(textFiveSeen.filter((entry) => entry.id !== "family-3-faq")
+          .map((entry) => [entry.id, entry.isStack, entry.ledeText, entry.ledeStrong, entry.ledeVisible,
+            entry.headingBeforeLede, entry.ledeBeforeNative, entry.nativeTag, entry.h2Count, entry.controls])));
+      // `UNO-WO-108 / R01` (§4 `browser`): the flag accumulates over both executed viewports, so a missing case can never
+      // leave it true. The list must show its two safe anchors and no other control; the table must stay link-free.
+      for (const entry of textFiveSeen) {
+        if (entry.id === "family-2-list") {
+          localA2.list.browser = localA2.list.browser
+            || (entry.safeAnchors === 2 && entry.controls === 2 && entry.nativeTag === "SECTION");
+        }
+        if (entry.id === "family-13-table") {
+          localA2.table.browser = localA2.table.browser
+            || (entry.safeAnchors === 0 && entry.controls === 0 && entry.nativeTag === "SECTION");
+        }
+      }
 
       // `UNO-WO-080 / R01`: the composed donor outlines as live DOM at this viewport, in native containers only.
       const outlineSeen = await tab.evaluate(() => {
@@ -3501,9 +3800,25 @@ async function consentPhase(base) {
       familyOk && ledeBrowserOk && ledeBrowserChecks === 2 && sequenceBrowserOk && sequenceBrowserChecks === 2
         && textFiveBrowserOk && textFiveBrowserChecks === 2 && outlineBrowserOk && outlineBrowserChecks === 12,
     );
-    // `UNO-WO-069 / R01`: the divider parity gate. It depends on every executed divider check (three per light viewport
-    // and three per dark/reduced-motion viewport) AND on the surrounding family gates, so no single label can stand
-    // in for the evidence.
+    // `UNO-WO-108 / R01` (§4 `refusal` / `rights`): the two rich families share the family-level refusal machinery, whose
+    // executed codes are asserted here, together with the no-donor-copy and no-opaque-key invariants already measured.
+      // `UNO-WO-108 / R01` (§4 `refusal` / `rights`): both dimensions were executed above — the refusals against the
+      // authored source and the served no-donor-copy / no-opaque-key invariants — so this block only totals them.
+      {
+        const flat = [...Object.values(localA2.list), ...Object.values(localA2.table)];
+      check(
+        "A2_LOCAL_TABLE_LIST_EVIDENCE=14/14 (uncredited, P6 pending)",
+        Object.keys(localA2.list).length === 7
+          && Object.keys(localA2.table).length === 7
+          && flat.length === 14
+          && flat.every((value) => value === true),
+        JSON.stringify({
+          table: localA2.table,
+          list: localA2.list,
+          refusalReasons,
+        }),
+      );
+    }
     check(
       "DIVIDER_PARITY=PASS the divider passed source, HTTP and light/dark Chromium evidence",
       dividerOk === true && familyOk === true && dividerChecks === 12,
