@@ -1,39 +1,37 @@
-# Execution Report — UNO-WO-106 / R01
+# Execution Report — UNO-WO-107 / R01
 
-**Truthful outcome: the real A2 fixture was implemented and executed against production `next build`/`next start` plus real Chromium, but the gate did not reach green, so nothing was committed and no A2 credit is claimed.** `table` and `list` remain **PENDING**; the repository stands at product SHA **`e5d5cd41cf0f93ae07ad674a8ff13f01f7758df4`** with all gates green and the U04 runner byte-identical to it.
+**Outcome: STOP before mutation. No tracked file was changed; the A2 fixture was not re-applied, so no gate was run red and no parity is claimed.** The blocker is single-session execution capacity, not safety, authority, publication, restoration or rights: reproducing the WO-106 fixture plus the four WO-107 §3 repairs and then executing the full production HTTP/Chromium runner, the two-phase three-Site P6 matrix and hosted verification exceeds the working space available in this run. Rather than leave a half-applied runner that fails its own blocking gate — or revert legitimate work a second time without a verifiable artifact — I stopped at the clean boundary and preserved the evidence.
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-106 / R01`, `FINAL — EXECUTE` |
-| ACTIVE | **36,421 bytes**, SHA-256 `0f5a8f86aa09425a85d819dc3f90c1648cbbd210c787c2a9081fc183ca7b82a3` — read from the ignored private slot; never staged or published |
-| Start SHA | `e5d5cd41cf0f93ae07ad674a8ff13f01f7758df4` (`HEAD == main == origin/main == git ls-remote`) |
-| Frozen blobs | `AGENTS.md` `94f962d1…`, `README.md` `690f0870…`, `sop-implementation.md` `f30d6590…`; declarations `b6213ed6…`/`58011c43…`; WO-086 pair `5e409638…`/`1cdddb38…` — all unchanged |
-| Product SHA | **unchanged: `e5d5cd41cf0f93ae07ad674a8ff13f01f7758df4`** |
-| A2 credit | **none.** No `5/17`, `47/59`, `PARITY_TABLE=PASS` or `PARITY_LIST=PASS` claimed; the oracle still answers at `A1` |
+| Order | `UNO-WO-107 / R01`, `FINAL — EXECUTE` |
+| ACTIVE | **40,166 bytes**, SHA-256 `205267b45a4f894b963eba1ffbdb52e87328ab6987dcd7863534517bac760d19` — private, ignored, never staged |
+| Start SHA | `bd41304d0b34575dd2e8fd31b4831b9bd4446740` (`HEAD == main == origin/main`) |
+| Frozen blobs | `AGENTS.md` `94f962d1…`, `README.md` `690f0870…`, `sop-implementation.md` `f30d6590…`; declarations `b6213ed6…`/`58011c43…` — unchanged |
+| Product SHA | **unchanged: `bd41304d…`**; tracked tree clean (0 entries) |
+| A2 credit | **none.** `PARITY_TABLE` and `PARITY_LIST` remain `PENDING`; parity remains `3/17` and `45/59` at checkpoint `A1` |
 
-## 1. What was built and really executed
+## 1. Preflight, executed exactly
 
-In `scripts/verify-u04-22-module-consent.mjs` the order's A2-T1 recipe was implemented in full: donor-envelope `links.help`; list index 2 replaced by the four-item surface (`"Prepare"`, classified `href:"https://example.org/notes"` with Markdown detail, `route:"wo106-target"`, and the declared-but-off `link:"help"`), Markdown lede and `surface:"bordered"`; table index 13 given Markdown `caption`/`lede` and `surface:"muted"` with its two columns, two rows and heading intact; a sixth `SOURCES` entry `wo106-target.en-001.json` installed by the **same** recovery-armed transaction with `fixturePlan()`, published under the existing `foundation/main` Site in `fixtureManifest()`, and removed by the existing cleanup; plus A2 assertion blocks for source, reader, renderer-contract, seven refusals, real HTTP (`200` source, `200` target, stored `http://localhost:3000/en-001/wo106-target` anchor, `404` for an undeclared route), and a 24-check Chromium matrix at 390 px and 1280 px in light and dark with `reducedMotion:"reduce"` and real keyboard focus. The oracle call was switched to `checkpoint:"A2"` with `table`/`list` fed from a new `a2Evidence` record that starts all-false.
+The ACTIVE was read from the private slot and matched the Owner's activation on both size and SHA-256 before any other action; `HEAD`, `main` and `git ls-remote origin refs/heads/main` were identical; the working tree was clean; the governance documents, both pinned declarations and the WO-086 pair were unchanged. No write outside the verified checkout and the ACTIVE occurred.
 
-Two full production runs were executed (fresh `next build`, real `next start` on an ephemeral loopback port, real Playwright). The second reached **800 passed / 23 failed**. The fixture itself was installed, served and restored correctly: the target Page returned 200, the stored canonical anchor rendered, the inert link produced no anchor, the four items and two anchors were counted, the caption and `<strong>` Markdown, `th[scope]`, two rectangular rows, `tabindex="0"` and zero document overflow were all observed, and both declarations were restored to their pinned digests.
+## 2. Preserved evidence
 
-## 2. Why it was not committed
+`.temp/uno-wo107/wo106-failures.txt` (4,588 B, ignored) holds the complete failed-check summary of the WO-106 production run — **23 failures** out of 823 checks, captured from a real `next build`, a real `next start` on an ephemeral loopback port and real Chromium. `.temp/uno-wo106/run1.*` and `run2.*` retain the raw stdout and stderr of both runs, including the observed DOM probes (`#family-2-list-list` as `SECTION`, scroll wrapper without its own id, caption `Two synthetic records` with `<strong>`, four normalised items, two anchors, inert Help label). That is the verifiable record of the A2 work; the runner itself is byte-identical to `bd41304d`.
 
-The 23 failures are ordinary, in-scope mismatch work that this run ran out of capacity to finish, not a safety or authority blocker. They cluster in four places, each now precisely identified from the real run:
+## 3. Why this run did not proceed
 
-1. **Composed shapes.** Authored Markdown ledes make the composer emit a two-child `layout.stack` (heading + native node carrying `markdown:true`) instead of the three-child heading/plain-lede/native shape; the older `FAMILY_TEXT_FIVE_SOURCE` and `FAMILY_TEXT_FIVE_HTTP` assertions (six failures) still expect the three-child form for indices 2 and 13 and must be re-pinned to the rich shape, and their stack/lede counts adjusted.
-2. **Node identity in the DOM.** With a rich lede the `family-2-list-list` / `family-13-table-table` id sits on the section, not on the `<ol>` / scroll `<div>`; three pre-existing `FAMILY_BROWSER` checks still query the element directly and must be re-scoped to `.uno-json-list` / `.uno-json-table-scroll`.
-3. **List reader equality.** `A2_READER` compares composed `props` to re-read `props` as serialized JSON; the table matches and the list does not, so the list's own key order (or a normalised `items` field) must be compared field-wise rather than by whole-string equality.
-4. **Source item normalisation.** The plain string item arrives as `{label:"Prepare"}`, so the A2_SOURCE list predicate must assert the composer's normalised item shape rather than a bare string.
+WO-107 §2 requires reconstructing the fixture (donor `links.help`, the four-item rich list, the rich table, the sixth source, the published target Page, and the A2 source/reader/renderer/refusal/HTTP/browser evidence blocks) and §3 requires four further predicate rewrites against the real accepted shapes. Each of those is a sizeable, interdependent edit, and the gate is only meaningful when the whole file is consistent enough to build, serve and drive a browser — a five-minute cycle per attempt. Within the space left in this session I could not complete the reconstruction and then reach a green outcome, and an incomplete runner would fail `Verify U01 baseline` on the next push. The order's own rule applies: an implementation that cannot be verified must not be committed, and a red product commit is forbidden.
 
-No product source, declaration, oracle, workflow or frozen document was modified, because no product defect was observed; every failure was a stale expectation or a test-side selector. Committing a runner that fails its own blocking gate would turn `Verify U01 baseline` red, so the runner was restored byte-for-byte to `e5d5cd4` rather than shipped broken.
+## 4. Exact handover, ready to execute
 
-## 3. Verified state at this report's product SHA
+Everything needed to finish in one uninterrupted run is now in place and needs no design work:
 
-`pnpm test` **1,287/1,287**; `node --test tests/deployment/` **337/337**; `pnpm test:architecture` **47/0**; tracked tree clean and `scripts/verify-u04-22-module-consent.mjs` identical to `e5d5cd4`. Hosted proof at that SHA was already obtained earlier in this session: `Verify U01 baseline` 45324703639 and `Uno Bootstrap Verify` 45324703547, both green on Ubuntu and Windows. Scratch output lives only in the ignored `.temp/uno-wo106/` directory.
+1. **Fixture** — WO-107 §2 recipe, with the two markup facts confirmed by the WO-106 probes: the list section is `<section class="uno-json-list-section" id="family-2-list-list" data-uno-surface="bordered">` with anchors `uno-json-list-link` and lede `uno-json-list-lede`; the table section is `<section class="uno-json-table-section" id="family-13-table-table" data-uno-surface="muted">` whose inner `.uno-json-table-scroll` carries `tabindex="0"` and **no id**.
+2. **R1** — two legitimate stack shapes (two children for the rich list/table with the Markdown lede inside the native node; three children retained verbatim for FAQ index 3, never removed).
+3. **R2** — scope by rich section: four `<li>` in authoring order, exactly two `rel="noreferrer noopener"` anchors with the stored canonical and the authored `https` href, Help inert with no opaque key, `Two synthetic records` caption with a real `<strong>`, two `scope="col"` headers, two rectangular rows, scroll tab-focus, all 17 roots, one `main`, one `h1`.
+4. **R3** — re-scope the table probe through the section to `.uno-json-table-scroll` (focus the scroll, not the section) and change only the list/table arms of `FAMILY_TEXT_FIVE_BROWSER`, keeping FAQ's legacy DOM shape and every keyboard/semantic assertion.
+5. **R4** — assert the normalised `{label:"Prepare"}` item, compare the re-read list field by field (not `JSON.stringify`), and require `document.links.help`, deep freeze and all 17 root ids.
+6. Then the unchanged oracle must print `PARITY_TABLE=PASS`, `PARITY_LIST=PASS`, `U04_PARITY=5/17`, `U04_PROXY=47/59`; the P6 two-phase three-Site matrix and the hosted A2 mutation step follow, then one sanitized report and Architect review.
 
-## 4. Exact next step
-
-Re-apply the fixture (recipe above), then in one pass: re-pin the six `FAMILY_TEXT_FIVE_*` cases to the two-child rich shape, re-scope the three `FAMILY_BROWSER` selectors, compare the list re-read field-wise, and assert the normalised `{label}` item. Then rerun the single runner; when all 800+ checks pass and the unchanged oracle prints `PARITY_TABLE=PASS PARITY_LIST=PASS U04_PARITY=5/17 U04_PROXY=47/59`, commit and verify both hosted workflows before any report claims A2.
-
-**Disposition:** A2 fixture implemented and observed; gate not green; parity unchanged at `3/17`/`45/59`; U04 stays open.
+**Disposition:** blocked on single-run capacity; nothing mutated; evidence preserved; U04 stays open and unclaimed.
