@@ -141,6 +141,9 @@ const localA2 = {
 };
 // Diagnostics only: the executed refusal codes, so a red `refusal` dimension names its own reason.
 let refusalReasons = "";
+// `UNO-WO-110 / R01` (§2 `browser`): every key here is added only by a Chromium assertion that actually ran and passed at
+// that exact viewport and colour scheme, so `table.browser` cannot be satisfied by one superficial observation.
+const tableBrowserCases = new Set();
 const a1Evidence = {
   prose: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
   callout: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
@@ -1776,7 +1779,7 @@ async function main() {
         localA2.list.reader = listReaderOk;
         localA2.table.reader = tableReaderOk;
         // `UNO-WO-108 / R01` (§4 `refusal`): two real refusals are executed against the authored source — an undeclared
-        // `link` id and an unsafe URL scheme — and both rich families depend on them.
+        // `link` id and an unsafe URL scheme — and the rich list depends on them.
         const undeclaredLink = familySource();
         undeclaredLink.sections[2].items[3] = { label: "Help unavailable", link: "absent" };
         const undeclaredLinkOutcome = composeUnoFoundationSubset(undeclaredLink, familyBindings());
@@ -1787,12 +1790,39 @@ async function main() {
           && unsafeHrefOutcome.status === "refused"
           && [undeclaredLinkOutcome.reason, unsafeHrefOutcome.reason]
             .every((reason) => typeof reason === "string" && reason.startsWith("family:"));
+        // `UNO-WO-110 / R01` (§2 `refusal`): the table's own refusal evidence is a malformed **table**, not the list's link
+        // refusals. Each probe mutates exactly one authored table field and must refuse the whole source Page with a family
+        // reason and no partial document, so a half-composed table can never be served as apparent evidence.
+        const tableRefusalProbes = [
+          ["cell Markdown", (source) => { source.sections[13].rows[0][0] = "**First**"; }],
+          ["row not an array", (source) => { source.sections[13].rows[1] = "Second"; }],
+          ["columns not an array", (source) => { source.sections[13].columns = "Phase"; }],
+          ["lede whitespace only", (source) => { source.sections[13].lede = "   "; }],
+        ].map(([label, mutate]) => {
+          const source = familySource();
+          mutate(source);
+          const outcome = composeUnoFoundationSubset(source, familyBindings());
+          return {
+            label,
+            reason: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+            partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+          };
+        });
+        const tableRefusalOk = tableRefusalProbes.every(
+          (probe) => probe.reason.startsWith("family:") && probe.partial === false,
+        );
+        check(
+          "A2_LOCAL_REFUSAL each malformed table refuses the whole source Page with a family reason and no partial document",
+          tableRefusalOk,
+          JSON.stringify(tableRefusalProbes),
+        );
         refusalReasons = JSON.stringify({
           undeclared: undeclaredLinkOutcome.status === "refused" ? undeclaredLinkOutcome.reason : undeclaredLinkOutcome.status,
           unsafeHref: unsafeHrefOutcome.status === "refused" ? unsafeHrefOutcome.reason : unsafeHrefOutcome.status,
+          table: tableRefusalProbes,
         });
         localA2.list.refusal = refusalOk;
-        localA2.table.refusal = refusalOk;
+        localA2.table.refusal = tableRefusalOk;
         const links = familyReparsed.accepted === true ? familyReparsed.document.links : undefined;
         check(
           "A2_LOCAL_READER the installed bytes re-read to the same rich list and table, with the one approved declaration",
@@ -2363,8 +2393,16 @@ async function main() {
         const missingHtml = await missingResponse.text();
         localA2.list.http = listRegion.includes('href="http://localhost:3000/en-001/wo108-target"')
           && !listRegion.includes("example.help");
-        localA2.table.http = tableRegion.includes('data-uno-surface="muted"')
-          && tableRegion.includes('tabindex="0"');
+        // `UNO-WO-110 / R01` (§2 `http`): the dimension is the real production response — HTTP 200 plus the checked rich
+        // table DOM exactly as served (surface, scroll control, Markdown lede, Markdown caption, two columns, four cells) —
+        // not the presence of one attribute.
+        localA2.table.http = familyHtmlResponse.status === 200
+          && tableRegion.includes('<section class="uno-json-table-section" id="family-13-table-table" data-uno-surface="muted">')
+          && tableRegion.includes('<div class="uno-json-table-scroll" tabindex="0">')
+          && tableRegion.includes("uno-json-table-lede")
+          && /<caption>[\s\S]*?<strong[^>]*>synthetic<\/strong>[\s\S]*?<\/caption>/u.test(tableRegion)
+          && (tableRegion.match(/<th scope="col">/gu) ?? []).length === 2
+          && (tableRegion.match(/<td>/gu) ?? []).length === 4;
         // `UNO-WO-108 / R01` (§4 `rights`): no donor copy, no opaque declaration key and no off-origin destination.
         localA2.list.rights = !familyHtml.includes(FAMILY_DONOR_SOURCE) && !listRegion.includes("example.help");
         localA2.table.rights = !familyHtml.includes(FAMILY_DONOR_SOURCE) && !tableRegion.includes("example.help");
@@ -3361,7 +3399,10 @@ async function consentPhase(base) {
           && seen.quote.anchors === 0,
         JSON.stringify(seen.quote));
       // `UNO-WO-068 / R03`: the last four families, each scoped to its own composed region.
-      familyCheck(`${width}px table shows a captioned two-column table and its scroll control takes focus`,
+      // `UNO-WO-110 / R01` (§2 `browser`): the light-viewport observation is recorded under its own key only when this exact
+      // assertion passed at this width — heading, Markdown lede and caption, two columns, four cells, no link, and the
+      // scroll control actually receiving focus.
+      const tableLightOk = familyCheck(`${width}px table shows a captioned two-column table and its scroll control takes focus`,
         seen.table.isSection && seen.table.isScroll && seen.table.focusable === "0" && seen.tableFocus
           && seen.table.wrapperTag === "TABLE" && seen.table.wrapperClass
           && JSON.stringify(seen.table.captions) === JSON.stringify(["Two synthetic records"])
@@ -3372,6 +3413,7 @@ async function consentPhase(base) {
           && JSON.stringify(seen.table.rows) === JSON.stringify([["First", "1"], ["Second", "2"]])
           && seen.table.links === 0,
         JSON.stringify(seen.table));
+      if (tableLightOk) tableBrowserCases.add(`light:${width}`);
       familyCheck(`${width}px columns show two authored tight stacks with one paragraph and one native list`,
         seen.columns.isDiv === "DIV" && seen.columns.columns === "2" && seen.columns.semantics === "plain"
           && seen.columns.ratio === "start-wide" && seen.columns.cells === 2 && seen.columns.cellsAreCells
@@ -3571,16 +3613,12 @@ async function consentPhase(base) {
         JSON.stringify(textFiveSeen.filter((entry) => entry.id !== "family-3-faq")
           .map((entry) => [entry.id, entry.isStack, entry.ledeText, entry.ledeStrong, entry.ledeVisible,
             entry.headingBeforeLede, entry.ledeBeforeNative, entry.nativeTag, entry.h2Count, entry.controls])));
-      // `UNO-WO-108 / R01` (§4 `browser`): the flag accumulates over both executed viewports, so a missing case can never
-      // leave it true. The list must show its two safe anchors and no other control; the table must stay link-free.
+      // `UNO-WO-108 / R01` (§4 `browser`): the list must show its two safe anchors and no other control; `UNO-WO-110 / R01`
+      // moved the table's own flag to the post-dark conjunction below, so one light pass can no longer set it.
       for (const entry of textFiveSeen) {
         if (entry.id === "family-2-list") {
           localA2.list.browser = localA2.list.browser
             || (entry.safeAnchors === 2 && entry.controls === 2 && entry.nativeTag === "SECTION");
-        }
-        if (entry.id === "family-13-table") {
-          localA2.table.browser = localA2.table.browser
-            || (entry.safeAnchors === 0 && entry.controls === 0 && entry.nativeTag === "SECTION");
         }
       }
 
@@ -3770,7 +3808,49 @@ async function consentPhase(base) {
         darkOutline.scheme && darkOutline.reducedMotion && darkOutline.steps === 2 && darkOutline.faq === 1
           && darkOutline.columns === 2 && darkOutline.h4s === 0 && darkOutline.overflow === 0,
         JSON.stringify(darkOutline));
+      // `UNO-WO-110 / R01` (§2 `browser`): the rich table under `prefers-color-scheme: dark` and
+      // `prefers-reduced-motion: reduce` at this exact viewport, including its focusable scroll control — the same real DOM
+      // the light pass measured, so the flag rests on four executed observations rather than one.
+      const darkTable = await tab.evaluate(() => {
+        const root = document.getElementById("family-13-table");
+        const section = document.getElementById("family-13-table-table");
+        const scroll = section?.querySelector(".uno-json-table-scroll") ?? null;
+        const table = scroll?.querySelector("table.uno-json-table") ?? null;
+        scroll?.focus();
+        return {
+          scheme: matchMedia("(prefers-color-scheme: dark)").matches,
+          reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+          isStack: root?.classList.contains("uno-json-stack") ?? false,
+          surface: section?.getAttribute("data-uno-surface") ?? "",
+          focusable: scroll?.getAttribute("tabindex") ?? "",
+          focused: document.activeElement === scroll,
+          caption: table?.querySelector("caption")?.textContent ?? "",
+          captionStrong: table?.querySelector("caption strong")?.textContent ?? "",
+          headers: table === null ? -1 : table.querySelectorAll("th[scope=col]").length,
+          cells: table === null ? -1 : table.querySelectorAll("tbody td").length,
+          links: section === null ? -1 : section.querySelectorAll("a").length,
+          overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        };
+      });
+      const darkTableOk = familyCheck(
+        `dark ${width}px the rich table keeps its caption, two columns, four cells and a focused scroll control`,
+        darkTable.scheme && darkTable.reducedMotion && darkTable.isStack && darkTable.surface === "muted"
+          && darkTable.focusable === "0" && darkTable.focused
+          && darkTable.caption === "Two synthetic records" && darkTable.captionStrong === "synthetic"
+          && darkTable.headers === 2 && darkTable.cells === 4 && darkTable.links === 0 && darkTable.overflow === 0,
+        JSON.stringify(darkTable),
+      );
+      if (darkTableOk) tableBrowserCases.add(`dark:${width}`);
     }
+    // `UNO-WO-110 / R01` (§2 `browser`): `table.browser` is the conjunction of four executed observations — light and
+    // dark/reduced-motion at 390px and 1280px — so a deleted, skipped or superficial case can never leave it true.
+    const tableBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];
+    localA2.table.browser = tableBrowserRequired.every((key) => tableBrowserCases.has(key));
+    check(
+      "A2_LOCAL_BROWSER the rich table was observed at 390px and 1280px in light and dark/reduced motion with its scroll control focused",
+      localA2.table.browser,
+      JSON.stringify(tableBrowserRequired.map((key) => [key, tableBrowserCases.has(key)])),
+    );
     await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
     familyCheck("the family Page raised no new console or page error", consoleErrors.length === errorsBefore,
       consoleErrors.slice(errorsBefore).join(" | ").slice(0, 180));
@@ -3807,7 +3887,7 @@ async function consentPhase(base) {
       {
         const flat = [...Object.values(localA2.list), ...Object.values(localA2.table)];
       check(
-        "A2_LOCAL_TABLE_LIST_EVIDENCE=14/14 (uncredited, P6 pending)",
+        "A2_LOCAL_TABLE_LIST_EVIDENCE=14/14 (table credited, list uncredited, P6 pending)",
         Object.keys(localA2.list).length === 7
           && Object.keys(localA2.table).length === 7
           && flat.length === 14
@@ -3937,7 +4017,9 @@ async function consentPhase(base) {
       a1Evidence.callout.browser,
       `checks=${a1CalloutBrowserChecks} ok=${a1CalloutBrowserOk}`,
     );
-    // The cumulative oracle reads only the evidence gathered above; it prints exactly the A1 row, never a fuller one.
+    // `UNO-WO-084 / R01` (checkpoint A1): the cumulative oracle still reads the three baseline records and prints exactly
+    // its own row. `UNO-WO-110 / R01` (§2) keeps this call as a regression assertion and prints the credited labels from the
+    // checkpoint-omitted four-family evaluation below, so the A1 row can never stand in for the fourth credit.
     const closure = evaluateU04FamilyClosure({
       families: {
         divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
@@ -3951,14 +4033,45 @@ async function consentPhase(base) {
     });
     check(
       "U04_CLOSURE_ORACLE the cumulative oracle accepts the A1 row from the executed evidence",
-      closure.ok === true && familyOk && dividerOk,
+      closure.ok === true && closure.parity === 3 && closure.proxy === 45 && familyOk && dividerOk,
       closure.ok ? `${closure.parity}/17 ${closure.proxy}/59` : String(closure.reason),
     );
-    if (closure.ok) {
-      // Every printed label is re-derived from the oracle's own credit set, so a label cannot appear without its reason.
-      const creditedNames = new Set(closure.credited.map((family) => `PARITY_${family.toUpperCase()}`));
-      const pendingNames = new Set(closure.pending.map((family) => `PARITY_${family.toUpperCase()}`));
-      for (const label of closure.labels) {
+    // `UNO-WO-110 / R01` (§2): the fourth family is credited by a **separate**, checkpoint-omitted evaluation of those same
+    // executed records plus the executed `localA2.table`. No interim target is declared for four families, so the assertion
+    // is the exact credited set and the exact interim counts; `list` stays PENDING despite its executed local evidence, and
+    // the frozen A2 row (`5/17`, `47/59`) is not claimed here.
+    const closureFour = evaluateU04FamilyClosure({
+      families: {
+        divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
+        prose: a1Evidence.prose,
+        callout: a1Evidence.callout,
+        table: localA2.table,
+      },
+      modules: UNO_RENDERABLE_MODULES.length,
+      zones: UNO_OWNED_MEDIA_ZONES.length,
+      browserMatrix: matrixCases.length,
+    });
+    check(
+      "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table and divider",
+      closureFour.ok === true
+        && JSON.stringify(closureFour.credited) === JSON.stringify(["prose", "callout", "table", "divider"])
+        && closureFour.parity === 4
+        && closureFour.proxy === 46
+        && closureFour.pending.includes("list")
+        && closureFour.labels.includes("PARITY_TABLE=PASS")
+        && closureFour.labels.includes("PARITY_LIST=PENDING")
+        && familyOk
+        && dividerOk,
+      closureFour.ok
+        ? `${closureFour.parity}/17 ${closureFour.proxy}/59 ${closureFour.credited.join(",")}`
+        : String(closureFour.reason),
+    );
+    if (closureFour.ok) {
+      // Every printed label is re-derived from this four-family result's own credit set, so a label cannot appear without
+      // its reason and the A1 regression cannot print a fuller row.
+      const creditedNames = new Set(closureFour.credited.map((family) => `PARITY_${family.toUpperCase()}`));
+      const pendingNames = new Set(closureFour.pending.map((family) => `PARITY_${family.toUpperCase()}`));
+      for (const label of closureFour.labels) {
         const equals = label.lastIndexOf("=");
         const name = label.slice(0, equals);
         const value = label.slice(equals + 1);
@@ -3967,9 +4080,9 @@ async function consentPhase(base) {
           : pendingNames.has(name)
             ? value === "PENDING"
             : name === "U04_PARITY"
-              ? value === `${closure.parity}/17`
+              ? value === `${closureFour.parity}/17`
               : name === "U04_PROXY"
-                ? value === `${closure.proxy}/59`
+                ? value === `${closureFour.proxy}/59`
                 : value === `${UNO_RENDERABLE_MODULES.length}/${UNO_RENDERABLE_MODULES.length}`
                   || value === `${UNO_OWNED_MEDIA_ZONES.length}/${UNO_OWNED_MEDIA_ZONES.length}`
                   || value === `${matrixCases.length}/${matrixCases.length}`;

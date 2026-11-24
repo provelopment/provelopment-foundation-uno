@@ -343,7 +343,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "a1ProseBrowserChecks === 20",
   "a1CalloutBrowserChecks === 12",
   "a1Evidence.prose.refusal = unsafeMarkup.status === \"refused\" && unsafeScheme.status === \"refused\"",
-  "closure.ok === true && familyOk && dividerOk",
+  "closure.ok === true && closure.parity === 3 && closure.proxy === 45 && familyOk && dividerOk",
   // `UNO-WO-080 / R01`: the three donor level-3 outlines — labels plus their executable predicates.
   "FAMILY_OUTLINE_THREE_SOURCE steps, faq and columns compose the documented level-3 item outline and refuse an authored level",
   "FAMILY_OUTLINE_THREE_HTTP the served Page puts the step titles, FAQ questions and column titles in level-3 headings of their own regions",
@@ -361,6 +361,23 @@ const PHASE_C_REQUIRED = Object.freeze([
   "outlineSeen.columnFirstChildIsHeading",
   "outlineBrowserChecks === 12",
   "darkOutline.columns === 2",
+  // `UNO-WO-110 / R01` (§2): the fourth family — a malformed-table refusal, the production-HTTP rich DOM, the four-case
+  // Chromium conjunction and the separate checkpoint-omitted four-family credit — labels plus their predicates.
+  "A2_LOCAL_REFUSAL each malformed table refuses the whole source Page with a family reason and no partial document",
+  "localA2.table.refusal = tableRefusalOk;",
+  '["columns not an array", (source) => { source.sections[13].columns = "Phase"; }]',
+  "localA2.table.http = familyHtmlResponse.status === 200",
+  "A2_LOCAL_BROWSER the rich table was observed at 390px and 1280px in light and dark/reduced motion with its scroll control focused",
+  'const tableBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];',
+  "if (tableLightOk) tableBrowserCases.add(`light:${width}`);",
+  "if (darkTableOk) tableBrowserCases.add(`dark:${width}`);",
+  "A2_LOCAL_TABLE_LIST_EVIDENCE=14/14 (table credited, list uncredited, P6 pending)",
+  "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table and divider",
+  'JSON.stringify(closureFour.credited) === JSON.stringify(["prose", "callout", "table", "divider"])',
+  "closureFour.parity === 4",
+  "closureFour.proxy === 46",
+  'closureFour.pending.includes("list")',
+  "table: localA2.table,",
 ]);
 
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
@@ -1022,6 +1039,30 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       assert.notEqual(mutated, source, label);
       assert.ok(audit(mutated).some((entry) => entry.includes(label)), `${label}: ${audit(mutated).join(",")}`);
     }
+  });
+
+  it("the audit fails when the fourth-family table evidence or its credit is neutered", () => {
+    const mutations = [
+      // The table's own refusal witness replaced by the list's, the HTTP proof weakened, the browser conjunction collapsed.
+      ["localA2.table.refusal = tableRefusalOk;", "localA2.table.refusal = refusalOk;"],
+      ["localA2.table.http = familyHtmlResponse.status === 200", "localA2.table.http = true"],
+      ['const tableBrowserRequired = ["light:390", "light:1280", "dark:390", "dark:1280"];', "const tableBrowserRequired = [];"],
+      ["table: localA2.table,", ""],
+      // The four-family credit weakened to an unconditional pass, and the A1 regression weakened in the same way.
+      ["closureFour.parity === 4", "true"],
+      ["closureFour.proxy === 46", "true"],
+      ['closureFour.pending.includes("list")', "true"],
+      ['JSON.stringify(closureFour.credited) === JSON.stringify(["prose", "callout", "table", "divider"])', "true"],
+      ["closure.ok === true && closure.parity === 3 && closure.proxy === 45 && familyOk && dividerOk", "true"],
+    ];
+    for (const [token, replacement] of mutations) {
+      const mutated = source.split(token).join(replacement);
+      assert.notEqual(mutated, source, token);
+      assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
+    }
+    // The four-family evaluation must stay checkpoint-omitted: a smuggled checkpoint would claim a row the Owner has not
+    // declared, so the frozen A2 target can never be printed from this credit.
+    assert.ok(!/checkpoint:\s*"A2"/u.test(source));
   });
 
   it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {
