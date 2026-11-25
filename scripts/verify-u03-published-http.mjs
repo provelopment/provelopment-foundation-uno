@@ -925,8 +925,32 @@ async function durableFamilySourcePhase() {
         JSON.stringify(DURABLE_PREFIX_IDS),
     );
     check(
+      // `UNO-WO-121 / R01`: the committed durable Page is **not** rewritten. It keeps its ordinary native gallery grid while
+      // the adapter now composes the donor's opt-in list, so the two are distinguished rather than conflated: every other
+      // appended section must still be the composer's own output, and only the Gallery section may differ.
       "DURABLE_FAMILY_SOURCE the appended sections are the composer's own output",
-      JSON.stringify(parsed.document.sections.slice(6)) === JSON.stringify(composed.document.sections),
+      (() => {
+        const committed = parsed.document.sections.slice(6);
+        const recomposed = composed.document.sections;
+        if (committed.length !== recomposed.length) return false;
+        const differing = committed
+          .filter((node, index) => JSON.stringify(node) !== JSON.stringify(recomposed[index]))
+          .map((node) => node.id);
+        return JSON.stringify(differing) === JSON.stringify(["family-5-gallery"]);
+      })(),
+    );
+    // The composed Gallery is the adopted list shape, and the committed Page still carries the ordinary grid it shipped with.
+    const committedGallery = parsed.document.sections.find((node) => node.id === "family-5-gallery");
+    const composedGallery = composed.document.sections.find((node) => node.id === "family-5-gallery");
+    check(
+      "DURABLE_FAMILY_SOURCE the composed Gallery is the opt-in list while the committed Page keeps its ordinary grid",
+      composedGallery?.module === "media.gallery"
+        && composedGallery?.props?.list === true
+        && committedGallery?.module === "media.gallery"
+        && committedGallery?.props?.list === undefined
+        && Array.isArray(committedGallery?.props?.items)
+        && committedGallery?.props?.items?.length === 2,
+      JSON.stringify({ composed: composedGallery?.props?.list, committed: committedGallery?.props?.list }),
     );
   }
 
