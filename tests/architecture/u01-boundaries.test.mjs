@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { README_TRUTH_ISSUES } from '../../scripts/verify-bootstrap.mjs';
+
 /**
  * Foundation Uno — U01 architecture boundary tests (Node-native, dependency-free).
  *
@@ -661,36 +663,42 @@ test('the real root layout carries exactly the one approved provider integration
 });
 
 /**
- * Every README truth rule in one place, so the mutation test cannot drift from the real check.
- * Returns the list of violated rules; an empty list means the README tells the truth.
+ * The durable README truth rules have exactly one definition — the exported rule list in
+ * `scripts/verify-bootstrap.mjs`. This gate consumes that list instead of re-stating it, so the
+ * bootstrap validator and the architecture gate cannot drift apart.
  */
-const readmeTruthIssues = (body) => {
-  const issues = [];
-  if (!body.includes('The authored public Uno A1 website is not implemented yet.')) issues.push('missing-disclaimer');
-  if (!body.includes('Node.js 26.x')) issues.push('missing-node26');
-  if (!body.includes('pnpm 11.6.0')) issues.push('missing-pnpm');
-  if (!/execution-report\.md/.test(body)) issues.push('missing-report-link');
-  for (const stale of ['U01 remains open', 'U03 is open', 'Node.js 24']) {
-    if (body.includes(stale)) issues.push(`stale:${stale}`);
-  }
-  if (/(?=[0-9a-f]*[0-9])[0-9a-f]{7,40}/.test(body)) issues.push('pinned-commit');
-  return issues;
-};
+const readmeTruthIssues = (body) => README_TRUTH_ISSUES(body).map(({ label }) => label);
+
+/** Wording that must never return: the repository records no frozen stage, head or status claim. */
+const OBSOLETE_README_TEXT = [
+  'not implemented yet',
+  'projected Page header',
+  'exactly one public Site',
+  'U01 remains open',
+];
 
 test('README and AGENTS describe the current technical baseline truthfully', () => {
   const readme = doc('README.md');
   const agents = doc('AGENTS.md');
 
-  assert.ok(
-    readme.includes('The authored public Uno A1 website is not implemented yet.'),
-    'README.md must carry the exact truthful sentence about the A1 website',
-  );
+  // The README carries the durable public truth and none of the superseded stage assertions.
+  assert.deepEqual(readmeTruthIssues(readme), []);
+  for (const obsolete of OBSOLETE_README_TEXT) {
+    assert.equal(
+      readme.toLowerCase().includes(obsolete.toLowerCase()),
+      false,
+      `README.md must not carry the superseded claim: ${obsolete}`,
+    );
+  }
   assert.match(readme, /technical baseline/i);
   assert.match(agents, /technical baseline/i);
 
   // The README must point progress at GitHub instead of freezing a stage or a commit.
-  assert.deepEqual(readmeTruthIssues(readme), []);
   assert.match(readme, /github\.com\/provelopment\/provelopment-foundation-uno/);
+  assert.match(readme, /current\s+`?main\b/i);
+  assert.match(readme, /execution-report\.md/);
+  assert.match(readme, /does not establish a published website/i);
+  assert.match(readme, /does not authorize (a )?release or deployment/i);
 
   for (const [name, body] of [
     ['README.md', readme],
@@ -705,15 +713,23 @@ test('README and AGENTS describe the current technical baseline truthfully', () 
   }
 });
 
-test('a README that reintroduces a stale stage, Node 24 or a lost disclaimer is refused', () => {
+test('a README that drops the disclaimer, its progress authority, reintroduces stale wording or claims publication is refused', () => {
   const readme = doc('README.md');
   assert.deepEqual(readmeTruthIssues(readme), [], 'the committed README must keep passing every rule');
 
   const mutations = [
+    ['removed publication disclaimer', readme.replace('does not establish a published website', 'is not finished')],
+    ['removed release disclaimer', readme.replace('does not authorize release or deployment', 'is not released')],
+    ['missing report link', readme.replaceAll('.documents/Reports/execution-report.md', 'the report')],
+    ['missing current main', readme.replaceAll(/current\s+`main`/giu, 'the default branch')],
+    ['missing progress-authority repository', readme.replaceAll('provelopment/provelopment-foundation-uno', 'the repository')],
+    ['missing baseline', readme.replaceAll(/technical baseline/giu, 'repository')],
+    ['reintroduced obsolete wording', `${readme}\nThe authored public Uno A1 website is not implemented yet.\n`],
+    ['restored single-public-Site restriction', `${readme}\nA1 permits exactly one public Site.\n`],
+    ['unsupported publication claim', `${readme}\nThis is a published website.\n`],
     ['appended U01 stage claim', `${readme}\nU01 remains open\n`],
     ['appended U03 stage claim', `${readme}\nU03 is open\n`],
     ['restored Node 24 claim', readme.replace('Node.js 26.x', 'Node.js 24.x')],
-    ['removed disclaimer', readme.replace('The authored public Uno A1 website is not implemented yet.', '')],
     ['pinned commit', `${readme}\nStart at 2a815c2.\n`],
   ];
   for (const [label, body] of mutations) {
@@ -722,8 +738,10 @@ test('a README that reintroduces a stale stage, Node 24 or a lost disclaimer is 
     assert.ok(issues.length > 0, `${label} must be refused by the README truth rules`);
   }
 
-  // The exact Owner-approved disclaimer is still present word for word.
-  assert.equal(readme.includes('The authored public Uno A1 website is not implemented yet.'), true);
+  // The approved wording is still present word for word, not merely implied.
+  assert.equal(readme.includes('does not establish a published website'), true);
+  assert.equal(readme.includes('does not authorize release or deployment'), true);
+  assert.equal(readme.includes('The authored public Uno A1 website is not implemented yet.'), false);
 });
 
 test('the authored core kernel is exactly the declared file set', () => {

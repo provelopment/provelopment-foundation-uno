@@ -8,9 +8,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const FROZEN_GOVERNANCE_FILES = Object.freeze([
-  { path: 'AGENTS.md', sha256: '6c6d5dcba44c9769df8a18db00d4791b38fc804759cb1da14e20daf9de31ca6f', maxBytes: 3200 },
-  { path: 'README.md', sha256: '97f93bdaf710bac53e3be48be0365c414042e89ef4461e55e98852cd0fd1995a', maxBytes: 3200 },
-  { path: '.documents/SOP/sop-implementation.md', sha256: '6d790ad43349c434297d4d8a1e98311a822d4ec31df67aa882542aeab21cb388', maxBytes: 6000 },
+  { path: 'AGENTS.md', sha256: 'e7ff1d7fcb555f8b2ac2cda3b7ea0267aab70f0e779436f415503141ae44185d', maxBytes: 3200 },
+  { path: 'README.md', sha256: '035eb96c2a12adb8143790cff775d73bbc5cb53b668db2c63aaf5998a8374322', maxBytes: 3200 },
+  { path: '.documents/SOP/sop-implementation.md', sha256: '6c20beb768294c3b12de63a34a5dd998e3d4d4b2d039ed945093e258b262cc2d', maxBytes: 6000 },
 ]);
 
 /** Pure reader injection supports refusal tests without writing fixtures. */

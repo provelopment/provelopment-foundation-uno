@@ -25,9 +25,21 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** All fixtures live here, inside the ignored task-scratch directory. */
 const FIXTURE_BASE = join(REPO_ROOT, '.temp', 'bootstrap-tests');
 
-/** A complete, minimal, valid U00 scaffold, including the four WIP slots. */
+/**
+ * A complete, minimal, valid U00 scaffold, including the four WIP slots.
+ *
+ * The README fixture carries only the durable public truth: baseline, progress authority
+ * (current `main` + the single report), and the publication/release disclaimer. It pins no
+ * stage, no commit and no implementation-status claim.
+ */
 const VALID_FILES = {
-  'README.md': '# Foundation Uno\n\nThe Uno runtime is not implemented yet.\n',
+  'README.md':
+    '# Foundation Uno\n\n' +
+    'Foundation Uno is a **technical baseline**, adapted from audited Foundation code. ' +
+    'Read current `main` and the [single execution report](.documents/Reports/execution-report.md) ' +
+    'for progress; the repository is https://github.com/provelopment/provelopment-foundation-uno. ' +
+    'A technical baseline or passing test does not establish a published website and does not ' +
+    'authorize release or deployment without separate Owner authorization.\n',
   'AGENTS.md':
     '# AGENTS.md\n\n' +
     'Canonical documents: https://drive.google.com/drive/folders/1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0\n' +
@@ -146,12 +158,70 @@ test('a missing README is refused', () => {
   assert.ok(issues.some((i) => i.includes('README.md')), JSON.stringify(issues));
 });
 
+const VALID_README = VALID_FILES['README.md'];
+
 test('a README that claims a working website is refused', () => {
   const root = makeFixture('dishonest-readme', {
     override: { 'README.md': '# Foundation Uno\n\nA production-ready Next.js website.\n' },
   });
   const issues = validateBootstrap(root);
-  assert.ok(issues.some((i) => i.includes('not implemented yet')), JSON.stringify(issues));
+  assert.ok(
+    issues.length > 0 && issues.every((i) => i.startsWith('README.md')),
+    JSON.stringify(issues),
+  );
+});
+
+test('a README without the baseline, progress authority or disclaimer is refused rule by rule', () => {
+  const cases = [
+    ['missing-baseline', VALID_README.replaceAll(/technical baseline/giu, 'repository')],
+    [
+      'missing-progress-authority',
+      VALID_README.replace('https://github.com/provelopment/provelopment-foundation-uno', 'the repository'),
+    ],
+    ['missing-current-main', VALID_README.replace('current `main`', 'the default branch')],
+    [
+      'missing-report-link',
+      VALID_README.replace('.documents/Reports/execution-report.md', 'the report'),
+    ],
+    [
+      'missing-publication-disclaimer',
+      VALID_README.replace('does not establish a published website', 'is not finished'),
+    ],
+    [
+      'missing-release-disclaimer',
+      VALID_README.replace('does not authorize release or deployment', 'is not released'),
+    ],
+  ];
+  for (const [label, body] of cases) {
+    assert.notEqual(body, VALID_README, `${label} must actually change the README`);
+    const root = makeFixture(`readme-${label}`, { override: { 'README.md': body } });
+    const issues = validateBootstrap(root);
+    assert.ok(
+      issues.some((i) => i.includes(label)),
+      `${label}: ${JSON.stringify(issues)}`,
+    );
+  }
+});
+
+test('a README that reintroduces a superseded stage claim, published-website claim or pinned commit is refused', () => {
+  const cases = [
+    ['not implemented yet', `${VALID_README}\nThe Uno runtime is not implemented yet.\n`],
+    ['projected Page header', `${VALID_README}\nThe projected Page header is authoritative.\n`],
+    ['exactly one public Site', `${VALID_README}\nA1 permits exactly one public Site.\n`],
+    ['U01 remains open', `${VALID_README}\nU01 remains open\n`],
+    ['published website', `${VALID_README}\nThis is a published website.\n`],
+    ['pinned commit', `${VALID_README}\nStart at 2a815c2.\n`],
+  ];
+  for (const [label, body] of cases) {
+    const root = makeFixture(`readme-stale-${label.replace(/[^a-z0-9]+/gi, '-')}`, {
+      override: { 'README.md': body },
+    });
+    const issues = validateBootstrap(root);
+    assert.ok(
+      issues.length > 0 && issues.some((i) => i.startsWith('README.md')),
+      `${label}: ${JSON.stringify(issues)}`,
+    );
+  }
 });
 
 test('a missing AGENTS.md is refused', () => {
@@ -184,9 +254,7 @@ test('a credential in a published document is refused', () => {
   const sampleToken = ['ghp', '0123456789abcdefghijABCDEFGHIJ012345'].join('_');
   const root = makeFixture('secret-leak', {
     override: {
-      'README.md':
-        '# Foundation Uno\n\nThe Uno runtime is not implemented yet.\n' +
-        `Example token: ${sampleToken}\n`,
+      'README.md': `${VALID_README}\nExample token: ${sampleToken}\n`,
     },
   });
   const issues = validateBootstrap(root);
@@ -201,9 +269,7 @@ test('a machine-specific private path in a published document is refused', () =>
   const privatePath = 'C:' + separator + 'Users' + separator + 'someone' + separator + 'repo';
   const root = makeFixture('private-path-leak', {
     override: {
-      'README.md':
-        '# Foundation Uno\n\nThe Uno runtime is not implemented yet.\n' +
-        `Local path: ${privatePath}\n`,
+      'README.md': `${VALID_README}\nLocal path: ${privatePath}\n`,
     },
   });
   const issues = validateBootstrap(root);

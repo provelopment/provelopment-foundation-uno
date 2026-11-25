@@ -14,7 +14,9 @@ Before any write, confirm the physical Uno root and every ancestor/junction; one
 
 All implementation files, package installs, build output, Git operations and task scratch stay inside the verified Uno root and the order's ledger. Parent workspace, Foundation template, Solo and siblings are read-only. No second clone/worktree, hook bypass, global install, cache escape, `git clean/reset` of unknown changes, force-push, secret publication or unapproved provider action.
 
-Uno contains exactly one Entity, an explicit Facet → Site → Page → localized-representation graph and one selected public Site. No Spoke/Hub or alternate publication authority. Keep framework-free core and inward ports/adapters boundaries; validate authored paths, URLs, assets, visibility and public/private properties at the stage that implements them. No unreviewed Foundation draft/Solo Rust/Connect import.
+Uno contains exactly one Entity, with one or more concurrently active Facets, Sites per Facet, Pages per Site and explicitly authored full-locale representations per Page — no arbitrary hierarchy or language-count ceiling, while resource, ownership and collision guards stay mandatory. Every valid Site may publish independently through its explicitly validated Facet/Site host and/or path binding; an optional explicit default is an entry preference, never an exclusive publisher, and public or unlisted discovery plus full-locale representations are supported without a second publisher. No Spoke/Hub or alternate publication authority. Keep framework-free core and inward ports/adapters boundaries; validate authored paths, URLs, assets, visibility and public/private properties at the stage that implements them. No unreviewed Foundation draft/Solo Rust/Connect import.
+
+An unexplained mid-run mutation of a file outside this order's ledger means **STOP**: preserve the unknown change, restore, overwrite and commit nothing, and record it for the Owner.
 
 ## 4. WIP, tests and Git
 

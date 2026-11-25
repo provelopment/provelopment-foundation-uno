@@ -142,6 +142,77 @@ function readText(path) {
   return readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
 }
 
+/**
+ * Durable public truth rules for `README.md`.
+ *
+ * The README is not a status log: progress authority is current `main` plus the single execution
+ * report, the repository is a technical baseline, and no declaration or passing test may be read as
+ * a published website, release or deployment. Both this validator and the architecture gate consume
+ * this list, so the two gates cannot drift apart. Superseded stage wording is refused so an old
+ * claim cannot come back and quietly contradict the current governance contract.
+ */
+export const OBSOLETE_README_CLAIMS = Object.freeze([
+  'not implemented yet',
+  'projected Page header',
+  'exactly one public Site',
+  'one selected public Site',
+  'U01 remains open',
+  'U03 is open',
+  'Node.js 24',
+]);
+
+export const README_TRUTH_RULES = Object.freeze([
+  { label: 'missing-baseline', ok: (body) => /technical baseline/i.test(body) },
+  {
+    label: 'missing-progress-authority',
+    ok: (body) => body.includes('provelopment/provelopment-foundation-uno'),
+  },
+  { label: 'missing-current-main', ok: (body) => /current\s+`?main\b/i.test(body) },
+  { label: 'missing-report-link', ok: (body) => /execution-report\.md/.test(body) },
+  {
+    label: 'missing-publication-disclaimer',
+    ok: (body) => /does not establish a published website/i.test(body),
+  },
+  {
+    label: 'missing-release-disclaimer',
+    ok: (body) => /does not authorize (a )?release or deployment/i.test(body),
+  },
+  { label: 'published-website-claim', ok: (body) => !/is a published (Uno )?website/i.test(body) },
+  {
+    label: 'pinned-commit',
+    ok: (body) => !/(?=[0-9a-f]*[0-9])[0-9a-f]{7,40}/.test(body),
+  },
+  {
+    label: 'obsolete-claim',
+    ok: (body) =>
+      !OBSOLETE_README_CLAIMS.some((claim) => body.toLowerCase().includes(claim.toLowerCase())),
+  },
+]);
+
+/**
+ * Evaluate the durable README truth rules against one README body.
+ *
+ * @param {string} body normalised README text
+ * @returns {Array<{ label: string, issue: string }>} violations; empty when the README is truthful
+ */
+export function README_TRUTH_ISSUES(body) {
+  const issues = [];
+  for (const { label, ok } of README_TRUTH_RULES) {
+    if (!ok(body)) {
+      issues.push({ label, issue: `README.md violates the durable truth rule (${label})` });
+    }
+  }
+  for (const claim of OBSOLETE_README_CLAIMS) {
+    if (body.toLowerCase().includes(claim.toLowerCase())) {
+      issues.push({
+        label: 'obsolete-claim',
+        issue: `README.md must not reintroduce the superseded claim (${claim})`,
+      });
+    }
+  }
+  return issues;
+}
+
 function isNonEmptyFile(path) {
   try {
     return statSync(path).isFile() && readFileSync(path).length > 0;
@@ -203,10 +274,10 @@ export function validateBootstrap(root) {
     }
   }
 
-  // --- 2. README tells the truth about the stage ------------------------------
+  // --- 2. README states the durable public truth, not a frozen stage ----------
   const readme = text('README.md');
-  if (readme && !/not implemented yet/i.test(readme)) {
-    issues.push('README.md must state that the Uno runtime is not implemented yet');
+  if (readme) {
+    for (const { issue } of README_TRUTH_ISSUES(readme)) issues.push(issue);
   }
 
   // --- 3. AGENTS anchors to the canonical records and the physical order ------

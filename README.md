@@ -1,12 +1,12 @@
 # Foundation Uno
 
-Foundation Uno is an independent, rebrandable Apache-2.0 **Next.js/TypeScript** website foundation adapted from audited [Provelopment Foundation](https://github.com/provelopment/provelopment-foundation) code. One Installation owns **one Entity → Facets → Sites → Pages → explicitly authored full-locale representations**. A1 permits exactly one explicitly selected public Site. It does not implement multi-Entity Hub/Spoke operation. Solo informs only adopted design concepts, not runtime code.
+Foundation Uno is an independent, rebrandable Apache-2.0 **Next.js/TypeScript** website foundation adapted from audited [Provelopment Foundation](https://github.com/provelopment/provelopment-foundation) code. One Installation owns **one Entity, one or more concurrently active Facets, Sites per Facet, Pages per Site and explicitly authored full-locale representations per Page**. Every valid Site may publish independently through its explicitly validated Facet/Site host and/or path binding; an optional explicit default is an entry preference, never an exclusive publisher. No arbitrary hierarchy or language ceiling and no multi-Entity Hub/Spoke operation; Solo informs only adopted design concepts, not runtime code.
 
 ## Source of truth
 
 The [Uno repository](https://github.com/provelopment/provelopment-foundation-uno) is the **only record of progress and executed work**. Read current `main`, [the single execution report](.documents/Reports/execution-report.md), [the roadmap](.documents/WIP/plan-roadmap.md) and exact-head CI for present stage, implemented features and limitations. This README has no run history, closed/open stage declarations or pinned commit.
 
-The authored public Uno A1 website is not implemented yet. A **technical baseline**, valid EFS declaration, passing tests or projected Page header is not by itself a published A1 website. Public routes, publication, releases and deployments require their own Owner-authorized work and evidence; do not describe unfinished functions as live.
+Current maturity, implemented features and outstanding gates live only in current `main` and [the single execution report](.documents/Reports/execution-report.md): the code is a **technical baseline**, and a technical baseline, valid declaration or passing test does not establish a published website and does not authorize release or deployment; those need their own Owner authorization and evidence.
 
 ## Develop and verify
 
