@@ -570,6 +570,30 @@ const PHASE_C_REQUIRED = Object.freeze([
   "const mediaBrowser = mediaBrowserReport(readings);",
   "mediaCaseVerdict(reading, testCase)",
   "walkToSafeLink(tab, MEDIA_EXPECTED.captionLinkHref)",
+  // `UNO-WO-121 / R01`: the Gallery family's own seven dimensions, its twelve closed probes, its three measured widths and
+  // its restore proof — plus the C1 row the unchanged oracle now earns.
+  "FAMILY_GALLERY_SOURCE the real adapter composes the donor's Gallery as one ordered list — authored heading and Markdown lede, whole-section surface, a Markdown caption, the decorative form and the donor's own default column intent left absent",
+  "FAMILY_GALLERY_READER one through twenty-four figures are accepted and zero or twenty-five refuse, twenty-four distinct bound identities coexist with a separate Media identity on one Page, the consumed set equals the bound set, repeated identities keep authored order, the ordinary grid and carousel and the required-alt boundary are unchanged, and no shared guard moved",
+  "FAMILY_GALLERY_REFUSAL every one of the ${GALLERY_REFUSAL_CASES.length} gallery probes refuses the whole Page with its own closed reason and no partial document",
+  "FAMILY_GALLERY_HTTP the served Gallery is one ordered list per section with the authored heading, Markdown lede and caption, the closed surface, the decorative empty alternative, no invented intent, and twenty-four occurrences each serving this Page's own 64x64 PNG",
+  "FAMILY_GALLERY_BROWSER ${testCase.key} the six served lists lay out the authored column count, keep their owned locators in order, load their images, own their captions, present their surfaces and reach the caption link by keyboard",
+  "FAMILY_GALLERY_BROWSER the browser dimension is the conjunction of all six executed cases at 390, 768 and 1280px in light and dark/reduced motion, with the fixture restored byte-exactly",
+  "FAMILY_GALLERY_RIGHTS the served Gallery renders no donor identity, no remote source, no provider and no locator outside this Page's own owned route",
+  "FAMILY_GALLERY_RESTORE the temporary Gallery fixture was restored byte-exactly and a fresh response serves the committed Page without any variant anchor",
+  "galleryCaseVerdict(reading, testCase)",
+  "const geometry = galleryGeometryReport(readings);",
+  "FAMILY_GALLERY_REFUSAL ${probe.label} refuses the whole Page with ${probe.expected} and no document",
+  "U04_CLOSURE_ORACLE the unchanged oracle credits exactly thirteen families at 13/17 and 55/59 under the C1 checkpoint it declared",
+  "U04_CLOSURE_ORACLE the same evidence reports 13/17 and 55/59 without any checkpoint selector, so the selector adds no credit of its own",
+  'closureC1.labels.includes("PARITY_GALLERY=PASS")',
+  'closureC1.labels.includes("U04_PARITY=13/17")',
+  'closureC1.labels.includes("U04_PROXY=55/59")',
+  "gallery: localA2.gallery,",
+  "const bindingsFor = (section) => {",
+  "bindingsFor(GALLERY_SOURCE)",
+  // The Gallery-scoped ceiling, the exact-consumption proof and the C1 credit each have their own required token.
+  "const noGalleryCeiling = composePage(",
+  "gallery: localA2.gallery,",
   "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_MEDIA_EVIDENCE=63/63 (table, list, hero, stats, steps, quote, faq, columns and media credited; P6 destination proof in the three-Site gate)",
   "localA2.columns.browser = conjunction(columnsCases) && geometry.ok;",
   "localA2.columns.renderer = rendererOk;",
@@ -961,6 +985,23 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
         "!textlessRegion.includes(\"uno-json-prose\")",
         "true",
         "!textlessRegion.includes(\"uno-json-prose\")",
+      ],
+      // `UNO-WO-121 / R01`: the Gallery-scoped binding ceiling and the one-list representation are each load-bearing — dropping
+      // either must fail the audit rather than silently pass.
+      [
+        "const noGalleryCeiling = composePage(",
+        "const noGalleryCeilingRemoved = composePage(",
+        "const noGalleryCeiling = composePage(",
+      ],
+      [
+        "bindingsFor(GALLERY_SOURCE)",
+        "GALLERY_BINDINGS.images",
+        "bindingsFor(GALLERY_SOURCE)",
+      ],
+      [
+        'closureC1.labels.includes("PARITY_GALLERY=PASS")',
+        'closureC1.labels.includes("PARITY_GALLERY=PENDING")',
+        'closureC1.labels.includes("PARITY_GALLERY=PASS")',
       ],
     ];
     for (const [from, to, contract] of shapes) {
@@ -1483,10 +1524,11 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       assert.notEqual(mutated, source, token);
       assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
     }
-    // The declared checkpoints are exactly the earned rows — the A1 regression, the A2 delivery, the B1 row and now the B2 row
-    // this order delivered. A higher checkpoint would claim a row the Owner has not delivered, so it must never appear.
+    // The declared checkpoints are exactly the earned rows — the A1 regression, the A2 delivery, the B1 row, the B2 row and now
+    // the C1 row this order delivered. A higher checkpoint would claim a row the Owner has not delivered, so it must never
+    // appear: C2 and D stay absent until their own orders authorize them.
     const declared = [...source.matchAll(/checkpoint:\s*"([A-Z0-9]+)",$/gmu)].map((match) => match[1]);
-    assert.deepEqual(declared, ["A1", "A2", "B1", "B2"]);
+    assert.deepEqual(declared, ["A1", "A2", "B1", "B2", "C1"]);
   });
 
   it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {

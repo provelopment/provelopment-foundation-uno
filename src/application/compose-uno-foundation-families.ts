@@ -201,7 +201,17 @@ function readMediaSourceIdentity(value: unknown): string | null {
 interface MediaBindingContext {
   readonly lookup: ReadonlyMap<string, UnoOwnedAssetRef>;
   readonly usedSources: Set<string>;
+  /**
+   * `UNO-WO-121 / R01`: set only by the Gallery arm that actually composed an opt-in list Gallery. The aggregate image-binding
+   * ceiling is 32 for such a Page and stays 8 for every Page without one, so a 24-distinct-image Gallery can coexist with the
+   * Media bindings an ordinary Page already needed while nothing else gains a wider binder.
+   */
+  galleryComposed: boolean;
 }
+
+/** The ordinary aggregate image-binding ceiling across a Page, and the Gallery-scoped one (`UNO-WO-121 / R01`). */
+const IMAGE_BINDING_CEILING = 8;
+const GALLERY_IMAGE_BINDING_CEILING = 32;
 
 /**
  * Read the optional second argument's envelope: at least one of the own keys `images` and `contactForms`.
@@ -279,7 +289,11 @@ function readContactAcknowledgements(value: PlainValue | undefined): ReadonlyMap
 }
 
 /**
- * Read the optional image binding list — exactly one to eight dense `{source, owned}` entries.
+ * Read the optional image binding list — one to thirty-two dense `{source, owned}` entries.
+ *
+ * `UNO-WO-121 / R01`: the list is read at the Gallery-scoped ceiling so a 24-distinct-image Gallery can be declared, and the
+ * ordinary eight-entry ceiling is enforced after composition for every Page that composed no Gallery. That keeps the binder
+ * exactly as wide as each Page needs and no wider.
  *
  * A present list is a declaration, never source or publication authority: sources are unique validated donor identities
  * and each owned value is validated by the established Uno-owned image policy *before* any candidate exists. An absent
@@ -290,7 +304,7 @@ function readImageBindings(value: PlainValue | undefined): ReadonlyMap<string, U
   const lookup = new Map<string, UnoOwnedAssetRef>();
   if (value === undefined) return lookup;
   if (!Array.isArray(value)) refuseUnsupportedFeature();
-  if (value.length < 1 || value.length > 8) refuseTarget();
+  if (value.length < 1 || value.length > GALLERY_IMAGE_BINDING_CEILING) refuseTarget();
   for (const rawImage of value) {
     if (rawImage === null || typeof rawImage !== "object" || Array.isArray(rawImage)) {
       refuseUnsupportedFeature();
@@ -1405,15 +1419,15 @@ function composeSection(
       return { id, module: "layout.stack", props: stackProps, children: wrapped };
     }
     case "gallery": {
-      // The donor also accepts optional heading/lede/surface, decorative images, Markdown captions and an implicit
-      // column default. This subset composes an explicitly columned grid of described images only.
-      requireExactKeys(record, ["type", "columns", "items"], []);
-      const columns = record["columns"];
-      if (columns !== 2 && columns !== 3 && columns !== 4) refuseTarget();
+      // `UNO-WO-121 / R01`: the donor's full Gallery surface, composed as the closed opt-in **list** representation of
+      // `media.gallery`. The donor carriers an optional plain heading, the shared Markdown lede, the closed whole-section
+      // surface and an optional column intent, plus one to twenty-four ordered figures, each with its own descriptive or
+      // explicitly decorative image and its own Markdown-capable caption. Ordinary native galleries are unaffected: this arm
+      // only ever emits the explicit list form, and the reader keeps the grid form for documents that do not opt in.
+      requireExactKeys(record, ["type", "items"], ["columns", "heading", "lede", "surface"]);
       const rawItems = record["items"];
       if (!Array.isArray(rawItems)) refuseUnsupportedFeature();
-      // Narrower than Uno's own 2..12 gallery bound: at most the binder's eight unique source identities.
-      if (rawItems.length < 2 || rawItems.length > 8) refuseTarget();
+      if (rawItems.length < 1 || rawItems.length > 24) refuseTarget();
       const items: Record<string, unknown>[] = [];
       for (const rawItem of rawItems) {
         if (rawItem === null || typeof rawItem !== "object" || Array.isArray(rawItem)) {
@@ -1426,20 +1440,71 @@ function composeSection(
           refuseUnsupportedFeature();
         }
         const image = rawImage as PlainRecord;
-        requireExactKeys(image, ["src", "alt"], []);
+        // The same donor alternative contract the Media arm adopted: `alt` is optional beside the donor's own optional
+        // boolean and required otherwise, and only the literal `true` makes an image decorative.
+        requireExactKeys(image, ["src"], ["alt", "decorative"]);
         const source = readMediaSourceIdentity(image["src"]);
         if (source === null) refuseUnsupportedFeature();
-        const alt = readNewFamilyText(image["alt"]);
-        // A donor decorative image is a different semantic and is not composed as a described grid item.
-        if (alt.trim().length === 0) refuseTarget();
-        const caption = ownsKey(entry, "caption") ? readNewFamilyText(entry["caption"]) : undefined;
-        if (caption !== undefined && caption.trim().length === 0) refuseTarget();
+        const rawDecorative = image["decorative"];
+        if (rawDecorative !== undefined && typeof rawDecorative !== "boolean") refuseUnsupportedFeature();
+        const decorative = rawDecorative === true;
+        const rawAlt = image["alt"];
+        if (rawAlt !== undefined && typeof rawAlt !== "string") refuseUnsupportedFeature();
+        let alt = "";
+        if (decorative) {
+          if (rawAlt !== undefined && rawAlt.length !== 0) refuseTarget();
+        } else if (rawAlt === undefined || rawAlt.trim().length === 0) {
+          refuseTarget();
+        } else {
+          alt = readNewFamilyText(rawAlt);
+        }
+        // The donor caption is Markdown-capable and read at the donor's own 4,000 bound. As in Media, an unformatted caption
+        // above the native 320-point bound is declared through that same accepted form rather than reformatted to fit.
+        const hasCaption = ownsKey(entry, "caption");
+        const caption = hasCaption ? readRichFamilyText(entry["caption"], 4000) : undefined;
+        const captionMarkdown = caption !== undefined
+          && (hasFamilyMarkdown(caption) || codePointLength(caption) > UNO_PAGE_DOCUMENT_LIMITS.mediaCaptionCodePoints);
         const owned = media.lookup.get(source);
         if (owned === undefined) refuseUnsupportedFeature();
         media.usedSources.add(source);
-        items.push({ asset: owned, alt, ...(caption === undefined ? {} : { caption }) });
+        items.push({
+          asset: owned,
+          alt,
+          ...(rawDecorative === undefined ? {} : { decorative: rawDecorative }),
+          ...(caption === undefined ? {} : { caption }),
+          ...(captionMarkdown ? { markdown: true } : {}),
+        });
       }
-      return { id, module: "media.gallery", props: { columns, items } };
+      // Closed presentation options, each refused rather than coerced when it is outside its set.
+      const columnsAuthored = ownsKey(record, "columns");
+      const columns = record["columns"];
+      if (columnsAuthored && columns !== 2 && columns !== 3 && columns !== 4) refuseUnsupportedFeature();
+      const surfaceAuthored = ownsKey(record, "surface");
+      if (
+        surfaceAuthored
+        && record["surface"] !== "plain"
+        && record["surface"] !== "muted"
+        && record["surface"] !== "bordered"
+      ) {
+        refuseUnsupportedFeature();
+      }
+      const headingAuthored = ownsKey(record, "heading");
+      const ledeAuthored = ownsKey(record, "lede");
+      const props: Record<string, unknown> = { list: true, items };
+      if (columnsAuthored) props["columns"] = columns;
+      if (headingAuthored) {
+        // The donor Gallery heading is a plain section heading, rendered at level 2 beneath the Page's own outline.
+        props["heading"] = readSectionHeading(record["heading"]);
+        props["level"] = 2;
+      }
+      if (ledeAuthored) {
+        const lede = readFamilyLede(record["lede"]);
+        props["lede"] = lede;
+        if (hasFamilyMarkdown(lede)) props["ledeMarkdown"] = true;
+      }
+      if (surfaceAuthored) props["surface"] = record["surface"];
+      media.galleryComposed = true;
+      return { id, module: "media.gallery", props };
     }
     case "contactForm": {
       // The donor accepts `{type, formRef}` only: a reference to a form renderer it may or may not have. This subset
@@ -1496,6 +1561,7 @@ export function composeUnoFoundationSubset(input: unknown, bindings?: unknown): 
     const media: MediaBindingContext = {
       lookup: readImageBindings(migration?.images),
       usedSources: new Set<string>(),
+      galleryComposed: false,
     };
     const contacts: ContactBindingContext = {
       acknowledged: readContactAcknowledgements(migration?.contactForms),
@@ -1514,6 +1580,10 @@ export function composeUnoFoundationSubset(input: unknown, bindings?: unknown): 
     for (const usedSource of media.usedSources) {
       if (!media.lookup.has(usedSource)) refuseUnsupportedFeature();
     }
+    // `UNO-WO-121 / R01`: the aggregate ceiling is eight identities for every Page that composed no Gallery, and thirty-two
+    // only for a Page that actually composed the opt-in list Gallery. The wider ceiling is scoped to the Gallery, never
+    // granted by the mere presence of a binding list.
+    if (!media.galleryComposed && media.lookup.size > IMAGE_BINDING_CEILING) refuseUnsupportedFeature();
 
     // The same exact-set rule for contact acknowledgements: every acknowledged `formRef` must be consumed by an authored
     // section and every authored section must be acknowledged. An acknowledgement never becomes publication or delivery

@@ -111,11 +111,18 @@ function MediaItemFigure({
   image,
   alt,
   caption,
+  markdown,
 }: {
   readonly image: UnoResolvedImage;
   readonly alt: string;
   readonly caption: string | undefined;
+  /**
+   * `UNO-WO-121 / R01`: true only for an item whose caption was declared as the donor's Markdown-capable form. The parsed AST
+   * is rendered when it is accepted, and the authored text is otherwise emitted as one escaped node — never a partial render.
+   */
+  readonly markdown?: boolean;
 }) {
+  const parsed = markdown === true ? parseFamilyMarkdown(caption) : null;
   return (
     <figure className="uno-json-media-item">
       <Image
@@ -126,7 +133,13 @@ function MediaItemFigure({
         unoptimized
         width={image.width}
       />
-      {caption === undefined ? null : <figcaption className="uno-json-media-caption">{caption}</figcaption>}
+      {caption === undefined ? null : parsed !== null ? (
+        <figcaption className="uno-json-media-caption">
+          <UnoFamilyMarkdown blocks={parsed} className="uno-json-media-caption-body" />
+        </figcaption>
+      ) : (
+        <figcaption className="uno-json-media-caption">{caption}</figcaption>
+      )}
     </figure>
   );
 }
@@ -751,6 +764,49 @@ function SectionNode({
     case "media.gallery": {
       const resolved = mediaOf(media, node.id).items;
       if (resolved === undefined || resolved.length !== node.props.items.length) return null;
+      // `UNO-WO-121 / R01`: the closed opt-in **list** representation. One ordered `<ul>` whose every direct `<li>` owns exactly
+      // one figure carrying that item's own image and caption, beneath only the authored heading and lede — no control, no
+      // invented heading, no invented text and no duplicated anchor.
+      if ("list" in node.props && node.props.list === true) {
+        const listProps = node.props;
+        const { heading, level, lede, ledeMarkdown, surface, columns } = listProps;
+        const Tag = level === undefined ? null : HEADING_TAGS[level];
+        const ledeParsed = ledeMarkdown === true ? parseFamilyMarkdown(lede) : null;
+        return (
+          <div className="uno-json-gallery-section" data-uno-surface={surface} id={node.id}>
+            {Tag === null || heading === undefined ? null : (
+              <Tag className="uno-json-heading" id={`${node.id}-heading`}>
+                {heading}
+              </Tag>
+            )}
+            {lede === undefined ? null : ledeParsed !== null ? (
+              <section className="uno-json-prose" id={`${node.id}-lede`}>
+                <UnoFamilyMarkdown blocks={ledeParsed} className="uno-json-gallery-lede" />
+              </section>
+            ) : (
+              <p className="uno-json-prose" id={`${node.id}-lede`}>
+                {lede}
+              </p>
+            )}
+            <ul className="uno-json-gallery-list" data-uno-columns={columns} id={`${node.id}-list`} role="list">
+              {listProps.items.map((item, index) => {
+                const image = resolved[index];
+                if (image === undefined) return null;
+                return (
+                  <li className="uno-json-gallery-entry" key={`${item.alt}:${index}`}>
+                    <MediaItemFigure
+                      alt={item.alt}
+                      caption={item.caption}
+                      image={image}
+                      markdown={item.markdown === true}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      }
       return (
         <div className="uno-json-gallery" data-uno-columns={node.props.columns} id={node.id}>
           {node.props.items.map((item, index) => {

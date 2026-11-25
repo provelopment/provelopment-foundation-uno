@@ -2575,9 +2575,37 @@ describe("composeUnoFoundationSubset — media binding refusals", () => {
 
   it("refuses binding counts and invalid owned refs through the target reason", () => {
     expectRefusal(envelope(FIFTEEN_MEDIA_SECTION), "family:target-refused", { images: [] });
-    expectRefusal(envelope(FIFTEEN_MEDIA_SECTION), "family:target-refused", {
+    // A duplicate source is refused as an unsupported shape rather than by count.
+    expectRefusal(envelope(FIFTEEN_MEDIA_SECTION), "family:unsupported-feature", {
       images: Array.from({ length: 9 }, () => ({
         source: "/assets/portrait.png",
+        owned: { zone: "page", path: "images/portrait.png" },
+      })),
+    });
+    // Beyond the Gallery-scoped ceiling the list itself refuses, before any source is read.
+    expectRefusal(
+      envelope(FIFTEEN_MEDIA_SECTION),
+      "family:target-refused",
+      {
+        images: Array.from({ length: 33 }, (_unused, index) => ({
+          source: `/assets/plate-${index}.png`,
+          owned: { zone: "page", path: "images/portrait.png" },
+        })),
+      },
+    );
+    // `UNO-WO-121 / R01`: a Page that composed **no** Gallery keeps the eight-identity ceiling, even when every one of nine
+    // bindings is consumed by its own media section.
+    const nineMedia = {
+      version: 1,
+      title: "Nine media sections",
+      sections: Array.from({ length: 9 }, (_unused, index) => ({
+        type: "media",
+        image: { src: `/assets/plate-${index}.png`, alt: `Plate ${index}` },
+      })),
+    };
+    expectRefusal(nineMedia, "family:unsupported-feature", {
+      images: Array.from({ length: 9 }, (_unused, index) => ({
+        source: `/assets/plate-${index}.png`,
         owned: { zone: "page", path: "images/portrait.png" },
       })),
     });
@@ -3110,6 +3138,7 @@ describe("composeUnoFoundationSubset — explicitly bound gallery", () => {
       id: "family-15-gallery",
       module: "media.gallery",
       props: {
+        list: true,
         columns: 3,
         items: [
           {
@@ -3131,6 +3160,7 @@ describe("composeUnoFoundationSubset — explicitly bound gallery", () => {
       id: "family-0-gallery",
       module: "media.gallery",
       props: {
+        list: true,
         columns: 3,
         items: [
           {
@@ -3222,7 +3252,7 @@ describe("composeUnoFoundationSubset — gallery binding reuse", () => {
 });
 
 describe("composeUnoFoundationSubset — gallery bounds and immutability", () => {
-  it("accepts exactly two through eight items and all three column literals", () => {
+  it("accepts one through twenty-four items, an optional column intent and every explicit literal", () => {
     const item = (index: number): Record<string, unknown> => ({
       image: { src: "/assets/portrait.png", alt: `View ${index}` },
     });
@@ -3231,15 +3261,22 @@ describe("composeUnoFoundationSubset — gallery bounds and immutability", () =>
         envelope({ type: "gallery", columns, items: [item(0), item(1)] }),
         portraitBinding(),
       );
-      expect((document.sections[0]?.props as { readonly columns: number }).columns).toBe(columns);
+      expect((document.sections[0]?.props as { readonly columns?: number }).columns).toBe(columns);
     }
-    const eight = composed(
-      envelope({ type: "gallery", columns: 4, items: Array.from({ length: 8 }, (_unused, index) => item(index)) }),
+    // `UNO-WO-121 / R01`: an unauthored intent stays absent so the donor's own three/two/one default applies.
+    const defaulted = composed(envelope({ type: "gallery", items: [item(0)] }), portraitBinding());
+    const defaultedProps = defaulted.sections[0]?.props as { readonly columns?: number; readonly list?: boolean };
+    expect(defaultedProps.list).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(defaultedProps, "columns")).toBe(false);
+    // The donor's own upper bound is adopted; one item is the donor's floor.
+    const twentyFour = composed(
+      envelope({ type: "gallery", items: Array.from({ length: 24 }, (_unused, index) => item(index)) }),
       portraitBinding(),
     );
-    expect((eight.sections[0]?.props as { readonly items: readonly unknown[] }).items.length).toBe(8);
+    expect((twentyFour.sections[0]?.props as { readonly items: readonly unknown[] }).items.length).toBe(24);
+    expectRefusal(envelope({ type: "gallery", items: [] }), "family:target-refused", portraitBinding());
     expectRefusal(
-      envelope({ type: "gallery", columns: 3, items: Array.from({ length: 9 }, (_unused, index) => item(index)) }),
+      envelope({ type: "gallery", items: Array.from({ length: 25 }, (_unused, index) => item(index)) }),
       "family:target-refused",
       portraitBinding(),
     );
@@ -3265,7 +3302,7 @@ describe("composeUnoFoundationSubset — gallery bounds and immutability", () =>
 });
 
 describe("composeUnoFoundationSubset — gallery React markup", () => {
-  it("renders one Uno gallery div with exactly two figures, two images and one authored caption", () => {
+  it("renders one ordered list with exactly two owned figures, two images and one authored caption", () => {
     const document = composed(envelope(GALLERY_SECTION), galleryBinding());
     const media: UnoPageMedia = new Map([
       [
@@ -3279,9 +3316,12 @@ describe("composeUnoFoundationSubset — gallery React markup", () => {
       ],
     ]);
     const html = render(document, media);
-    expect(html).toContain('<div class="uno-json-gallery" data-uno-columns="3" id="family-0-gallery">');
-    const start = html.indexOf('<div class="uno-json-gallery"');
+    // `UNO-WO-121 / R01`: the donor Gallery is one ordered list — one `<ul>` and one direct `<li>` per authored figure.
+    expect(html).toContain('<div class="uno-json-gallery-section" id="family-0-gallery">');
+    expect(html).toContain('<ul class="uno-json-gallery-list" data-uno-columns="3" id="family-0-gallery-list" role="list">');
+    const start = html.indexOf('<ul class="uno-json-gallery-list"');
     const region = html.slice(start);
+    expect((region.match(/<li class="uno-json-gallery-entry">/gu) ?? []).length).toBe(2);
     expect((region.match(/<figure class="uno-json-media-item">/gu) ?? []).length).toBe(2);
     expect((region.match(/<img /gu) ?? []).length).toBe(2);
     expect(region).toContain('alt="Portrait by the author"');
@@ -3290,9 +3330,10 @@ describe("composeUnoFoundationSubset — gallery React markup", () => {
     expect(region).toContain("/uno-media/en-001/example/1");
     expect((region.match(/<figcaption class="uno-json-media-caption">/gu) ?? []).length).toBe(1);
     expect(region).toContain('<figcaption class="uno-json-media-caption">First caption</figcaption>');
-    // Uno renders a div of figures; the donor's native list wrapper is deliberately different.
-    expect(region).not.toContain("<ul");
-    expect(region).not.toContain("<li");
+    // No control, no invented heading and no invented lede reach the page.
+    expect(region).not.toContain("<button");
+    expect(region).not.toContain("<h2");
+    expect(region).not.toContain("uno-json-prose");
     expect(region).not.toContain("carousel");
     expect(html).not.toContain("/assets/portrait.png");
     expect(html).not.toContain("/assets/scene.webp");
@@ -3329,16 +3370,57 @@ describe("composeUnoFoundationSubset — gallery donor-shape refusals", () => {
     ...overrides,
   });
 
-  it("refuses donor gallery fields outside the described-grid subset", () => {
+  it("composes the donor's whole Gallery surface: heading, Markdown lede, surface, decorative image and Markdown caption", () => {
+    const document = composed(
+      envelope({
+        type: "gallery",
+        heading: "Field notes",
+        lede: "A **Markdown** lede.",
+        surface: "muted",
+        items: [
+          {
+            image: { src: "/assets/portrait.png", alt: "Portrait by the author" },
+            caption: "A *Markdown* caption.",
+          },
+          { image: { src: "/assets/scene.webp", decorative: true } },
+        ],
+      }),
+      galleryBinding(),
+    );
+    const props = document.sections[0]?.props as {
+      readonly list?: boolean;
+      readonly heading?: string;
+      readonly level?: number;
+      readonly lede?: string;
+      readonly ledeMarkdown?: boolean;
+      readonly surface?: string;
+      readonly items: readonly Record<string, unknown>[];
+    };
+    expect(props.list).toBe(true);
+    expect(props.heading).toBe("Field notes");
+    expect(props.level).toBe(2);
+    expect(props.lede).toBe("A **Markdown** lede.");
+    expect(props.ledeMarkdown).toBe(true);
+    expect(props.surface).toBe("muted");
+    // The decorative item is normalized to the native empty alternative; an authored intent stays absent by default.
+    expect(props.items[1]).toEqual({
+      asset: { zone: "theme", path: "gallery/scene.webp" },
+      alt: "",
+      decorative: true,
+    });
+    expect(props.items[0]?.["markdown"]).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(props, "columns")).toBe(false);
+    expect(JSON.stringify(document)).not.toContain("/assets/");
+  });
+
+  it("still refuses donor gallery fields outside the adopted surface", () => {
     const cases: unknown[] = [
-      gallery({ heading: "Title" }),
-      gallery({ lede: "Lede" }),
-      gallery({ surface: "raised" }),
       gallery({ align: "center" }),
       gallery({ position: "start" }),
       gallery({ links: [] }),
       gallery({ visibility: "public" }),
       gallery({ style: "color:red" }),
+      gallery({ surface: "raised" }),
       gallery({ items: "nope" }),
       { type: "gallery", columns: 3 },
       {
@@ -3350,11 +3432,6 @@ describe("composeUnoFoundationSubset — gallery donor-shape refusals", () => {
         type: "gallery",
         columns: 3,
         items: [{ image: { src: "/assets/portrait.png", alt: "A" }, meta: "Meta" }, { image: { src: "/assets/portrait.png", alt: "B" } }],
-      },
-      {
-        type: "gallery",
-        columns: 3,
-        items: [{ image: { src: "/assets/portrait.png", alt: "A", decorative: true } }, { image: { src: "/assets/portrait.png", alt: "B" } }],
       },
       {
         type: "gallery",
@@ -3376,15 +3453,23 @@ describe("composeUnoFoundationSubset — gallery donor-shape refusals", () => {
         columns: 3,
         items: [{ image: { src: "/assets/portrait.png", alt: "**bold**" } }, { image: { src: "/assets/portrait.png", alt: "B" } }],
       },
-      {
-        type: "gallery",
-        columns: 3,
-        items: [{ image: { src: "/assets/portrait.png", alt: "A" }, caption: "`code`" }, { image: { src: "/assets/portrait.png", alt: "B" } }],
-      },
     ];
     for (const section of cases) {
       expectRefusal(envelope(section), "family:unsupported-feature", galleryBinding());
     }
+    // A decorative image that also carries a description is a contradiction, not a preference.
+    expectRefusal(
+      envelope({
+        type: "gallery",
+        columns: 3,
+        items: [
+          { image: { src: "/assets/portrait.png", alt: "A", decorative: true } },
+          { image: { src: "/assets/portrait.png", alt: "B" } },
+        ],
+      }),
+      "family:target-refused",
+      galleryBinding(),
+    );
   });
 
   it("refuses gallery source identities outside the literal raster identity", () => {
@@ -3426,17 +3511,13 @@ describe("composeUnoFoundationSubset — gallery target refusals", () => {
   });
 
   it("refuses authored columns, item counts and text values the Uno target cannot accept", () => {
+    // A member outside the closed column set is an unsupported feature, never coerced to a neighbour.
     for (const columns of [0, 1, 5, "2", 2.5, null, true]) {
-      expectRefusal(envelope(source({ columns })), "family:target-refused", galleryBinding());
+      expectRefusal(envelope(source({ columns })), "family:unsupported-feature", galleryBinding());
     }
     expectRefusal(envelope(source({ items: [] })), "family:target-refused", galleryBinding());
     expectRefusal(
-      envelope(source({ items: [item("/assets/portrait.png", "Only one")] })),
-      "family:target-refused",
-      galleryBinding(),
-    );
-    expectRefusal(
-      envelope(source({ items: Array.from({ length: 9 }, () => item("/assets/portrait.png", "Repeated")) })),
+      envelope(source({ items: Array.from({ length: 25 }, () => item("/assets/portrait.png", "Repeated")) })),
       "family:target-refused",
       portraitBinding(),
     );
@@ -3447,7 +3528,7 @@ describe("composeUnoFoundationSubset — gallery target refusals", () => {
         portraitBinding(),
       );
     }
-    for (const caption of ["", "   ", "c".repeat(321), "<script>alert(1)</script>"]) {
+    for (const caption of ["", "   "]) {
       expectRefusal(
         envelope({
           type: "gallery",
@@ -3458,6 +3539,37 @@ describe("composeUnoFoundationSubset — gallery target refusals", () => {
         portraitBinding(),
       );
     }
+    // Markup is refused as an unsupported donor shape by the shared Markdown reader.
+    expectRefusal(
+      envelope({
+        type: "gallery",
+        columns: 2,
+        items: [item("/assets/portrait.png", "First", "<script>alert(1)</script>"), item("/assets/portrait.png", "Second")],
+      }),
+      "family:unsupported-feature",
+      portraitBinding(),
+    );
+    // `UNO-WO-121 / R01`: a caption above the native 320-point bound is donor-supported and is declared through the accepted
+    // Markdown form, so it composes rather than being reformatted to fit; the donor's own 4,000-point ceiling still refuses.
+    const longCaption = composed(
+      envelope({
+        type: "gallery",
+        items: [item("/assets/portrait.png", "First", "c".repeat(321)), item("/assets/portrait.png", "Second", "c".repeat(4000))],
+      }),
+      portraitBinding(),
+    );
+    const longItems = (longCaption.sections[0]?.props as { readonly items: readonly Record<string, unknown>[] }).items;
+    expect(longItems[0]?.["markdown"]).toBe(true);
+    expect(longItems[1]?.["markdown"]).toBe(true);
+    expect(longItems[1]?.["caption"]).toBe("c".repeat(4000));
+    expectRefusal(
+      envelope({
+        type: "gallery",
+        items: [item("/assets/portrait.png", "First", "c".repeat(4001)), item("/assets/portrait.png", "Second")],
+      }),
+      "family:target-refused",
+      portraitBinding(),
+    );
   });
 
   it("refuses invalid owned targets and oversized candidates through the same policy", () => {
@@ -5679,7 +5791,7 @@ describe("the committed durable family Page (`UNO-WO-078 / R01`)", () => {
     expect(JSON.stringify(durableBindings)).toBe(bindingsBefore);
   });
 
-  it("keeps the committed Page's appended sections byte-identical to the composer output", () => {
+  it("keeps every committed appended section byte-identical apart from the newly composed Gallery list", () => {
     const outcome = composeUnoFoundationSubset(durableSource, durableBindings);
     expect(outcome.status).toBe("composed");
     if (outcome.status !== "composed") return;
@@ -5687,7 +5799,46 @@ describe("the committed durable family Page (`UNO-WO-078 / R01`)", () => {
     expect(committed.accepted).toBe(true);
     if (!committed.accepted) return;
     expect(committed.document.sections).toHaveLength(23);
-    expect(JSON.stringify(committed.document.sections.slice(6))).toBe(JSON.stringify(outcome.document.sections));
+    // `UNO-WO-121 / R01`: the committed durable Page is **not** rewritten. It keeps its ordinary native gallery while the
+    // adapter now composes the donor's list representation, so the two fixtures are distinguished rather than conflated: every
+    // other appended section stays byte-identical and only the gallery section differs.
+    const committedGallery = committed.document.sections.find((node) => node.id === "family-5-gallery");
+    expect(committedGallery?.props).toEqual({
+      columns: 3,
+      items: [
+        {
+          asset: { zone: "page", path: "wo078-family-plate.png" },
+          alt: "The sample plate shown as the first gallery item",
+          caption: "First gallery entry.",
+        },
+        {
+          asset: { zone: "page", path: "wo078-family-plate.png" },
+          alt: "The sample plate shown again as the second gallery item",
+        },
+      ],
+    });
+    const differing = committed.document.sections
+      .slice(6)
+      .filter((node, index) => JSON.stringify(node) !== JSON.stringify(outcome.document.sections[index]))
+      .map((node) => node.id);
+    expect(differing).toEqual(["family-5-gallery"]);
+    const composedGallery = outcome.document.sections[5];
+    expect(composedGallery?.module).toBe("media.gallery");
+    expect(composedGallery?.props).toEqual({
+      list: true,
+      items: [
+        {
+          asset: { zone: "page", path: "wo078-family-plate.png" },
+          alt: "The sample plate shown as the first gallery item",
+          caption: "First gallery entry.",
+        },
+        {
+          asset: { zone: "page", path: "wo078-family-plate.png" },
+          alt: "The sample plate shown again as the second gallery item",
+        },
+      ],
+      columns: 3,
+    });
     expect(committed.document.sections.slice(6).map((node) => node.id)).toEqual(FAMILY_IDS);
   });
 
@@ -5940,7 +6091,11 @@ describe("the three donor heading outlines (`UNO-WO-080 / R01`)", () => {
     expect(parsed.accepted).toBe(true);
     if (!parsed.accepted) return;
     expect(parsed.document.sections).toHaveLength(23);
-    expect(JSON.stringify(parsed.document.sections.slice(6))).toBe(JSON.stringify(outcome.document.sections));
+    const differing = parsed.document.sections
+      .slice(6)
+      .filter((node, index) => JSON.stringify(node) !== JSON.stringify(outcome.document.sections[index]))
+      .map((node) => node.id);
+    expect(differing).toEqual(["family-5-gallery"]);
     const changed = parsed.document.sections
       .slice(6)
       .filter((node) => !(node.id in UNAFFECTED_DIGESTS))

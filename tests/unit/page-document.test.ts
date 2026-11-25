@@ -1709,12 +1709,147 @@ describe("readUnoPageDocument — the eleven remaining owned modules", () => {
     const items = (count: number) =>
       Array.from({ length: count }, (_unused, index) => ({ asset: asset(`g-${index}.png`), alt: `Image ${index}` }));
 
-    it("bounds a gallery to two through twelve items at one of three column counts", () => {
+    it("bounds the ordinary gallery to two through twelve items at one of three column counts", () => {
       expect(readUnoPageDocument(probe("media.gallery", { columns: 3, items: items(2) })).accepted).toBe(true);
       expect(readUnoPageDocument(probe("media.gallery", { columns: 4, items: items(12) })).accepted).toBe(true);
       expectRefusal(probe("media.gallery", { columns: 3, items: items(1) }), "document:invalid-props");
       expectRefusal(probe("media.gallery", { columns: 3, items: items(13) }), "document:invalid-props");
       expectRefusal(probe("media.gallery", { columns: 5, items: items(2) }), "document:invalid-props");
+    });
+
+    /**
+     * `UNO-WO-121 / R01`: the opt-in list representation is a separate closed shape. It admits the donor's 1–24 ordered
+     * figures, an optional column intent, an optional authored heading with its closed level, a Markdown lede and the closed
+     * surface — while the ordinary grid above keeps its exact two-through-twelve acceptance and its required columns.
+     */
+    describe("opt-in list Gallery", () => {
+      const listItems = (count: number) =>
+        Array.from({ length: count }, (_unused, index) => ({ asset: asset(`g-${index}.png`), alt: `Image ${index}` }));
+      const list = (extra: Record<string, unknown>) => ({ list: true, ...extra });
+
+      it("accepts one through twenty-four ordered figures and refuses zero or twenty-five", () => {
+        for (const count of [1, 8, 9, 12, 13, 24]) {
+          expect(readUnoPageDocument(probe("media.gallery", list({ items: listItems(count) }))).accepted).toBe(true);
+        }
+        expectRefusal(probe("media.gallery", list({ items: listItems(0) })), "document:invalid-props");
+        expectRefusal(probe("media.gallery", list({ items: listItems(25) })), "document:invalid-props");
+        // The ordinary native grid keeps its own floor and ceiling; the opt-in shape is the only wider one.
+        expectRefusal(probe("media.gallery", { columns: 3, items: listItems(1) }), "document:invalid-props");
+        expectRefusal(probe("media.gallery", { columns: 3, items: listItems(13) }), "document:invalid-props");
+      });
+
+      it("keeps an optional column intent absent rather than defaulting it, and refuses an unknown one", () => {
+        const omitted = readUnoPageDocument(probe("media.gallery", list({ items: listItems(3) })));
+        expect(omitted.accepted).toBe(true);
+        if (omitted.accepted) {
+          expect(Object.prototype.hasOwnProperty.call(omitted.document.sections[0]?.props ?? {}, "columns")).toBe(false);
+        }
+        for (const columns of [2, 3, 4]) {
+          expect(readUnoPageDocument(probe("media.gallery", list({ columns, items: listItems(2) }))).accepted).toBe(true);
+        }
+        for (const columns of [1, 5, "3", null]) {
+          expectRefusal(probe("media.gallery", list({ columns, items: listItems(2) })), "document:invalid-props");
+        }
+      });
+
+      it("requires an explicit alternative on every item, in both object and raw JSON form", () => {
+        const withItem = (item: Record<string, unknown>) => list({ items: [item] });
+        // A described figure needs a non-empty alternative; a decorative one needs it exactly empty.
+        expect(readUnoPageDocument(probe("media.gallery", withItem({ asset: asset("g.png"), alt: "Described" }))).accepted)
+          .toBe(true);
+        expect(
+          readUnoPageDocument(probe("media.gallery", withItem({ asset: asset("g.png"), alt: "", decorative: true })))
+            .accepted,
+        ).toBe(true);
+        const omitted = withItem({ asset: asset("g.png"), decorative: true });
+        expectRefusal(probe("media.gallery", omitted), "document:invalid-props");
+        expectRefusal(JSON.stringify(probe("media.gallery", omitted)), "document:invalid-props");
+        expectRefusal(probe("media.gallery", withItem({ asset: asset("g.png") })), "document:invalid-props");
+        expectRefusal(probe("media.gallery", withItem({ asset: asset("g.png"), alt: "" })), "document:invalid-props");
+        expectRefusal(
+          probe("media.gallery", withItem({ asset: asset("g.png"), alt: "Described", decorative: true })),
+          "document:invalid-props",
+        );
+        expectRefusal(
+          probe("media.gallery", withItem({ asset: asset("g.png"), alt: "a".repeat(321) })),
+          "document:invalid-props",
+        );
+        expectRefusal(
+          probe("media.gallery", withItem({ asset: asset("g.png"), alt: "Described", decorative: "true" })),
+          "document:invalid-props",
+        );
+      });
+
+      it("keeps the plain caption at 320 and reads a declared caption at the donor's 4,000", () => {
+        const item = (extra: Record<string, unknown>) => ({ asset: asset("g.png"), alt: "Described", ...extra });
+        expect(readUnoPageDocument(probe("media.gallery", list({ items: [item({ caption: "c".repeat(320) })] }))).accepted)
+          .toBe(true);
+        expectRefusal(
+          probe("media.gallery", list({ items: [item({ caption: "c".repeat(321) })] })),
+          "document:invalid-props",
+        );
+        expect(
+          readUnoPageDocument(
+            probe("media.gallery", list({ items: [item({ caption: "c".repeat(4000), markdown: true })] })),
+          ).accepted,
+        ).toBe(true);
+        expect(
+          readUnoPageDocument(
+            probe("media.gallery", list({ items: [item({ caption: `**${"c".repeat(3996)}**`, markdown: true })] })),
+          ).accepted,
+        ).toBe(true);
+        expectRefusal(
+          probe("media.gallery", list({ items: [item({ caption: "c".repeat(4001), markdown: true })] })),
+          "document:invalid-props",
+        );
+        // A declared caption with no caption at all, or a crossed `markdown` value, refuses.
+        expectRefusal(probe("media.gallery", list({ items: [item({ markdown: true })] })), "document:invalid-props");
+        expectRefusal(
+          probe("media.gallery", list({ items: [item({ caption: "c", markdown: false })] })),
+          "document:invalid-props",
+        );
+        // The one shared well-formedness decision covers the plain and the declared form alike.
+        const lone = `${"c".repeat(4)}\ud800`;
+        expectRefusal(probe("media.gallery", list({ items: [item({ caption: lone })] })), "document:invalid-props");
+        expectRefusal(
+          probe("media.gallery", list({ items: [item({ caption: lone, markdown: true })] })),
+          "document:invalid-props",
+        );
+      });
+
+      it("closes the section heading, lede and surface members and leaves the carousel untouched", () => {
+        const listed = listItems(2);
+        expect(
+          readUnoPageDocument(
+            probe(
+              "media.gallery",
+              list({ items: listed, heading: "Field notes", level: 2, lede: "A *lede*.", ledeMarkdown: true, surface: "muted" }),
+            ),
+          ).accepted,
+        ).toBe(true);
+        expect(readUnoPageDocument(probe("media.gallery", list({ items: listed, lede: "Plain lede" }))).accepted).toBe(true);
+        // A level without a heading, a heading without a level and each member outside its closed set refuse.
+        expectRefusal(probe("media.gallery", list({ items: listed, level: 2 })), "document:invalid-props");
+        expectRefusal(probe("media.gallery", list({ items: listed, heading: "Notes" })), "document:invalid-props");
+        expectRefusal(probe("media.gallery", list({ items: listed, surface: "raised" })), "document:invalid-props");
+        expectRefusal(probe("media.gallery", list({ items: listed, ledeMarkdown: true })), "document:invalid-props");
+        expectRefusal(
+          probe("media.gallery", list({ items: listed, ledeMarkdown: false, lede: "x" })),
+          "document:invalid-props",
+        );
+        // The ordinary grid admits none of these members.
+        expectRefusal(
+          probe("media.gallery", { columns: 3, items: items(2), surface: "muted" }),
+          "document:invalid-props",
+        );
+        // `list` is the literal `true`; any other value is a crossed shape, never a falsy opt-out.
+        for (const value of [false, 1, "true", null]) {
+          expectRefusal(probe("media.gallery", { list: value, items: items(2) }), "document:invalid-props");
+        }
+        // The unchanged carousel keeps its own bound and label contract.
+        expect(readUnoPageDocument(probe("media.carousel", { label: "Work", items: items(2) })).accepted).toBe(true);
+        expectRefusal(probe("media.carousel", { label: "Work", items: items(9) }), "document:invalid-props");
+      });
     });
 
     it("bounds a carousel to two through eight items and requires a label", () => {

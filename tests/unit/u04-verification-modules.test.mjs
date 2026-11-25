@@ -22,6 +22,19 @@ import {
   FAMILY_EVIDENCE_KEYS,
 } from "../../scripts/u04/family-evidence.mjs";
 import {
+  GALLERY_CASES,
+  GALLERY_COLUMNS,
+  GALLERY_EXPECTED,
+  GALLERY_IDS,
+  GALLERY_REFUSAL_CASES,
+  GALLERY_SOURCES,
+  GALLERY_VARIANTS,
+  galleryCaseVerdict,
+  galleryGeometryReport,
+  galleryListOf,
+  galleryRegionOf,
+} from "../../scripts/u04/gallery-evidence.mjs";
+import {
   FAMILY_DONOR_SOURCE,
   FAMILY_IDS,
   FAMILY_PLATE,
@@ -1015,3 +1028,107 @@ describe("the extracted Media evidence module", () => {
 });
 
 
+
+// `UNO-WO-121 / R01`: the Gallery evidence module is a tested unit of the delivery, not a refactor of convenience. Its
+// region reader, list reader and case verdict are each executed directly, and each one is shown to fail on a mutant.
+describe("gallery evidence module (UNO-WO-121)", () => {
+  const served = (variant, index, overrides = {}) => {
+    const items = GALLERY_VARIANTS[index].items;
+    return {
+      id: GALLERY_IDS[index],
+      listCount: 1,
+      itemCount: items.length,
+      imageCount: items.length,
+      columns: GALLERY_VARIANTS[index].columns === undefined ? null : String(GALLERY_VARIANTS[index].columns),
+      trackCount: GALLERY_COLUMNS[index]["at1280"],
+      gridColumns: "",
+      columnGap: 12,
+      widths: [],
+      tops: items.map((_unused, itemIndex) => itemIndex * 10),
+      lefts: [],
+      topsAscending: true,
+      srcs: items.map((_unused, itemIndex) => `/uno-media/en-001/example/${index * 24 + itemIndex}`),
+      ascending: true,
+      alts: items.map((item) => (item.image.decorative === true ? "" : "Described")),
+      naturalWidths: items.map(() => GALLERY_EXPECTED.intrinsicWidth),
+      naturalHeights: items.map(() => GALLERY_EXPECTED.intrinsicHeight),
+      imagesLoaded: true,
+      heading: index === 0 ? GALLERY_EXPECTED.heading : (GALLERY_VARIANTS[index].heading ?? null),
+      lede: index === 0 ? "A bounded lede." : null,
+      ledeStrong: index === 0 ? GALLERY_EXPECTED.ledeStrong : null,
+      captionEm: index === 0 ? GALLERY_EXPECTED.captionEm : null,
+      captionLinkHref: index === 0 ? GALLERY_EXPECTED.captionLinkHref : null,
+      captionText: null,
+      surface: index === 0 ? GALLERY_EXPECTED.surface : null,
+      backgroundColor: index === 0 ? "rgb(245, 247, 251)" : "rgba(0, 0, 0, 0)",
+      borderWidth: "0px",
+      padding: "",
+      hasControls: false,
+      overflow: 0,
+      ...overrides,
+    };
+  };
+  const reading = (overrides = {}) => ({
+    case: "light:1280",
+    width: 1280,
+    dark: false,
+    reduce: false,
+    variants: GALLERY_VARIANTS.map((_unused, index) => served("", index, index === 0 ? overrides : {})),
+    keyboard: { reached: true, leftAfterTab: true, pageUrlBefore: "u", pageUrlAfter: "u" },
+    errors: 0,
+    foreignRequests: 0,
+  });
+  const wide = GALLERY_CASES.find((entry) => entry.key === "light:1280");
+
+  it("judges a complete reading as executed, and refuses a mutated one", () => {
+    expect(galleryCaseVerdict(reading(), wide).ok).toBe(true);
+    const mutants = [
+      [{ trackCount: 2 }, "tracks"],
+      [{ itemCount: 1 }, "items"],
+      [{ imageCount: 0 }, "images"],
+      [{ ascending: false }, "order"],
+      [{ srcs: ["/assets/donor-plate.png"], ascending: true }, "owned"],
+      [{ hasControls: true }, "controls"],
+      [{ overflow: 8 }, "overflow"],
+      [{ backgroundColor: "rgb(0, 0, 0)" }, "surface-paint"],
+      [{ alts: ["Described", "Described"] }, "decorative-alt"],
+      [{ heading: "Invented" }, "heading"],
+    ];
+    for (const [mutant, label] of mutants) {
+      const verdict = galleryCaseVerdict(reading(mutant), wide);
+      expect(verdict.ok, label).toBe(false);
+      expect(verdict.detail).toContain(label);
+    }
+  });
+
+  it("reads one ordered list per region and never the page after it", () => {
+    const html = [
+      '<div class="uno-json-gallery-section" id="g1"><h2 class="uno-json-heading">Field notes</h2>',
+      '<section class="uno-json-prose">A lede.</section>',
+      '<ul class="uno-json-gallery-list" data-uno-columns="2" role="list">',
+      '<li class="uno-json-gallery-entry"><figure class="uno-json-media-item"><img src="/uno-media/p/0" alt="A"/><figcaption class="uno-json-media-caption">One</figcaption></figure></li>',
+      '</ul></div>',
+      '<form><input name="q"/></form>',
+    ].join("");
+    const region = galleryRegionOf(html, "g1");
+    expect(region.startsWith('<div class="uno-json-gallery-section"')).toBe(true);
+    expect(region).not.toContain("<form");
+    const list = galleryListOf(region);
+    expect(list.listCount).toBe(1);
+    expect(list.itemCount).toBe(1);
+    expect(list.imageCount).toBe(1);
+    expect(list.columns).toBe("2");
+    expect(list.hasControls).toBe(false);
+    // A region with two lists is not one ordered list, and the reader says so rather than counting the first one.
+    expect(galleryListOf(`${region}${region}`).listCount).toBe(2);
+  });
+
+  it("declares the executed widths, the twenty-four identity ceiling and both closed refusal reasons", () => {
+    expect(GALLERY_CASES.map((entry) => entry.width)).toEqual([390, 768, 1280, 390, 768, 1280]);
+    expect(new Set(GALLERY_SOURCES).size).toBe(24);
+    expect(GALLERY_VARIANTS[5].items.length).toBe(24);
+    const reasons = new Set(GALLERY_REFUSAL_CASES.map((probe) => probe.expected));
+    expect([...reasons].sort()).toEqual(["family:target-refused", "family:unsupported-feature"]);
+    expect(galleryGeometryReport([]).ok).toBe(false);
+  });
+});

@@ -1517,6 +1517,68 @@ main {
   min-width: 0;
 }
 
+/* --- Gallery list (`UNO-WO-121 / R01`) ---------------------------------------- */
+/* The donor Gallery is one ordered list of figures. It is one column at a narrow viewport, two at an intermediate one and,
+   without an authored intent, three at a wide one; an authored intent of 2, 3 or 4 stands at the intermediate width and
+   above, so no viewport ever receives fewer columns than the author asked for. */
+.uno-json-gallery-section {
+  min-width: 0;
+}
+
+.uno-json-gallery-section[data-uno-surface="muted"] {
+  padding: 1rem 1.25rem;
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-surface);
+}
+
+.uno-json-gallery-section[data-uno-surface="bordered"] {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-background);
+}
+
+.uno-json-gallery-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uno-json-gallery-entry {
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .uno-json-gallery-list,
+  .uno-json-gallery-list[data-uno-columns="2"],
+  .uno-json-gallery-list[data-uno-columns="3"],
+  .uno-json-gallery-list[data-uno-columns="4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .uno-json-gallery-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .uno-json-gallery-list[data-uno-columns="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .uno-json-gallery-list[data-uno-columns="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .uno-json-gallery-list[data-uno-columns="4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 /* --- Watermark --------------------------------------------------------------- */
 .uno-json-watermark-wrap {
   position: relative;

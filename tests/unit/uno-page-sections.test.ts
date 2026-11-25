@@ -1296,6 +1296,71 @@ describe("the eleven remaining module renderers", () => {
     expect(html).toContain('alt="Two"');
   });
 
+  it("renders the opt-in Gallery list as one ordered list of owned figures under its authored heading and lede", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Gallery list",
+        sections: [
+          {
+            id: "gal-list",
+            module: "media.gallery",
+            props: {
+              list: true,
+              heading: "Field notes",
+              level: 2,
+              lede: "A **Markdown** lede.",
+              ledeMarkdown: true,
+              surface: "muted",
+              items: [
+                {
+                  asset: { zone: "page", path: "g-one.png" },
+                  alt: "One",
+                  caption: "A *Markdown* caption.",
+                  markdown: true,
+                },
+                { asset: { zone: "page", path: "g-two.png" }, alt: "", decorative: true },
+              ],
+            },
+          },
+        ],
+      },
+      new Map([["gal-list", { items: [image("0"), image("1")] }]]),
+    );
+    // One section anchored on the node, one heading, one lede, then the ordered list.
+    expect(html).toContain('<div class="uno-json-gallery-section" data-uno-surface="muted" id="gal-list">');
+    expect(html).toContain('<h2 class="uno-json-heading" id="gal-list-heading">Field notes</h2>');
+    expect(html.indexOf('id="gal-list-heading"')).toBeLessThan(html.indexOf('id="gal-list-lede"'));
+    expect(html.indexOf('id="gal-list-lede"')).toBeLessThan(html.indexOf('id="gal-list-list"'));
+    expect(html).toContain('<ul class="uno-json-gallery-list" id="gal-list-list" role="list">');
+    expect((html.match(/<li class="uno-json-gallery-entry">/gu) ?? []).length).toBe(2);
+    expect((html.match(/<figure class="uno-json-media-item">/gu) ?? []).length).toBe(2);
+    expect(html).toContain("<strong class=\"uno-family-md-strong\">Markdown</strong>");
+    expect(html).toContain("<em class=\"uno-family-md-em\">Markdown</em>");
+    // The decorative figure carries an empty alternative, and no control or invented heading reaches the page.
+    expect(html).toContain('alt=""');
+    expect(html).not.toContain("<button");
+    expect(html).not.toContain("carousel");
+    // An unauthored column intent renders no attribute at all, so the stylesheet's own default applies.
+    const defaulted = renderWithMedia(
+      {
+        version: 1,
+        title: "Gallery default",
+        sections: [
+          {
+            id: "gal-default",
+            module: "media.gallery",
+            props: { list: true, items: [{ asset: { zone: "page", path: "g-one.png" }, alt: "One" }] },
+          },
+        ],
+      },
+      new Map([["gal-default", { items: [image("0")] }]]),
+    );
+    expect(defaulted).toContain('<ul class="uno-json-gallery-list" id="gal-default-list" role="list">');
+    expect(defaulted).not.toContain("data-uno-columns");
+    expect(defaulted).not.toContain("data-uno-surface");
+  });
+
   it("renders the carousel through the island with one item on stage", () => {
     const html = renderWithMedia(
       {

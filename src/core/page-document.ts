@@ -125,6 +125,12 @@ export const UNO_PAGE_DOCUMENT_LIMITS = Object.freeze({
   /** `media.gallery` and `media.carousel` item bounds. */
   galleryItems: 12,
   carouselItems: 8,
+  /**
+   * `UNO-WO-121 / R01`: the donor Gallery's own 1–24 item ceiling, adopted **only** by the closed opt-in list representation
+   * of `media.gallery`. The ordinary native gallery keeps its `galleryItems` (12) bound and its 2-item floor exactly, and an
+   * ordinary `media.carousel` keeps its 2–8 bound.
+   */
+  galleryListItems: 24,
   mediaAltCodePoints: 320,
   mediaCaptionCodePoints: 320,
   /**
@@ -531,11 +537,53 @@ export function isUnoExternalVideoProps(props: UnoMediaVideoAlternative): props 
   return Object.prototype.hasOwnProperty.call(props, "source");
 }
 
-/** `media.gallery` props: 2–12 owned images at one of three closed column intents. */
-export interface UnoMediaGalleryProps {
+/**
+ * `media.gallery` props in its **ordinary** native form: 2–12 owned images at one of three closed column intents, each with
+ * its own non-empty alternative and an optional plain caption.
+ */
+export interface UnoMediaGalleryGridProps {
   readonly columns: 2 | 3 | 4;
   readonly items: readonly UnoMediaItem[];
 }
+
+/**
+ * One item of the opt-in **list** Gallery (`UNO-WO-121 / R01`).
+ *
+ * It carries the same alternative-text contract `media.image` adopted after `UNO-WO-120 / R03`: `alt` is a **required** native
+ * key, the literal `true` decorative flag needs it exactly empty, and a described figure needs it non-empty at the unchanged
+ * 320 code points. A caption is optional and never invented; `markdown` declares the donor's Markdown-capable form and is read
+ * at the same 4,000-point donor bound `media.image` uses, while an undeclared caption keeps the native 320 and its one shared
+ * well-formedness decision.
+ */
+export interface UnoMediaListItem {
+  readonly asset: UnoOwnedAssetRef;
+  readonly alt: string;
+  readonly decorative?: boolean;
+  readonly caption?: string;
+  readonly markdown?: true;
+}
+
+/**
+ * `media.gallery` in its closed opt-in **list** representation (`UNO-WO-121 / R01`).
+ *
+ * The donor Gallery is one ordered list of one to twenty-four figures beneath an optional authored heading and Markdown lede,
+ * inside a whole-section closed surface, with an optional column intent that otherwise defaults to three columns at a wide
+ * viewport, two at an intermediate one and one at a narrow one. The representation is opt-in through the literal `list: true`,
+ * so the ordinary native gallery keeps its exact previous shape, markup and acceptance, and `media.carousel` is untouched.
+ */
+export interface UnoMediaGalleryListProps {
+  readonly list: true;
+  readonly items: readonly UnoMediaListItem[];
+  readonly columns?: 2 | 3 | 4;
+  readonly heading?: string;
+  readonly level?: 2 | 3 | 4 | 5 | 6;
+  readonly lede?: string;
+  readonly ledeMarkdown?: true;
+  readonly surface?: UnoSectionSurface;
+}
+
+/** `media.gallery` props: the ordinary native grid, or the closed opt-in list representation. */
+export type UnoMediaGalleryProps = UnoMediaGalleryGridProps | UnoMediaGalleryListProps;
 
 /** `media.carousel` props: 2–8 owned images behind one authored group label. */
 export interface UnoMediaCarouselProps {
@@ -2054,6 +2102,74 @@ function readMediaItems(value: unknown, min: number, max: number): UnoMediaItem[
 }
 
 /**
+ * One optional closed column intent for the opt-in list Gallery; absence keeps the donor's responsive default.
+ *
+ * `UNO-WO-121 / R01`: an authored intent must be one of the three closed literals, and an absent one is never coerced to
+ * `3` — it stays absent so the renderer can apply the donor's own three/two/one default instead of an invented intent.
+ */
+function optionalGalleryColumns(value: unknown): 2 | 3 | 4 | undefined {
+  if (value === undefined) return undefined;
+  if (value === 2 || value === 3 || value === 4) return value;
+  throw new RefusedDocument("document:invalid-props");
+}
+
+/**
+ * One bounded ordered item list for the opt-in list Gallery (`UNO-WO-121 / R01`).
+ *
+ * Every item repeats the `media.image` alternative contract after `UNO-WO-120 / R03` verbatim: `asset` and `alt` are both
+ * required keys, the literal `true` decorative flag requires the alternative to be exactly empty, a described figure requires
+ * a non-empty one, and the bound stays 320 code points. A caption is optional and never invented: an undeclared caption keeps
+ * the native 320-point form and its shared well-formedness decision, while a caption declared as Markdown is read at the
+ * donor's own 4,000-point bound — the same two forms `media.image` publishes, so no caption bound moves anywhere.
+ */
+function readGalleryListItems(value: unknown): UnoMediaListItem[] {
+  if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
+  if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.galleryListItems) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const items: UnoMediaListItem[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) throw new RefusedDocument("document:invalid-props");
+    const item = readPlainData(value[index]);
+    if (item === null) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(item, ["asset", "alt"], ["decorative", "caption", "markdown"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const rawDecorative = item["decorative"];
+    if (rawDecorative !== undefined && typeof rawDecorative !== "boolean") {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const decorative = rawDecorative === true;
+    const asset = readOwnedAsset(item["asset"], "image");
+    const alt = readBoundedText(
+      item["alt"],
+      UNO_PAGE_DOCUMENT_LIMITS.mediaAltCodePoints,
+      "document:invalid-props",
+      decorative,
+      false,
+    );
+    if (decorative && alt.length !== 0) throw new RefusedDocument("document:invalid-props");
+    const markdown = optionalProseMarkdown(item["markdown"]);
+    let caption: string | undefined;
+    if (markdown === true) {
+      // A declared-Markdown caption with no caption at all is a crossed shape, exactly as `media.image` treats it.
+      if (item["caption"] === undefined) throw new RefusedDocument("document:invalid-props");
+      caption = requireFamilyMarkdown(item["caption"], UNO_PAGE_DOCUMENT_LIMITS.mediaCaptionMarkdownCodePoints);
+    } else {
+      caption = optionalMediaCaption(item["caption"]);
+    }
+    items.push({
+      asset,
+      alt,
+      ...(rawDecorative === undefined ? {} : { decorative: rawDecorative }),
+      ...(caption === undefined ? {} : { caption }),
+      ...(markdown === undefined ? {} : { markdown }),
+    });
+  }
+  return items;
+}
+
+/**
  * One positional panel-entry list for `interaction.tabs` and `interaction.accordion`.
  *
  * Exactly one entry per child, in child order, naming that same child: a tab list cannot introduce a panel, omit one,
@@ -2542,11 +2658,51 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "media.gallery") {
-    if (!hasExactlyKeys(props, ["columns", "items"], [])) throw new RefusedDocument("document:invalid-props");
-    const columns = props["columns"];
-    if (columns !== 2 && columns !== 3 && columns !== 4) throw new RefusedDocument("document:invalid-props");
-    const items = readMediaItems(props["items"], 2, UNO_PAGE_DOCUMENT_LIMITS.galleryItems);
-    return { id, module: "media.gallery", props: { columns, items } };
+    // `UNO-WO-121 / R01`: the opt-in **list** representation is a separate, explicit shape. Its absence keeps the ordinary
+    // native gallery byte-identical — required `columns`, 2–12 described items, one plain caption each and the existing markup.
+    if (props["list"] === undefined) {
+      if (!hasExactlyKeys(props, ["columns", "items"], [])) throw new RefusedDocument("document:invalid-props");
+      const columns = props["columns"];
+      if (columns !== 2 && columns !== 3 && columns !== 4) throw new RefusedDocument("document:invalid-props");
+      const items = readMediaItems(props["items"], 2, UNO_PAGE_DOCUMENT_LIMITS.galleryItems);
+      return { id, module: "media.gallery", props: { columns, items } };
+    }
+    if (props["list"] !== true) throw new RefusedDocument("document:invalid-props");
+    if (
+      !hasExactlyKeys(
+        props,
+        ["list", "items"],
+        ["columns", "heading", "level", "lede", "ledeMarkdown", "surface"],
+      )
+    ) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const columns = optionalGalleryColumns(props["columns"]);
+    // An authored heading carries its closed level and obeys the Page outline, exactly as `content.heading` does; a level with
+    // no heading, or a heading with no level, refuses rather than leaving the rank to guesswork.
+    const { heading, level } = readOptionalHeading(props, state);
+    const ledeMarkdown = optionalProseMarkdown(props["ledeMarkdown"]);
+    if (ledeMarkdown === true && props["lede"] === undefined) throw new RefusedDocument("document:invalid-props");
+    const lede =
+      ledeMarkdown === true
+        ? requireFamilyMarkdown(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
+        : optionalMarkdownCapableText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, false);
+    const surface = optionalSurface(props["surface"]);
+    const items = readGalleryListItems(props["items"]);
+    return {
+      id,
+      module: "media.gallery",
+      props: {
+        list: true,
+        items,
+        ...(columns === undefined ? {} : { columns }),
+        ...(heading === undefined ? {} : { heading }),
+        ...(level === undefined ? {} : { level }),
+        ...(lede === undefined ? {} : { lede }),
+        ...(ledeMarkdown === undefined ? {} : { ledeMarkdown }),
+        ...(surface === undefined ? {} : { surface }),
+      },
+    };
   }
 
   if (moduleName === "media.carousel") {
