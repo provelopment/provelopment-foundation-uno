@@ -1,128 +1,134 @@
-# Execution Report — UNO-WO-114 / R01
+# Execution Report — UNO-WO-115 / R01
 
-**Outcome: DELIVERED — `PARITY_STEPS=PASS`, `U04_PARITY=8/17`, `U04_PROXY=50/59`, the declared B1 row earned through the unchanged oracle, with all seven earlier credits and every prior checkpoint regression preserved.**
+**Outcome: STOPPED before commit — an authority conflict. The authorized governance correction cannot reach a green local gate because two gate sources outside this order's authorized path list still require the superseded wording. No governance or product bytes were published; the authorized edits remain uncommitted in the working tree for review.**
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-114 / R01`, `FINAL — EXECUTE` |
-| ACTIVE | **2,786 bytes**, SHA-256 `49c34be612ee0ad09ee8983d0739b4190818bbe56983c92898d47597da3b83d7` — matched the activation exactly; private, ignored, never staged |
-| Start SHA | `8d3355dca702e03a13be95ec717edeb0534a5ccf` (`HEAD` = `main` = `origin/main` = `ls-remote`, clean tree, one worktree, one Uno `origin`) |
-| Product SHA | **`729d94bfc7b4591e39c922903fc565516834e334`** |
-| Credited families | `prose`, `callout`, `table`, `list`, `hero`, `stats`, **`steps`**, `divider` → **`8/17`**, **`50/59`** |
-| Checkpoint | **B1** — enforced by the unchanged oracle's own declared target, not re-declared here |
+| Order | `UNO-WO-115 / R01`, `FINAL — EXECUTE` |
+| ACTIVE | **3,568 bytes**, SHA-256 `27072c0fc5f1c0850be2350a3f4200aeb517d6db412dfa99508a922546cf134b` — matched the activation exactly; private, ignored, never staged |
+| Start SHA | `b3d921e9f1ebae97a8c1354c0cc04469aae80d53` (`HEAD` = `main` = `origin/main` = `ls-remote`, clean tree, one worktree, one Uno `origin`) |
+| End SHA | **unchanged** — `b3d921e9f1ebae97a8c1354c0cc04469aae80d53`; this run published only this report |
+| B1 baseline | intact: `PARITY_STEPS=PASS`, `U04_PARITY=8/17`, `U04_PROXY=50/59`, three-Site P6 PASS |
 
-## 1. Steps parity (the substantive surface)
+## 1. Why this run stopped
 
-The pinned donor contract is `stepsSectionSchema = {type, ...headingFields (optional plain heading, Markdown-capable lede),
-items: 1–12 of {title, body?}, ...surfaceField}` with `stepItemSchema.body` typed `markdownTextSchema`, rendered by
-`StepsSection` as a `SectionHeading` over a native `<ol>` whose items are a level-3 title plus an optional Markdown body.
-The Uno timeline already matched the donor on item count (12), closed `surface`, the level-3 item outline and native
-ordered-list semantics, so two genuine gaps were closed end to end:
+The order authorises exactly six paths. Three of them are the frozen governance files, their gate script and its tests.
+Replacing the superseded single-public-Site wording and the stale maturity assertions — as the order requires — makes the
+repository's **own** bootstrap and architecture gates fail, because those two sources still demand the old text verbatim and
+are **not** in the authorized list:
 
-- **Markdown-capable lede.** `steps` now reads its donor `lede` through the same shared family Markdown reader the credited
-  `prose`, `table`, `list`, `hero` and `stats` families use, and composes it as `content.prose {text, markdown: true}`
-  inside the existing authored-text stack. A plain lede keeps the **byte-identical** `content.prose {text}` child.
-- **Markdown-capable item body.** The strict reader (`src/core/page-document.ts`) gained the closed `markdown?: true`
-  switch on `content.timeline`, and the composer sets it only when an authored body actually carries Markdown (read at the
-  Uno target's own 320-code-point description bound). The renderer draws it through the one shared family renderer
-  (`<div class="uno-json-timeline-description">` + `<strong class="uno-family-md-strong">`), while an unflagged body keeps
-  the escaped `<p>` of the earlier accepted output.
-
-Nothing was invented: no status, current step, `aria-current`, date, icon, destination, ordinal marker or extra heading is
-manufactured, and the native `<ol>`/`<li>` semantics, decorative marker and authored order are unchanged.
-
-**Evidence.** `localA2.steps` is a seven-dimension record filled only by executed checks: composed source, strict-reader
-round-trip, served React markup, real production HTTP (`stepsServed` + an independently parsed ordered-item list), the
-four-case Chromium conjunction (light and dark/reduced-motion at 390 px and 1280 px), seven whole-source steps refusals and
-the rights invariants. The unchanged oracle then credits exactly `prose, callout, table, list, hero, stats, steps, divider`
-at B1 `8/17` / `50/59`; A1 (`3/17`), four-family (`4/17`), A2 (`5/17`), six-family (`6/17`) and seven-family (`7/17`) all
-remain as regressions.
-
-## 2. The reusable verification modules (extended, not rewritten)
-
-The runner remains an orchestrator. The Steps family reuses the same modules the Hero and Stats families established and
-adds one cohesive module of its own:
-
-| Module | Lines | Responsibility |
+| Blocking source (unauthorised) | Line | Requirement that now fails |
 | --- | --- | --- |
-| `scripts/u04/steps-evidence.mjs` | **181** | Steps expectations derived from one fixture definition, the served-region and ordered-item parsers, the seven-dimension predicate and the seven-case refusal matrix |
-| `scripts/u04/stats-evidence.mjs` | 162 | unchanged Stats expectations and predicates |
-| `scripts/u04/hero-evidence.mjs` | 138 | unchanged Hero expectations and predicates |
-| `scripts/u04/family-evidence.mjs` | 54 | the seven-dimension record, `isCreditable`, the four-case `conjunction` |
-| `scripts/u04/serving-harness.mjs` | 105 | pinned-CLI lookup, free port, bounded child run, readiness wait, best-effort kill |
-| `scripts/u04/family-fixture.mjs` | 259 | adds the exported `STEPS_SOURCE` and authors index 11 from it |
+| `scripts/verify-bootstrap.mjs` | 208 | README must match `/not implemented yet/i` → `README.md must state that the Uno runtime is not implemented yet` |
+| `tests/bootstrap.test.mjs` | 154 (fixtures 30/188/205) | asserts that same rule refuses a README without the sentence |
+| `tests/architecture/u01-boundaries.test.mjs` | 669, 685–686, 726 | README must contain verbatim `The authored public Uno A1 website is not implemented yet.` (`missing-disclaimer`, plus two explicit `assert.ok`/`assert.equal` checks) |
 
-`stepsNodeProps()` is **derived** from the fixture rather than retyped, so the runner, the served-HTTP assertion and the
-unit tests cannot drift. `tests/unit/u04-verification-modules.test.mjs` (393 lines, 21 tests) executes the real adapter
-against the real fixture, both parsers, both predicates' accept/reject cases and every refusal case.
+The order's own acceptance criterion requires the architecture and bootstrap gates to be green, and both hosted workflows run
+them. Satisfying the governance correction therefore requires editing files the order does not authorise, and leaving the
+gates red blocks the authorised commit/push. Under `AGENTS.md`, SOP §2/§3 and SOP §6 (“STOP if a task conflicts with this
+rule”), a conflict between authorized scope and a mandatory gate is a **STOP**, not an improvised widening of the path
+ledger. I stopped before staging or committing any governance or product path.
 
-## 3. Documentation
+One earlier rule was satisfiable inside the authorised README change and was therefore kept: the README still says the code
+is a **technical baseline** (`u01-boundaries.test.mjs:688`), while the stale “not implemented yet / projected Page header”
+claims were removed as instructed.
 
-`.documents/Architecture/u04-family-parity.md`: the aggregate now reads **eight** fully parity-evidenced candidates with
-**nine** still bounded, the `steps` row is rewritten as `PARITY (UNO-WO-114 / R01)` with its real accepted fields (Markdown
-lede and body, the closed surface, the 12-item bound), its deliberate refusals, its output and its evidence, the
-`stats`/`steps` narrative records that `UNO-WO-113 / R01` and `UNO-WO-114 / R01` supersede the bounded half for both
-families, section 6 now reports nine bounded shapes, and the HTTP/browser paragraph describes the Steps Markdown lede, body
-and surface. The unit tests that pin the ledger text were updated (positive `8/17` and `50/59`, `9/17` still forbidden, the
-bounded-mode count now zero, `Nine of the seventeen remain bounded`).
+## 2. Authorized work performed (uncommitted, unstaged)
 
-## 4. Local gates (all green)
+| Path | Bytes | SHA-256 |
+| --- | --- | --- |
+| `AGENTS.md` | **3,164** (cap 3,200) | `e7ff1d7fcb555f8b2ac2cda3b7ea0267aab70f0e779436f415503141ae44185d` |
+| `README.md` | **2,938** (cap 3,200) | `e6995a841b1d5f7e4cf83c10bdcacde5fcbe9620ba75e16f09a4057044280304` |
+| `.documents/SOP/sop-implementation.md` | **5,438** (cap 6,000) | `6c20beb768294c3b12de63a34a5dd998e3d4d4b2d039ed945093e258b262cc2d` |
+
+- **`AGENTS.md`** (Product bullet): one Entity per Installation; **one or more concurrently active Facets, Sites per Facet,
+  Pages per Site and explicitly authored full-locale representations per Page**; every valid Site may publish independently
+  through its validated Facet/Site host and/or path binding; an optional explicit default is an entry preference, **never an
+  exclusive publisher**; no arbitrary hierarchy or language ceiling; resource, ownership and collision guards mandatory; no
+  Hub/Spoke or second Entity; Foundation Next.js/TypeScript stays the technical source, not Solo Rust. The **Writes** bullet
+  now adds: an unexplained mid-run external file change means **STOP** — preserve it and restore nothing without Owner
+  direction.
+- **`README.md`**: the single-public-Site A1 restriction is replaced by the same concurrent contract; the stale maturity
+  assertions are replaced by stable direction to current `main` and the sole execution report, stating a technical baseline
+  without implying release or deployment. Mission, rights, development commands, authority boundary and the exact-hash
+  sentence are preserved.
+- **`.documents/SOP/sop-implementation.md`** §3: the one-selected-public-Site invariant is replaced by the concurrent
+  contract, including optional nonexclusive defaults, public/unlisted discovery and full-locale representations, and a new
+  paragraph requires **STOP/preservation** on an unexplained mid-run mutation with no unauthorized restoration. All other
+  safety, authority and freeze rules are untouched.
+- **`scripts/verify-governance-docs.mjs`**: only the three `sha256` literals changed; byte caps (3,200 / 3,200 / 6,000),
+  validation logic and both workflows are unchanged.
+- **`tests/governance-docs.test.mjs`**: 8 existing tests preserved plus 4 new — the three corrected files pass the hash gate,
+  the unchanged caps and an approved-contract content check (concurrent wording present, six superseded forms absent, one
+  statement per file, the STOP/preserve sentences, README boundaries, dropped maturity claim); an unexpected byte flip in
+  **each** file is refused by the exact-hash gate and never as a cap; a stale single-public-Site rewrite of **each** file is
+  refused by content *and* by hash; and the three prior approved digests are provably superseded.
+
+`git status` at stop: exactly those five paths modified, **nothing staged**, `HEAD` unchanged.
+
+
+## 3. Local results (all executed in this run)
 
 | Gate | Result |
 | --- | --- |
-| `verify-u04-22-module-consent.mjs` (real build/start + Chromium) | **838 passed / 0 failed**; `PARITY_STEPS=PASS`, `8/17`, `50/59`, 35/35 evidence |
-| `verify-u03-multisite-http.mjs` (three Sites, both phases, restored) | **179 passed / 0 failed**, both phases byte-exact |
-| `u03-multisite-contract` + `u04-22-module-consent` + `u04-family-closure` | **101 passed / 0 failed** |
-| `pnpm test` | **1,313 / 1,313** (21 extracted-module tests) |
-| `pnpm test:architecture`, `pnpm typecheck`, `pnpm lint` | **47 / 0**, exit 0, exit 0 |
-| Declarations after every run | `manifest` `b6213ed6…`, `config` `58011c43…` |
-| Governance bytes | `verify-governance-docs` PASS (`AGENTS.md`, `README.md`, SOP) |
+| `node scripts/verify-governance-docs.mjs` | **PASS** — `AGENTS.md, README.md and local SOP match Owner-frozen bytes` |
+| `node --test tests/governance-docs.test.mjs` | **13 passed / 0 failed** |
+| `pnpm test` (unit) | **1,313 / 1,313** |
+| `pnpm typecheck` / `pnpm lint` | exit 0 / exit 0 |
+| `pnpm build` | **exit 0** — `Compiled successfully` |
+| `verify-u04-22-module-consent.mjs` (build + start + Chromium) | **838 passed / 0 failed** — `PARITY_STEPS=PASS`, `U04_PARITY=8/17`, `U04_PROXY=50/59`, 35/35 evidence |
+| `verify-u03-multisite-http.mjs` (three Sites, both phases) | **179 passed / 0 failed**, both phases byte-exact |
+| `pnpm test:bootstrap` | **18 passed / 1 failed** — `the real Uno root passes the same validation` → `README.md must state that the Uno runtime is not implemented yet` |
+| `pnpm test:architecture` | **45 passed / 2 failed** — `README.md must carry the exact truthful sentence about the A1 website`; plus the mutation test's `missing-disclaimer` rule |
 
-## 5. Hosted proof at `729d94b`
+No hosted verification was attempted: nothing was pushed, and the two failing gates are exactly what the hosted workflows
+execute.
 
-| Workflow | Run | `ubuntu-24.04` | `windows-2025` |
-| --- | --- | --- | --- |
-| `Verify U01 baseline` | **45416405115** | success | success |
-| `Uno Bootstrap Verify` | **45416405074** | success | success |
+## 4. The reported `README.md` rewrite (read-only investigation)
 
-Read out of the **actual** hosted logs, identically on both systems:
+The prior order disclosed that the working copy's `README.md` was replaced mid-run with Foundation-oriented prose and that it
+was restored with `git checkout --`. This order authorises read-only investigation of that incident. Findings:
 
-```text
-verify-u01-http: 105 passed, 0 failed
-verify-u03-http: 135 passed, 0 failed
-verify-u03-published-http: 999 passed, 0 failed
-verify-u03-multisite-http: 179 passed, 0 failed
-verify-u04-22-module-consent: 838 passed, 0 failed
-PASS  U04_LABEL PARITY_HERO=PASS
-PASS  U04_LABEL PARITY_STATS=PASS
-PASS  U04_LABEL PARITY_STEPS=PASS
-PASS  U04_LABEL U04_PARITY=8/17
-PASS  U04_LABEL U04_PROXY=50/59
-```
+- No task or script in this repository writes `README.md`: no `package.json` script names it, and no `writeFileSync` /
+  `writeFile` target in `scripts/`, `tests/` or `.github/` includes it.
+- The rewritten content referenced `SOP-ARCHITECT.md`, `BLUEPRINT.md`, `PLAN.md`, `WIP.md` and a seven-file Drive folder —
+  files that do not exist in Uno — so the text was not produced by Uno's own tooling.
+- `git reflog` contains only this agent's own commits; the content was never committed, and no copy survives in `.temp/`,
+  so there is no recoverable artefact to inspect.
+- **Cause: unresolved.** The mutation appeared in the interval between the P6 gate finishing and the architecture gate
+  starting. An external editor/sync or agent-style process remains an unproven hypothesis only; asserting it would be a
+  claim without evidence, which this order forbids.
+- For the record: the WO-114 run restored the frozen blob. Under the rule this order installs, the correct response would
+  have been STOP + preserve + report instead — which is precisely why the clause was ordered. This run performed no
+  restoration of any unexpected change.
 
-## 6. Outstanding risks (disclosed)
 
-1. **Out-of-band `README.md` modification, reverted.** During this run the working copy's `README.md` was replaced with
-   Foundation-oriented text by a process outside this agent's edits (no command in this run targets it). `AGENTS.md` and
-   the SOP were untouched. The file was restored to its committed frozen blob (`690f0870…`) with `git checkout --`, the
-   frozen bytes were re-verified with `verify-governance-docs` (**PASS**), the architecture gate returned to **47/0**, and
-   the published commit carries the unchanged blob. No edit to a frozen governance file was authored, staged or pushed, but
-   the Architect should confirm the mechanism, since the same mechanism could reappear.
-2. **Shared Markdown-path well-formedness.** The rich Markdown reader used by the credited `table`, `list`, `hero`, `stats`
-   and now `steps` families refuses markup, images, unsafe schemes, control characters, padding and bounds but does not
-   reject an unpaired surrogate (the *plain* reader does). That acceptance predates this order and is identical across all
-   five rich families, so Steps matches existing behaviour exactly; tightening it would change four already-credited
-   families and is therefore left to a future explicit order rather than taken here. The affected probe was replaced with a
-   still-refused Markdown case, and the observation is recorded for the Architect.
-3. **Donor presentation not adopted.** The donor's decorative `aria-hidden` ordinal marker and `SectionHeading` typography
-   are not reproduced; Uno relies on native `<ol>` semantics, as it already does for the accepted timeline.
+## 5. Risks
 
-## 7. State and next
+1. **Scope conflict (blocking).** Until the two unauthorised gate sources are corrected or the Owner directs otherwise, the
+   corrected governance bytes and a green bootstrap/architecture gate are mutually exclusive.
+2. **`AGENTS.md` headroom.** 3,164 of 3,200 approved bytes — 36 bytes of headroom. Further growth needs the Owner's cap
+   decision, not a silent adjustment.
+3. **External mutation mechanism.** Unresolved (section 4); the new STOP/preserve rule bounds the reaction, not the cause.
 
-`Steps` is credited on the declared **B1** row at `8/17` / `50/59`, with `hero`, `stats`, `table`, `list`, `prose`,
-`callout` and `divider` preserved and every earlier checkpoint regression still green. `U04` remains **OPEN** — B1 is an
-interim checkpoint, not stage closure, release or deployment, and the Owner separately decides those. No workflow,
-closure-oracle, permanent declaration, protected governance file, committed durable Page or other family's behaviour was
-changed. The product commit was pushed non-force and this single sanitized report is overwritten. The run stops here for
-independent Architect review.
+## 6. State, remedy and review
+
+`HEAD` and `origin/main` remain `b3d921e9f1ebae97a8c1354c0cc04469aae80d53`; the only published change is this report, a
+sanitized single-file overwrite under the standing report-only exception. The three corrected files, the gate literals and
+the extended governance tests are complete and locally validated (governance gate PASS, 13/0) but **uncommitted**.
+
+Minimal remedy requiring Owner authorization — one of:
+
+- **A.** Authorize `scripts/verify-bootstrap.mjs` (line 208 rule), `tests/bootstrap.test.mjs` (rule 154 and its fixtures) and
+  `tests/architecture/u01-boundaries.test.mjs` (lines 669, 685–686, 716, 726) to state the *current* truthful rule instead
+  of the superseded sentence — for example: the README must point progress at current `main` and the sole execution report
+  and must not claim a published website, which it already satisfies; or
+- **B.** Direct that the superseded sentence be retained, in which case the README correction in this order must be narrowed.
+
+With either decision the work already present in the working tree can be finished in one short follow-up run: update those
+rules, re-run the full gate set, commit, push and verify both hosted OS jobs at the exact head.
+
+`U04` remains **OPEN**. No product code, dependency, workflow, closure oracle, declaration, durable Page, external
+repository, provider, release or deployment was touched, and no new parity credit is claimed. Stopping here for independent
+Architect review.
 
