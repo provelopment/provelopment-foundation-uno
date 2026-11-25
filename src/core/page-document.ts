@@ -117,6 +117,11 @@ export const UNO_PAGE_DOCUMENT_LIMITS = Object.freeze({
   /** `interaction.tabs`, `interaction.accordion` and `interaction.modal` child bounds. */
   tabChildren: 6,
   accordionChildren: 8,
+  /**
+   * `UNO-WO-118 / R01`: the donor's own 24-item `faq` ceiling. It is **not** an accordion bound — the ordinary 1–8 group
+   * bound above stays exactly as it was, and an authored FAQ beyond eight entries is composed as consecutive ordinary groups.
+   */
+  faqItems: 24,
   /** `media.gallery` and `media.carousel` item bounds. */
   galleryItems: 12,
   carouselItems: 8,
@@ -550,6 +555,12 @@ export interface UnoInteractionAccordionProps {
    * Only the literal `3` is accepted, and only when it is authored; an absent value keeps the plain summary label.
    */
   readonly summaryHeadingLevel?: 3;
+  /**
+   * `UNO-WO-118 / R01`: the donor `faq` section carries a closed `surface`, and the disclosure group is where it belongs —
+   * one `data-uno-surface` on the group wrapper, exactly as a native section carries its own. Absent means no attribute at
+   * all, so every accordion authored before this switch keeps its byte-identical markup.
+   */
+  readonly surface?: UnoSectionSurface;
 }
 
 /** `interaction.modal` props: the trigger, dialog title and close control labels. Its one child is the content. */
@@ -2528,7 +2539,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "interaction.accordion") {
-    if (!hasExactlyKeys(props, ["items"], ["summaryHeadingLevel"])) {
+    if (!hasExactlyKeys(props, ["items"], ["summaryHeadingLevel", "surface"])) {
       throw new RefusedDocument("document:invalid-props");
     }
     const children = readChildren(
@@ -2541,10 +2552,16 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
     );
     const items = readPanelEntries(props["items"], children, 1, UNO_PAGE_DOCUMENT_LIMITS.accordionChildren);
     const summaryHeadingLevel = optionalLevelThree(props, "summaryHeadingLevel");
+    // `UNO-WO-118 / R01`: the donor's closed section surface, carried by the disclosure group itself.
+    const surface = optionalSurface(props["surface"]);
     return {
       id,
       module: "interaction.accordion",
-      props: { items, ...(summaryHeadingLevel === undefined ? {} : { summaryHeadingLevel }) },
+      props: {
+        items,
+        ...(summaryHeadingLevel === undefined ? {} : { summaryHeadingLevel }),
+        ...(surface === undefined ? {} : { surface }),
+      },
       children,
     };
   }

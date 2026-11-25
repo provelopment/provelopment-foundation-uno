@@ -59,6 +59,29 @@ export const STATS_SOURCE = Object.freeze({
 });
 
 /**
+ * `UNO-WO-118 / R01`: the donated FAQ surface, exactly as authored — a plain heading, a Markdown-capable lede, the donor's
+ * own closed `surface`, and two ordered `{question, answer}` items: one Markdown answer with an approved safe link and one
+ * plain answer. Two items are what proves independent native disclosures, authored order and exact answer ownership in the
+ * served Page; the donor's 24-item ceiling is proved separately by composition boundaries.
+ */
+export const FAQ_SOURCE = Object.freeze({
+  type: "faq",
+  heading: "Synthetic FAQ heading",
+  lede: "Synthetic FAQ **introduction** with bounds.",
+  surface: "muted",
+  items: Object.freeze([
+    Object.freeze({
+      question: "Can this contact notice send anything?",
+      answer: "No. Delivery is **off**, and [the notes](https://example.org/notes) stay read-only.",
+    }),
+    Object.freeze({
+      question: "Is the fixture bounded?",
+      answer: "Every authored value is bounded.",
+    }),
+  ]),
+});
+
+/**
  * `UNO-WO-117 / R01`: the donated Quote surface, exactly as authored — a Markdown-capable `body`, a plain `attribution`
  * beside a plain `role` (the donor draws a role only with an attribution), and the donor's closed `align`/`surface` pair.
  * The donor authors no heading or lede for this family, so neither is present.
@@ -143,10 +166,10 @@ export function familySource() {
         ],
       },
       {
-        type: "faq",
-        heading: "Synthetic FAQ heading",
-        lede: "Synthetic FAQ introduction.",
-        items: [{ question: "Can this contact notice send anything?", answer: "No. Delivery is off." }],
+        // `UNO-WO-118 / R01`: index 3 now authors the donor's full FAQ surface from the single exported definition — a plain
+        // heading, a Markdown lede, the closed `surface` and two ordered question/answer items.
+        ...FAQ_SOURCE,
+        items: FAQ_SOURCE.items.map((item) => ({ ...item })),
       },
       { type: "media", image: { src: FAMILY_DONOR_SOURCE, alt: "Synthetic blue image plate" } },
       {

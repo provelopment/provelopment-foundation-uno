@@ -64,6 +64,17 @@ import {
   quoteRegionOf,
   quoteServed,
 } from "./u04/quote-evidence.mjs";
+import {
+  FAQ_ACCORDION_ID,
+  FAQ_EXPECTED,
+  FAQ_ID,
+  FAQ_REFUSAL_CASES,
+  faqDisclosuresOf,
+  faqLayoutOf,
+  faqNodeProps,
+  faqRegionOf,
+  faqServed,
+} from "./u04/faq-evidence.mjs";
 import { freeLoopbackPort, killChild, nextBinPath, runChild, waitForServer } from "./u04/serving-harness.mjs";
 
 registerHooks({
@@ -175,6 +186,7 @@ const localA2 = {
   stats: createFamilyEvidence(),
   steps: createFamilyEvidence(),
   quote: createFamilyEvidence(),
+  faq: createFamilyEvidence(),
 };
 // Diagnostics only: the executed refusal codes, so a red `refusal` dimension names its own reason.
 let refusalReasons = "";
@@ -194,6 +206,9 @@ const stepsBrowserCases = new Set();
 // `UNO-WO-117 / R01`: and for the credited Quote family, whose parsed Markdown quotation, closed presentation pair and
 // separate caption spans must hold in all four cases at both viewports.
 const quoteBrowserCases = new Set();
+// `UNO-WO-118 / R01`: and for the credited FAQ family, whose authored heading, Markdown lede, closed surface, ordered
+// level-3 questions, Markdown answer and independent native disclosures must hold in all four cases at both viewports.
+const faqBrowserCases = new Set();
 const a1Evidence = {
   prose: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
   callout: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
@@ -883,7 +898,8 @@ async function main() {
           && stepsTimeline.props.items.length === 2
           && faqAccordion?.module === "interaction.accordion"
           && faqAccordion.props.summaryHeadingLevel === 3
-          && faqAccordion.children.length === 1
+          && faqAccordion.props.surface === "muted"
+          && faqAccordion.children.length === FAQ_EXPECTED.items.length
           && columnTitles.length === 2
           && columnTitles.every((title) => title?.module === "content.heading" && title.props.level === 3)
           && authoredLevelOutcome.status === "refused"
@@ -1025,7 +1041,9 @@ async function main() {
       ["list heading oversize", "family:target-refused", (s) => { s.sections[2].heading = "x".repeat(161); }],
       ["list lede wrong type", "family:unsupported-feature", (s) => { s.sections[2].lede = 7; }],
       ["faq heading unpaired surrogate", "family:target-refused", (s) => { s.sections[3].heading = "Lead \uD800 tail"; }],
-      ["faq lede Markdown link", "family:unsupported-feature", (s) => { s.sections[3].lede = "[label](https://example.test)"; }],
+      // `UNO-WO-118 / R01`: the donor's `faq` lede is now Markdown-capable, so this probe exercises an answer the shared
+      // reader itself refuses rather than a lede that is now legitimately accepted.
+      ["faq answer markup", "family:unsupported-feature", (s) => { s.sections[3].items[0].answer = "<b>bold</b>"; }],
       ["table heading Markdown code", "family:unsupported-feature", (s) => { s.sections[13].heading = "`code` heading"; }],
       ["table lede oversize", "family:target-refused", (s) => { s.sections[13].lede = "y".repeat(4001); }],
     ].map(([expectedLabel, expected, mutate]) => {
@@ -1530,17 +1548,37 @@ async function main() {
           && child.id === `${id}-${suffix}`
           && richFieldsOk(index, child);
         const faqLede = (section?.children ?? [])[1];
-        const faqExactOK = faqLede?.module === "content.prose"
+        const faqGroup = (section?.children ?? [])[2];
+        // `UNO-WO-118 / R01`: the `faq` lede is now Markdown-capable and the disclosure group carries the donor's closed
+        // `surface`, so its arm is field-level like the rich `list`/`table` arms rather than an exact plain-`<p>` match.
+        // The entries are derived from this page's own source, so the arm works for any authored id.
+        const faqSourceItems = index === 3 && Array.isArray(source.sections[index].items)
+          ? source.sections[index].items
+          : [];
+        const faqExpectedProps = {
+          items: faqSourceItems.map((entry, itemIndex) => ({
+            sectionId: `${id}-answer-${itemIndex}`,
+            label: entry.question,
+          })),
+          summaryHeadingLevel: 3,
+          ...(source.sections[index].surface === undefined ? {} : { surface: source.sections[index].surface }),
+        };
+        const faqRichOK = faqLede?.module === "content.prose"
           && faqLede.id === `${id}-lede`
-          && JSON.stringify(faqLede.props) === JSON.stringify({ text: ledeText })
-          && section.children[2]?.id === `${id}-${suffix}`
-          && expected !== null
-          && JSON.stringify(section.children[2]) === JSON.stringify(expected);
-        const shapeOk = common && (rich ? richOK : faqExactOK);
+          && JSON.stringify(faqLede.props) === JSON.stringify({ text: ledeText, markdown: true })
+          && faqGroup?.module === "interaction.accordion"
+          && faqGroup.id === `${id}-${suffix}`
+          && JSON.stringify(faqGroup.props) === JSON.stringify(faqExpectedProps)
+          && JSON.stringify(faqGroup.children?.map((child) => child.id))
+            === JSON.stringify(faqSourceItems.map((_, itemIndex) => `${id}-answer-${itemIndex}`));
+        const shapeOk = common && (index === 3 ? faqRichOK : rich ? richOK : expected !== null
+          && JSON.stringify(section.children[2]) === JSON.stringify(expected));
         return {
           id,
           ok: shapeOk,
-          detail: shapeOk ? `${id} ok` : `${id} ${JSON.stringify(section?.children?.map((node) => node.id))}`,
+          detail: shapeOk
+            ? `${id} ok`
+            : `${id} ${JSON.stringify(section?.children?.map((node) => node.id))}`,
         };
       });
       for (const evidence of textFiveEvidence) {
@@ -1580,6 +1618,18 @@ async function main() {
       localA2.quote.source = familyAccepted.sections[12]?.module === "content.testimonials"
         && familyAccepted.sections[12]?.id === QUOTE_EXPECTED.id
         && JSON.stringify(familyAccepted.sections[12]?.props) === JSON.stringify(quoteNodeProps());
+      // `UNO-WO-118 / R01`: the FAQ family's accepted composition — the authored heading and Markdown lede, then the one
+      // native disclosure group carrying the donor's closed surface, two positional entries and their own answer children.
+      localA2.faq.source = familyAccepted.sections[3]?.module === "layout.stack"
+        && familyAccepted.sections[3]?.id === FAQ_ID
+        && familyAccepted.sections[3]?.children?.[0]?.id === `${FAQ_ID}-heading`
+        && JSON.stringify(familyAccepted.sections[3]?.children?.[1]?.props)
+          === JSON.stringify({ text: FAQ_EXPECTED.lede, markdown: true })
+        && familyAccepted.sections[3]?.children?.[2]?.module === "interaction.accordion"
+        && familyAccepted.sections[3]?.children?.[2]?.id === FAQ_ACCORDION_ID
+        && JSON.stringify(familyAccepted.sections[3]?.children?.[2]?.props) === JSON.stringify(faqNodeProps())
+        && JSON.stringify(familyAccepted.sections[3]?.children?.[2]?.children?.map((child) => child.id))
+          === JSON.stringify(FAQ_EXPECTED.items.map((item) => item.answerId));
       // `UNO-WO-108 / R01` (R4): the strict reader is compared field by field, because a re-read record may order its own
       // keys differently. The composed props and the re-read props must still describe exactly the same authored surface.
       {
@@ -1684,6 +1734,32 @@ async function main() {
           && sameKeys(rereadQuote.props, familyAccepted.sections[12]?.props)
           && Object.isFrozen(familyReparsed.document);
         localA2.quote.reader = quoteReaderOk;
+        // `UNO-WO-118 / R01`: the strict reader round-trip of the FAQ family — the heading/lede/group stack, the Markdown
+        // lede with its own switch, and the native group whose entries name exactly the answer children they own.
+        const rereadFaq = familyReparsed.accepted === true ? familyReparsed.document.sections[3] : undefined;
+        const rereadFaqGroup = rereadFaq?.module === "layout.stack" ? rereadFaq.children?.[2] : undefined;
+        const faqReaderOk = rereadFaq?.module === "layout.stack"
+          && rereadFaq.id === FAQ_ID
+          && rereadFaq.children?.[0]?.module === "content.heading"
+          && rereadFaq.children?.[1]?.module === "content.prose"
+          && JSON.stringify(rereadFaq.children?.[1]?.props) === JSON.stringify({ text: FAQ_EXPECTED.lede, markdown: true })
+          && rereadFaqGroup?.module === "interaction.accordion"
+          && JSON.stringify(rereadFaqGroup.props) === JSON.stringify(faqNodeProps())
+          && JSON.stringify(rereadFaqGroup.children?.map((child) => child.id))
+            === JSON.stringify(FAQ_EXPECTED.items.map((item) => item.answerId))
+          && rereadFaqGroup.children?.every(
+            (child, index) =>
+              child.module === "content.prose"
+              && JSON.stringify(child.props)
+                === JSON.stringify(
+                  FAQ_EXPECTED.items[index]?.markdown === true
+                    ? { text: FAQ_EXPECTED.items[index].answer, markdown: true }
+                    : { text: FAQ_EXPECTED.items[index].answer },
+                ),
+          )
+          && sameKeys(rereadFaqGroup.props, familyAccepted.sections[3]?.children?.[2]?.props)
+          && Object.isFrozen(familyReparsed.document);
+        localA2.faq.reader = faqReaderOk;
         // `UNO-WO-108 / R01` (§4 `refusal`): two real refusals are executed against the authored source — an undeclared
         // `link` id and an unsafe URL scheme — and the rich list depends on them.
         const undeclaredLink = familySource();
@@ -1811,6 +1887,92 @@ async function main() {
           JSON.stringify(quoteRefusalProbes),
         );
         localA2.quote.refusal = quoteRefusalOk;
+        // `UNO-WO-118 / R01`: the FAQ family's whole-source refusal matrix, plus the donor's own 1–8–9–24–25 boundaries
+        // composed by the real adapter — nine and twenty-four entries are consecutive ordinary groups, twenty-five refuses,
+        // and the ordinary accordion bound is proved untouched directly on the strict reader.
+        const faqRefusalProbes = FAQ_REFUSAL_CASES.map((probe) => {
+          const source = familySource();
+          probe.mutate(source);
+          const outcome = composeUnoFoundationSubset(source, familyBindings());
+          return {
+            label: probe.label,
+            expected: probe.expected,
+            reason: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+            partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+          };
+        });
+        const faqRefusalOk = faqRefusalProbes.every(
+          (probe) => probe.reason === probe.expected && probe.partial === false,
+        );
+        check(
+          "A2_LOCAL_REFUSAL every malformed faq family refuses the whole source Page with the family's own reason",
+          faqRefusalOk,
+          JSON.stringify(faqRefusalProbes),
+        );
+        localA2.faq.refusal = faqRefusalOk;
+        {
+          const sourceWithItems = (count) => {
+            const source = familySource();
+            source.sections[3] = {
+              type: "faq",
+              items: Array.from({ length: count }, (_, index) => ({
+                question: `Question ${index}`,
+                answer: "A bounded answer.",
+              })),
+            };
+            return composeUnoFoundationSubset(source, familyBindings());
+          };
+          const layoutOf = (count) => {
+            const outcome = sourceWithItems(count);
+            return outcome.status === "composed" ? faqLayoutOf(outcome.document.sections[3]) : null;
+          };
+          const eight = layoutOf(8);
+          const nine = layoutOf(9);
+          const twentyFour = layoutOf(24);
+          const twentyFive = sourceWithItems(25);
+          const ninePanels = readUnoPageDocument({
+            version: 1,
+            title: "Accordion bound",
+            sections: [
+              {
+                id: "accordion",
+                module: "interaction.accordion",
+                props: {
+                  items: Array.from({ length: 9 }, (_, index) => ({ sectionId: `p${index}`, label: `L${index}` })),
+                },
+                children: Array.from({ length: 9 }, (_, index) => ({
+                  id: `p${index}`,
+                  module: "content.prose",
+                  props: { text: "A." },
+                })),
+              },
+            ],
+          });
+          const ok = eight?.container === "accordion"
+            && eight.groups.length === 1
+            && eight.groups[0]?.children?.length === 8
+            && nine?.container === "stack"
+            && nine.groups.length === 2
+            && JSON.stringify(nine.groups.map((group) => group.children?.length)) === JSON.stringify([8, 1])
+            && twentyFour?.container === "stack"
+            && twentyFour.groups.length === 3
+            && JSON.stringify(twentyFour.groups.map((group) => group.children?.length)) === JSON.stringify([8, 8, 8])
+            && twentyFive.status === "refused"
+            && twentyFive.reason === "family:target-refused"
+            && Object.prototype.hasOwnProperty.call(twentyFive, "document") === false
+            && ninePanels.accepted === false;
+          check(
+            "A2_LOCAL_REFUSAL the FAQ boundary is exactly 1-8 one group, 9-24 consecutive groups and 25 refused, with the ordinary nine-panel accordion still refused",
+            ok,
+            JSON.stringify({
+              eight: eight?.groups.map((group) => group.children?.length),
+              nine: nine?.groups.map((group) => group.children?.length),
+              twentyFour: twentyFour?.groups.map((group) => group.children?.length),
+              twentyFive: twentyFive.status === "refused" ? twentyFive.reason : twentyFive.status,
+              ninePanels: ninePanels.accepted === true ? "accepted" : ninePanels.reason,
+            }),
+          );
+        }
         {
           const quoteDocument = (props) => ({
             version: 1,
@@ -2215,13 +2377,13 @@ async function main() {
         && listRegion.includes(">published</strong>")
     );
     check(
-      "FAMILY_HTTP=200 the FAQ renders as a native disclosure with the authored question",
-      familyHtml.includes('<div class="uno-json-accordion" id="family-3-faq-accordion">')
+      "FAMILY_HTTP=200 the FAQ renders as native disclosures with the authored questions",
+      familyHtml.includes(`<div class="uno-json-accordion" data-uno-surface="${FAQ_EXPECTED.surface}" id="${FAQ_ACCORDION_ID}">`)
         && familyHtml.includes("<details") && familyHtml.includes("<summary")
-        && familyHtml.includes("Can this contact notice send anything?")
+        && (familyHtml.match(/<details class="uno-json-disclosure">/gu) ?? []).length === FAQ_EXPECTED.items.length
         // `UNO-WO-080 / R01`: the donor's FAQ questions are level-3 headings inside their own native summaries.
-        && familyHtml.includes(
-          '<summary class="uno-json-disclosure-summary"><h3>Can this contact notice send anything?</h3></summary>',
+        && FAQ_EXPECTED.items.every((item) =>
+          familyHtml.includes(`<summary class="uno-json-disclosure-summary"><h3>${item.question}</h3></summary>`),
         ),
     );
     const galleryStart = familyHtml.indexOf('<div class="uno-json-gallery" data-uno-columns="2" id="family-5-gallery">');
@@ -2468,7 +2630,7 @@ async function main() {
     {
       const servedFive = [
         [2, "list", "Synthetic list heading", '<ol class="uno-json-list">'],
-        [3, "faq", "Synthetic FAQ heading", '<div class="uno-json-accordion" id="family-3-faq-accordion">'],
+        [3, "faq", FAQ_EXPECTED.heading, `<div class="uno-json-accordion" data-uno-surface="${FAQ_EXPECTED.surface}" id="${FAQ_ACCORDION_ID}">`],
         [13, "table", "Synthetic table heading", '<div class="uno-json-table-scroll" tabindex="0">'],
       ];
       // `UNO-WO-108 / R01` (R2): three distinct arms, because the rich list and table carry the Markdown lede inside a
@@ -2483,12 +2645,22 @@ async function main() {
           && (region.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
           && !/<main\b|<h1\b|<h4\b|<script\b|<iframe\b|<form\b|<button\b|<input\b/iu.test(region);
         if (index === 3) {
+          // `UNO-WO-118 / R01`: the `faq` lede is Markdown and the disclosure group carries the authored surface, so the arm
+          // asserts the shared renderer's lede node, the two authored level-3 questions in authored order, the owned Markdown
+          // answer's safe link and the untouched plain answer.
+          const disclosures = faqDisclosuresOf(region);
           return common
             && (region.match(new RegExp(`id="${id}-lede"`, "gu")) ?? []).length === 1
-            && region.includes(`<p class="uno-json-prose" id="${id}-lede">Synthetic FAQ introduction.</p>`)
+            && region.includes(`<section class="uno-json-prose" id="${id}-lede">`)
             && region.indexOf(`${id}-lede`) < region.indexOf(nativeOpen)
-            && (region.match(/<h3[\s>]/giu) ?? []).length === 1
-            && !/<a\b/iu.test(region);
+            && region.includes(`data-uno-surface="${FAQ_EXPECTED.surface}"`)
+            && (region.match(/<h3[\s>]/giu) ?? []).length === FAQ_EXPECTED.items.length
+            && disclosures.length === FAQ_EXPECTED.items.length
+            && FAQ_EXPECTED.items.every((item, itemIndex) => disclosures[itemIndex]?.question === item.question)
+            && region.includes(
+              `<a class="uno-family-md-link" href="${FAQ_EXPECTED.items[0].answerHref}" rel="noopener noreferrer">`,
+            )
+            && !region.includes("javascript:");
         }
         if (index === 2) {
           return common
@@ -2572,14 +2744,14 @@ async function main() {
         "FAMILY_TEXT_FIVE_HTTP the three remaining authored-text families add seven stacks and three headings with no duplicate id, extra main or external destination",
         (familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length === 7
           && (familyHtml.match(/<h2 class="uno-json-heading" id="family-(?:2-list|3-faq|13-table)-heading"/gu) ?? []).length === 3
-          && (familyHtml.match(/<p class="uno-json-prose" id="family-3-faq-lede"/gu) ?? []).length === 1
+          && (familyHtml.match(/<section class="uno-json-prose" id="family-3-faq-lede"/gu) ?? []).length === 1
           && (familyHtml.match(/<div class="uno-family-md uno-json-list-lede">/gu) ?? []).length === 1
           && (familyHtml.match(/<div class="uno-family-md uno-json-table-lede">/gu) ?? []).length === 1
           && servedFive.every(([index, type, headingText, nativeOpen]) => servedFiveOk(index, type, headingText, nativeOpen))
           && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
           && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
           && !familyHtml.includes(FAMILY_DONOR_SOURCE),
-        `stacks=${(familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length} h2=${(familyHtml.match(/<h2 class="uno-json-heading" id="family-(?:2-list|3-faq|13-table)-heading"/gu) ?? []).length} faqLede=${(familyHtml.match(/<p class="uno-json-prose" id="family-3-faq-lede"/gu) ?? []).length} listLede=${(familyHtml.match(/uno-json-list-lede/gu) ?? []).length} tableLede=${(familyHtml.match(/uno-json-table-lede/gu) ?? []).length} main=${(familyHtml.match(/<main[\s>]/giu) ?? []).length} h1=${(familyHtml.match(/<h1[\s>]/giu) ?? []).length} donor=${familyHtml.includes(FAMILY_DONOR_SOURCE)}`,
+        `stacks=${(familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length} h2=${(familyHtml.match(/<h2 class="uno-json-heading" id="family-(?:2-list|3-faq|13-table)-heading"/gu) ?? []).length} faqLede=${(familyHtml.match(/<section class="uno-json-prose" id="family-3-faq-lede"/gu) ?? []).length} listLede=${(familyHtml.match(/uno-json-list-lede/gu) ?? []).length} tableLede=${(familyHtml.match(/uno-json-table-lede/gu) ?? []).length} main=${(familyHtml.match(/<main[\s>]/giu) ?? []).length} h1=${(familyHtml.match(/<h1[\s>]/giu) ?? []).length} donor=${familyHtml.includes(FAMILY_DONOR_SOURCE)}`,
       );
       // `UNO-WO-084 / R01` (A1): the two rich families exactly as served, and only once each.
       const proseServed = familyRegionOf("family-0-prose");
@@ -2623,10 +2795,10 @@ async function main() {
           && lastFourRegions.every((region) => !/<main\b|<h1\b|<script\b|<iframe\b|<form\b|<input\b|<textarea\b|<button\b/iu.test(region))
           && (familyHtml.match(/<main[\s>]/giu) ?? []).length === 1
           && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
-          // `UNO-WO-080 / R01`: the fixture FAQ authors one question, so its own level-3 heading is expected once — the
-          // two former column `h2`s and the two step titles are now `h3` as well, giving nine `h2` and nine `h3`.
+          // `UNO-WO-080 / R01`: the composed outlines are level-3 headings — the two step titles, the two column titles and
+          // every FAQ question — so the counts move with the authored FAQ items rather than a fixed single question.
           && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 9
-          && (familyHtml.match(/<h3[\s>]/giu) ?? []).length === 9
+          && (familyHtml.match(/<h3[\s>]/giu) ?? []).length === 8 + FAQ_EXPECTED.items.length
           && !familyHtml.includes(FAMILY_DONOR_SOURCE)
           && !familyHtml.includes("formRef"),
         `${lastFourRegions.map((region) => region.length).join("/")} h2=${(familyHtml.match(/<h2[\s>]/giu) ?? []).length} h3=${(familyHtml.match(/<h3[\s>]/giu) ?? []).length}`,
@@ -2646,8 +2818,9 @@ async function main() {
         (stepsServed.match(/<li class="uno-json-timeline-item"[^>]*>(?:(?!<\/li>)[\s\S])*?<h3 class="uno-json-timeline-title">/gu) ?? [])
           .length === 2;
       const faqOwnedBySummaries =
-        (faqServed.match(/<summary class="uno-json-disclosure-summary"><h3>[^<]+<\/h3><\/summary>/gu) ?? []).length === 1
-        && faqServed.includes("<h3>Can this contact notice send anything?</h3>");
+        (faqServed.match(/<summary class="uno-json-disclosure-summary"><h3>[^<]+<\/h3><\/summary>/gu) ?? []).length
+          === FAQ_EXPECTED.items.length
+        && FAQ_EXPECTED.items.every((item) => faqServed.includes(`<h3>${item.question}</h3>`));
       const columnsOwnedByCells =
         (columnsServed.match(/<div class="uno-json-cell"[^>]*>\s*<div class="uno-json-stack"[^>]*>\s*<h3 class="uno-json-heading"[^>]*>/gu) ?? [])
           .length === 2;
@@ -2820,6 +2993,32 @@ async function main() {
         && quoteItems.role === QUOTE_EXPECTED.role
         && !/<button\b|<form\b|<iframe\b|<img\b/iu.test(quoteRegion),
       JSON.stringify(quoteItems).slice(0, 400),
+    );
+    // `UNO-WO-118 / R01` (§2 `renderer`/`http`/`rights`): the credited FAQ family's served proof is the extracted predicate —
+    // the authored heading, the Markdown lede through the shared renderer, the closed `surface` on the group, one native
+    // `<details>` per authored item in order with its question as a level-3 heading in its own summary, the Markdown answer
+    // parsed inside the disclosure it owns, and no invented open state, control, form, frame or donor identity.
+    const faqRegion = faqRegionOf(familyHtml);
+    const faqFacts = faqServed(faqRegion);
+    const faqDisclosures = faqDisclosuresOf(faqRegion);
+    localA2.faq.renderer = faqRegion.length > 0 && faqFacts.ok;
+    localA2.faq.http = familyHtmlResponse.status === 200 && faqFacts.ok;
+    localA2.faq.rights = !familyHtml.includes(FAMILY_DONOR_SOURCE)
+      && !faqRegion.includes("example.help")
+      && !faqRegion.includes("wo066-donor")
+      && (faqRegion.match(/<details class="uno-json-disclosure">/gu) ?? []).length === FAQ_EXPECTED.items.length;
+    check(
+      "FAMILY_FAQ_HTTP the served faq carries its Markdown lede, closed surface, ordered level-3 questions and owned Markdown answer",
+      localA2.faq.http,
+      faqFacts.detail,
+    );
+    check(
+      "FAMILY_FAQ_HTTP the faq holds no donor identity, declaration key, invented open state, form control or frame",
+      localA2.faq.rights
+        && faqDisclosures.length === FAQ_EXPECTED.items.length
+        && faqDisclosures.every((found, index) => found.question === FAQ_EXPECTED.items[index].question)
+        && !/open=|aria-expanded|<button\b|<form\b|<iframe\b/iu.test(faqRegion),
+      JSON.stringify(faqDisclosures.map((found) => found.question)),
     );
 
     check(
@@ -3854,7 +4053,9 @@ async function consentPhase(base) {
           const native = rich ? (root?.querySelector(`#${nativeId}`) ?? null) : (root?.lastElementChild ?? null);
           const lede = rich
             ? (native?.querySelector(id === "family-2-list" ? ".uno-json-list-lede" : ".uno-json-table-lede") ?? null)
-            : (root?.querySelector(":scope > p.uno-json-prose") ?? null);
+            // `UNO-WO-118 / R01`: the credited FAQ lede is now Markdown-capable, so it is the prose `<section>` sibling
+            // the still-plain arm used to read as a bare `<p>`.
+            : (root?.querySelector(":scope > p.uno-json-prose, :scope > section.uno-json-prose") ?? null);
           const insideNative = rich ? (native?.querySelector("ol, .uno-json-table-scroll") ?? null) : null;
           const headingBox = heading?.getBoundingClientRect() ?? null;
           const ledeBox = lede?.getBoundingClientRect() ?? null;
@@ -3880,15 +4081,15 @@ async function consentPhase(base) {
             nativeTag: native?.tagName ?? "",
             h2Count: root?.querySelectorAll("h2").length ?? -1,
             controls: root?.querySelectorAll("a, button, input, select, textarea, iframe").length ?? -1,
-            safeAnchors: root?.querySelectorAll("a.uno-json-list-link").length ?? 0,
+            safeAnchors: root?.querySelectorAll("a.uno-json-list-link, a.uno-family-md-link").length ?? 0,
           };
         });
       });
       const expectedFive = [
         ["family-2-list", "Synthetic list heading", "A bounded list on one published Page.",
           "family-2-list-list", "SECTION", "bounded list", 2],
-        ["family-3-faq", "Synthetic FAQ heading", "Synthetic FAQ introduction.",
-          "family-3-faq-accordion", "DIV", "", 0],
+        ["family-3-faq", FAQ_EXPECTED.heading, FAQ_EXPECTED.ledeText,
+          FAQ_ACCORDION_ID, "DIV", FAQ_EXPECTED.ledeStrong, 1],
         ["family-13-table", "Synthetic table heading", "The table explains synthetic totals.",
           "family-13-table-table", "SECTION", "table", 0],
       ];
@@ -3954,10 +4155,10 @@ async function consentPhase(base) {
       outlineCheck(`${width}px the step headings keep authored order`,
         outlineSeen.stepHeadings[0] === "Draft" && outlineSeen.stepHeadings[1] === "Review",
         JSON.stringify(outlineSeen.stepHeadings));
-      outlineCheck(`${width}px one FAQ question heading sits inside its own native summary`,
-        outlineSeen.faqHeadings.length === 1
-          && outlineSeen.faqHeadings[0] === "Can this contact notice send anything?"
-          && outlineSeen.faqSummaryText.length === 1,
+      outlineCheck(`${width}px every FAQ question heading sits inside its own native summary`,
+        outlineSeen.faqHeadings.length === FAQ_EXPECTED.items.length
+          && JSON.stringify(outlineSeen.faqHeadings) === JSON.stringify(FAQ_EXPECTED.items.map((item) => item.question))
+          && outlineSeen.faqSummaryText.length === FAQ_EXPECTED.items.length,
         JSON.stringify({ headings: outlineSeen.faqHeadings, summaries: outlineSeen.faqSummaryText }));
       outlineCheck(`${width}px each column title is the first level-3 heading of its own column`,
         outlineSeen.columnHeadings.length === 2
@@ -3970,6 +4171,53 @@ async function consentPhase(base) {
           && outlineSeen.headingRoles === 0 && outlineSeen.controlsInOutline === 0 && outlineSeen.overflow === 0,
         JSON.stringify(outlineSeen));
 
+      // `UNO-WO-118 / R01` (§2 `browser`): the credited FAQ family as this browser lays it out — the authored heading, the
+      // Markdown lede, the closed surface on the group, every question a level-3 heading in its own summary, the Markdown
+      // answer parsed and linked inside the disclosure it owns, and every disclosure initially closed.
+      const faqLight = await tab.evaluate((expected) => {
+        const root = document.getElementById("family-3-faq");
+        const group = document.getElementById("family-3-faq-accordion");
+        const heading = root?.querySelector(":scope > h2.uno-json-heading") ?? null;
+        const lede = root?.querySelector(":scope > section.uno-json-prose") ?? null;
+        const details = [...(group?.querySelectorAll(":scope > details.uno-json-disclosure") ?? [])];
+        const link = group?.querySelector(".uno-json-disclosure-body a.uno-family-md-link") ?? null;
+        return {
+          surface: group?.getAttribute("data-uno-surface") ?? "",
+          headingText: heading?.textContent ?? "",
+          ledeStrong: lede?.querySelector("strong.uno-family-md-strong")?.textContent ?? "",
+          questions: details.map((entry) => entry.querySelector("summary > h3")?.textContent ?? ""),
+          summariesWithoutHeading: details.filter((entry) => entry.querySelector("summary > h3") === null).length,
+          details: details.length,
+          open: details.filter((entry) => entry.open).length,
+          answerStrong: group?.querySelector(".uno-json-disclosure-body strong.uno-family-md-strong")?.textContent ?? "",
+          answerLink: link?.getAttribute("href") ?? "",
+          answerLinkRel: link?.getAttribute("rel") ?? "",
+          plainAnswers: group?.querySelectorAll(".uno-json-disclosure-body p.uno-json-prose").length ?? -1,
+          headings: root?.querySelectorAll("h2, h3").length ?? -1,
+          controls: root?.querySelectorAll("button, form, iframe, input, select, textarea").length ?? -1,
+          overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+          expectedQuestions: expected,
+        };
+      }, FAQ_EXPECTED.items.map((item) => item.question));
+      const faqLightOk = familyCheck(
+        `${width}px faq shows its Markdown lede, closed surface, ordered level-3 questions and closed disclosures`,
+        faqLight.surface === FAQ_EXPECTED.surface
+          && faqLight.headingText === FAQ_EXPECTED.heading
+          && faqLight.ledeStrong === FAQ_EXPECTED.ledeStrong
+          && JSON.stringify(faqLight.questions) === JSON.stringify(faqLight.expectedQuestions)
+          && faqLight.summariesWithoutHeading === 0
+          && faqLight.details === FAQ_EXPECTED.items.length
+          && faqLight.open === 0
+          && faqLight.answerStrong === FAQ_EXPECTED.items[0].answerStrong
+          && faqLight.answerLink === FAQ_EXPECTED.items[0].answerHref
+          && faqLight.answerLinkRel === "noopener noreferrer"
+          && faqLight.plainAnswers === 1
+          && faqLight.headings === 1 + FAQ_EXPECTED.items.length
+          && faqLight.controls === 0 && faqLight.overflow === 0,
+        JSON.stringify(faqLight),
+      );
+      if (faqLightOk) faqBrowserCases.add(`light:${width}`);
+
       const familySummary = tab.locator("#family-3-faq-accordion summary").first();
       const familyDetails = tab.locator("#family-3-faq-accordion details").first();
       await familySummary.focus();
@@ -3978,11 +4226,42 @@ async function consentPhase(base) {
       await tab.keyboard.press("Enter");
       familyCheck(`${width}px Enter opens the FAQ disclosure`, await familyDetails.evaluate((element) => element.open),
         String(await familyDetails.evaluate((element) => element.open)));
+      // `UNO-WO-118 / R01`: the disclosures are independent — opening the first leaves the second closed.
+      familyCheck(`${width}px the FAQ disclosures open independently`,
+        await tab.evaluate(() => {
+          const group = document.getElementById("family-3-faq-accordion");
+          const details = [...(group?.querySelectorAll(":scope > details.uno-json-disclosure") ?? [])];
+          return details.length === 2 && details[0]?.open === true && details[1]?.open === false;
+        }),
+        await tab.evaluate(() => {
+          const group = document.getElementById("family-3-faq-accordion");
+          return [...(group?.querySelectorAll(":scope > details.uno-json-disclosure") ?? [])]
+            .map((entry) => entry.open)
+            .join(",");
+        }));
       await tab.keyboard.press("Space");
       familyCheck(`${width}px Space closes the FAQ disclosure and keeps focus`,
         !(await familyDetails.evaluate((element) => element.open))
           && await familySummary.evaluate((element) => document.activeElement === element),
         String(await familyDetails.evaluate((element) => element.open)));
+      // The second disclosure is reachable and independent of the first on the keyboard too.
+      const secondSummary = tab.locator("#family-3-faq-accordion summary").nth(1);
+      await secondSummary.focus();
+      await tab.keyboard.press("Enter");
+      familyCheck(`${width}px the second FAQ disclosure opens by keyboard without opening the first`,
+        await tab.evaluate(() => {
+          const group = document.getElementById("family-3-faq-accordion");
+          const details = [...(group?.querySelectorAll(":scope > details.uno-json-disclosure") ?? [])];
+          return details[0]?.open === false && details[1]?.open === true
+            && document.activeElement === details[1]?.querySelector("summary");
+        }),
+        await tab.evaluate(() => {
+          const group = document.getElementById("family-3-faq-accordion");
+          return [...(group?.querySelectorAll(":scope > details.uno-json-disclosure") ?? [])]
+            .map((entry) => entry.open)
+            .join(",");
+        }));
+      await tab.keyboard.press("Enter");
 
       await tab.getByRole("link", { name: "Contact notice", exact: true }).click();
       await delay(200);
@@ -4106,7 +4385,8 @@ async function consentPhase(base) {
         };
       });
       outlineCheck(`dark ${width}px the three level-3 outline regions survive dark and reduced motion`,
-        darkOutline.scheme && darkOutline.reducedMotion && darkOutline.steps === 2 && darkOutline.faq === 1
+        darkOutline.scheme && darkOutline.reducedMotion && darkOutline.steps === 2
+          && darkOutline.faq === FAQ_EXPECTED.items.length
           && darkOutline.columns === 2 && darkOutline.h4s === 0 && darkOutline.overflow === 0,
         JSON.stringify(darkOutline));
       // `UNO-WO-110 / R01` (§2 `browser`): the rich table under `prefers-color-scheme: dark` and
@@ -4314,6 +4594,42 @@ async function consentPhase(base) {
         JSON.stringify(darkQuote),
       );
       if (darkQuoteOk) quoteBrowserCases.add(`dark:${width}`);
+      // `UNO-WO-118 / R01` (§2 `browser`): the credited FAQ family under dark and reduced motion at this viewport — the
+      // Markdown lede, the closed surface, every question a level-3 heading, the owned Markdown answer and closed disclosures.
+      const darkFaq = await tab.evaluate((expected) => {
+        const root = document.getElementById("family-3-faq");
+        const group = document.getElementById("family-3-faq-accordion");
+        const details = [...(group?.querySelectorAll(":scope > details.uno-json-disclosure") ?? [])];
+        const box = root?.getBoundingClientRect() ?? null;
+        const link = group?.querySelector(".uno-json-disclosure-body a.uno-family-md-link") ?? null;
+        return {
+          scheme: matchMedia("(prefers-color-scheme: dark)").matches,
+          reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+          surface: group?.getAttribute("data-uno-surface") ?? "",
+          ledeStrong: root?.querySelector(":scope > section.uno-json-prose strong.uno-family-md-strong")?.textContent ?? "",
+          questions: details.map((entry) => entry.querySelector("summary > h3")?.textContent ?? ""),
+          details: details.length,
+          open: details.filter((entry) => entry.open).length,
+          answerStrong: group?.querySelector(".uno-json-disclosure-body strong.uno-family-md-strong")?.textContent ?? "",
+          answerLink: link?.getAttribute("href") ?? "",
+          controls: root?.querySelectorAll("button, form, iframe, input, select, textarea").length ?? -1,
+          visible: box !== null && box.width > 0 && box.height > 0,
+          overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+          expectedQuestions: expected,
+        };
+      }, FAQ_EXPECTED.items.map((item) => item.question));
+      const darkFaqOk = familyCheck(
+        `dark ${width}px the faq family keeps its Markdown lede, closed surface and owned Markdown answer`,
+        darkFaq.scheme && darkFaq.reducedMotion && darkFaq.surface === FAQ_EXPECTED.surface
+          && darkFaq.ledeStrong === FAQ_EXPECTED.ledeStrong
+          && JSON.stringify(darkFaq.questions) === JSON.stringify(darkFaq.expectedQuestions)
+          && darkFaq.details === FAQ_EXPECTED.items.length && darkFaq.open === 0
+          && darkFaq.answerStrong === FAQ_EXPECTED.items[0].answerStrong
+          && darkFaq.answerLink === FAQ_EXPECTED.items[0].answerHref
+          && darkFaq.controls === 0 && darkFaq.visible && darkFaq.overflow === 0,
+        JSON.stringify(darkFaq),
+      );
+      if (darkFaqOk) faqBrowserCases.add(`dark:${width}`);
     }
     // `UNO-WO-111 / R01` (§2 `browser`): `list.browser` is the conjunction of the same four executed observations, so a
     // deleted, skipped or superficial case can never leave the credited family true. `UNO-WO-112 / R01` moves the rule into
@@ -4364,6 +4680,14 @@ async function consentPhase(base) {
       localA2.quote.browser,
       conjunctionDetail(quoteBrowserCases),
     );
+    // `UNO-WO-118 / R01` (§2 `browser`): the credited FAQ family's four-case conjunction, each key added only by a real
+    // Chromium assertion that its Markdown lede, closed surface, level-3 questions and owned Markdown answer survived.
+    localA2.faq.browser = conjunction(faqBrowserCases);
+    check(
+      "A2_LOCAL_BROWSER the rich faq family was observed at 390px and 1280px in light and dark/reduced motion with its Markdown lede and answer",
+      localA2.faq.browser,
+      conjunctionDetail(faqBrowserCases),
+    );
     await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
     familyCheck("the family Page raised no new console or page error", consoleErrors.length === errorsBefore,
       consoleErrors.slice(errorsBefore).join(" | ").slice(0, 180));
@@ -4404,12 +4728,13 @@ async function consentPhase(base) {
         stats: localA2.stats,
         steps: localA2.steps,
         quote: localA2.quote,
+        faq: localA2.faq,
       };
       const dimensions = Object.values(records).reduce((total, record) => total + Object.keys(record).length, 0);
       check(
-        "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_EVIDENCE=42/42 (table, list, hero, stats, steps and quote credited; P6 destination proof in the three-Site gate)",
-        records.list && records.table && records.hero && records.stats && records.steps && records.quote
-          && dimensions === 42
+        "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_EVIDENCE=49/49 (table, list, hero, stats, steps, quote and faq credited; P6 destination proof in the three-Site gate)",
+        records.list && records.table && records.hero && records.stats && records.steps && records.quote && records.faq
+          && dimensions === 49
           && Object.values(localA2).every((record) => isCreditable(record)),
         JSON.stringify({ ...records, refusalReasons }),
       );
@@ -4640,6 +4965,7 @@ async function consentPhase(base) {
         && closureB1.labels.includes("PARITY_HERO=PASS")
         && closureB1.labels.includes("PARITY_STATS=PASS")
         && closureB1.labels.includes("PARITY_QUOTE=PENDING")
+        && closureB1.labels.includes("PARITY_FAQ=PENDING")
         && familyOk
         && dividerOk,
       closureB1.ok
@@ -4683,12 +5009,50 @@ async function consentPhase(base) {
         ? `${closureInterim.parity}/17 ${closureInterim.proxy}/59 ${closureInterim.credited.join(",")}`
         : String(closureInterim.reason),
     );
-    if (closureInterim.ok) {
-      // Every printed label is re-derived from the interim result's own credit set, so a label cannot appear without its
+    // `UNO-WO-118 / R01` (§3): the newly credited **FAQ** family, evaluated by the same unchanged oracle **without** a
+    // checkpoint selector, so the interim row is whatever the executed records earn — ten families, `10/17` and `52/59`.
+    // The B1 and nine-family rows above stay retained regressions, and the declared **B2** target is still not claimed:
+    // it also requires `columns`.
+    const closureTen = evaluateU04FamilyClosure({
+      families: {
+        divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
+        prose: a1Evidence.prose,
+        callout: a1Evidence.callout,
+        table: localA2.table,
+        list: localA2.list,
+        hero: localA2.hero,
+        stats: localA2.stats,
+        steps: localA2.steps,
+        quote: localA2.quote,
+        faq: localA2.faq,
+      },
+      modules: UNO_RENDERABLE_MODULES.length,
+      zones: UNO_OWNED_MEDIA_ZONES.length,
+      browserMatrix: matrixCases.length,
+    });
+    check(
+      "U04_CLOSURE_ORACLE the unchanged oracle credits exactly ten families at 10/17 and 52/59 without a checkpoint selector",
+      closureTen.ok === true
+        && JSON.stringify(closureTen.credited)
+          === JSON.stringify(["prose", "callout", "table", "list", "hero", "stats", "steps", "quote", "faq", "divider"])
+        && closureTen.parity === 10
+        && closureTen.proxy === 52
+        && closureTen.labels.includes("PARITY_FAQ=PASS")
+        && closureTen.labels.includes("U04_PARITY=10/17")
+        && closureTen.labels.includes("U04_PROXY=52/59")
+        && closureTen.labels.includes("PARITY_COLUMNS=PENDING")
+        && familyOk
+        && dividerOk,
+      closureTen.ok
+        ? `${closureTen.parity}/17 ${closureTen.proxy}/59 ${closureTen.credited.join(",")}`
+        : String(closureTen.reason),
+    );
+    if (closureTen.ok) {
+      // Every printed label is re-derived from the ten-family result's own credit set, so a label cannot appear without its
       // reason and no earlier row can print a fuller one.
-      const creditedNames = new Set(closureInterim.credited.map((family) => `PARITY_${family.toUpperCase()}`));
-      const pendingNames = new Set(closureInterim.pending.map((family) => `PARITY_${family.toUpperCase()}`));
-      for (const label of closureInterim.labels) {
+      const creditedNames = new Set(closureTen.credited.map((family) => `PARITY_${family.toUpperCase()}`));
+      const pendingNames = new Set(closureTen.pending.map((family) => `PARITY_${family.toUpperCase()}`));
+      for (const label of closureTen.labels) {
         const equals = label.lastIndexOf("=");
         const name = label.slice(0, equals);
         const value = label.slice(equals + 1);
@@ -4697,9 +5061,9 @@ async function consentPhase(base) {
           : pendingNames.has(name)
             ? value === "PENDING"
             : name === "U04_PARITY"
-              ? value === `${closureInterim.parity}/17`
+              ? value === `${closureTen.parity}/17`
               : name === "U04_PROXY"
-                ? value === `${closureInterim.proxy}/59`
+                ? value === `${closureTen.proxy}/59`
                 : value === `${UNO_RENDERABLE_MODULES.length}/${UNO_RENDERABLE_MODULES.length}`
                   || value === `${UNO_OWNED_MEDIA_ZONES.length}/${UNO_OWNED_MEDIA_ZONES.length}`
                   || value === `${matrixCases.length}/${matrixCases.length}`;

@@ -931,6 +931,54 @@ describe("the eleven remaining module renderers", () => {
     expect(html.includes("<h3")).toBe(false);
   });
 
+  /**
+   * `UNO-WO-118 / R01`: the FAQ family's own native surface — the donor's closed `surface` on the disclosure group and a
+   * Markdown answer drawn through the shared renderer, with the platform's `<details>`/`<summary>` untouched.
+   */
+  it("renders the authored FAQ surface and a Markdown answer inside its native disclosure", () => {
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "FAQ surface",
+        sections: [
+          {
+            id: "faq",
+            module: "interaction.accordion",
+            props: {
+              items: [
+                { sectionId: "faq-answer-0", label: "Marked down?" },
+                { sectionId: "faq-answer-1", label: "Plain?" },
+              ],
+              summaryHeadingLevel: 3,
+              surface: "muted",
+            },
+            children: [
+              {
+                id: "faq-answer-0",
+                module: "content.prose",
+                props: { text: "A **bounded** answer with [a link](https://example.org/notes).", markdown: true },
+              },
+              { id: "faq-answer-1", module: "content.prose", props: { text: "A plain answer." } },
+            ],
+          },
+        ],
+      },
+      new Map(),
+    );
+    expect(html).toContain('<div class="uno-json-accordion" data-uno-surface="muted" id="faq">');
+    expect((html.match(/<details class="uno-json-disclosure">/gu) ?? []).length).toBe(2);
+    expect(html).toContain('<summary class="uno-json-disclosure-summary"><h3>Marked down?</h3></summary>');
+    expect(html).toContain('<summary class="uno-json-disclosure-summary"><h3>Plain?</h3></summary>');
+    // The Markdown answer is parsed inside its disclosure; the plain one stays the escaped paragraph.
+    expect(html).toContain('<strong class="uno-family-md-strong">bounded</strong>');
+    expect(html).toContain('<a class="uno-family-md-link" href="https://example.org/notes" rel="noopener noreferrer">a link</a>');
+    expect(html).toContain('<p class="uno-json-prose" id="faq-answer-1">A plain answer.</p>');
+    expect(html).not.toContain("**bounded**");
+    // Native state is never authored: no disclosure is rendered open, and no control replaces the summary.
+    expect(html).not.toContain("open=");
+    expect(html).not.toContain("<button");
+  });
+
   it("renders one step heading inside its own list item when itemHeadingLevel is 3", () => {
     const html = renderWithMedia(
       {

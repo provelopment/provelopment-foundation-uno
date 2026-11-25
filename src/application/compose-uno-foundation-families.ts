@@ -75,6 +75,7 @@ import {
   isWellFormedUnicodeText,
   readUnoFamilyMarkdown,
   readUnoPageDocument,
+  UNO_PAGE_DOCUMENT_LIMITS,
   type UnoPageDocument,
 } from "../core/page-document";
 import {
@@ -672,7 +673,15 @@ function wrapAuthoredText(
   id: string,
   child: CandidateSection,
   childSuffix: string,
-  options: { readonly markdownLede?: boolean } = {},
+  options: {
+    readonly markdownLede?: boolean;
+    /**
+     * `UNO-WO-118 / R01`: which shared reader validates a Markdown-capable lede. The sequence families keep the rich reader
+     * (and its refusal vocabulary); the five `headingFields` families keep the lede reader they have always used, so one
+     * family can adopt the donor's Markdown lede without changing its neighbours' reasons.
+     */
+    readonly ledeReader?: (value: PlainValue | undefined) => string;
+  } = {},
 ): CandidateSection {
   const headingAuthored = ownsKey(record, "heading");
   const ledeAuthored = ownsKey(record, "lede");
@@ -689,7 +698,8 @@ function wrapAuthoredText(
     // `UNO-WO-113 / R01`: the credited `stats` family reads its lede at the donor's own Markdown-capable surface, so the one
     // shared Markdown renderer draws it. A plain lede keeps the byte-identical `content.prose {text}` child.
     if (options.markdownLede === true) {
-      const lede = readRichFamilyText(record["lede"], 4000);
+      const ledeReader = options.ledeReader ?? ((value: PlainValue | undefined) => readRichFamilyText(value, 4000));
+      const lede = ledeReader(record["lede"]);
       wrapped.push({
         id: `${id}-lede`,
         module: "content.prose",
@@ -1022,13 +1032,14 @@ function composeSection(
       return { id, module: "content.testimonials", props };
     }
     case "faq": {
-      // The donor FAQ also spreads `headingFields`; `surface`, custom open state, unsafe answers and Markdown stay outside
-      // this subset. The authored heading/lede precede the native disclosure group; answers keep their own ids.
-      requireExactKeys(record, ["type", "items"], ["heading", "lede"]);
+      // `UNO-WO-118 / R01`: the donor FAQ carries an optional plain `heading`, a **Markdown** `lede`, the closed `surface`
+      // and 1–24 ordered `{question, answer}` items whose question is plain and whose answer is Markdown-capable. Custom
+      // open state, links inside the question and every other donor key stay outside this subset.
+      requireExactKeys(record, ["type", "items"], ["heading", "lede", "surface"]);
       const items = record["items"];
       if (!Array.isArray(items)) refuseUnsupportedFeature();
-      // Uno's accordion carries exactly 1..8 positional entries, so the source bound is that same closed bound.
-      if (items.length < 1 || items.length > 8) refuseTarget();
+      // The donor's own 24-item ceiling; `UNO_PAGE_DOCUMENT_LIMITS.faqItems` records it beside the ordinary accordion bound.
+      if (items.length < 1 || items.length > UNO_PAGE_DOCUMENT_LIMITS.faqItems) refuseTarget();
       const entries: Record<string, unknown>[] = [];
       const answers: CandidateSection[] = [];
       for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
@@ -1037,24 +1048,55 @@ function composeSection(
         const entry = raw as PlainRecord;
         // Exactly `{question, answer}`: a link, icon, open state or any other key is a feature refusal.
         requireExactKeys(entry, ["question", "answer"], []);
+        const question = readNewFamilyText(entry["question"]);
+        // The donor question is a plain summary label, and the strict reader's positional label bound is 160 code points.
+        // Enforced here so the refusal is this family's own and the adaptation is explicit rather than incidental.
+        if (codePointLength(question) > 160) refuseTarget();
         const answerId = `${id}-answer-${itemIndex}`;
-        entries.push({ sectionId: answerId, label: readNewFamilyText(entry["question"]) });
+        entries.push({ sectionId: answerId, label: question });
+        // The donor answer is Markdown-capable: one shared-reader read at the donor's own 4,000 code-point bound, flagged
+        // only when it actually authors Markdown so a plain answer keeps its byte-identical escaped paragraph.
+        const answer = readRichFamilyText(entry["answer"], 4000);
         answers.push({
           id: answerId,
           module: "content.prose",
-          props: { text: readNewFamilyText(entry["answer"]) },
+          props: hasFamilyMarkdown(answer) ? { text: answer, markdown: true } : { text: answer },
         });
       }
-      // `UNO-WO-080 / R01`: the donor renders each question as a level-3 heading inside its native `<summary>`, so the
-      // composed accordion always carries the closed literal switch. The positional entries, answer ids and refusal
-      // vocabulary are untouched, and no donor field becomes representable.
-      const accordion: CandidateSection = {
-        id,
-        module: "interaction.accordion",
-        props: { items: entries, summaryHeadingLevel: 3 },
-        children: answers,
-      };
-      return wrapAuthoredText(record, id, accordion, "accordion");
+      // `UNO-WO-080 / R01`: the donor renders each question as a level-3 heading inside its native `<summary>`, so every
+      // composed accordion carries the closed literal switch.
+      // `UNO-WO-118 / R01`: the donor's 24-item ceiling exceeds the ordinary 1–8 disclosure group, and the group bound is
+      // **not** raised. The authored items instead become consecutive native groups of at most that same ordinary bound,
+      // in authored order, each keeping every answer's own id: a nine-item FAQ is the first eight beside the ninth, and a
+      // twenty-four-item FAQ is three such groups. One group keeps the documented identity (`family-N-faq` at the root, or
+      // `family-N-faq-accordion` under an authored heading/lede), so every input that fitted before is byte-identical.
+      const chunkSize = UNO_PAGE_DOCUMENT_LIMITS.accordionChildren;
+      const groups: CandidateSection[] = [];
+      for (let start = 0; start < answers.length; start += chunkSize) {
+        const slice = answers.slice(start, start + chunkSize);
+        const group: Record<string, unknown> = {
+          items: entries.slice(start, start + chunkSize),
+          summaryHeadingLevel: 3,
+        };
+        // An absent surface stays absent; an authored one is copied as a closed literal the Uno reader validates.
+        if (ownsKey(record, "surface")) group["surface"] = record["surface"];
+        groups.push({ id: `${id}-accordion-${groups.length + 1}`, module: "interaction.accordion", props: group, children: slice });
+      }
+      const single = groups.length === 1;
+      const only = groups[0];
+      // One group: the pre-existing root identity. Several groups: one container per chunk under the family anchor.
+      const composed: CandidateSection =
+        single && only !== undefined
+          ? {
+              module: only.module,
+              props: only.props,
+              children: only.children,
+              id: ownsKey(record, "heading") || ownsKey(record, "lede") ? `${id}-accordion` : id,
+            }
+          : { id, module: "layout.stack", props: {}, children: groups };
+      // The authored heading and Markdown lede precede the disclosure group(s) exactly as the donor renders them, read by the
+      // same lede reader this family has always used so its refusal vocabulary is unchanged.
+      return wrapAuthoredText(record, id, composed, "accordion", { markdownLede: true, ledeReader: readFamilyLede });
     }
     case "columns": {
       requireExactKeys(record, ["type", "items"], ["ratio"]);

@@ -1777,6 +1777,56 @@ describe("readUnoPageDocument — the eleven remaining owned modules", () => {
     });
   });
 
+  /**
+   * `UNO-WO-118 / R01`: the FAQ family's two native additions — the donor's closed `surface` on the disclosure group, and a
+   * Markdown-capable answer — with the ordinary 1–8 panel bound untouched.
+   */
+  describe("interaction.accordion — the FAQ surface and the unchanged panel bound", () => {
+    const panels = (count: number) => ({
+      items: Array.from({ length: count }, (_, index) => ({ sectionId: `d-${index}`, label: `L${index}` })),
+      children: Array.from({ length: count }, (_, index) => leaf(`d-${index}`)),
+    });
+    const accordion = (props: Record<string, unknown>, children?: readonly unknown[]): unknown =>
+      probe("interaction.accordion", props, children);
+    const sized = (count: number, extra: Record<string, unknown> = {}): unknown => {
+      const shape = panels(count);
+      return accordion({ items: shape.items, ...extra }, shape.children);
+    };
+
+    it("accepts the closed surface, keeps its absence exact and refuses any other value", () => {
+      const one = { items: [{ sectionId: "d-one", label: "One" }] };
+      const surfaced = readUnoPageDocument(accordion({ ...one, surface: "muted" }, [leaf("d-one")]));
+      expect(surfaced.accepted).toBe(true);
+      if (!surfaced.accepted) return;
+      const node = surfaced.document.sections[0];
+      if (node?.module !== "interaction.accordion") throw new Error("expected an accordion");
+      expect(node.props.surface).toBe("muted");
+      expect(Object.isFrozen(node.props)).toBe(true);
+      // The same JSON text re-reads identically.
+      expect(JSON.stringify(readUnoPageDocument(JSON.stringify(surfaced.document)))).toBe(JSON.stringify(surfaced));
+      // Absent stays absent, so an accordion authored before the switch keeps its exact props.
+      const plain = readUnoPageDocument(accordion(one, [leaf("d-one")]));
+      expect(plain.accepted).toBe(true);
+      if (plain.accepted) {
+        const plainNode = plain.document.sections[0];
+        if (plainNode?.module === "interaction.accordion") {
+          expect(Object.prototype.hasOwnProperty.call(plainNode.props, "surface")).toBe(false);
+        }
+      }
+      for (const wrong of ["shadow", "raised", "", 1, null, true, ["muted"], { surface: "muted" }]) {
+        expectRefusal(accordion({ ...one, surface: wrong }, [leaf("d-one")]), "document:invalid-props");
+      }
+    });
+
+    it("keeps the ordinary one-to-eight panel bound exactly where it was", () => {
+      expect(readUnoPageDocument(sized(1)).accepted).toBe(true);
+      expect(readUnoPageDocument(sized(8)).accepted).toBe(true);
+      expect(readUnoPageDocument(sized(8, { surface: "bordered" })).accepted).toBe(true);
+      expectRefusal(sized(9), "document:invalid-children");
+      expectRefusal(accordion({ items: [], surface: "muted" }, []), "document:invalid-children");
+    });
+  });
+
 
 
   describe("interaction.modal and interaction.contact", () => {

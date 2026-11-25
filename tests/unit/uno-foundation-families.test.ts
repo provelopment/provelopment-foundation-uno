@@ -1279,16 +1279,12 @@ describe("composeUnoFoundationSubset — faq and columns React markup", () => {
 });
 
 describe("composeUnoFoundationSubset — faq refusal", () => {
-  it("refuses faq fields, item states and Markdown outside the bounded subset", () => {
+  it("refuses faq fields, item states and invalid Markdown outside the bounded subset", () => {
     expectRefusal(envelope({ type: "faq" }), "family:unsupported-feature");
-    // `UNO-WO-075 / R01` accepts the optional `heading`/`lede` on `faq`, so the remaining out-of-subset keys prove the
-    // refusal here while the accepted pair is covered by the five-family authored-text cases.
+    // `UNO-WO-075 / R01` accepts the optional `heading`/`lede` on `faq` and `UNO-WO-118 / R01` accepts the donor `surface`,
+    // so the remaining out-of-subset keys prove the refusal here while the accepted fields are covered elsewhere.
     expectRefusal(
       envelope({ type: "faq", items: [{ question: "Q", answer: "A" }], align: "center" }),
-      "family:unsupported-feature",
-    );
-    expectRefusal(
-      envelope({ type: "faq", items: [{ question: "Q", answer: "A" }], surface: "muted" }),
       "family:unsupported-feature",
     );
     expectRefusal(
@@ -1302,10 +1298,14 @@ describe("composeUnoFoundationSubset — faq refusal", () => {
       );
     }
     expectRefusal(envelope({ type: "faq", items: ["Q"] }), "family:unsupported-feature");
+    // A question stays plain text, and an answer must be Markdown the shared reader accepts — never a literal rendering.
     for (const [question, answer] of [
       ["**q**", "A"],
-      ["Q", "*em*"],
-      ["Q", "[x](https://example.org)"],
+      ["Q", "<script>alert(1)</script>"],
+      ["Q", "An ![alt](https://example.org/i.png) image."],
+      ["Q", "An **unbalanced answer."],
+      ["Q", "[x](javascript:alert(1))"],
+      ["Q", "[x](//example.org/protocol-relative)"],
     ] as const) {
       expectRefusal(envelope({ type: "faq", items: [{ question, answer }] }), "family:unsupported-feature");
     }
@@ -1313,17 +1313,14 @@ describe("composeUnoFoundationSubset — faq refusal", () => {
 
   it("refuses malformed faq values through the Uno target and keeps the getter count at zero", () => {
     expectRefusal(envelope({ type: "faq", items: [] }), "family:target-refused");
-    const nine = Array.from({ length: 9 }, (_, index) => ({ question: `Q${index}`, answer: "A" }));
-    expectRefusal(envelope({ type: "faq", items: nine }), "family:target-refused");
+    // `UNO-WO-118 / R01`: the donor ceiling is 24, so nine entries now compose and twenty-five refuse.
+    const twentyFive = Array.from({ length: 25 }, (_, index) => ({ question: `Q${index}`, answer: "A" }));
+    expectRefusal(envelope({ type: "faq", items: twentyFive }), "family:target-refused");
     expectRefusal(envelope({ type: "faq", items: [{ question: "", answer: "A" }] }), "family:target-refused");
     expectRefusal(envelope({ type: "faq", items: [{ question: "q".repeat(161), answer: "A" }] }), "family:target-refused");
     expectRefusal(envelope({ type: "faq", items: [{ question: "Q", answer: "" }] }), "family:target-refused");
     expectRefusal(
       envelope({ type: "faq", items: [{ question: "Q", answer: "a".repeat(4001) }] }),
-      "family:target-refused",
-    );
-    expectRefusal(
-      envelope({ type: "faq", items: [{ question: "Q", answer: "<script>alert(1)</script>" }] }),
       "family:target-refused",
     );
 
@@ -1345,6 +1342,58 @@ describe("composeUnoFoundationSubset — faq refusal", () => {
 });
 
 describe("composeUnoFoundationSubset — columns refusal", () => {
+
+/**
+ * `UNO-WO-118 / R01`: the donor FAQ surface as this adapter composes it.
+ *
+ * The donor carries an optional plain `heading`, a **Markdown** `lede`, the closed `surface` and 1–24 ordered
+ * `{question, answer}` items whose answer is Markdown-capable. The 24-item ceiling exceeds the ordinary 1–8 disclosure
+ * group, so a longer authored list becomes consecutive ordinary groups — the group bound itself is never raised. Every
+ * input that fitted before keeps its byte-identical output.
+ */
+describe("composeUnoFoundationSubset — faq parity, Markdown and the donor item ceiling", () => {
+  const faq = (items: readonly unknown[], extra: Record<string, unknown> = {}) =>
+    composed(envelope({ type: "faq", items, ...extra }));
+  const items = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({ question: `Question ${index}`, answer: `Answer ${index}.` }));
+
+  it("keeps a one-to-eight-item FAQ as one group with its documented identity", () => {
+    // No authored text: the family anchor is the group itself, exactly as before.
+    for (const count of [1, 8]) {
+      const node = faq(items(count)).sections[0];
+      expect(node?.module).toBe("interaction.accordion");
+      expect(node?.id).toBe("family-0-faq");
+      if (node?.module !== "interaction.accordion") continue;
+      expect(node.props.items).toEqual(
+        items(count).map((item, index) => ({ sectionId: `family-0-faq-answer-${index}`, label: item.question })),
+      );
+      expect(node.props.summaryHeadingLevel).toBe(3);
+      expect(Object.prototype.hasOwnProperty.call(node.props, "surface")).toBe(false);
+      expect(node.children.map((child) => child.id)).toEqual(items(count).map((_, index) => `family-0-faq-answer-${index}`));
+      // A plain answer keeps the byte-identical escaped paragraph.
+      expect(node.children[0]?.props).toEqual({ text: "Answer 0." });
+    }
+    // Authored heading/lede: the pre-existing heading + lede + accordion stack under the same anchor.
+    const wrapped = faq(items(2), { heading: "Questions", lede: "A **bounded** lede." }).sections[0];
+    expect(wrapped?.module).toBe("layout.stack");
+    if (wrapped?.module !== "layout.stack") return;
+    expect(wrapped.children.map((child) => child.id)).toEqual([
+      "family-0-faq-heading",
+      "family-0-faq-lede",
+      "family-0-faq-accordion",
+    ]);
+    expect(wrapped.children[1]?.props).toEqual({ text: "A **bounded** lede.", markdown: true });
+    const group = wrapped.children[2];
+    expect(group?.module).toBe("interaction.accordion");
+    if (group?.module === "interaction.accordion") {
+      expect(group.children.map((child) => child.id)).toEqual([
+        "family-0-faq-answer-0",
+        "family-0-faq-answer-1",
+      ]);
+    }
+  });
+});
+
   it("refuses columns fields, body/list conflicts and Markdown outside the bounded subset", () => {
     expectRefusal(envelope({ type: "columns", items: "A" }), "family:unsupported-feature");
     expectRefusal(
@@ -2609,11 +2658,11 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/FAMILY_PARITY=17\/17/u);
     expect(ledger).toContain("ADAPT (divider semantic parity candidate)");
-    expect(ledger).toContain("nine of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("ten of seventeen fully parity-evidenced candidates");
     // `UNO-WO-071 / R01` normalizes the divider wording to its already independently accepted status.
     expect(ledger).toContain("independently accepted under `UNO-WO-069 / R01`");
     expect(ledger).not.toContain("awaiting independent Architect acceptance");
-    expect(ledger).toContain("eight still bounded");
+    expect(ledger).toContain("seven still bounded");
     // `UNO-WO-070 / R01`: the two grid families gained a bounded authored-heading mode, which must never be recorded as
     // full parity, a second/third accepted family or a closed stage.
     expect(ledger).toContain("ADAPT (bounded grid plus authored section heading and plain-text lede)");
@@ -2623,7 +2672,7 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).toContain("byte-identically");
     expect(ledger).toContain("heading-less");
     expect(ledger).toContain("bounded capability, not parity");
-    expect(ledger).toContain("Eight of the seventeen remain bounded");
+    expect(ledger).toContain("Seven of the seventeen remain bounded");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
@@ -4336,7 +4385,7 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
     expect(ledger).toContain("lede-only");
     expect(ledger).toContain("no-lede");
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("nine of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("ten of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
@@ -4709,7 +4758,7 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
     expect(ledger.split("ADAPT (bounded authored plain-text heading/lede)").length - 1).toBe(0);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("nine of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("ten of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/stats[^.\n]*full semantic parity/u);
@@ -4990,9 +5039,10 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     for (const type of FIVE_TYPES) {
       for (const [value, reason] of cases) {
         expectRefusal(fivePage(type, { heading: value }), reason);
-        if (type !== "faq") {
-          // `UNO-WO-084 / R01`: a `prose`/`callout` lede is Markdown-capable. Non-text, blank, padded, oversized,
-          // surrogate-bearing and unsafe-Markdown values still refuse; every other value is an accepted Markdown lede.
+        {
+          // `UNO-WO-084 / R01`: a `prose`/`callout` lede is Markdown-capable, and `UNO-WO-118 / R01` brings the donor's
+          // Markdown `faq` lede to the same shared reader, so all five ledes now share one rule. Non-text, blank, padded,
+          // oversized, surrogate-bearing and unsafe-Markdown values still refuse; every other value is an accepted lede.
           const refusesAsLede =
             typeof value !== "string" ||
             value.trim().length === 0 ||
@@ -5043,15 +5093,11 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
 
   it("preserves the earlier native refusals and does not widen neighbouring families", () => {
     for (const type of FIVE_TYPES) {
-      // `UNO-WO-084 / R01` widens only `prose` and `callout`; the other three still refuse the closed presentation fields.
+      // `UNO-WO-084 / R01` widens only `prose` and `callout`; the other three still refuse the closed alignment field.
       if (type !== "prose" && type !== "callout") {
         expectRefusal(fivePage(type, { align: "center" }), "family:unsupported-feature");
-        // `UNO-WO-102 / R01`: `table` and `list` now carry the donor's closed `surface`; `faq` still refuses it.
-        if (type === "faq") {
-          expectRefusal(fivePage(type, { surface: "muted" }), "family:unsupported-feature");
-        } else {
-          expect(composeUnoFoundationSubset(fivePage(type, { surface: "muted" })).status).toBe("composed");
-        }
+        // `UNO-WO-102 / R01`: `table` and `list` carry the donor's closed `surface`; `UNO-WO-118 / R01` gives `faq` its own.
+        expect(composeUnoFoundationSubset(fivePage(type, { surface: "muted" })).status).toBe("composed");
       }
       expectRefusal(fivePage(type, { eyebrow: "X" }), "family:unsupported-feature");
       expectRefusal(fivePage(type, { heading: "Valid", markdown: "# no" }), "family:unsupported-feature");
@@ -5059,6 +5105,10 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     // The newly accepted presentation fields stay closed: an unlisted value is still refused by the Uno reader.
     expectRefusal(envelope({ type: "prose", body: "A", align: "right" }), "family:target-refused");
     expectRefusal(envelope({ type: "prose", body: "A", surface: "shadow" }), "family:target-refused");
+    expectRefusal(
+      envelope({ type: "faq", items: [{ question: "Q", answer: "A" }], surface: "shadow" }),
+      "family:target-refused",
+    );
     expectRefusal(envelope({ type: "list", items: [{ label: "Linked", route: "../about" }] }), "family:target-refused");
     expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], align: "center" }), "family:unsupported-feature");
     // The two new optional keys stay family-specific: unmapped neighbouring families still refuse them.
@@ -5118,17 +5168,21 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     // `UNO-WO-084 / R01` (A1) credited prose and callout; `UNO-WO-110 / R01` credited table and `UNO-WO-111 / R01` credited
     // list, so only `faq` keeps the earlier bounded authored-text treatment while the two new rows carry their own parity
     // disposition and evidence.
-    expect(ledger.split("ADAPT (bounded plain-text heading/lede)").length - 1).toBe(1);
+    // `UNO-WO-118 / R01` credited `faq`, so no row carries the earlier bounded authored-text disposition any more; the two
+    // A1 credits, the two A2 credits and the two newest parity rows are each present exactly once.
+    expect(ledger.split("ADAPT (bounded plain-text heading/lede)").length - 1).toBe(0);
     expect(ledger.split("PARITY (A1, UNO-WO-084 / R01)").length - 1).toBe(2);
     expect(ledger.split("PARITY (UNO-WO-110 / R01)").length - 1).toBe(1);
     expect(ledger.split("PARITY (UNO-WO-111 / R01)").length - 1).toBe(1);
-    // `UNO-WO-117 / R01` credited quote, so exactly one row carries this order's parity disposition.
+    // `UNO-WO-117 / R01` credited quote and `UNO-WO-118 / R01` credited faq, so exactly one row carries each order's
+    // parity disposition.
     expect(ledger.split("PARITY (UNO-WO-117 / R01)").length - 1).toBe(1);
+    expect(ledger.split("PARITY (UNO-WO-118 / R01)").length - 1).toBe(1);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("nine of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("ten of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("sixteen still bounded");
-    expect(ledger).toContain("eight still bounded");
-    expect(ledger).toContain("Eight of the seventeen remain bounded");
+    expect(ledger).toContain("seven still bounded");
+    expect(ledger).toContain("Seven of the seventeen remain bounded");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("16/17");
     // `UNO-WO-114 / R01`: the ledger records the delivered B1 row (`8/17` / `50/59`); `UNO-WO-117 / R01` records the
@@ -5721,4 +5775,123 @@ describe("composeUnoFoundationSubset — R02 keeps valid compositions unchanged"
     }
   });
 });
+
+/**
+ * `UNO-WO-118 / R01`, second half: the FAQ splitting, Markdown answers and the closed surface.
+ *
+ * The donor's 24-item ceiling is represented by consecutive ordinary disclosure groups, never by raising the group bound:
+ * the document reader still refuses nine panels in one accordion, and the composed Page keeps authored order, exact answer
+ * ownership and the byte-identical plain output for every input that fitted before.
+ */
+describe("composeUnoFoundationSubset — faq groups, Markdown answers and the closed surface", () => {
+  const faq = (items: readonly unknown[], extra: Record<string, unknown> = {}) =>
+    composed(envelope({ type: "faq", items, ...extra }));
+  const items = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({ question: `Question ${index}`, answer: `Answer ${index}.` }));
+  /** The number of disclosures one composed child carries, or -1 when it is not a disclosure group at all. */
+  const panels = (node: { readonly module: string; readonly children?: readonly unknown[] } | undefined) =>
+    node?.module === "interaction.accordion" ? (node.children?.length ?? -1) : -1;
+
+  it("splits nine to twenty-four items into consecutive ordinary groups without raising the group bound", () => {
+    const nine = faq(items(9)).sections[0];
+    expect(nine?.module).toBe("layout.stack");
+    expect(nine?.id).toBe("family-0-faq");
+    if (nine?.module !== "layout.stack") return;
+    expect(nine.children.map((child) => child.id)).toEqual(["family-0-faq-accordion-1", "family-0-faq-accordion-2"]);
+    expect(nine.children.map(panels)).toEqual([8, 1]);
+    // Authored order and exact answer ownership survive the split: each entry names its own child, in order.
+    const first = nine.children[0];
+    const second = nine.children[1];
+    const firstEntry = first?.module === "interaction.accordion" ? first.props.items : [];
+    const secondEntry = second?.module === "interaction.accordion" ? second.props.items : [];
+    expect(firstEntry.length).toBe(8);
+    expect(secondEntry).toEqual([{ sectionId: "family-0-faq-answer-8", label: "Question 8" }]);
+    expect(second?.module === "interaction.accordion" ? second.children[0]?.id : "").toBe(
+      secondEntry[0]?.sectionId,
+    );
+
+    const twentyFour = faq(items(24), { surface: "muted" }).sections[0];
+    expect(twentyFour?.module).toBe("layout.stack");
+    if (twentyFour?.module !== "layout.stack") return;
+    expect(twentyFour.children.map((child) => child.id)).toEqual([
+      "family-0-faq-accordion-1",
+      "family-0-faq-accordion-2",
+      "family-0-faq-accordion-3",
+    ]);
+    expect(twentyFour.children.map(panels)).toEqual([8, 8, 8]);
+    // The closed surface is carried by each disclosure group; the container itself adds nothing.
+    expect(twentyFour.props).toEqual({});
+    for (const group of twentyFour.children) {
+      if (group?.module !== "interaction.accordion") continue;
+      expect(group.props.surface).toBe("muted");
+      expect(group.props.summaryHeadingLevel).toBe(3);
+      expect(group.children.length).toBeLessThanOrEqual(8);
+    }
+    // The ordinary accordion bound is untouched: a hand-authored document still refuses nine panels.
+    const ninePanels = readUnoPageDocument({
+      version: 1,
+      title: "Accordion bound",
+      sections: [
+        {
+          id: "accordion",
+          module: "interaction.accordion",
+          props: { items: Array.from({ length: 9 }, (_, index) => ({ sectionId: `p${index}`, label: `L${index}` })) },
+          children: Array.from({ length: 9 }, (_, index) => ({
+            id: `p${index}`,
+            module: "content.prose",
+            props: { text: "A." },
+          })),
+        },
+      ],
+    });
+    expect(ninePanels.accepted).toBe(false);
+  });
+
+  it("reads a Markdown answer as the declared rich body and a plain answer as escaped text", () => {
+    const node = faq([
+      { question: "Marked down?", answer: "A **bounded** answer with [a link](https://example.org/notes)." },
+      { question: "Plain?", answer: "A plain answer." },
+    ]).sections[0];
+    if (node?.module !== "interaction.accordion") throw new Error("expected an accordion");
+    expect(node.children[0]?.props).toEqual({
+      text: "A **bounded** answer with [a link](https://example.org/notes).",
+      markdown: true,
+    });
+    expect(node.children[1]?.props).toEqual({ text: "A plain answer." });
+    const html = render(
+      composed(
+        envelope({
+          type: "faq",
+          items: [{ question: "Marked down?", answer: "A **bounded** answer with [a link](https://example.org/notes)." }],
+        }),
+      ),
+    );
+    expect(html).toContain('<div class="uno-json-accordion" id="family-0-faq">');
+    expect(html).toContain('<strong class="uno-family-md-strong">bounded</strong>');
+    expect(html).toContain(
+      '<a class="uno-family-md-link" href="https://example.org/notes" rel="noopener noreferrer">a link</a>',
+    );
+    expect(html).not.toContain("**bounded**");
+    expect(html).not.toContain("open=");
+  });
+
+  it("renders the closed surface on the disclosure group only when it is authored", () => {
+    const surfaced = render(
+      composed(
+        envelope({
+          type: "faq",
+          items: [{ question: "Where?", answer: "At the selected site." }],
+          surface: "muted",
+        }),
+      ),
+    );
+    expect(surfaced).toContain('<div class="uno-json-accordion" data-uno-surface="muted" id="family-0-faq">');
+    const plain = render(
+      composed(envelope({ type: "faq", items: [{ question: "Where?", answer: "At the selected site." }] })),
+    );
+    expect(plain).toContain('<div class="uno-json-accordion" id="family-0-faq">');
+    expect(plain).not.toContain("data-uno-surface");
+  });
+});
+
 

@@ -801,8 +801,15 @@ function SectionNode({
       // `UNO-WO-080 / R01`: only an explicitly authored literal `3` wraps the label in one level-3 heading inside its
       // own `<summary>`; an accordion authored before that switch keeps its plain summary text byte-identically.
       const summaryHeadingLevel = node.props.summaryHeadingLevel;
+      // `UNO-WO-118 / R01`: the donor's closed section surface is carried by the group wrapper; an accordion without one
+      // keeps exactly its previous attributes.
+      const surface = node.props.surface;
       return (
-        <div className="uno-json-accordion" id={node.id}>
+        <div
+          className="uno-json-accordion"
+          {...(surface === undefined ? {} : { "data-uno-surface": surface })}
+          id={node.id}
+        >
           {node.children.map((child, index) => (
             <details className="uno-json-disclosure" key={child.id}>
               <summary className="uno-json-disclosure-summary">
