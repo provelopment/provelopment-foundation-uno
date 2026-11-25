@@ -902,6 +902,39 @@ describe("composeUnoFoundationSubset — steps and quote React markup", () => {
     expect(html).toContain('<span class="uno-json-testimonial-role">Reviewer</span>');
   });
 
+  it("composes, re-reads and renders a quote whose Markdown body carries one approved safe link", () => {
+    // `UNO-WO-118 / R02` (§4): the positive half of the Quote destination proof. The R01 credit rests on refusals; this case
+    // proves the same path accepts an authored safe `https` link, keeps it byte-identically through the strict reader, and
+    // renders it as a real anchor with `rel="noopener noreferrer"` and no literal Markdown syntax. No product code changes.
+    const body = "A **linked** quotation, see [the notes](https://example.org/notes).";
+    const outcome = composeUnoFoundationSubset(
+      envelope({ type: "quote", body, attribution: "Synthetic contributor", surface: "muted" }),
+    );
+    expect(outcome.status).toBe("composed");
+    if (outcome.status !== "composed") return;
+    const node = outcome.document.sections[0];
+    expect(node?.module).toBe("content.testimonials");
+    if (node?.module !== "content.testimonials") return;
+    expect(node.props).toEqual({
+      items: [{ quote: body, attribution: "Synthetic contributor" }],
+      surface: "muted",
+      markdown: true,
+    });
+    // Read: the strict reader accepts the composed node and the same document as JSON text, unchanged.
+    const reread = readUnoPageDocument(outcome.document);
+    expect(reread.accepted).toBe(true);
+    if (reread.accepted) expect(JSON.stringify(reread.document)).toBe(JSON.stringify(outcome.document));
+    // Render: one real anchor with the approved destination, no literal Markdown left behind.
+    const html = render(outcome.document);
+    expect(html).toContain(
+      '<a class="uno-family-md-link" href="https://example.org/notes" rel="noopener noreferrer">the notes</a>',
+    );
+    expect(html).toContain('<strong class="uno-family-md-strong">linked</strong>');
+    expect(html).not.toContain("](");
+    expect(html).not.toContain("**linked**");
+    expect(html).not.toContain("target=");
+  });
+
   it("supplies no second main, h1, script, iframe or handler from these two families", () => {
     expect((html.match(/<main/gu) ?? []).length).toBe(0);
     expect((html.match(/<h1/gu) ?? []).length).toBe(0);
@@ -5891,6 +5924,51 @@ describe("composeUnoFoundationSubset — faq groups, Markdown answers and the cl
     );
     expect(plain).toContain('<div class="uno-json-accordion" id="family-0-faq">');
     expect(plain).not.toContain("data-uno-surface");
+    // `UNO-WO-118 / R02`: `plain` is authored explicitly and is still the ordinary accordion — the closed value is emitted,
+    // but it carries no treatment of its own, which is exactly what the surface stylesheet must honour.
+    const explicit = render(
+      composed(
+        envelope({
+          type: "faq",
+          items: [{ question: "Where?", answer: "At the selected site." }],
+          surface: "plain",
+        }),
+      ),
+    );
+    expect(explicit).toContain('<div class="uno-json-accordion" data-uno-surface="plain" id="family-0-faq">');
+  });
+
+  it("applies the authored surface to every consecutive group of a long FAQ", () => {
+    // `UNO-WO-118 / R02`: nine entries compose two ordinary groups, and both must carry the same closed surface so the
+    // stylesheet can present the whole authored list as one surfacing choice rather than only the first group.
+    const nine = render(
+      composed(
+        envelope({
+          type: "faq",
+          surface: "bordered",
+          items: Array.from({ length: 9 }, (_, index) => ({ question: `Q${index}`, answer: `A${index}.` })),
+        }),
+      ),
+    );
+    expect(nine).toContain('<div class="uno-json-accordion" data-uno-surface="bordered" id="family-0-faq-accordion-1">');
+    expect(nine).toContain('<div class="uno-json-accordion" data-uno-surface="bordered" id="family-0-faq-accordion-2">');
+    expect((nine.match(/data-uno-surface="bordered"/gu) ?? []).length).toBe(2);
+    expect((nine.match(/<details class="uno-json-disclosure">/gu) ?? []).length).toBe(9);
+    expect(nine).toContain("<summary class=\"uno-json-disclosure-summary\"><h3>Q0</h3></summary>");
+    expect(nine).toContain("<summary class=\"uno-json-disclosure-summary\"><h3>Q8</h3></summary>");
+    expect(nine.indexOf("Q0")).toBeLessThan(nine.indexOf("Q8"));
+    // The twenty-four-entry ceiling renders three surfaced groups, still never more than eight panels each.
+    const twentyFour = render(
+      composed(
+        envelope({
+          type: "faq",
+          surface: "muted",
+          items: Array.from({ length: 24 }, (_, index) => ({ question: `Q${index}`, answer: `A${index}.` })),
+        }),
+      ),
+    );
+    expect((twentyFour.match(/data-uno-surface="muted"/gu) ?? []).length).toBe(3);
+    expect((twentyFour.match(/<details class="uno-json-disclosure">/gu) ?? []).length).toBe(24);
   });
 });
 

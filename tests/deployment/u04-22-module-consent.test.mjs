@@ -534,6 +534,20 @@ const PHASE_C_REQUIRED = Object.freeze([
   "${width}px the second FAQ disclosure opens by keyboard without opening the first",
   "dark ${width}px the faq family keeps its Markdown lede, closed surface and owned Markdown answer",
   "U04_CLOSURE_ORACLE the unchanged oracle credits exactly ten families at 10/17 and 52/59 without a checkpoint selector",
+  // `UNO-WO-118 / R02` (§2): the executed stylesheet check, the computed-appearance proof of the closed surface, its long-FAQ
+  // coverage and the temporary fixture restoration.
+  "FAMILY_SURFACE_CSS the shipped stylesheet gives the closed surface one token-only treatment per emphasised value and none for plain",
+  "background-color: var(--uno-surface-strong);",
+  "border: 1px solid var(--uno-border);",
+  "const faqSurfaceVerdict = faqSurfacesDistinct(faqSurfaceLight.rows);",
+  "const darkSurfaceVerdict = faqSurfacesDistinct(darkFaqSurface.rows);",
+  "${width}px the faq surface presents distinctly: muted and bordered differ from plain, plain equals the absent accordion, and the authored reading is muted",
+  "dark ${width}px the faq surface still presents distinctly in dark and reduced motion",
+  "A2_LOCAL_BROWSER the faq surface presents distinctly (plain == absent, muted and bordered each different) at 390px and 1280px in light and dark/reduced motion",
+  "FAMILY_BROWSER the long twenty-four-item faq serves three consecutive groups that all present the authored surface",
+  "FAMILY_BROWSER the fixture Page is restored byte-exactly after the long faq visit",
+  "const faqSurfaceOk = conjunction(faqSurfaceCases);",
+  "surface.paddingInlineStart === \"12px\"",
   'closureTen.labels.includes("U04_PARITY=10/17")',
   'closureTen.labels.includes("U04_PROXY=52/59")',
   'closureInterim.labels.includes("PARITY_FAQ=PENDING")',
@@ -782,6 +796,34 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
   });
 
   // `UNO-WO-067 / R01` §5: five independent mutations over the appended families, each failing for its own token.
+  // `UNO-WO-118 / R02`: the surface proof must be load-bearing in both directions — deleting a computed-appearance comparison
+  // and neutering the long-FAQ coverage each have to fail the audit for their own token.
+  it("the audit genuinely fails when the faq surface presentation proof is deleted or neutered", () => {
+    const shapes = [
+      [
+        "const faqSurfaceVerdict = faqSurfacesDistinct(faqSurfaceLight.rows);",
+        "const faqSurfaceVerdict = { ok: true, detail: \"\" };",
+        "faqSurfacesDistinct(faqSurfaceLight.rows)",
+      ],
+      [
+        "const darkSurfaceVerdict = faqSurfacesDistinct(darkFaqSurface.rows);",
+        "const darkSurfaceVerdict = { ok: true, detail: \"\" };",
+        "faqSurfacesDistinct(darkFaqSurface.rows)",
+      ],
+      ["surface.paddingInlineStart === \"12px\"", "true", "surface.paddingInlineStart"],
+      [
+        "FAMILY_BROWSER the long twenty-four-item faq serves three consecutive groups that all present the authored surface",
+        "long faq unverified",
+        "long twenty-four-item faq",
+      ],
+    ];
+    for (const [from, to, contract] of shapes) {
+      const mutated = source.replace(from, to);
+      assert.notEqual(mutated, source, from);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
   it("the audit genuinely fails when an appended source shape is changed", () => {
     const shapes = [
       [source.replaceAll('type: "hero",', 'type: "prose",'), 'type: "hero",'],

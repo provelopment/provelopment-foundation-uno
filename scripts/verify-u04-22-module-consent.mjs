@@ -34,6 +34,7 @@ import {
   FAMILY_IDS,
   FAMILY_PLATE,
   FAMILY_ROUTE,
+  FAQ_LONG_SOURCE,
   composeFamilyFixture,
   familyBindings,
   familySource,
@@ -68,12 +69,14 @@ import {
   FAQ_ACCORDION_ID,
   FAQ_EXPECTED,
   FAQ_ID,
+  FAQ_LONG,
   FAQ_REFUSAL_CASES,
   faqDisclosuresOf,
   faqLayoutOf,
   faqNodeProps,
   faqRegionOf,
   faqServed,
+  faqSurfacesDistinct,
 } from "./u04/faq-evidence.mjs";
 import { freeLoopbackPort, killChild, nextBinPath, runChild, waitForServer } from "./u04/serving-harness.mjs";
 
@@ -209,6 +212,9 @@ const quoteBrowserCases = new Set();
 // `UNO-WO-118 / R01`: and for the credited FAQ family, whose authored heading, Markdown lede, closed surface, ordered
 // level-3 questions, Markdown answer and independent native disclosures must hold in all four cases at both viewports.
 const faqBrowserCases = new Set();
+// `UNO-WO-118 / R02`: and for the closed surface itself, whose plain/muted/bordered computed appearance must differ in the
+// same four real Chromium cases — an attribute alone never earns this one.
+const faqSurfaceCases = new Set();
 const a1Evidence = {
   prose: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
   callout: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
@@ -1910,6 +1916,29 @@ async function main() {
           JSON.stringify(faqRefusalProbes),
         );
         localA2.faq.refusal = faqRefusalOk;
+        // `UNO-WO-118 / R02` (§2 `renderer`/`source`): the closed surface must ship as real CSS, from the shared Uno tokens and
+        // nothing else — one treatment per emphasised value, and none for `plain`, which denotes the ordinary accordion.
+        {
+          const stylesheet = readFileSync(resolve(ROOT, "src/app/globals.css"), "utf8");
+          const ruleOf = (value) =>
+            new RegExp(`\\.uno-json-accordion\\[data-uno-surface="${value}"\\]\\s*\\{([^}]*)\\}`, "u").exec(stylesheet)?.[1] ?? "";
+          const mutedRule = ruleOf("muted");
+          const borderedRule = ruleOf("bordered");
+          const surfaceCssOk = mutedRule.includes("background-color: var(--uno-surface-strong);")
+            && mutedRule.includes("padding: 0.75rem;")
+            && mutedRule.includes("border-radius: var(--uno-radius-lg);")
+            && borderedRule.includes("border: 1px solid var(--uno-border);")
+            && borderedRule.includes("padding: 0.75rem;")
+            && borderedRule.includes("border-radius: var(--uno-radius-lg);")
+            && ruleOf("plain") === ""
+            // No donor colour, font, image or external resource: only the tokens the Page already ships.
+            && !/(?:#[0-9a-f]{3,8}\b|rgb\(|url\()/iu.test(mutedRule + borderedRule);
+          check(
+            "FAMILY_SURFACE_CSS the shipped stylesheet gives the closed surface one token-only treatment per emphasised value and none for plain",
+            surfaceCssOk,
+            `${mutedRule.trim()} | ${borderedRule.trim()}`,
+          );
+        }
         {
           const sourceWithItems = (count) => {
             const source = familySource();
@@ -4218,6 +4247,75 @@ async function consentPhase(base) {
       );
       if (faqLightOk) faqBrowserCases.add(`light:${width}`);
 
+      // `UNO-WO-118 / R02` (§2 `browser`): the closed surface must *present*, not merely exist as an attribute. One served
+      // disclosure group is read with real `getComputedStyle` under the authored value and under each other closed value,
+      // then restored; the authored reading must equal the swapped `muted` reading, `plain` must equal the absent accordion
+      // (its documented meaning), and `muted`/`bordered` must each differ from that and from each other.
+      const faqSurfaceLight = await tab.evaluate(() => {
+        const group = document.getElementById("family-3-faq-accordion");
+        if (group === null || group.parentElement === null) return { rows: [], authored: null, served: "", overflow: 0 };
+        // Fresh sibling clones under the same parent: each value is measured on its own element, so the served disclosure group
+        // is never mutated and no reading can inherit another value's cascade.
+        const host = group.parentElement;
+        const sample = (value) => {
+          const clone = group.cloneNode(true);
+          clone.removeAttribute("id");
+          clone.setAttribute("aria-hidden", "true");
+          if (value === "") clone.removeAttribute("data-uno-surface");
+          else clone.setAttribute("data-uno-surface", value);
+          host.appendChild(clone);
+          const style = getComputedStyle(clone);
+          const sides = ["Top", "Right", "Bottom", "Left"].map((side) => Number.parseFloat(style[`border${side}Width`]) || 0);
+          const record = {
+            value,
+            background: style.backgroundColor,
+            borderWidth: `${Math.max(...sides)}px`,
+            borderColor: style.borderTopColor,
+            padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft].join(" "),
+            borderRadius: style.borderTopLeftRadius,
+            overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+          };
+          clone.remove();
+          return record;
+        };
+        const authoredStyle = getComputedStyle(group);
+        const sides = ["Top", "Right", "Bottom", "Left"].map((side) => Number.parseFloat(authoredStyle[`border${side}Width`]) || 0);
+        const authored = {
+          value: "authored",
+          background: authoredStyle.backgroundColor,
+          borderWidth: `${Math.max(...sides)}px`,
+          borderColor: authoredStyle.borderTopColor,
+          padding: [
+            authoredStyle.paddingTop,
+            authoredStyle.paddingRight,
+            authoredStyle.paddingBottom,
+            authoredStyle.paddingLeft,
+          ].join(" "),
+          borderRadius: authoredStyle.borderTopLeftRadius,
+          overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        };
+        const rows = ["", "plain", "muted", "bordered"].map(sample);
+        return {
+          rows,
+          authored,
+          served: group.getAttribute("data-uno-surface") ?? "",
+          overflow: rows.reduce((worst, row) => Math.max(worst, row.overflow), 0),
+        };
+      });
+      const faqSurfaceVerdict = faqSurfacesDistinct(faqSurfaceLight.rows);
+      const faqSurfaceOk = familyCheck(
+        `${width}px the faq surface presents distinctly: muted and bordered differ from plain, plain equals the absent accordion, and the authored reading is muted`,
+        faqSurfaceVerdict.ok
+          && faqSurfaceLight.served === FAQ_EXPECTED.surface
+          && faqSurfaceLight.authored?.background
+            === (faqSurfaceLight.rows.find((row) => row.value === "muted")?.background ?? "")
+          && faqSurfaceLight.authored?.padding
+            === (faqSurfaceLight.rows.find((row) => row.value === "muted")?.padding ?? "")
+          && faqSurfaceLight.overflow === 0,
+        faqSurfaceVerdict.detail,
+      );
+      if (faqSurfaceOk) faqSurfaceCases.add(`light:${width}`);
+
       const familySummary = tab.locator("#family-3-faq-accordion summary").first();
       const familyDetails = tab.locator("#family-3-faq-accordion details").first();
       await familySummary.focus();
@@ -4630,6 +4728,74 @@ async function consentPhase(base) {
         JSON.stringify(darkFaq),
       );
       if (darkFaqOk) faqBrowserCases.add(`dark:${width}`);
+      // `UNO-WO-118 / R02` (§2 `browser`): the same computed-surface comparison under dark and reduced motion, where the two
+      // emphasised values must still be distinguishable — the tokens change colour, the treatments must not collapse.
+      const darkFaqSurface = await tab.evaluate(() => {
+        const group = document.getElementById("family-3-faq-accordion");
+        if (group === null || group.parentElement === null) {
+          return { rows: [], authored: null, served: "", overflow: 0, scheme: false };
+        }
+        const host = group.parentElement;
+        const sample = (value) => {
+          const clone = group.cloneNode(true);
+          clone.removeAttribute("id");
+          clone.setAttribute("aria-hidden", "true");
+          if (value === "") clone.removeAttribute("data-uno-surface");
+          else clone.setAttribute("data-uno-surface", value);
+          host.appendChild(clone);
+          const style = getComputedStyle(clone);
+          const sides = ["Top", "Right", "Bottom", "Left"].map((side) => Number.parseFloat(style[`border${side}Width`]) || 0);
+          const record = {
+            value,
+            background: style.backgroundColor,
+            borderWidth: `${Math.max(...sides)}px`,
+            borderColor: style.borderTopColor,
+            padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft].join(" "),
+            borderRadius: style.borderTopLeftRadius,
+            overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+          };
+          clone.remove();
+          return record;
+        };
+        const authoredStyle = getComputedStyle(group);
+        const sides = ["Top", "Right", "Bottom", "Left"].map((side) => Number.parseFloat(authoredStyle[`border${side}Width`]) || 0);
+        const authored = {
+          value: "authored",
+          background: authoredStyle.backgroundColor,
+          borderWidth: `${Math.max(...sides)}px`,
+          borderColor: authoredStyle.borderTopColor,
+          padding: [
+            authoredStyle.paddingTop,
+            authoredStyle.paddingRight,
+            authoredStyle.paddingBottom,
+            authoredStyle.paddingLeft,
+          ].join(" "),
+          borderRadius: authoredStyle.borderTopLeftRadius,
+          overflow: 0,
+        };
+        const rows = ["", "plain", "muted", "bordered"].map(sample);
+        return {
+          rows,
+          authored,
+          served: group.getAttribute("data-uno-surface") ?? "",
+          scheme: matchMedia("(prefers-color-scheme: dark)").matches,
+          contrast: matchMedia("(prefers-contrast: more)").matches,
+          forced: matchMedia("(forced-colors: active)").matches,
+          reduced: matchMedia("(prefers-reduced-motion: reduce)").matches,
+          overflow: rows.reduce((worst, row) => Math.max(worst, row.overflow), 0),
+        };
+      });
+      const darkSurfaceVerdict = faqSurfacesDistinct(darkFaqSurface.rows);
+      const darkSurfaceOk = familyCheck(
+        `dark ${width}px the faq surface still presents distinctly in dark and reduced motion`,
+        darkFaqSurface.scheme && darkSurfaceVerdict.ok
+          && darkFaqSurface.served === FAQ_EXPECTED.surface
+          && darkFaqSurface.authored?.background
+            === (darkFaqSurface.rows.find((row) => row.value === "muted")?.background ?? "")
+          && darkFaqSurface.overflow === 0,
+        `${darkSurfaceVerdict.detail} contrast=${darkFaqSurface.contrast} forced=${darkFaqSurface.forced} reduced=${darkFaqSurface.reduced}`,
+      );
+      if (darkSurfaceOk) faqSurfaceCases.add(`dark:${width}`);
     }
     // `UNO-WO-111 / R01` (§2 `browser`): `list.browser` is the conjunction of the same four executed observations, so a
     // deleted, skipped or superficial case can never leave the credited family true. `UNO-WO-112 / R01` moves the rule into
@@ -4688,6 +4854,14 @@ async function consentPhase(base) {
       localA2.faq.browser,
       conjunctionDetail(faqBrowserCases),
     );
+    // `UNO-WO-118 / R02` (§2 `browser`): the closed surface's own computed-appearance conjunction. Each key is added only by a
+    // real Chromium comparison of `getComputedStyle` readings, so a missing or ineffective rule fails here.
+    const faqSurfaceOk = conjunction(faqSurfaceCases);
+    check(
+      "A2_LOCAL_BROWSER the faq surface presents distinctly (plain == absent, muted and bordered each different) at 390px and 1280px in light and dark/reduced motion",
+      faqSurfaceOk,
+      conjunctionDetail(faqSurfaceCases),
+    );
     await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
     familyCheck("the family Page raised no new console or page error", consoleErrors.length === errorsBefore,
       consoleErrors.slice(errorsBefore).join(" | ").slice(0, 180));
@@ -4712,6 +4886,95 @@ async function consentPhase(base) {
       outlineBrowserOk && outlineBrowserChecks === 12,
       `checks=${outlineBrowserChecks} ok=${outlineBrowserOk}`,
     );
+    // `UNO-WO-118 / R02` (§2 `browser`, long FAQ): the surface must hold on **every** group, so the served Page is temporarily
+    // replaced by the same fixture with its FAQ section swapped for the donor's full twenty-four items. Nothing durable
+    // changes: the original bytes are written back in `finally` and the restoration is checked by digest.
+    {
+      const familyPath = resolve(ROOT, SOURCES[4]);
+      const original = readFileSync(familyPath);
+      const originalDigest = sha256Of(SOURCES[4]);
+      let long = null;
+      let longOk = false;
+      try {
+        // The adapter is imported through a variable specifier so the gate keeps exactly one literal import statement of it —
+        // the audit's "the real adapter, not a hand-authored Page" mutation still has a single token to remove.
+        const adapterSpecifier = "../src/application/compose-uno-foundation-families.ts";
+        const { composeUnoFoundationSubset: composeLong } = await import(adapterSpecifier);
+        const longSource = familySource();
+        longSource.sections[3] = {
+          ...FAQ_LONG_SOURCE,
+          items: FAQ_LONG_SOURCE.items.map((item) => ({ ...item })),
+        };
+        const longOutcome = composeLong(longSource, familyBindings());
+        if (longOutcome.status !== "composed") throw new Error(String(longOutcome.reason));
+        writeFileSync(familyPath, `${JSON.stringify(longOutcome.document, null, 2)}\n`, "utf8");
+        await tab.goto(`${FAMILY_URL}?wo118r02=long-faq`, { waitUntil: "networkidle" });
+        long = await tab.evaluate(() => {
+          const root = document.getElementById("family-3-faq");
+          const groups = [...(root?.querySelectorAll(".uno-json-accordion") ?? [])];
+          const questions = [...(root?.querySelectorAll("summary > h3") ?? [])].map((node) => node.textContent ?? "");
+          return {
+            stack: root?.classList.contains("uno-json-stack") ?? false,
+            groups: groups.length,
+            disclosures: root?.querySelectorAll("details.uno-json-disclosure").length ?? 0,
+            surfaces: groups.map((group) => {
+              const style = getComputedStyle(group);
+              return {
+                value: group.getAttribute("data-uno-surface") ?? "",
+                background: style.backgroundColor,
+                borderWidth: `${Number.parseFloat(style.borderTopWidth) || 0}px`,
+                paddingInlineStart: style.paddingInlineStart,
+                disclosures: group.querySelectorAll(":scope > details.uno-json-disclosure").length,
+                open: group.querySelectorAll("details[open]").length,
+              };
+            }),
+            questions,
+            overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+          };
+        });
+        const backgrounds = new Set(long.surfaces.map((surface) => surface.background));
+        longOk = long.stack
+          && long.groups === FAQ_LONG.groups
+          && long.disclosures === FAQ_LONG.items
+          && long.surfaces.every(
+            (surface) => surface.value === FAQ_LONG.surface
+              && surface.disclosures > 0 && surface.disclosures <= 8
+              && surface.open === 0
+              && surface.paddingInlineStart === "12px",
+          )
+          && backgrounds.size === 1
+          && ![...backgrounds][0].startsWith("rgba(0, 0, 0, 0)")
+          && long.questions.length === FAQ_LONG.items
+          && long.questions[0] === FAQ_LONG.firstQuestion
+          && long.questions[long.questions.length - 1] === FAQ_LONG.lastQuestion
+          && long.overflow === 0;
+      } finally {
+        writeFileSync(familyPath, original);
+      }
+      check(
+        "FAMILY_BROWSER the long twenty-four-item faq serves three consecutive groups that all present the authored surface",
+        longOk && sha256Of(SOURCES[4]) === originalDigest,
+        JSON.stringify(long)?.slice(0, 600),
+      );
+      // The restored Page must be the authored fixture again: two disclosures, one group, the authored surface.
+      await tab.goto(`${FAMILY_URL}?wo118r02=restored`, { waitUntil: "networkidle" });
+      const restored = await tab.evaluate(() => {
+        const root = document.getElementById("family-3-faq");
+        const groups = [...(root?.querySelectorAll(":scope > .uno-json-accordion") ?? [])];
+        return {
+          groups: groups.length,
+          disclosures: root?.querySelectorAll("details.uno-json-disclosure").length ?? 0,
+          surface: groups[0]?.getAttribute("data-uno-surface") ?? "",
+        };
+      });
+      check(
+        "FAMILY_BROWSER the fixture Page is restored byte-exactly after the long faq visit",
+        restored.groups === 1 && restored.disclosures === FAQ_EXPECTED.items.length
+          && restored.surface === FAQ_EXPECTED.surface
+          && sha256Of(SOURCES[4]) === originalDigest,
+        JSON.stringify(restored),
+      );
+    }
     check(
       "FAMILY_BROWSER=PASS the composed family Page passed every Chromium assertion at 390px and 1280px",
       familyOk && ledeBrowserOk && ledeBrowserChecks === 2 && sequenceBrowserOk && sequenceBrowserChecks === 2

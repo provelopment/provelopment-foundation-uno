@@ -13,6 +13,11 @@ function render(document: UnoPageDocument): string {
   return renderToStaticMarkup(createElement(UnoPageSections, { document }));
 }
 
+/** The one stylesheet the production Page actually ships. */
+function stylesheet(): string {
+  return readFileSync(fileURLToPath(new URL("../../src/app/globals.css", import.meta.url)), "utf8");
+}
+
 /** Build one accepted document from plain data, failing loudly if the fixture itself is invalid. */
 function accept(document: Record<string, unknown>): UnoPageDocument {
   const result = readUnoPageDocument(document);
@@ -977,6 +982,34 @@ describe("the eleven remaining module renderers", () => {
     // Native state is never authored: no disclosure is rendered open, and no control replaces the summary.
     expect(html).not.toContain("open=");
     expect(html).not.toContain("<button");
+  });
+
+  // `UNO-WO-118 / R02`: the attribute alone is not a surface. The shipped stylesheet must define one treatment per emphasised
+  // value from the shared tokens, and must define nothing for the ordinary accordion or for the authorable `plain` value.
+  it("styles the closed accordion surface from the shared tokens and leaves the ordinary group alone", () => {
+    const css = stylesheet();
+    const rule = (value: string): string | null => {
+      const pattern = new RegExp(`\\.uno-json-accordion\\[data-uno-surface="${value}"\\]\\s*\\{([^}]*)\\}`, "u");
+      const match = pattern.exec(css);
+      return match === null ? null : (match[1] ?? null);
+    };
+    const muted = rule("muted");
+    const bordered = rule("bordered");
+    expect(muted).not.toBeNull();
+    expect(bordered).not.toBeNull();
+    expect(muted).toContain("background-color: var(--uno-surface-strong)");
+    expect(muted).toContain("padding:");
+    expect(muted).toContain("border-radius: var(--uno-radius-lg)");
+    expect(bordered).toContain("border: 1px solid var(--uno-border)");
+    expect(bordered).toContain("padding:");
+    // `plain` denotes no emphasis, exactly as it does for every other Uno surface module, so there is no rule for it and the
+    // base accordion rule keeps only its layout.
+    expect(rule("plain")).toBeNull();
+    const base = /\.uno-json-accordion\s*\{([^}]*)\}/u.exec(css)?.[1] ?? "";
+    expect(base).toContain("display: flex");
+    expect(base).not.toContain("background");
+    expect(base).not.toContain("padding");
+    expect(base).not.toContain("border");
   });
 
   it("renders one step heading inside its own list item when itemHeadingLevel is 3", () => {

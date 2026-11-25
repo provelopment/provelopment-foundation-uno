@@ -9,7 +9,7 @@
  * WHAT IT IS NOT. No authority and no I/O: every function here is a pure predicate over a string or over inert authored
  * data, so it can be exercised without a server, a browser or a file.
  */
-import { FAQ_SOURCE } from "./family-fixture.mjs";
+import { FAQ_LONG_SOURCE, FAQ_SOURCE } from "./family-fixture.mjs";
 
 /** The one composed FAQ region this proof reads, and the disclosure group inside its authored heading/lede stack. */
 export const FAQ_ID = "family-3-faq";
@@ -243,5 +243,55 @@ export function faqServed(region, expected = FAQ_EXPECTED) {
     && !region.includes("example.help")
     && !region.includes("wo066-donor");
   return { ok, detail: JSON.stringify({ headingAt, ledeAt, groupAt, disclosures: disclosures.length }) };
+}
+
+
+/**
+ * `UNO-WO-118 / R02`: the surface-coverage facts this proof reads from the single long fixture definition.
+ *
+ * The donor's 24-item ceiling composes into consecutive ordinary groups of at most eight; the surface must be effective on
+ * every one of them, and the twenty-fifth item must still be refused.
+ */
+export const FAQ_LONG = Object.freeze({
+  items: FAQ_LONG_SOURCE.items.length,
+  groups: Math.ceil(FAQ_LONG_SOURCE.items.length / 8),
+  surface: FAQ_LONG_SOURCE.surface,
+  firstQuestion: FAQ_LONG_SOURCE.items[0].question,
+  lastQuestion: FAQ_LONG_SOURCE.items[FAQ_LONG_SOURCE.items.length - 1].question,
+});
+
+/**
+ * The computed-appearance comparison for the closed surface, over real `getComputedStyle` readings of one served disclosure
+ * group under each authored value. A missing rule, an ineffective rule, or two values that present identically fails here.
+ *
+ * `plain` is the ordinary accordion by convention — every other Uno surface module treats it as "no emphasis" — so it must
+ * equal the absent reading; the two emphasised values must each differ from it and from each other, in the background, the
+ * border or the padding, not merely in the attribute.
+ */
+export function faqSurfacesDistinct(rows) {
+  const of = (value) => rows.find((row) => row.value === value) ?? null;
+  const absent = of("");
+  const plain = of("plain");
+  const muted = of("muted");
+  const bordered = of("bordered");
+  const complete = [absent, plain, muted, bordered].every(
+    (row) => row !== null && typeof row.background === "string" && row.background.length > 0
+      && typeof row.borderWidth === "string" && typeof row.padding === "string",
+  );
+  const same = (left, right) =>
+    left.background === right.background
+    && left.borderWidth === right.borderWidth
+    && left.padding === right.padding
+    && left.borderRadius === right.borderRadius;
+  const ok = complete
+    && same(plain, absent)
+    && !same(muted, plain)
+    && !same(bordered, plain)
+    && !same(muted, bordered)
+    && muted.background !== plain.background
+    && Number.parseFloat(bordered.borderWidth) > Number.parseFloat(plain.borderWidth)
+    && bordered.background !== muted.background
+    && (muted.padding !== plain.padding || bordered.padding !== plain.padding);
+  return { ok, detail: JSON.stringify(rows) };
 }
 

@@ -82,6 +82,26 @@ export const FAQ_SOURCE = Object.freeze({
 });
 
 /**
+ * `UNO-WO-118 / R02`: the long FAQ used only for the surface-coverage proof — the donor's full twenty-four-item ceiling,
+ * authored exactly as a donor Page could author it. It is composed by the real adapter into three consecutive ordinary
+ * groups, which is the only way to observe that the closed surface is effective on **every** group rather than on the first.
+ */
+export const FAQ_LONG_SOURCE = Object.freeze({
+  type: "faq",
+  heading: "Synthetic long FAQ",
+  lede: "Twenty-four **bounded** questions.",
+  surface: "muted",
+  items: Object.freeze(
+    Array.from({ length: 24 }, (_, index) =>
+      Object.freeze({
+        question: `Question ${index + 1}?`,
+        answer: index === 0 ? "The **first** answer." : `Answer ${index + 1}.`,
+      }),
+    ),
+  ),
+});
+
+/**
  * `UNO-WO-117 / R01`: the donated Quote surface, exactly as authored — a Markdown-capable `body`, a plain `attribution`
  * beside a plain `role` (the donor draws a role only with an attribution), and the donor's closed `align`/`surface` pair.
  * The donor authors no heading or lede for this family, so neither is present.

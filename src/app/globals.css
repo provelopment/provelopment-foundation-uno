@@ -1586,6 +1586,29 @@ main {
   min-width: 0;
 }
 
+/*
+ * `UNO-WO-118 / R02`: the donor's closed FAQ `surface`, applied to the disclosure group. `plain` is the ordinary accordion —
+ * the convention every other Uno surface module already follows (`data-uno-surface="plain"` has no rule anywhere because it
+ * denotes "no emphasis") — so the two emphasised choices add exactly one treatment each, from the shared Uno tokens, and an
+ * accordion without a surface keeps its byte-identical, pixel-identical appearance.
+ *
+ * `muted` lifts the group onto the stronger surface so the group reads as one block against the page. `bordered` instead
+ * keeps the page background and draws one rule around the group, so it is distinguishable from `muted` in every colour
+ * scheme; the disclosures keep their own `--uno-surface` fill inside either group.
+ */
+.uno-json-accordion[data-uno-surface="muted"] {
+  padding: 0.75rem;
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-surface-strong);
+}
+
+.uno-json-accordion[data-uno-surface="bordered"] {
+  padding: 0.75rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-background);
+}
+
 /* --- Modal ------------------------------------------------------------------- */
 .uno-json-modal {
   min-width: 0;
