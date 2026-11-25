@@ -1,89 +1,111 @@
-# Execution Report — UNO-WO-120 / R02
+# Execution Report — UNO-WO-120 / R03
 
-**Outcome: COMPLETE — the five corrections R02 authorized are implemented and executed. `PARITY_MEDIA=PASS`, `U04_PARITY=12/17`,
-`U04_PROXY=54/59`; all eleven prior credits are preserved, **B2** stays earned at exactly `11/17` / `53/59`, the owned-asset
-protections are unchanged, and every mandatory local and exact-head hosted gate is green. C1 and U04 remain OPEN.**
+**Outcome: COMPLETE — the native required-`alt` input boundary is restored while the donor-side normalization stays in the
+adapter. All five delivered R02 Media corrections are preserved. `PARITY_MEDIA=PASS`, `U04_PARITY=12/17`, `U04_PROXY=54/59`; the
+eleven prior credits are preserved, **B2** is unchanged at exactly `11/17` / `53/59`, and every mandatory local and exact-head
+hosted gate is green. C1 and U04 remain OPEN.**
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-120 / R02`, `FINAL — EXECUTE` (supersedes R01) |
-| ACTIVE | **4,914 bytes**, SHA-256 `d74d370c240cc06b9da137c85da075379b0633a72fc436b801202088cabc046b` — matched the activation exactly; private, ignored, absent from the tree |
-| Start SHA | `3572eb8c7c5ca0df1231c909ad5e6b5eec3dc8fc` (`HEAD` = `main` = `origin/main` = `ls-remote`; one worktree; one Uno `origin`; clean tree) |
-| Product head | `94fdabac4a72640500d1b1a2da690094aeb9ca3d` (`3572eb8..94fdaba`, one non-force push) |
+| Order | `UNO-WO-120 / R03`, `FINAL — EXECUTE` (supersedes R02) |
+| ACTIVE | **3,779 bytes**, SHA-256 `028fa6fd39fb58287c4d060e4d1e84d43620a85e65c44db2ec9c6eb398b1ce69` — matched the activation exactly; private, ignored, absent from the tree |
+| Start SHA | `5d8fe8ad5cf5255b86aa3a5c785a116c9ac5607e` (`HEAD` = `main` = `origin/main` = `ls-remote`; one worktree; one Uno `origin`; clean tree) |
+| Product head | `9791e52eb48934e3b8c8baab958732229304291e` (`5d8fe8a..9791e52`, one non-force push) |
 | Oracle | **unchanged** `scripts/verify-u04-family-closure.mjs` — twelve families at **12/17** / **54/59**, selector `B2` still exactly **11/17** / **53/59** |
 
-## 1. The five corrections, each executed
+## 1. The authorized correction
 
-**(1) The donor's optional boolean is adopted as the donor declares it.** `decorative` may be absent, `false` or `true`. A
-`true` flag may now **omit** `alt`, and the accepted node is normalized to the native empty alternative; R01's explicit
-`alt: ""` form still composes. A non-boolean flag, a nonempty `alt` beside `true`, and an absent **or** empty `alt` without
-`true` all still refuse the target. The described alt keeps its 320-code-point bound (the donor's 400 is documented, not
-adopted).
+**The defect.** R02's authorised text says "Keep native required alt and 320-code-point bound" and "Preserve ordinary native and
+other-family behavior". R02 correctly normalized an omitted donor `alt` beside `decorative: true` **in the composer**, but it also
+made `alt` optional at the **native strict reader** — so a hand-authored native document could omit the alternative and still be
+accepted, which is a widening of the native contract the order never authorized.
 
-**(2) Every donor-supported caption is representable through 4,000, including unformatted text.** A caption above the native
-bound is declared through the **accepted Markdown-capable form** — no padding, no wrapping, no inserted emphasis: the composed
-`caption` is the authored string byte for byte. Measured: unformatted 321 and 4,000 compose with `markdown: true`; 4,001 refuses;
-an unflagged 320-point caption composes byte-identically to before; the native 320 bound and every unrelated caption limit are
-untouched.
+**The correction.** `src/core/page-document.ts` is back to the original native boundary: `media.image` requires **both** `asset`
+and `alt`; the alternative is read with the unchanged 320-code-point bound; `decorative: true` requires it exactly empty; a
+described image requires it non-empty; a non-boolean flag still refuses. Nothing else about the node changed — the caption forms,
+the `markdown` literal and the closed props set are untouched.
 
-**(3) One shared Unicode decision covers both native caption forms.** A lone high surrogate, a lone low surrogate and a reversed
-pair refuse in the plain **and** the declared form; a valid supplementary pair still counts once and is accepted in both; the
-existing newline and unsafe-text policies are unchanged. The decision is confined to the native `media.image` caption — no other
-plain field, gallery/carousel item or video caption was hardened.
+**What stays where.** The donor's optional boolean is a **source** shape and its normalization belongs to the adapter, which
+already emitted the native `alt: ""` before reading; the composer is unchanged by this round. So:
 
-**(4) A textless position is accepted.** `position: "start"`/`"end"` with no `heading` and no `lede` composes a
-`layout.stack` carrying the position and **one** child — the figure — with no invented heading, no invented text, no duplicate
-image and no new module. The stylesheet keeps the donor's placement: at a wide viewport the single figure keeps its own track
-(`start` first, `end` second) and below `64rem` it stays one full-width column in authored order.
-
-**(5) `plain` is proven authored, not inferred.** R01 compared `plain` with `absent` using two variants that both authored **no**
-surface. One served variant now authors `surface: "plain"` and another authors none, so the closed literal is compared with the
-donor's own absence: the authored node carries `data-uno-surface="plain"` while the bare one carries no attribute at all, and both
-compute to `rgba(0, 0, 0, 0)` with no border and no padding.
-
-## 2. Authorized ledger (12 modified; no other path touched)
-
-`src/core/page-document.ts` · `src/application/compose-uno-foundation-families.ts` · `src/app/globals.css` ·
-`scripts/u04/family-fixture.mjs` · `scripts/u04/media-evidence.mjs` · `scripts/verify-u04-22-module-consent.mjs` ·
-`tests/unit/page-document.test.ts` · `tests/unit/uno-foundation-families.test.ts` · `tests/unit/uno-page-sections.test.ts` ·
-`tests/unit/u04-verification-modules.test.mjs` · `tests/deployment/u04-22-module-consent.test.mjs` ·
-`.documents/Architecture/u04-family-parity.md`, plus this single overwrite of `.documents/Reports/execution-report.md`.
-`src/components/uno-page-sections.tsx` was authorized but needed no change: the position attribute and the Markdown caption were
-already rendered, so the round is purely additive on the composition and style side.
-
-Frozen governance, the closure oracle, workflows, dependencies, durable Pages and declarations, the owned-media policy,
-publication authority, providers and sibling repositories were read-only and are unchanged.
-
-## 3. What R01 got wrong, recorded rather than hidden
-
-Four of the five corrections are corrections of R01's own record, so they are stated as such: R01 refused a position without
-authored text although the donor accepts one; it required `alt` beside `decorative` although the donor's boolean makes it
-optional; it left unformatted captions above 320 unrepresentable although the donor's field reaches 4,000; it applied the
-well-formedness decision to the declared caption only; and it claimed a `plain`-versus-absent surface comparison from two
-variants that both authored no surface. Each is now executed, and the evidence that would have caught them is part of the gate.
-
-## 4. Seven dimensions, as executed
-
-| Dimension | Evidence (all executed this run) |
+| Input | Result |
 | --- | --- |
-| `source` | the real adapter composes the rich section as `layout.stack {position:"start", surface:"muted"}` with the figure first; `end` reverses the children and keeps a plain caption plain; the decorative variant — whose fixture **omits `alt`** — composes `alt: ""` with `decorative: true` and the authored `surface:"plain"`; both textless positions compose one child (`family-0-media-figure`) under the position, with no text node; the bare section stays one `media.image` at the anchor, byte-identical |
-| `reader` | the composed Page round-trips; the unflagged caption accepts 320 and refuses 321, while the declared form accepts 321 and 4,000 and refuses 4,001; an unformatted 400-character caption composes with `markdown: true` and its exact authored text; lone high/low surrogates refuse in **both** forms and a supplementary pair is accepted in both; `decorative: false` composes beside a description, `{decorative: true}` alone normalizes to `alt: ""`, and contradictory or missing forms refuse |
-| `renderer` | the served region is one positioned, surfaced stack whose figure owns its image **and** its `figcaption`; the caption renders from the shared AST (`<strong class="uno-family-md-strong">owned</strong>`, `<a class="uno-family-md-link" href="https://example.org/media-notes">`), never raw syntax; the decorative figure is `<img alt="">` with no `aria-label` and no `title`; a textless positioned stack renders exactly one figure and no heading or prose element |
-| `http` | the committed Page's own locator answers `200 image/png` with bytes equal to the generated 64×64 plate (`IHDR` 64×64); the temporary page additionally serves the authored `data-uno-surface="plain"`, the normalized `alt=""`, both textless positions with one `<img>` each and no `h2`/`uno-json-prose`, and the byte-identical bare figure |
-| `browser` | four cases — `light:390`, `light:1280`, `dark:390` (reduced motion), `dark:1280` (reduced motion) — each measuring **six** variants. 1280: rich tracks `[246,246]` at lefts `[380,646]`, `end` `[245,245]` at `[381,646]`, the authored-plain decorative stack `[552,552,552]` at `[360,360,360]`, bare `[552]` at `[360]`, **textless start `[266]` at `[360]`** and **textless end `[266]` at `[646]`** (content edge 360 + one 266 track + the 20 px gap). 390: every variant one column (`[310,310]`, `[308,308]`, `[350,…]`) in authored order, textless ones flush at the content edge. Images all loaded `64×64`; surfaces `muted` `rgb(245,247,251)` / `muted` dark `rgb(20,27,36)`, `bordered` `rgb(255,255,255)` / `rgb(12,17,24)` with a 1 px border and token padding, authored `plain` and absent both `rgba(0,0,0,0)` with no border and no padding; **6 real Tab presses** reach `A[https://example.org/media-notes]`, focus leaves again, the URL is unchanged, **0** foreign requests, **0** console/page errors |
-| `refusal` | **fourteen** closed probes, each refusing the whole Page with its own literal reason and no document: unbound source, remote URL source, decorative with a nonempty alt, empty alt without the flag, missing alt without the flag, non-boolean decorative value, malformed Unicode plain caption, malformed Unicode Markdown caption, unsafe Markdown destination, malformed Markdown, caption beyond 4,000, unknown position, unknown surface, unknown image field |
-| `rights` | the served region renders no donor identity, no storage path, no remote host, no provider, no `url(`/`@font-face`/frame; every `src` matches this Page's own `/uno-media/<locale>/wo066-family-composition/<n>` route |
+| donor section, `decorative: true`, `alt` omitted | adapter composes `media.image {asset, alt: "", decorative: true}` → **accepted**, served figure carries an explicit empty `alt` |
+| donor section, `decorative: true`, `alt: ""` | **accepted**, byte-identical to R02 |
+| donor section, described alt with `decorative` absent or `false` | **accepted** as before |
+| **direct native object** (`readUnoPageDocument`) `decorative: true`, `alt` omitted | **refused** `document:invalid-props`, no document |
+| **raw JSON document** with the same omission | **refused** `document:invalid-props`, no document |
+| direct native object, `alt` omitted and no flag | **refused** as before |
+| direct native object, nonempty `alt` with `true`, empty `alt` without `true`, non-boolean flag, `alt` > 320 code points | **refused** as before |
 
-## 5. Restore and regression proof
+No native alt bound was widened, no donor composition changed, and the caption-Unicode protection, long-caption representation,
+textless position and surface behaviour are exactly as delivered by R02.
 
-Both temporary fixture transactions re-request the Page after the restore and assert a **fresh** served original in addition to
-the byte digest: `FAMILY_MEDIA_RESTORE` and `FAMILY_COLUMNS_RESTORE` both PASS — the committed Page, its committed region and
-none of the temporary variant anchors. The committed fixture, the durable Components Page, the twenty-two module ids (22/22),
-the four owned zones (4/4), the sixteen-cell browser matrix (16/16), the P6 declaration phases and the 179-check multi-Site gate
-are unchanged and green.
+## 2. Authorized ledger (7 modified; no other path touched)
+
+`src/core/page-document.ts` (the native required-`alt` restoration and its comments) · `scripts/verify-u04-22-module-consent.mjs`
+and `scripts/u04/media-evidence.mjs` (to distinguish source normalization from direct-native refusal) ·
+`tests/unit/page-document.test.ts`, `tests/unit/u04-verification-modules.test.mjs`,
+`tests/deployment/u04-22-module-consent.test.mjs` (focused boundary regression and mutation-sensitive evidence) ·
+`.documents/Architecture/u04-family-parity.md`, and this single overwrite of `.documents/Reports/execution-report.md`.
+
+No composer, renderer, stylesheet, durable Page/declaration, asset policy, dependency, workflow, oracle, frozen governance,
+sibling repository, provider, release or deployment change was made. `tests/unit/uno-foundation-families.test.ts` needed no edit:
+its composer expectation (`omitted donor alt → alt: ""`) is still exactly what the adapter does.
+
+## 3. Acceptance evidence, as executed
+
+**Through the real composer** (`FAMILY_MEDIA_SOURCE`, PASS): the donor fixture whose `image` **omits `alt`** and authors
+`decorative: true` composes `media.image {alt: "", decorative: true}`, and the existing explicit empty-alt form composes
+identically; both round-trip through the strict reader; the served figure renders `<img alt="">` with no accessible name, and the
+temporary page serves that exact markup (`FAMILY_MEDIA_HTTP`, PASS).
+
+**The native boundary refuses the omission** (`FAMILY_MEDIA_READER`, PASS) — proven directly on `readUnoPageDocument`, not through
+the adapter: explicit empty alt with `true` **accepted**; descriptive alt with absent/`false` decorative **accepted**; omitted alt
+with `true`, omitted alt with no flag, contradictory nonempty alt with `true`, empty alt without `true`, non-boolean
+`decorative`, and a 321-code-point alt **refused**; and the same omission submitted as a **raw JSON string** refused as well. Each
+refusal carries no document. The reader dimension also keeps every R02 caption proof: unflagged 320 accepted / 321 refused
+natively, declared 321 and 4,000 accepted / 4,001 refused, an unformatted 400-character caption declared through the accepted
+Markdown form with its exact authored text, lone high/low surrogates refused in **both** forms, and a supplementary pair accepted
+in both.
+
+**All seven Media dimensions re-executed** (913 checks, 0 failed): `source`, `reader`, `renderer`, `http`, `browser`, `refusal`
+(**fourteen** closed probes), `rights` — with `FAMILY_MEDIA_RESTORE` proving the byte-exact restore **and** a fresh served
+original.
+
+**Six variants across four real Chromium cases** (`light:390`, `light:1280`, `dark:390`+reduced motion, `dark:1280`+reduced
+motion), each measuring the committed rich section, the `end` position, the decorative figure whose donor alt is omitted (served
+`alt=""`, authored `surface:"plain"`), the bare figure, and both textless positions. Measured at 1280: rich tracks `[246,246]` at
+lefts `[380,646]`; `end` `[245,245]` at `[381,646]`; decorative `[552,552,552]` at `[360,360,360]`; bare `[552]` at `[360]`;
+**textless start `[266]` at `[360]`** and **textless end `[266]` at `[646]`**. At 390 every variant is one column in authored
+order with the textless figures flush to the content edge. Images all loaded `64×64` from this Page's own locator; surfaces
+`muted` `rgb(245,247,251)` / dark `rgb(20,27,36)`, `bordered` `rgb(255,255,255)` / dark `rgb(12,17,24)`, authored `plain`
+`rgba(0,0,0,0)` **with** `data-uno-surface="plain"`, absent `rgba(0,0,0,0)` with **no** attribute; **6** real Tab presses reach
+`A[https://example.org/media-notes]`, focus leaves again, no navigation, **0** foreign requests, **0** console/page errors.
+
+**Prior credits, restoration and cross-cutting regressions**: `A2_LOCAL_…=63/63`, `U04_MODULE_IDS=22/22`,
+`U04_BROWSER_MATRIX=16/16`, four of four owned zones, `FAMILY_COLUMNS_RESTORE` and the concurrent multi-Facet/Site/Page/locale
+phases of the P6 gate (179 checks, both declaration phases byte-exact) all PASS. The unchanged oracle credits twelve families at
+`12/17` / `54/59` and earns **B2** at exactly `11/17` / `53/59`; no `C1` claim is made.
 
 
-## 6. Local verification (sequential, final head)
+## 4. Mutation-sensitive evidence
+
+The deployment audit (346 checks) now pins the **restored** boundary and fails if it is weakened:
+
+- the reader label asserts that "the native reader still requires an explicit alt while the adapter normalizes the donor's
+  omission";
+- the token `directOmission.accepted === false` must be present, and replacing it with `true` fails the audit;
+- the token `Media raw omission probe` must be present, and dropping it fails the audit — so the raw-JSON refusal cannot vanish
+  silently;
+- the R02 tokens for the declared unformatted caption, the shared Unicode decision and the textless served shape remain required,
+  each with its own neutering shape.
+
+The unit suite mirrors the split: `page-document.test.ts` asserts the native refusal (object **and** raw JSON, no document) beside
+the still-accepted explicit forms; `u04-verification-modules.test.mjs` asserts that the served decorative figure must carry the
+explicit empty alternative even though the donor input omitted it.
+
+## 5. Local verification (sequential, final head)
 
 | Gate | Result |
 | --- | --- |
@@ -92,49 +114,38 @@ are unchanged and green.
 | `node scripts/verify-governance-docs.mjs` | **PASS** — frozen bytes unchanged |
 | `pnpm test:bootstrap` | **21 / 0** |
 | `pnpm test:architecture` | **47 / 0** |
-| `node --test tests/deployment` | **346 / 0** — including the four new R02 mutation shapes |
+| `node --test tests/deployment` | **346 / 0** |
 | `pnpm build` | **exit 0** — `Compiled successfully` |
-| `node scripts/verify-u04-22-module-consent.mjs` | **913 passed / 0 failed** — `PARITY_MEDIA=PASS`, `U04_PARITY=12/17`, `U04_PROXY=54/59`, B2 still `11/17` / `53/59`, `22/22` modules, `4/4` zones, `16/16` browser matrix, `63/63` rich-family dimensions, fourteen refusals |
+| `node scripts/verify-u04-22-module-consent.mjs` | **913 passed / 0 failed** — `PARITY_MEDIA=PASS`, `U04_PARITY=12/17`, `U04_PROXY=54/59`, `22/22`, `63/63`, `16/16`, fourteen refusals, B2 `11/17` / `53/59` |
 | `node scripts/verify-u03-multisite-http.mjs` | **179 passed / 0 failed** — both P6 declaration phases byte-exact |
 
-The new coverage is mutation-sensitive in both directions: `tests/deployment/u04-22-module-consent.test.mjs` adds four shapes
-that must each fail the audit when the declared unformatted caption, the shared Unicode decision, the normalized optional
-alternative or the textless served shape is removed, and `tests/unit/u04-verification-modules.test.mjs` adds three suites that
-refuse a textless variant which loses its track or placement or gains invented text, an authored `plain` that was never
-authored, and a decorative image whose omitted alternative was not normalized.
+## 6. Hosted verification at the exact product head
 
-## 7. Hosted verification at the exact product head
-
-Both workflows ran at `94fdabac4a72640500d1b1a2da690094aeb9ca3d` on both operating systems:
+Both workflows ran at `9791e52eb48934e3b8c8baab958732229304291e` on both operating systems:
 
 | Workflow | Run | Jobs |
 | --- | --- | --- |
-| `Verify U01 baseline` | [45630730286](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45630730286) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — 38/38 steps each: governance bytes, dependency and brand contracts, **Unit tests**, the U04 JSON-slice hermetic contract, the production build and bounded output tracing, the multi-Site P6 contract, the three-Site P6 HTTP/Chromium run, the A1 slice, the 22-module hermetic guard, the **22-module production HTTP/Chromium consent run** carrying the six-variant Media evidence, and deployment readiness |
-| `Uno Bootstrap Verify` | [45630730558](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45630730558) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — 10/10 steps each |
+| `Verify U01 baseline` | [45635804565](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45635804565) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — 38/38 steps each, including governance bytes, **Unit tests**, the A1 slice, the 22-module hermetic guard, the **22-module production HTTP/Chromium consent run**, the multi-Site P6 contract and run, and deployment readiness |
+| `Uno Bootstrap Verify` | [45635804527](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45635804527) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — 10/10 steps each |
 
-## 8. Risks and limits
+## 7. Risks and limits
 
-1. **Alt bound.** Uno keeps 320 code points where the donor allows 400; a longer donor description refuses the Page and no other
-   media contract was widened.
-2. **Long captions are declared, not detected.** An unformatted caption above 320 is representable because the adapter declares
-   the Markdown-capable form; the plain form's own 320 bound is unchanged, so a hand-authored native node must make the same
-   declaration.
-3. **The decorative omission is one-way.** `alt` is optional only beside the literal `true`; an absent `alt` without it refuses
-   rather than being read as decorative, and a nonempty `alt` beside it is a contradiction.
-4. **Caption Unicode scope.** The shared well-formedness decision is applied to the native `media.image` caption only; gallery,
-   carousel and video captions keep exactly the acceptance they had, so a lone surrogate there is unchanged behaviour and not
-   covered by this order.
-5. **Textless placement is CSS-scoped.** The second-track placement is a `:only-child` rule inside the wide-viewport media query,
-   so a positioned stack that later gains a second child is unaffected by it; the browser evidence measures both textless cases
-   in all four cases rather than inferring them.
-6. **Lazy images are visited.** Every variant is scrolled into view and its own `load` awaited before measuring, so an off-screen
-   figure is never reported as loaded.
-7. **Checkpoints.** `B2` is earned and unchanged at `11/17` / `53/59`; the twelve-family `12/17` / `54/59` row is checkpoint-free
-   and `C1` is **not** claimed because `gallery` remains bounded. No stage closure, release or deployment follows.
+1. **Two boundaries, one contract.** The donor may omit `alt` beside `decorative: true`; the native document may not. The split is
+   enforced by location (adapter versus reader), and both directions are mutation-guarded, so a future change that moves the
+   normalization back into the reader fails the audit.
+2. **Alt bound.** Uno keeps 320 code points where the donor allows 400; a longer donor description refuses and no bound moved.
+3. **Caption scope.** The shared well-formedness decision still applies to the native `media.image` caption only; gallery,
+   carousel and video captions keep exactly the acceptance they had.
+4. **Long captions are declared, not detected.** An unformatted caption above 320 is representable because the adapter declares
+   the accepted Markdown form; a hand-authored native node must make the same declaration.
+5. **Textless placement is CSS-scoped** to a single-child stack inside the wide-viewport media query, and is measured in all four
+   browser cases rather than inferred.
+6. **Checkpoints.** `B2` remains earned and unchanged; the twelve-family row is checkpoint-free; `C1` is **not** claimed because
+   `gallery` remains bounded. No stage closure, release or deployment follows.
 
-## 9. Disposition
+## 8. Disposition
 
-Twelve of seventeen families are parity-evidenced with executed seven-dimension evidence; the five R02 corrections are each
-executed and mutation-guarded; the fourteen refusal probes are closed; the browser dimension is a six-variant, four-case
-conjunction; and both temporary transactions prove a fresh served original. Stopping for independent Architect review.
+Media remains the twelfth parity-evidenced family with the delivered R02 capability intact and the native input boundary restored
+to its pre-adoption contract; the correction is proven from the real composer in one direction and from the strict reader in the
+other, and both are guarded by mutation-sensitive tests. Stopping for independent Architect review.
 
