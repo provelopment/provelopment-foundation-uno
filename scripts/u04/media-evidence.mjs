@@ -56,9 +56,13 @@ export const MEDIA_VARIANTS = Object.freeze(
       surface: source.surface ?? null,
       heading: source.heading ?? null,
       lede: source.lede ?? null,
-      /** The alternative the served image must carry; an omitted donor `alt` is normalized to the native empty one. */
+      /** The alternative the served image must carry; the adapter normalizes an omitted donor `alt` to the native empty one. */
       alt: source.image.alt ?? "",
-      /** True when the donor omitted `alt` entirely — the optional boolean form the reader normalizes. */
+      /**
+       * True when the donor omitted `alt` entirely — the optional source form. `UNO-WO-120 / R03`: the omission is the
+       * **adapter's** to normalize; the native reader requires an explicit alternative, so this flag describes donor input
+       * and never a native node, and the served figure must still carry `alt: ""`.
+       */
       altOmitted: !Object.prototype.hasOwnProperty.call(source.image, "alt"),
       decorative: source.image.decorative === true,
       /** True when the section authors a position but no heading and no lede: one figure, placed by the position alone. */

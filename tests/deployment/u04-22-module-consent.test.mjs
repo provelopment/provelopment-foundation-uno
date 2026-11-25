@@ -548,7 +548,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_COLUMNS_RIGHTS the served columns region carries no donor identity, owned asset, foreign resource or provider",
   // `UNO-WO-120 / R01`: the Media family's own seven dimensions, its closed refusal probes and its restore proof.
   "FAMILY_MEDIA_SOURCE the real adapter composes the donor's Media surface — authored heading and Markdown lede, closed position and surface, a Markdown caption, the optional decorative form, both textless positions and the byte-identical bare section",
-  "FAMILY_MEDIA_READER the composed Page round-trips, the donor caption bound is 4,000 for both declared forms while the unflagged caption stays at 320, one shared Unicode decision covers both, the optional decorative form is normalized to the native empty alt and the closed position/surface members refuse any other shape",
+  "FAMILY_MEDIA_READER the composed Page round-trips, the donor caption bound is 4,000 for both declared forms while the unflagged caption stays at 320, one shared Unicode decision covers both, the native reader still requires an explicit alt while the adapter normalizes the donor's omission, and the closed position/surface members refuse any other shape",
   "FAMILY_MEDIA_REFUSAL every one of the ${MEDIA_REFUSAL_CASES.length} media probes refuses the whole Page with its own closed reason and no partial document",
   "FAMILY_MEDIA_HTTP the served Media section is one positioned and surfaced stack whose figure owns its loaded 64x64 PNG and its Markdown caption, with the authored heading and Markdown lede",
   "FAMILY_MEDIA_HTTP the temporary page serves the end position with a plain caption, the decorative figure with a normalized empty alt and an authored plain surface, both textless positions and the byte-identical bare figure",
@@ -560,7 +560,10 @@ const PHASE_C_REQUIRED = Object.freeze([
   // Markdown form, the one shared Unicode decision, the normalized optional decorative boolean and the textless placement.
   "mediaFigureOf(longComposed.document.sections[0])?.props.markdown === true",
   "readFigureAccepts(figureProps({ caption: loneHigh, markdown: true })) === false",
-  'normalized.document.sections[0].props.alt === ""',
+  // `UNO-WO-120 / R03`: the native required-alt boundary is proven by a **direct** refusal, while the adapter's own
+  // normalization stays proven on the real composer.
+  "directOmission.accepted === false",
+  "Media raw omission probe",
   '!textlessRegion.includes("uno-json-prose")',
   "localA2.media.browser = conjunction(mediaCases) && mediaBrowser.ok;",
   "localA2.media.renderer = rendererOk;",
@@ -945,9 +948,14 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
         "readFigureAccepts(figureProps({ caption: loneHigh, markdown: true }))",
       ],
       [
-        "normalized.document.sections[0].props.alt === \"\"",
+        "directOmission.accepted === false",
         "true",
-        "normalized.document.sections[0].props.alt",
+        "directOmission.accepted === false",
+      ],
+      [
+        "Media raw omission probe",
+        "Media raw probe",
+        "Media raw omission probe",
       ],
       [
         "!textlessRegion.includes(\"uno-json-prose\")",

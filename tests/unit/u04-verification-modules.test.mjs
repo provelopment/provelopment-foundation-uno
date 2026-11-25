@@ -914,6 +914,9 @@ describe("the extracted Media evidence module", () => {
   it("refuses a decorative image whose omitted alternative was not normalized, and a described one that lost its name", () => {
     const readings = allCases();
     const decorativeId = MEDIA_VARIANTS[2].id;
+    // `UNO-WO-120 / R03`: the omission belongs to the **donor input**, and the adapter normalizes it — so the served figure
+    // must carry the explicit native empty alternative, and a missing `alt` in the served markup is a refusal, not an
+    // equivalent way to be decorative.
     expect(MEDIA_VARIANTS[2].altOmitted).toBe(true);
     expect(MEDIA_VARIANTS[2].alt).toBe("");
     // The reader normalizes the omission to the native empty alternative, so an absent `alt` in the served markup refuses.

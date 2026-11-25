@@ -5657,9 +5657,11 @@ async function consentPhase(base) {
         && readFigureAccepts(figureProps({ caption: loneLow, markdown: true })) === false
         && readFigureAccepts(figureProps({ caption: supplement })) === true
         && readFigureAccepts(figureProps({ caption: supplement, markdown: true })) === true;
-      // The donor's optional boolean: a described image may say `false`, `true` may omit the alternative (normalized to the
-      // native empty one) or carry it explicitly empty; a contradiction or a missing description still refuses.
-      const normalized = readUnoPageDocument({
+      // `UNO-WO-120 / R03`: the donor's optional boolean is a **source** shape. A described image may say `false`, and both the
+      // authored and the adapter-normalized decorative forms carry an explicit empty alternative — but the native reader keeps
+      // its original required-`alt` boundary, so a **direct** native object or raw JSON document that omits `alt` refuses even
+      // beside the true flag. The composer's own normalization is proven separately, on the real adapter, above.
+      const directOmission = readUnoPageDocument({
         version: 1,
         title: "Media decorative probe",
         sections: [{
@@ -5669,15 +5671,25 @@ async function consentPhase(base) {
         }],
       });
       const decorativeOptional = readFigureAccepts(figureProps({ alt: "Described plate", decorative: false })) === true
-        && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE }, decorative: true }) === true
         && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE }, alt: "", decorative: true }) === true
         && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE }, alt: "Described plate", decorative: true }) === false
         && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE } }) === false
         && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE }, alt: "" }) === false
         && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE }, alt: "Described plate", decorative: "true" }) === false
-        // The omission is normalized, not preserved: the accepted node carries the native empty alternative.
-        && normalized.accepted === true
-        && normalized.document.sections[0].props.alt === "";
+        // The omission is refused, not normalized, at the native boundary — with the flag, without it, and through the raw
+        // JSON entry point alike, and the refusal carries no document.
+        && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE }, decorative: true }) === false
+        && directOmission.accepted === false
+        && directOmission.document === undefined
+        && readUnoPageDocument(JSON.stringify({
+          version: 1,
+          title: "Media raw omission probe",
+          sections: [{
+            id: "media-raw-probe",
+            module: "media.image",
+            props: { asset: { zone: "page", path: FAMILY_PLATE }, decorative: true },
+          }],
+        })).accepted === false;
       // The document-level closed members, each refused by the reader itself rather than silently defaulted.
       const documentRefusals = [
         (document) => {
@@ -5706,7 +5718,7 @@ async function consentPhase(base) {
       localA2.media.reader = richAccepted && donorBound && nativeBound && longDeclared && unicodeShared
         && decorativeOptional && documentRefusals;
       check(
-        "FAMILY_MEDIA_READER the composed Page round-trips, the donor caption bound is 4,000 for both declared forms while the unflagged caption stays at 320, one shared Unicode decision covers both, the optional decorative form is normalized to the native empty alt and the closed position/surface members refuse any other shape",
+        "FAMILY_MEDIA_READER the composed Page round-trips, the donor caption bound is 4,000 for both declared forms while the unflagged caption stays at 320, one shared Unicode decision covers both, the native reader still requires an explicit alt while the adapter normalizes the donor's omission, and the closed position/surface members refuse any other shape",
         localA2.media.reader === true,
         JSON.stringify({ richAccepted, donorBound, nativeBound, longDeclared, unicodeShared, decorativeOptional, documentRefusals }),
       );

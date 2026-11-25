@@ -478,9 +478,9 @@ export interface UnoMediaItem {
  * adapter from the donor's own Markdown-capable `caption`, and is read at the donor's 4,000 bound instead of the native
  * plain caption's 320 — the two forms are disjoint, so no native caption bound is loosened.
  *
- * `UNO-WO-120 / R02`: the donor's `alt` is optional beside `decorative`, so the *reader* accepts its absence — but only when
- * `decorative` is the literal `true`, and then the normalized node carries the native empty alternative. An omitted `alt`
- * without that flag is a missing description and still refuses, exactly as an empty one does.
+ * `UNO-WO-120 / R03`: `alt` is a **required** native key and the node always carries it. The donor may omit its own `alt`
+ * beside `decorative: true`; the adapter normalizes that source shape to the native `alt: ""` before strict reading, so the
+ * native boundary itself never admits an omitted alternative.
  */
 export interface UnoMediaImageProps {
   readonly asset: UnoOwnedAssetRef;
@@ -2416,8 +2416,12 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "media.image") {
-    // `UNO-WO-120 / R02`: `alt` is optional **only** beside `decorative: true`; every described image still requires it.
-    if (!hasExactlyKeys(props, ["asset"], ["alt", "decorative", "caption", "markdown"])) {
+    // `UNO-WO-120 / R03`: the **native input boundary is unchanged** — both `asset` and `alt` are required keys, exactly as they
+    // were before the donor family was adopted. The donor's own optional boolean is a *source* shape: the adapter reads an
+    // omitted donor `alt` beside `decorative: true` and emits the native `alt: ""` before this reader ever sees it. A direct
+    // native object or raw JSON document that omits `alt` therefore refuses here even with the decorative flag, so adopting the
+    // donor capability never widened what a native document may say.
+    if (!hasExactlyKeys(props, ["asset", "alt"], ["decorative", "caption", "markdown"])) {
       throw new RefusedDocument("document:invalid-props");
     }
     const rawDecorative = props["decorative"];
@@ -2426,24 +2430,17 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
     }
     const decorative = rawDecorative === true;
     const asset = readOwnedAsset(props["asset"], "image");
-    // A decorative image is announced as nothing. The donor's own boolean is optional, so `decorative: true` with the
-    // alternative omitted is normalized to the native empty `alt`; a described image must say something, and a nonempty
-    // alternative beside the flag is a contradiction rather than a preference.
-    const rawAlt = props["alt"];
-    let alt: string;
-    if (rawAlt === undefined) {
-      if (!decorative) throw new RefusedDocument("document:invalid-props");
-      alt = "";
-    } else {
-      alt = readBoundedText(
-        rawAlt,
-        UNO_PAGE_DOCUMENT_LIMITS.mediaAltCodePoints,
-        "document:invalid-props",
-        decorative,
-        false,
-      );
-      if (decorative && alt.length !== 0) throw new RefusedDocument("document:invalid-props");
-    }
+    // A decorative image is announced as nothing, so its `alt` must be exactly empty; a meaningful one must say something.
+    // `UNO-WO-120 / R03`: this is the original native semantics, restored verbatim — the empty value is authored or normalized
+    // by the adapter, never borrowed from absence, and the 320-code-point bound is untouched.
+    const alt = readBoundedText(
+      props["alt"],
+      UNO_PAGE_DOCUMENT_LIMITS.mediaAltCodePoints,
+      "document:invalid-props",
+      decorative,
+      false,
+    );
+    if (decorative && alt.length !== 0) throw new RefusedDocument("document:invalid-props");
     // `UNO-WO-120 / R01`: the two caption forms are disjoint. A declared Markdown caption is the donor's form and is read at
     // the donor's bound; anything else keeps the native plain caption and its unchanged 320-point bound.
     // `UNO-WO-120 / R02`: both forms share the one well-formedness decision, so no lone surrogate reaches a visitor as a

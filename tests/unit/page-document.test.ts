@@ -1541,25 +1541,32 @@ describe("readUnoPageDocument — the eleven remaining owned modules", () => {
       );
     });
 
-    it("normalizes the donor's optional decorative boolean and still requires a description otherwise", () => {
-      // `UNO-WO-120 / R02`: an explicitly true flag may omit the alternative, and the accepted node carries the native empty
-      // one; an explicit false beside a real description is the donor's ordinary described form.
-      const omitted = readUnoPageDocument(probe("media.image", { asset: asset("hero.png"), decorative: true }));
-      expect(omitted.accepted).toBe(true);
-      if (omitted.accepted) expect(omitted.document.sections[0]?.props).toEqual({
-        asset: { zone: "page", path: "hero.png" },
-        alt: "",
-        decorative: true,
-      });
+    it("keeps the native required-alt boundary while the adapter owns the donor's omission", () => {
+      // `UNO-WO-120 / R03`: the native reader's original contract is unchanged — `alt` is a required key, an explicitly true
+      // flag needs it exactly empty, and an explicit false beside a real description is the donor's described form.
       expect(
         readUnoPageDocument(probe("media.image", { asset: asset("hero.png"), alt: "A", decorative: false })).accepted,
       ).toBe(true);
-      // Absence without the flag is a missing description, and an empty alternative without it is the same mistake.
+      expect(
+        readUnoPageDocument(probe("media.image", { asset: asset("hero.png"), alt: "", decorative: true })).accepted,
+      ).toBe(true);
+      // A **direct** native object — or a raw JSON document — that omits the alternative refuses, with the flag or without it,
+      // and the refusal carries no document. The donor's optional `alt` is a source shape the adapter normalizes, never a
+      // widening of what a native document may say.
+      const omitted = probe("media.image", { asset: asset("hero.png"), decorative: true });
+      const refused = readUnoPageDocument(omitted);
+      expect(refused.accepted).toBe(false);
+      if (!refused.accepted) expect(refused.reason).toBe("document:invalid-props");
+      expect("document" in refused).toBe(false);
       expectRefusal(probe("media.image", { asset: asset("hero.png") }), "document:invalid-props");
-      expectRefusal(probe("media.image", { asset: asset("hero.png"), alt: "", decorative: false }), "document:invalid-props");
-      // The alternative itself is still bounded at 320 code points.
+      expectRefusal(JSON.stringify(omitted), "document:invalid-props");
+      // The alt itself is still bounded at 320 code points, and an empty alternative without the flag is the same mistake.
       expectRefusal(
         probe("media.image", { asset: asset("hero.png"), alt: "a".repeat(321) }),
+        "document:invalid-props",
+      );
+      expectRefusal(
+        probe("media.image", { asset: asset("hero.png"), alt: "", decorative: false }),
         "document:invalid-props",
       );
     });
