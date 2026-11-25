@@ -2287,10 +2287,15 @@ describe("readUnoPageDocument — Markdown-capable Unicode well-formedness", () 
     ["prose text", (value) => probe("content.prose", { text: value })],
     ["prose text with markdown", (value) => probe("content.prose", { text: value, markdown: true })],
     ["prose lede with markdown", (value) => probe("content.prose", { text: "Body.", lede: value, markdown: true })],
+    ["prose lede without markdown", (value) => probe("content.prose", { text: "Body.", lede: value })],
     ["callout text", (value) => probe("content.prose", { variant: "callout", text: value })],
     [
       "callout lede with markdown",
       (value) => probe("content.prose", { variant: "callout", text: "Body.", lede: value, markdown: true }),
+    ],
+    [
+      "callout lede without markdown",
+      (value) => probe("content.prose", { variant: "callout", text: "Body.", lede: value }),
     ],
     [
       "list item detail",
@@ -2301,8 +2306,24 @@ describe("readUnoPageDocument — Markdown-capable Unicode well-formedness", () 
       (value) => probe("content.prose", { variant: "list", items: [{ label: "L", detail: value }], markdown: true }),
     ],
     [
+      "list lede without markdown",
+      (value) => probe("content.prose", { variant: "list", items: [{ label: "One" }], lede: value }),
+    ],
+    [
+      "list lede with markdown",
+      (value) => probe("content.prose", { variant: "list", items: [{ label: "One" }], lede: value, markdown: true }),
+    ],
+    [
       "table caption",
       (value) => probe("content.prose", { variant: "table", columns: ["A"], rows: [["b"]], caption: value }),
+    ],
+    [
+      "table lede without markdown",
+      (value) => probe("content.prose", { variant: "table", columns: ["A"], rows: [["b"]], lede: value }),
+    ],
+    [
+      "table lede with markdown",
+      (value) => probe("content.prose", { variant: "table", columns: ["A"], rows: [["b"]], lede: value, markdown: true }),
     ],
     ["hero lede", (value) => probe("content.hero", { lede: value })],
     ["hero support", (value) => probe("content.hero", { support: value })],
@@ -2377,6 +2398,213 @@ describe("readUnoPageDocument — Markdown-capable Unicode well-formedness", () 
     expect(readUnoPageDocument({ ...minimal(), title: "a\uD800b" }).accepted).toBe(true);
     expect(readUnoPageDocument(probe("content.testimonials", { items: [{ quote: "a\uD800b" }] })).accepted).toBe(true);
     expect(readUnoPageDocument(probe("content.heading", { text: "a\uD800b", level: 2 })).accepted).toBe(true);
+  });
+});
+
+
+/**
+ * `UNO-WO-116 / R02`, correction one: the pre-R01 plain prose/callout lede newline refusal.
+ *
+ * At `1bf835f` an undeclared lede was read with `allowNewlines: false`, so CR, LF and CRLF refused; R01 accidentally widened
+ * it. The single-line refusal is restored without losing R01's Unicode decision, while the body keeps the multi-line policy
+ * it has always had and a declared-Markdown lede may still span lines because it is parsed as authored Markdown.
+ */
+describe("readUnoPageDocument — plain prose and callout lede newline policy", () => {
+  function probe(props: Record<string, unknown>): Record<string, unknown> {
+    return { ...minimal(), sections: [section("probe", "content.prose", props)] };
+  }
+
+  /** The three authored line endings, each named. */
+  const BREAKS: readonly (readonly [string, string])[] = [
+    ["line feed", "Two\nlines"],
+    ["carriage return", "Two\rlines"],
+    ["CRLF", "Two\r\nlines"],
+  ];
+
+  it("refuses a CR, LF or CRLF in an undeclared prose or callout lede, from plain data and JSON text", () => {
+    for (const [label, lede] of BREAKS) {
+      for (const props of [
+        { text: "Body.", lede },
+        { variant: "callout", text: "Body.", lede },
+      ]) {
+        const where = `${label} / ${props.variant ?? "prose"}`;
+        // The pre-R01 reason is retained: the bounded text reader owns the control-character refusal, so a line break in a
+        // single-line field is `document:unsafe-text`, exactly as it was at `1bf835f`.
+        const direct = readUnoPageDocument(probe(props));
+        expect(direct.accepted, where).toBe(false);
+        if (!direct.accepted) expect(direct.reason, where).toBe("document:unsafe-text");
+        // The same bytes as authored JSON text: the strict reader decodes the escape and the field refuses identically.
+        const text = JSON.stringify(probe(props));
+        const viaText = readUnoPageDocument(text);
+        expect(viaText.accepted, `${where} / JSON text`).toBe(false);
+        if (!viaText.accepted) expect(viaText.reason, `${where} / JSON text`).toBe("document:unsafe-text");
+      }
+    }
+  });
+
+  it("keeps the multi-line body policy in both forms", () => {
+    // The body has always allowed newlines as plain text, and still does — plain and declared-Markdown alike.
+    const body = "First line\nSecond line";
+    const plain = readUnoPageDocument(probe({ text: body }));
+    expect(plain.accepted).toBe(true);
+    if (plain.accepted) expect((plain.document.sections[0]?.props as { text?: string }).text).toBe(body);
+    const marked = readUnoPageDocument(probe({ text: body, markdown: true }));
+    expect(marked.accepted).toBe(true);
+    if (marked.accepted) expect((marked.document.sections[0]?.props as { text?: string }).text).toBe(body);
+  });
+
+  it("keeps the previously valid declared-Markdown lede behavior", () => {
+    // A lede that declares Markdown is parsed as Markdown, so its authored line break is a paragraph break, not a refusal.
+    for (const lede of ["First line\nSecond line", "Two **strong** lines"]) {
+      const result = readUnoPageDocument(probe({ text: "Body.", lede, markdown: true }));
+      expect(result.accepted, lede).toBe(true);
+      if (!result.accepted) continue;
+      expect((result.document.sections[0]?.props as { lede?: string }).lede).toBe(lede);
+    }
+    // A callout keeps the same accepted Markdown lede inside the accent.
+    const callout = readUnoPageDocument(
+      probe({ variant: "callout", text: "Body.", lede: "First line\nSecond line", markdown: true }),
+    );
+    expect(callout.accepted).toBe(true);
+  });
+
+  it("keeps R01's Unicode refusal in the plain lede", () => {
+    expectRefusal(probe({ text: "Body.", lede: "Lead \uD800 tail" }), "document:invalid-props");
+    expectRefusal(probe({ variant: "callout", text: "Body.", lede: "Lead \uDC00 tail" }), "document:invalid-props");
+  });
+});
+
+
+/**
+ * `UNO-WO-116 / R02`, correction two: declared Markdown is validated at the strict Page reader.
+ *
+ * Before this correction a native hero/stats/timeline node could declare `markdown: true` and carry Markdown the shared reader
+ * refuses; the renderer then printed the raw syntax as literal text. Declaring Markdown now means the field **must** parse by
+ * the same shared reader the composer and the renderer use, so the fallback is unreachable for an accepted Page. Bounds,
+ * newline policies, the closed flag, optional absence, the reason vocabulary and every valid authored output are retained;
+ * without the flag, previously accepted well-formed literal text is unchanged.
+ */
+describe("readUnoPageDocument — declared Markdown is validated for hero, stats and timeline", () => {
+  function probe(module: string, props: Record<string, unknown>): Record<string, unknown> {
+    return { ...minimal(), sections: [section("probe", module, props)] };
+  }
+
+  /**
+   * Markdown the shared reader refuses, each named with the closed reason the strict reader already owns for it: the
+   * plain-text layer keeps `document:unsafe-text` for raw markup and an encoded scheme, and the Markdown layer refuses the
+   * rest with `document:invalid-props`.
+   */
+  const INVALID: readonly (readonly [string, string, string])[] = [
+    ["raw element", "Lead <b>bold</b> tail", "document:unsafe-text"],
+    ["image", "Lead ![alt](https://example.invalid/i.png) tail", "document:invalid-props"],
+    ["unbalanced strong", "Lead **unclosed", "document:invalid-props"],
+    ["script destination", "Lead [x](javascript:alert(1)) tail", "document:unsafe-text"],
+    ["protocol-relative destination", "Lead [x](//example.invalid/p) tail", "document:invalid-props"],
+  ];
+
+  /** Every declared-Markdown native surface, each built from one value. */
+  const SURFACES: readonly (readonly [string, (value: string) => Record<string, unknown>])[] = [
+    ["hero lede", (value) => probe("content.hero", { lede: value, markdown: true })],
+    ["hero support", (value) => probe("content.hero", { support: value, markdown: true })],
+    [
+      "stats detail",
+      (value) => probe("content.stats", { items: [{ value: "1", label: "L", detail: value }], markdown: true }),
+    ],
+    [
+      "timeline description",
+      (value) => probe("content.timeline", { items: [{ title: "T", description: value }], markdown: true }),
+    ],
+  ];
+
+  it("refuses the whole Page for each invalid declared-Markdown field, from plain data and JSON text", () => {
+    for (const [surface, build] of SURFACES) {
+      for (const [label, value, expected] of INVALID) {
+        const where = `${surface} / ${label}`;
+        const direct = readUnoPageDocument(build(value));
+        expect(direct.accepted, where).toBe(false);
+        // Nothing partial ever comes back: the result is exactly one closed refusal with the documented reason.
+        expect(Object.keys(direct).sort(), where).toEqual(["accepted", "reason"]);
+        if (!direct.accepted) expect(direct.reason, where).toBe(expected);
+        const viaText = readUnoPageDocument(JSON.stringify(build(value)));
+        expect(viaText.accepted, `${where} / JSON text`).toBe(false);
+        if (!viaText.accepted) expect(viaText.reason, `${where} / JSON text`).toBe(expected);
+      }
+    }
+  });
+
+
+  it("accepts valid declared Markdown and keeps the authored text exactly", () => {
+    const cases: readonly (readonly [string, string, Record<string, unknown>, string])[] = [
+      ["hero lede", "content.hero", { lede: "A **visible** line\n\nand a second paragraph", markdown: true }, "lede"],
+      ["hero support", "content.hero", { support: "This is *bounded* support.", markdown: true }, "support"],
+      [
+        "stats detail",
+        "content.stats",
+        { items: [{ value: "1", label: "L", detail: "Only `one` detail." }], markdown: true },
+        "detail",
+      ],
+      [
+        "timeline description",
+        "content.timeline",
+        { items: [{ title: "T", description: "The **source** milestone." }], markdown: true },
+        "description",
+      ],
+    ];
+    for (const [label, module, props, field] of cases) {
+      const result = readUnoPageDocument(probe(module, props));
+      expect(result.accepted, label).toBe(true);
+      if (!result.accepted) continue;
+      const section = (result.document.sections as readonly { props: Record<string, unknown> }[])[0];
+      if (section === undefined) throw new Error("expected one section");
+      const authored =
+        field === "detail" || field === "description"
+          ? ((section.props["items"] as readonly Record<string, unknown>[])[0] ?? {})[field]
+          : section.props[field];
+      const expected =
+        field === "detail" || field === "description"
+          ? ((props["items"] as readonly Record<string, unknown>[])[0] ?? {})[field]
+          : props[field];
+      expect(authored, label).toBe(expected);
+      // The accepted document round-trips through its own serialization.
+      expect(readUnoPageDocument(JSON.stringify(result.document)).accepted, `${label} round trip`).toBe(true);
+    }
+  });
+
+  it("retains each field's own newline policy when Markdown is declared", () => {
+    // A hero body field is multi-line by contract, so an authored blank line is a paragraph break.
+    expect(readUnoPageDocument(probe("content.hero", { lede: "One\n\nTwo", markdown: true })).accepted).toBe(true);
+    // A stats detail and a timeline description stay single-line: declaring Markdown does not widen them.
+    expectRefusal(
+      probe("content.stats", { items: [{ value: "1", label: "L", detail: "One\nTwo" }], markdown: true }),
+      "document:unsafe-text",
+    );
+    expectRefusal(
+      probe("content.timeline", { items: [{ title: "T", description: "One\nTwo" }], markdown: true }),
+      "document:unsafe-text",
+    );
+  });
+
+  it("leaves the undeclared form exactly as lax or strict as it was", () => {
+    // Well-formed literal text that happens to look like Markdown stays accepted when no Markdown is declared.
+    const literal = "Lead **unclosed ![alt](https://example.invalid/i.png) tail";
+    const undeclared: readonly (readonly [string, Record<string, unknown>])[] = [
+      ["hero lede", { lede: literal }],
+      ["hero support", { support: literal }],
+      ["stats detail", { items: [{ value: "1", label: "L", detail: literal }] }],
+      ["timeline description", { items: [{ title: "T", description: literal }] }],
+    ];
+    const modules = ["content.hero", "content.hero", "content.stats", "content.timeline"];
+    undeclared.forEach(([label, props], index) => {
+      const result = readUnoPageDocument(probe(modules[index] ?? "content.hero", props));
+      expect(result.accepted, `${label} without the flag`).toBe(true);
+    });
+    // The R01 Unicode refusal and the closed flag are unchanged.
+    expectRefusal(probe("content.hero", { lede: "Lead \uD800 tail" }), "document:invalid-props");
+    expectRefusal(
+      probe("content.stats", { items: [{ value: "1", label: "L" }], markdown: false }),
+      "document:invalid-props",
+    );
+    expectRefusal(probe("content.timeline", { items: [{ title: "T" }], markdown: "true" }), "document:invalid-props");
   });
 });
 

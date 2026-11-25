@@ -200,7 +200,7 @@ and this ledger claims no link engine, route resolver or publication authority.
   label/value, unsafe script or scheme) and any candidate above the Uno 64 KiB source cap. The whole document refuses; no partial Page is
   ever returned.
 
-### 4a. Shared Unicode well-formedness (`UNO-WO-116 / R01`)
+### 4a. Shared Markdown validation — Unicode well-formedness (`UNO-WO-116 / R01`) and R02 corrections
 
 A JavaScript string is a UTF-16 code-unit sequence, so it can hold a lone high surrogate, a lone low surrogate, a reversed
 pair or an interrupted pair. None of those can be encoded as UTF-8 or rendered faithfully — a browser shows a replacement
@@ -214,11 +214,11 @@ refuses, and every well-formed value is published byte-exactly.
 - **The Markdown reader** refuses the whole field with the new closed reason `markdown:ill-formed-unicode`, before parsing
   and before the size cap, so the reason is never a cap or a parse artefact. `requireFamilyMarkdown` therefore refuses the
   document (`document:invalid-props`) for a `markdown: true` field.
-- **The strict Page reader** refuses the whole Page (`document:invalid-props`) for every Markdown-capable field in **both**
-  its forms — with and without the `markdown` switch — because the plain form is a publication form too: hero `lede`/`support`,
-  stats item `detail`, timeline item `description`, prose and callout `text`/`lede`, list item `detail` and `lede`, table
-  `caption` and `lede`. Both entry points are covered: plain own data and raw JSON text, where the strict reader decodes an
-  authored `\uD800` escape into the same lone code unit.
+- **The strict Page reader** refuses the whole Page for every Markdown-capable field in **both** its forms — with and without
+  the `markdown` switch — because the plain form is a publication form too: hero `lede`/`support`, stats item `detail`,
+  timeline item `description`, prose and callout `text`/`lede`, list item `detail` and `lede`, table `caption` and `lede`. Both
+  entry points are covered: plain own data and raw JSON text, where the strict reader decodes an authored `\uD800` escape into
+  the same lone code unit.
 - **The composer** refuses the whole source with its established reasons and never a partial Page:
   `family:unsupported-feature` where the field is read through the shared Markdown reader (prose/callout body, table caption,
   list `detail`, hero `lede`/`support`, stats `detail`/`lede`, steps body/`lede`), and `family:target-refused` where it is read
@@ -229,14 +229,28 @@ refuses, and every well-formed value is published byte-exactly.
   pair still counts as **one** code point against the declared bound — 4,000 accepted and 4,001 refused for a body,
   320 accepted and 321 refused for an item detail.
 
-**Remaining scope, stated rather than implied.** Native *plain* fields are deliberately outside this order and keep their
-previous contract: a `title`, `description`, testimonial `quote`, `heading`, item `label`/`value`, media `alt`, media caption,
+#### 4a.1 `UNO-WO-116 / R02` — two corrections on top of R01
+
+1. **The pre-R01 plain lede single-line policy is restored.** R01 held an undeclared prose/callout `lede` to the multi-line
+   body policy by mistake. At `1bf835f` that field refused CR, LF and CRLF with `document:unsafe-text`; it refuses them again,
+   while R01's Unicode decision still applies to the same field. `requireFamilyMarkdown` now takes the field's own newline
+   policy instead of always allowing line breaks, so a declared-Markdown lede keeps its authored lines (it is parsed as
+   Markdown) and the body keeps the multi-line policy it has always had.
+2. **Declared Markdown is validated at the strict Page reader.** When `markdown: true` is declared, every present native hero
+   `lede`/`support`, stats item `detail` and timeline item `description` must now parse by the same shared `readUnoFamilyMarkdown`
+   the composer and the renderer use. Unsupported or unbalanced Markdown — raw HTML, image syntax, unbalanced emphasis, an
+   unsafe or protocol-relative destination — refuses the whole Page instead of being printed as literal syntax. Bounds, the
+   per-field newline policies (hero bodies multi-line, stats/timeline item text single-line), the closed literal flag, optional
+   absence, the reason vocabulary (`document:unsafe-text` for the plain-text layer, `document:invalid-props` for the Markdown
+   layer) and every valid authored output are unchanged. The renderer keeps its literal branch, but that branch is now
+   unreachable for an accepted Page: the reader validated exactly the bytes the renderer will parse.
+
+**Remaining scope, stated rather than implied.** Native *plain* fields keep their previous contract and are deliberately
+outside both rounds: a `title`, `description`, testimonial `quote`, `heading`, item `label`/`value`, media `alt`, media caption,
 price `amount`/`unit`, contact `description`, action label and similar field still counts a lone surrogate once and accepts it
-— the counting contract is unchanged and pinned by its own tests. Separately, a hand-authored native `content.hero`,
-`content.stats` or `content.timeline` node that declares `markdown: true` but carries Markdown the shared reader refuses still
-renders that field literally at render time; this order validates Unicode well-formedness, it does not make those three native
-modules validate Markdown, and it adds no Markdown feature or destination policy. Neither gap is claimed as closed, and no
-universal text validation is claimed.
+— the counting contract is unchanged and pinned by its own tests. Also unchanged: a *declared* Markdown field is validated as
+Markdown but not rewritten, so no Markdown feature, destination policy or renderer redesign was added by either round; native
+plain-only fields are still not subject to the Unicode decision, and no universal text validation is claimed.
 
 ## 5. WO-066/WO-067/WO-068 temporary composed-family production proof
 

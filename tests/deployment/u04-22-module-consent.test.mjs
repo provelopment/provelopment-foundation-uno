@@ -473,6 +473,10 @@ const PHASE_C_REQUIRED = Object.freeze([
   "A2_LOCAL_REFUSAL the malformed-Unicode probes are present in the hero, stats and steps matrices and no earlier case was dropped",
   "A2_LOCAL_READER a native hero, stats and timeline node with a malformed Markdown field is refused from plain data and JSON text",
   "unicodeProbes.steps >= 2",
+  // `UNO-WO-116 / R02`: the restored pre-R01 plain lede single-line policy and the strict reader's declared-Markdown
+  // validation for the three native families.
+  "A2_LOCAL_READER the plain prose and callout lede refuses CR, LF and CRLF while a declared-Markdown lede and the body keep their lines",
+  "A2_LOCAL_READER every invalid declared-Markdown hero, stats and timeline field is refused while valid and undeclared text is accepted",
   "FAMILY_STEPS_HTTP the served steps family carries its heading, Markdown lede, closed surface, ordered titles and Markdown body",
   "FAMILY_STEPS_HTTP the step titles and body are exactly the authored ones in order, with no invented status, current step or date",
   "${width}px steps show both Markdown bodies, the closed surface and two ordered titles",
@@ -517,6 +521,8 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       "A2_LOCAL_REFUSAL the malformed-Unicode probes are present in the hero, stats and steps matrices and no earlier case was dropped",
       "A2_LOCAL_READER a native hero, stats and timeline node with a malformed Markdown field is refused from plain data and JSON text",
       "unicodeProbes.steps >= 2",
+      "A2_LOCAL_READER the plain prose and callout lede refuses CR, LF and CRLF while a declared-Markdown lede and the body keep their lines",
+      "A2_LOCAL_READER every invalid declared-Markdown hero, stats and timeline field is refused while valid and undeclared text is accepted",
     ]) {
       const mutated = source.replace(token, "");
       const missing = audit(mutated);

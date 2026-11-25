@@ -1328,10 +1328,13 @@ function optionalProseMarkdown(value: unknown): true | undefined {
  *
  * The plain-text reader still runs first, so control characters, markup and encoded schemes are refused by the same rules
  * as every other authored field. A field the Markdown reader refuses (raw HTML, an image, an unsafe destination, an
- * unbalanced construct or a cap) refuses the document rather than yielding a partial render.
+ * unbalanced construct, ill-formed Unicode or a cap) refuses the document rather than yielding a partial render.
+ *
+ * `UNO-WO-116 / R02`: the caller passes the field's own newline policy, so a declared-Markdown field keeps exactly the
+ * newline rules it had as text instead of borrowing the most permissive one.
  */
-function requireFamilyMarkdown(value: unknown, codePointLimit: number): string {
-  const text = readBoundedText(value, codePointLimit, "document:invalid-props", false, true);
+function requireFamilyMarkdown(value: unknown, codePointLimit: number, allowNewlines = true): string {
+  const text = readBoundedText(value, codePointLimit, "document:invalid-props", false, allowNewlines);
   if (!readUnoFamilyMarkdown(text).ok) throw new RefusedDocument("document:invalid-props");
   return text;
 }
@@ -1344,12 +1347,14 @@ function readProseBody(props: DataRecord): UnoContentProseBody {
       ? requireFamilyMarkdown(props["text"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
       : readMarkdownCapableText(props["text"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
   const heading = optionalProseText(props["heading"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints);
+  // `UNO-WO-116 / R02`: the plain lede restores its single-line refusal. Only a declared-Markdown lede may span lines —
+  // it is parsed as authored Markdown — so a CR, LF or CRLF in an undeclared lede refuses exactly as it did before R01.
   const lede =
     props["lede"] === undefined
       ? undefined
       : markdown === true
         ? requireFamilyMarkdown(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
-        : optionalMarkdownCapableText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
+        : optionalMarkdownCapableText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, false);
   const align = optionalProseAlign(props["align"]);
   const surface = optionalProseSurface(props["surface"]);
   return {
@@ -1664,7 +1669,7 @@ function optionalBoundedText(
 }
 
 /** 1–6 factual statistics, each exactly `{value, label, detail?}`. Numbers are authored text, never computed. */
-function readStatItems(value: unknown): UnoStatItem[] {
+function readStatItems(value: unknown, markdown: boolean): UnoStatItem[] {
   if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
   if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.statItems) {
     throw new RefusedDocument("document:invalid-props");
@@ -1692,11 +1697,13 @@ function readStatItems(value: unknown): UnoStatItem[] {
       false,
     );
     // `UNO-WO-116 / R01`: the item detail is Markdown-capable, so its plain form must be well-formed too.
-    const detail = optionalMarkdownCapableText(
-      item["detail"],
-      UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints,
-      false,
-    );
+    // `UNO-WO-116 / R02`: a declared-Markdown detail must parse by the shared reader, under the same single-line policy.
+    const detail =
+      item["detail"] === undefined
+        ? undefined
+        : markdown
+          ? requireFamilyMarkdown(item["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints, false)
+          : optionalMarkdownCapableText(item["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints, false);
     items.push(detail === undefined ? { value: statValue, label } : { value: statValue, label, detail });
   }
   return items;
@@ -1806,7 +1813,7 @@ function optionalTimelineStatus(value: unknown): UnoTimelineStatus | undefined {
  * Order is the author's own and is never sorted, and at most one entry may be `current`: two simultaneous "current"
  * milestones would be a contradictory statement about the programme this Page describes.
  */
-function readTimelineItems(value: unknown): UnoTimelineItem[] {
+function readTimelineItems(value: unknown, markdown: boolean): UnoTimelineItem[] {
   if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
   if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.timelineItems) {
     throw new RefusedDocument("document:invalid-props");
@@ -1828,11 +1835,17 @@ function readTimelineItems(value: unknown): UnoTimelineItem[] {
       false,
     );
     // `UNO-WO-116 / R01`: the milestone description is Markdown-capable, so its plain form must be well-formed too.
-    const itemDescription = optionalMarkdownCapableText(
-      item["description"],
-      UNO_PAGE_DOCUMENT_LIMITS.timelineDescriptionCodePoints,
-      false,
-    );
+    // `UNO-WO-116 / R02`: a declared-Markdown description must parse by the shared reader, under the same single-line policy.
+    const itemDescription =
+      item["description"] === undefined
+        ? undefined
+        : markdown
+          ? requireFamilyMarkdown(item["description"], UNO_PAGE_DOCUMENT_LIMITS.timelineDescriptionCodePoints, false)
+          : optionalMarkdownCapableText(
+              item["description"],
+              UNO_PAGE_DOCUMENT_LIMITS.timelineDescriptionCodePoints,
+              false,
+            );
     const dateLabel = optionalBoundedText(item["dateLabel"], UNO_PAGE_DOCUMENT_LIMITS.timelineDateLabelCodePoints, false);
     const status = optionalTimelineStatus(item["status"]);
     if (status === "current") {
@@ -2169,18 +2182,28 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
       throw new RefusedDocument("document:invalid-props");
     }
     const eyebrow = optionalBoundedText(props["eyebrow"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, false);
+    // `UNO-WO-112 / R01`: the closed Markdown switch — only ever the literal `true`, never a truthy stand-in.
+    const markdown = optionalProseMarkdown(props["markdown"]);
     // `UNO-WO-116 / R01`: both body fields are Markdown-capable, so their plain form is held to the same
     // well-formedness decision as the Markdown form — a malformed field refuses the Page instead of rendering literally.
-    const lede = optionalMarkdownCapableText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
-    const support = optionalMarkdownCapableText(props["support"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
+    // `UNO-WO-116 / R02`: a declared-Markdown field must also *parse* here, so the renderer can never fall back to printing
+    // raw syntax as if it were the authored meaning.
+    const lede =
+      props["lede"] === undefined
+        ? undefined
+        : markdown === true
+          ? requireFamilyMarkdown(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
+          : optionalMarkdownCapableText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
+    const support =
+      props["support"] === undefined
+        ? undefined
+        : markdown === true
+          ? requireFamilyMarkdown(props["support"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
+          : optionalMarkdownCapableText(props["support"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
     // A hero with no authored body would be an empty decorative band, so at least one body field is required.
     if (lede === undefined && support === undefined) throw new RefusedDocument("document:invalid-props");
     const align = optionalAlign(props["align"]);
     const surface = optionalSurface(props["surface"]);
-    // `UNO-WO-112 / R01`: the closed Markdown switch — only ever the literal `true`, never a truthy stand-in.
-    if (props["markdown"] !== undefined && props["markdown"] !== true) {
-      throw new RefusedDocument("document:invalid-props");
-    }
     const actions =
       props["actions"] === undefined
         ? undefined
@@ -2195,7 +2218,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
         ...(align === undefined ? {} : { align }),
         ...(surface === undefined ? {} : { surface }),
         ...(actions === undefined ? {} : { actions }),
-        ...(props["markdown"] === undefined ? {} : { markdown: true as const }),
+        ...(markdown === undefined ? {} : { markdown }),
       },
     };
   }
@@ -2204,12 +2227,10 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
     if (!hasExactlyKeys(props, ["items"], ["heading", "level", "surface", "markdown"])) {
       throw new RefusedDocument("document:invalid-props");
     }
-    const items = readStatItems(props["items"]);
-    const surface = optionalSurface(props["surface"]);
     // `UNO-WO-113 / R01`: the closed Markdown switch for item details — only ever the literal `true`.
-    if (props["markdown"] !== undefined && props["markdown"] !== true) {
-      throw new RefusedDocument("document:invalid-props");
-    }
+    const markdown = optionalProseMarkdown(props["markdown"]);
+    const items = readStatItems(props["items"], markdown === true);
+    const surface = optionalSurface(props["surface"]);
     // Items first, then surface, then heading: a stats item refusal always outranks a heading-level refusal.
     const { heading, level } = readOptionalHeading(props, state);
     return {
@@ -2220,7 +2241,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
         ...(heading === undefined ? {} : { heading }),
         ...(level === undefined ? {} : { level }),
         ...(surface === undefined ? {} : { surface }),
-        ...(props["markdown"] === undefined ? {} : { markdown: true as const }),
+        ...(markdown === undefined ? {} : { markdown }),
       },
     };
   }
@@ -2262,12 +2283,10 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
     if (!hasExactlyKeys(props, ["items"], ["heading", "level", "surface", "itemHeadingLevel", "markdown"])) {
       throw new RefusedDocument("document:invalid-props");
     }
-    const items = readTimelineItems(props["items"]);
-    const surface = optionalSurface(props["surface"]);
     // `UNO-WO-114 / R01`: the closed Markdown switch for milestone descriptions — only ever the literal `true`.
-    if (props["markdown"] !== undefined && props["markdown"] !== true) {
-      throw new RefusedDocument("document:invalid-props");
-    }
+    const markdown = optionalProseMarkdown(props["markdown"]);
+    const items = readTimelineItems(props["items"], markdown === true);
+    const surface = optionalSurface(props["surface"]);
     const { heading, level } = readOptionalHeading(props, state);
     const itemHeadingLevel = optionalLevelThree(props, "itemHeadingLevel");
     return {
@@ -2279,7 +2298,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
         ...(level === undefined ? {} : { level }),
         ...(surface === undefined ? {} : { surface }),
         ...(itemHeadingLevel === undefined ? {} : { itemHeadingLevel }),
-        ...(props["markdown"] === undefined ? {} : { markdown: true as const }),
+        ...(markdown === undefined ? {} : { markdown }),
       },
     };
   }

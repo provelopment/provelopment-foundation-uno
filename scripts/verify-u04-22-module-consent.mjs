@@ -1783,6 +1783,98 @@ async function main() {
             },
           }),
         );
+        // `UNO-WO-116 / R02`: the pre-R01 single-line lede policy is restored, and a declared-Markdown lede keeps its authored
+        // line breaks. Both prose and callout forms are proved, from plain data and from raw JSON text.
+        const ledePage = (props) => ({
+          version: 1,
+          title: "Plain lede policy",
+          sections: [{ id: "lede", module: "content.prose", props }],
+        });
+        const plainLedeForms = [
+          ledePage({ text: "Body.", lede: "Two\nlines" }),
+          ledePage({ variant: "callout", text: "Body.", lede: "Two\r\nlines" }),
+        ];
+        const plainLedeRefusals = plainLedeForms.map((document) => ({
+          object: readUnoPageDocument(document),
+          text: readUnoPageDocument(JSON.stringify(document)),
+        }));
+        const declaredLedeAccepted = [
+          readUnoPageDocument(ledePage({ text: "Body.", lede: "Two\nlines", markdown: true })),
+          readUnoPageDocument(
+            ledePage({ variant: "callout", text: "Body.", lede: "Two **strong** lines", markdown: true }),
+          ),
+          // The body keeps the multi-line policy it has always had.
+          readUnoPageDocument(ledePage({ text: "First line\nSecond line" })),
+        ];
+        check(
+          "A2_LOCAL_READER the plain prose and callout lede refuses CR, LF and CRLF while a declared-Markdown lede and the body keep their lines",
+          plainLedeRefusals.every(
+            (probe) =>
+              probe.object.accepted === false
+              && probe.object.reason === "document:unsafe-text"
+              && probe.text.accepted === false
+              && probe.text.reason === "document:unsafe-text",
+          ) && declaredLedeAccepted.every((probe) => probe.accepted === true),
+          JSON.stringify({
+            refused: plainLedeRefusals.map((probe) => (probe.object.accepted ? "accepted" : probe.object.reason)),
+            accepted: declaredLedeAccepted.map((probe) => (probe.accepted ? "accepted" : probe.reason)),
+          }),
+        );
+        // `UNO-WO-116 / R02`: declaring Markdown now requires the shared reader to accept it for every present native hero
+        // lede/support, stats detail and timeline description, so the renderer can never fall back to printing syntax.
+        const declaredMarkdownNative = [
+          {
+            module: "content.hero",
+            props: (value) => ({ lede: value, markdown: true }),
+            undeclaredProps: (value) => ({ lede: value }),
+          },
+          {
+            module: "content.hero",
+            props: (value) => ({ support: value, markdown: true }),
+            undeclaredProps: (value) => ({ support: value }),
+          },
+          {
+            module: "content.stats",
+            props: (value) => ({ items: [{ value: "1", label: "L", detail: value }], markdown: true }),
+            undeclaredProps: (value) => ({ items: [{ value: "1", label: "L", detail: value }] }),
+          },
+          {
+            module: "content.timeline",
+            props: (value) => ({ items: [{ title: "T", description: value }], markdown: true }),
+            undeclaredProps: (value) => ({ items: [{ title: "T", description: value }] }),
+          },
+        ];
+        const nativeDeclaredProbes = declaredMarkdownNative.map((surface) => {
+          const build = (value) => ({
+            version: 1,
+            title: "Declared Markdown",
+            sections: [{ id: "node", module: surface.module, props: surface.props(value) }],
+          });
+          return {
+            module: surface.module,
+            invalid: ["Lead **unclosed", "Lead ![alt](https://example.invalid/i.png)", "Lead <b>x</b> tail"].map((value) => {
+              const object = readUnoPageDocument(build(value));
+              const text = readUnoPageDocument(JSON.stringify(build(value)));
+              return `${object.accepted ? "accepted" : object.reason}/${text.accepted ? "accepted" : text.reason}`;
+            }),
+            valid: readUnoPageDocument(build("A **visible** line")).accepted,
+            undeclared: readUnoPageDocument({
+              version: 1,
+              title: "Undeclared Markdown",
+              sections: [{ id: "node", module: surface.module, props: surface.undeclaredProps("Lead **unclosed") }],
+            }).accepted,
+          };
+        });
+        check(
+          "A2_LOCAL_READER every invalid declared-Markdown hero, stats and timeline field is refused while valid and undeclared text is accepted",
+          nativeDeclaredProbes.every(
+            (probe) =>
+              probe.invalid.every(
+                (outcome) => outcome.startsWith("document:") && !outcome.includes("accepted"),
+              ) && probe.valid === true && probe.undeclared === true,
+          ),
+          JSON.stringify(nativeDeclaredProbes),
+        );
         // `UNO-WO-116 / R01`: the strict reader itself refuses a malformed Markdown-capable field on a **native** node — the
         // hero, stats and timeline forms the composer never builds — from plain data and from raw JSON text alike.
         const nativeMalformed = [

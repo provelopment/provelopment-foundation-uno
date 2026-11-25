@@ -5594,3 +5594,58 @@ describe("composeUnoFoundationSubset — shared Unicode well-formedness", () => 
   });
 });
 
+
+/**
+ * `UNO-WO-116 / R02`: the corrections must not change a valid composition.
+ *
+ * The composer already reads every Markdown-capable field through the shared reader before it sets the closed flag, so its own
+ * output always satisfies the strict reader's new declared-Markdown validation. These cases pin that: a plain single-line lede
+ * keeps its byte-identical hoisted paragraph, a Markdown or multi-line lede keeps the declared form, and the three native
+ * families whose fields are now validated compose, re-read and render exactly as before.
+ */
+describe("composeUnoFoundationSubset — R02 keeps valid compositions unchanged", () => {
+  it("keeps a plain single-line lede byte-identically hoisted", () => {
+    const document = composed(envelope({ type: "prose", body: "Body.", lede: "A single line." }));
+    const section = document.sections[0];
+    expect(section?.module).toBe("layout.stack");
+    if (section?.module !== "layout.stack") return;
+    expect(section.children.map((child) => child.module)).toEqual(["content.prose", "content.prose"]);
+    expect(section.children[0]?.props).toEqual({ text: "A single line." });
+    expect(section.children[1]?.props).toEqual({ text: "Body." });
+  });
+
+  it("keeps a multi-line or Markdown lede in the declared form and re-reads it", () => {
+    for (const lede of ["One\nTwo", "A **visible** lede"]) {
+      const document = composed(envelope({ type: "prose", body: "Body.", lede }));
+      const props = document.sections[0]?.props as { text?: string; lede?: string; markdown?: true } | undefined;
+      expect(props?.markdown, lede).toBe(true);
+      expect(props?.lede, lede).toBe(lede);
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted, lede).toBe(true);
+    }
+    // A callout keeps the same declared Markdown lede inside its own accent.
+    const callout = composed(envelope({ type: "callout", body: "Body.", lede: "One\nTwo", tone: "info" }));
+    const props = callout.sections[0]?.props as { variant?: string; lede?: string; markdown?: true } | undefined;
+    expect(props?.variant).toBe("callout");
+    expect(props?.markdown).toBe(true);
+    expect(props?.lede).toBe("One\nTwo");
+  });
+
+  it("keeps the credited hero, stats and steps Markdown fields composing, re-reading and rendering", () => {
+    const hero = composed(envelope({ type: "hero", lede: "A **visible** line", support: "This is *bounded*." }));
+    const stats = composed(
+      envelope({ type: "stats", items: [{ value: "1", label: "One", detail: "Only **one** detail." }] }),
+    );
+    const steps = composed(envelope({ type: "steps", items: [{ title: "Draft", body: "The **source** step." }] }));
+    for (const [label, document] of [
+      ["hero", hero],
+      ["stats", stats],
+      ["steps", steps],
+    ] as const) {
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted, label).toBe(true);
+      const html = render(document);
+      expect(html, label).toContain('<strong class="uno-family-md-strong">');
+      expect(html, label).not.toContain("**");
+    }
+  });
+});
+

@@ -1427,3 +1427,49 @@ describe("UnoPageSections — Markdown-capable Unicode", () => {
   });
 });
 
+
+/**
+ * `UNO-WO-116 / R02`: a declared-Markdown field can no longer reach the renderer unparsed.
+ *
+ * The renderer keeps its literal fallback for a field the shared reader refuses, but that path is now unreachable for an
+ * accepted Page: the strict reader validates the same Markdown the renderer will parse. These cases prove the refusal happens
+ * before any markup exists, and that a valid declared field still renders through the shared Markdown renderer.
+ */
+describe("UnoPageSections — declared Markdown is never printed as literal syntax", () => {
+  function page(module: string, props: Record<string, unknown>): Record<string, unknown> {
+    return { version: 1, title: "Declared Markdown fixture", sections: [{ id: "probe", module, props }] };
+  }
+
+  it("refuses every invalid declared-Markdown field before any markup is produced", () => {
+    const invalid = [
+      page("content.hero", { lede: "Lead **unclosed", markdown: true }),
+      page("content.hero", { support: "Lead ![alt](https://example.invalid/i.png)", markdown: true }),
+      page("content.stats", { items: [{ value: "1", label: "L", detail: "Lead **unclosed" }], markdown: true }),
+      page("content.timeline", { items: [{ title: "T", description: "Lead [x](//example.invalid/p)" }], markdown: true }),
+    ];
+    for (const fixture of invalid) {
+      const result = readUnoPageDocument(fixture);
+      expect(result.accepted).toBe(false);
+      if (!result.accepted) expect(result.reason).toBe("document:invalid-props");
+    }
+  });
+
+  it("renders a valid declared field through the shared Markdown renderer, never as its source syntax", () => {
+    const hero = render(accept(page("content.hero", { lede: "A **visible** line", markdown: true })));
+    expect(hero).toContain('<strong class="uno-family-md-strong">visible</strong>');
+    expect(hero).not.toContain("**visible**");
+
+    const stats = render(
+      accept(page("content.stats", { items: [{ value: "1", label: "L", detail: "Only `one` detail." }], markdown: true })),
+    );
+    expect(stats).toContain('<code class="uno-family-md-code">one</code>');
+    expect(stats).not.toContain("`one`");
+
+    const timeline = render(
+      accept(page("content.timeline", { items: [{ title: "T", description: "The **source** milestone." }], markdown: true })),
+    );
+    expect(timeline).toContain('<strong class="uno-family-md-strong">source</strong>');
+    expect(timeline).not.toContain("**source**");
+  });
+});
+
