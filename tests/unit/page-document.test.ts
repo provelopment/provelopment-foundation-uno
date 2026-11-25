@@ -1541,6 +1541,58 @@ describe("readUnoPageDocument — the eleven remaining owned modules", () => {
       );
     });
 
+    it("normalizes the donor's optional decorative boolean and still requires a description otherwise", () => {
+      // `UNO-WO-120 / R02`: an explicitly true flag may omit the alternative, and the accepted node carries the native empty
+      // one; an explicit false beside a real description is the donor's ordinary described form.
+      const omitted = readUnoPageDocument(probe("media.image", { asset: asset("hero.png"), decorative: true }));
+      expect(omitted.accepted).toBe(true);
+      if (omitted.accepted) expect(omitted.document.sections[0]?.props).toEqual({
+        asset: { zone: "page", path: "hero.png" },
+        alt: "",
+        decorative: true,
+      });
+      expect(
+        readUnoPageDocument(probe("media.image", { asset: asset("hero.png"), alt: "A", decorative: false })).accepted,
+      ).toBe(true);
+      // Absence without the flag is a missing description, and an empty alternative without it is the same mistake.
+      expectRefusal(probe("media.image", { asset: asset("hero.png") }), "document:invalid-props");
+      expectRefusal(probe("media.image", { asset: asset("hero.png"), alt: "", decorative: false }), "document:invalid-props");
+      // The alternative itself is still bounded at 320 code points.
+      expectRefusal(
+        probe("media.image", { asset: asset("hero.png"), alt: "a".repeat(321) }),
+        "document:invalid-props",
+      );
+    });
+
+    it("applies the one shared Unicode decision to both native caption forms", () => {
+      // `UNO-WO-120 / R02`: a lone or reversed surrogate refuses in the unflagged form as well as the declared one, while a
+      // valid supplementary pair stays one code point and is accepted in each.
+      const lone = [`${"c".repeat(10)}\ud800${"c".repeat(10)}`, `${"c".repeat(10)}\udc00${"c".repeat(10)}`];
+      for (const caption of lone) {
+        expectRefusal(probe("media.image", { asset: asset("hero.png"), alt: "A", caption }), "document:invalid-props");
+        expectRefusal(
+          probe("media.image", { asset: asset("hero.png"), alt: "A", caption, markdown: true }),
+          "document:invalid-props",
+        );
+      }
+      const pair = `${"c".repeat(10)}\u{1f600}${"c".repeat(10)}`;
+      expect(readUnoPageDocument(probe("media.image", { asset: asset("hero.png"), alt: "A", caption: pair })).accepted)
+        .toBe(true);
+      expect(
+        readUnoPageDocument(probe("media.image", { asset: asset("hero.png"), alt: "A", caption: pair, markdown: true }))
+          .accepted,
+      ).toBe(true);
+      // The shared decision is the caption's own; the newline and unsafe-text policies are unchanged in both forms.
+      expectRefusal(
+        probe("media.image", { asset: asset("hero.png"), alt: "A", caption: "line\u0000break" }),
+        "document:unsafe-text",
+      );
+      expectRefusal(
+        probe("media.image", { asset: asset("hero.png"), alt: "A", caption: "line\u0000break", markdown: true }),
+        "document:unsafe-text",
+      );
+    });
+
     it("accepts the donor's Markdown caption form at its own 4,000 bound and keeps the plain form at 320", () => {
       const markdownCaption = (length: number) => `**${"c".repeat(length - 4)}**`;
       // `UNO-WO-120 / R01`: the two caption forms are disjoint; the donor's bound governs only the declared Markdown form.

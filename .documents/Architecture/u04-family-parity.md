@@ -9,12 +9,12 @@ checkpoint A1, `table` under `UNO-WO-110 / R01`, `list` under `UNO-WO-111 / R01`
 `hero` under `UNO-WO-112 / R01` at `6/17` / `48/59`, `stats` under `UNO-WO-113 / R01` at `7/17` / `49/59`, `steps` under
 `UNO-WO-114 / R01` at the earned **B1** `8/17` / `50/59` row, `quote` under `UNO-WO-117 / R01` at `9/17` / `51/59`,
 `faq` under `UNO-WO-118 / R01` at the checkpoint-free interim `10/17` / `52/59`, `columns` under `UNO-WO-119 / R01` at the
-earned **B2** `11/17` / `53/59` row, and `media` under `UNO-WO-120 / R01` at the checkpoint-free twelve-family `12/17` /
+earned **B2** `11/17` / `53/59` row, and `media` under `UNO-WO-120 / R02` at the checkpoint-free twelve-family `12/17` /
 `54/59` row), five still bounded/non-parity (with the
 bounded authored-heading and plain-text-lede modes for `cards`/`features`, which add no parity credit); one **durable** family composition published on the existing committed
 Components Page under `UNO-WO-078 / R01`**, verified over real production HTTP and Chromium and still a bounded
 composition, never a parity uplift.** U04 remains OPEN. **B2 (`11/17` / `53/59`) is earned by `UNO-WO-119 / R01`** with
-`quote`, `faq` and `columns` all credited by executed evidence, and `UNO-WO-120 / R01` credits `media` without moving that row:
+`quote`, `faq` and `columns` all credited by executed evidence, and `UNO-WO-120 / R02` credits `media` without moving that row:
 the checkpoint-free twelve-family result is `12/17` / `54/59`. Earlier rows (`B1` `8/17` / `50/59` and the nine-, ten- and
 eleven-family interims `9/17` / `51/59`, `10/17` / `52/59`, `11/17` / `53/59`) are retained as regressions, and no later
 checkpoint target — `C1` included — is asserted here.
@@ -67,13 +67,14 @@ features; they are **not** additional donor family keys and must never be listed
 | `cards` | `page-document.ts` `a12d964c…` (strict `cardsSectionSchema`, `cardItemSchema`, `headingFields` with optional `heading` and Markdown-capable `lede`, `itemColumnsField`); `media-sections.tsx` `e3f3a12e…` (native `<li>` cards with optional media/meta/action, `SectionHeading` `<h2>` + Markdown lede, `ItemTitle` `<h3>`); `section-support.tsx` `19c9bee3…` (`SectionHeading`, `ItemTitle`, `columnsClass` default) | `ADAPT (bounded grid plus authored section heading and plain-text lede)` | `type`, required `columns` 2\|3\|4, `items[1..8]{title,body?}`, optional plain-text `heading` (nonempty, unpadded, ≤160 code points, no Markdown or markup), optional plain-text `lede` (nonempty, unpadded, ≤4000 code points, no Markdown, markup, control text or unpaired surrogate) | donor `surface`, an omitted `columns`, item `image`/`meta`/`action`/`href`/`icon`/`style`, Markdown and links — including the donor's Markdown-capable `lede` — donor borders, and the donor heading-less `<h3>` outline | **no-lede** (heading-less or headed-only) is byte-identical to the previously accepted output; `heading+lede` is one `layout.stack {}` holding `content.heading {level:2}`, one `content.prose {text}` at `${id}-lede` and the grid, whose item titles are `content.heading {level:3}`; `lede-only` is the same stack with `[content.prose {text}, layout.grid]` and heading-less level-2 item titles, inventing no heading | heading-less `<ul data-uno-item-semantics="list" role="list">` of `<li>` with `<h2>` titles; headed `<div class="uno-json-stack">` with one authored `<h2>`, then exactly one escaped `<p class="uno-json-prose" id="family-N-cards-lede">` in source order before the native `<ul>/<li>` list of `<h3>` titles; lede-only renders the paragraph before the list with no invented `<h2>` and only authored card bodies as further paragraphs | composed (four pre-WO-071 baselines byte-identical + `heading+lede` + `lede-only`) + required-columns/count/Markdown/heading/lede refusal + `<h2>/<p>/<h3>` order and markup |
 | `features` | `page-document.ts` `a12d964c…` (strict `featuresSectionSchema`, `featureItemSchema`, `headingFields` with optional `heading` and Markdown-capable `lede`, `itemColumnsField`); `media-sections.tsx` `e3f3a12e…` (native `<li>` features with optional decorative icon, `SectionHeading` `<h2>` + Markdown lede, `ItemTitle` `<h3>`); `section-support.tsx` `19c9bee3…` | `ADAPT (bounded grid plus authored section heading and plain-text lede)` | `type`, required `columns` 2\|3\|4, `items[1..8]{title,body?}`, optional plain-text `heading` (nonempty, unpadded, ≤160 code points, no Markdown or markup), optional plain-text `lede` (nonempty, unpadded, ≤4000 code points, no Markdown, markup, control text or unpaired surrogate) | donor `surface`, an omitted `columns`, item `icon`/`image`/`href`/`style`, Markdown and links — including the donor's Markdown-capable `lede` — donor icon rendering, and the donor heading-less `<h3>` outline | the same three lede modes: **no-lede** byte-identical; `heading+lede` one `layout.stack {}` with `content.heading {level:2}`, `content.prose {text}` at `${id}-lede` then the grid with level-3 item titles; `lede-only` `[content.prose {text}, layout.grid]` with level-2 item titles and no invented heading | the same native `<ul role="list">`/`<li>` structure, with exactly one escaped `<p class="uno-json-prose" id="family-N-features-lede">` after the authored `<h2>` and before the list; per-feature `<h3>` titles in headed mode and `<h2>` titles in lede-only mode | composed (four pre-WO-071 baselines byte-identical + `heading+lede` + `lede-only`) + required-columns/count/Markdown/heading/lede refusal + `<h2>/<p>/<h3>` order and markup |
 | `actions` | `page-document.ts` `a12d964c…` (strict `actionsSectionSchema`, `actionSchema`, destination and variant forms); `text-sections.tsx` `caeee577…` (donor `ActionsSection` genuine link list); `section-support.tsx` `19c9bee3…` (donor `ActionLinks` item presentation) | `COMPOSE (same-document anchor subset)` | `type`, required `actions[1..8]{label,href}` where the label is plain text and `href` is a literal `#family-<index>-<name>` fragment naming an existing **top-level** composed section | donor `href`/`route`/`link` destination alternatives, action `variant`, section `heading`/`lede`/`align`/`surface`, Markdown labels, external/`mailto:`/`tel:`/site-route destinations, percent-encoded, suffixed, whitespace or missing/nested targets | `content.actions {items:[{label,targetId}]}`, preserving authored order and each authored anchor one-to-one; the composer's own exact top-level ID equality check runs before the Uno reader | `<ul class="uno-json-actions" id="family-13-actions">` with one direct `<li class="uno-json-action-item">` and one native `<a class="uno-json-action" href="#<targetId>">` per authored action | composed + destination/label refusal + native-anchor markup |
-| `media` | `page-document.ts` `a12d964c…` (strict `imageSchema`, `mediaSectionSchema`, donor `src`, alt/decorative, optional caption, heading/lede/position/surface); `media-sections.tsx` `e3f3a12e…` (donor `<figure>` image and caption, optional `position`); `section-support.tsx` `19c9bee3…` (donor image presentation and alt semantics); local Uno `src/core/assets/uno-owned-media.ts` `f988a0e5…` (`UnoOwnedAssetRef`, `readUnoOwnedAssetRef`, `readUnoOwnedMediaPath`, four zones, per-purpose extension/MIME, generated-SHA policy) | `COMPOSE (explicit owned-image binding subset)` | `type`, required `image{src,alt}` with a literal donor `/assets/…` identity (lowercase raster extension, path accepted by the local owned-media policy) and an authored nonblank descriptive alt, optional plain `caption`; a caller-supplied `{images:[{source,owned}]}` binding maps each consumed donor identity to a separately authored `{zone,path,integrity?}` image ref | donor decorative images (empty alt), donor `heading`/`lede`/`position`/`surface`, remote or protocol-relative sources, SVG, uppercase extensions, percent-encoding, query/fragment, donor Markdown caption and any automatic URL-to-asset migration, unbound/missing/extra/duplicate bindings, Markdown text | `media.image {asset,alt,caption?}` where `asset` is the validated owned ref from the binding; donor `src` never becomes a rendered URL, and the binding is validated before a candidate exists | real `<figure class="uno-json-media" id="family-14-media">` only when the server supplies a resolved image projection; without that projection no figure and no image is emitted, and the donor path never appears as a `src` | PARITY (UNO-WO-120 / R01): heading, Markdown lede and caption, closed position/surface, explicit decorative form; composed + twelve closed refusals + four-case Chromium |
+| `media` | `page-document.ts` `a12d964c…` (strict `imageSchema`, `mediaSectionSchema`, donor `src`, alt/decorative, optional caption, heading/lede/position/surface); `media-sections.tsx` `e3f3a12e…` (donor `<figure>` image and caption, optional `position`); `section-support.tsx` `19c9bee3…` (donor image presentation and alt semantics); local Uno `src/core/assets/uno-owned-media.ts` `f988a0e5…` (`UnoOwnedAssetRef`, `readUnoOwnedAssetRef`, `readUnoOwnedMediaPath`, four zones, per-purpose extension/MIME, generated-SHA policy) | `COMPOSE (explicit owned-image binding subset)` | `type`, required `image{src,alt}` with a literal donor `/assets/…` identity (lowercase raster extension, path accepted by the local owned-media policy) and an authored nonblank descriptive alt, optional plain `caption`; a caller-supplied `{images:[{source,owned}]}` binding maps each consumed donor identity to a separately authored `{zone,path,integrity?}` image ref | donor decorative images (empty alt), donor `heading`/`lede`/`position`/`surface`, remote or protocol-relative sources, SVG, uppercase extensions, percent-encoding, query/fragment, donor Markdown caption and any automatic URL-to-asset migration, unbound/missing/extra/duplicate bindings, Markdown text | `media.image {asset,alt,caption?}` where `asset` is the validated owned ref from the binding; donor `src` never becomes a rendered URL, and the binding is validated before a candidate exists | real `<figure class="uno-json-media" id="family-14-media">` only when the server supplies a resolved image projection; without that projection no figure and no image is emitted, and the donor path never appears as a `src` | PARITY (UNO-WO-120 / R02): heading, Markdown lede and caption to 4,000 including unformatted text, closed position/surface with textless placement, the donor's optional decorative boolean normalized to the native empty alt, and an authored `plain` surface proven against its absence; composed + fourteen closed refusals + six-variant four-case Chromium |
 | `gallery` | `page-document.ts` `a12d964c…` (strict `gallerySectionSchema`: `items[2..12]{image,caption?}`, `imageSchema` `src`/`alt`/decorative, optional `columns`, heading/lede/surface); `media-sections.tsx` `e3f3a12e…` (donor native `<ul>`/`<li>` grouping, a `<figure>` per image, Markdown caption); `section-support.tsx` `19c9bee3…` (donor image alternative contract and column defaults); local Uno `src/core/assets/uno-owned-media.ts` `f988a0e5…` (owned-ref policy); local Uno `src/core/page-document.ts` `2d968300…` (`media.gallery {columns:2|3|4,items[2..12]{asset,alt,caption?}}`) and `src/components/uno-page-sections.tsx` `cde15a6b…` (`<div class="uno-json-gallery">` of `<figure class="uno-json-media-item">` children) | `COMPOSE (explicit owned-gallery binding subset)` | `type`, required `columns` exactly `2`, `3` or `4`, required `items[2..8]` each exactly `{image:{src,alt},caption?}` with a literal donor `/assets/…` identity and an authored nonblank descriptive alt; the same caller-supplied `{images:[{source,owned}]}` binding as `media`, whose unique source set must equal the set consumed across **both** families | donor optional `heading`/`lede`/`surface`, implicit column default, decorative images (empty alt), donor `position`/`align`, item `href`/`meta`/`action`/`icon`, image `width`/`height`/`srcset`/`style`, remote or protocol-relative sources, SVG, uppercase extensions, Markdown text, unbound/missing/extra/duplicate bindings | `media.gallery {columns,items:[{asset,alt,caption?}]}` built in authored item order, with each missing caption kept absent; donor `src` never becomes a rendered URL | one `<div class="uno-json-gallery" data-uno-columns="…" id="family-N-gallery">` with exactly one `<figure class="uno-json-media-item">` per projected item, and no gallery at all without a matching server projection | composed + explicit-binding refusal + projection-gated markup |
 | `contactForm` | donor `src/core/page-document.ts` `a12d964c…` (strict `contactForm` section = `{type, formRef}`; `formRef` trimmed, nonempty, max 64, `/^[a-z0-9][a-z0-9-]*$/`, an intent reference only); donor `src/components/site/page-document-content.tsx` `fc35a52d…` (`renderContactForm?.(section.formRef) ?? null` — a per-render caller seam, absent means nothing rendered); local Uno `src/core/page-document.ts` `2d968300…` (`interaction.contact` with empty props `{}` and optional heading/description/fields/submitLabel, no `formRef`) and local `src/components/uno-page-sections.tsx` `cde15a6b…` (fixed `Delivery is switched off. Nothing entered here is sent or stored.` notice, no form) | `COMPOSE (acknowledged delivery-OFF notice subset)` | `type` and a literal `formRef` in the pinned donor grammar, plus a separate caller acknowledgement `{contactForms:[{formRef, mode:"delivery-off"}]}` matching it exactly; output is one `interaction.contact` node with empty props and nothing else. The generated node id is `family-<index>-contactform`: the donor `type` stays canonical `contactForm`, while only the target suffix is lowercase because the frozen Uno section-id grammar `/^[a-z][a-z0-9-]{0,47}$/u` admits no uppercase | donor `formRef` trim semantics, any `heading`/`description`/`fields`/`submitLabel`, any provider/recipient/URL/webhook/token/secret/status/method/action key, an unacknowledged or mismatched reference, a non-`delivery-off` mode, and any donor form UI or delivery behaviour | `interaction.contact {props:{}}`; the donor `formRef` is validated, acknowledged, then **discarded**, so it never reaches the Page, HTML, client props, id suffix, log or URL | one `<section class="uno-json-contact">` whose only content is the existing fixed OFF status line: no `<form>`, `<input>`, `<textarea>`, `<button>`, `action`, `method`, handler, iframe, script or echoed reference | composed + acknowledgement and refusal tests + real React markup proof |
 
 Each accepted output is one validated, deep-frozen `UnoPageDocument` with `version: 1`, the donor title and one node
 per input section (`family-<index>-<type>`). Absent optional fields stay absent; the renderer owns visual defaults.
-No donor Markdown, link destination, image or media form is rendered by this subset.
+No donor Markdown, link destination, image or media form reaches a visitor except through the separately credited families;
+every credited family renders only what its own row above admits, and an uncredited family still renders none of it.
 
 **The FAQ family and the donor's twenty-four items (`UNO-WO-118 / R01`).** The pinned donor `faq` schema spreads
 `headingFields`, carries the closed `surfaceField`, and accepts 1–24 ordered `{question, answer}` items whose question is
@@ -111,37 +112,50 @@ module follows, and the bare grid without a heading, lede or surface is byte-ide
 browser proof for these four served variants is **completed by `UNO-WO-119 / R02`** below, which executes all four
 width × scheme cases; R01 measured only the light/normal pair and asked merely which cell was wider.
 
-**The Media family in full (`UNO-WO-120 / R01`).** The donor's `MediaSection` carries an optional plain `heading`, a
-Markdown-capable `lede`, a figure with a Markdown-capable `caption` and an optional `decorative` boolean, plus the closed
-`position` and `surface`. Uno now expresses all of that **through the existing `media.image` module and the section stack**, with no
-new module id and no new asset authority: the composer composes a `layout.stack` at the family anchor whose children are the
+**The Media family in full (`UNO-WO-120 / R02`; R01 superseded).** The donor's `MediaSection` carries an optional plain `heading`,
+a Markdown-capable `lede`, a figure with a Markdown-capable `caption` and an optional `decorative` boolean, plus the closed
+`position` and `surface`. Uno now expresses all of that **through the existing `media.image` module and the section stack**, with
+no new module id and no new asset authority: the composer composes a `layout.stack` at the family anchor whose children are the
 figure and one owned text stack — `position: "start"` puts the figure first, `end` the text first — and `surface` sits on the
 wrapper, so it covers the heading, the lede **and** the figure, exactly as the donor's own outer section does. `layout.stack`
 gained one closed optional `position` (`start`/`end`); the shipped stylesheet lays such a stack out as **two equal tracks** above
-`64rem` and as one column, in the same authored order, below it. `media.image` gained one closed optional `markdown` literal, and
-its caption is then read by the **shared** Markdown reader at the donor's own 4,000 bound, while a caption without Markdown keeps
-the native 320-point contract untouched. The decorative form is the donor's optional boolean, admitted only as the literal `true`
-with an exactly empty `alt`; a nonempty alt beside it, or an empty alt without it, refuses the target.
+`64rem` and as one column, in the same authored order, below it. `media.image` gained one closed optional `markdown` literal.
+
+**The five corrections R02 makes to R01, each executed.** (1) **The optional boolean is adopted as the donor declares it**:
+`decorative` may be absent, `false` or `true`; an explicitly `true` flag may **omit** `alt`, and the accepted node is normalized to
+the native empty alternative, while R01's explicit `alt: ""` form still composes. A wrong type, a nonempty alt beside `true`, and
+an absent or empty alt without `true` all still refuse. (2) **Every donor-supported caption is representable to 4,000**,
+including text carrying no Markdown at all: the adapter declares that caption through the **accepted Markdown-capable form**
+instead of padding, wrapping or formatting the words to fit, so 321–4,000 unformatted characters compose, 4,001 refuses, and a
+caption the unflagged 320-point bound already accepted is byte-identical. (3) **The shared Unicode decision covers both native
+caption forms** — a lone or reversed surrogate refuses in the plain and the declared form alike, while a valid supplementary pair
+still counts once and is accepted in each; the newline and unsafe-text policies are unchanged. (4) **A textless position is
+accepted**: `start`/`end` with no heading and no lede composes one figure in the donor's own track — the first, or the second at a
+wide viewport — with no invented heading, no invented text, no duplicate image and no new module. (5) **`plain` is proven
+authored, not inferred**: one served variant authors `surface: "plain"` while another authors no surface at all, so the closed
+literal is compared with the donor's own absence instead of with a second unauthored stack.
 
 Recorded adaptations, none concealed: (1) **alt bound** — Uno keeps its own 320 code points where the donor allows 400, so a
-longer donor description refuses rather than widening any other media contract; (2) **decorative alt is required** — the subset
-still requires the `alt` key, so an explicit decorative image authors `alt: ""`, and the semantic is never inferred from an empty
-string alone; (3) **the position needs authored text** — a `position` with neither heading nor lede refuses rather than inventing
-one; (4) **remote and SVG sources stay out** — the donor identity is a migration key, never a rendered `src`, and every image is
-the separately authored owned reference served from `/uno-media/...`; (5) **gallery, carousel and video are untouched** — their
-own caption and alt contracts are unchanged.
+longer donor description refuses rather than widening any other media contract; (2) **a described image needs a description** —
+the omission is admitted only beside the explicitly true decorative flag, so no empty string is ever read as decorative on its
+own; (3) **remote and SVG sources stay out** — the donor identity is a migration key, never a rendered `src`, and every image is
+the separately authored owned reference served from `/uno-media/...`; (4) **gallery, carousel and video are untouched** — their
+own caption and alt contracts are unchanged, and the new Unicode decision is confined to the native `media.image` caption.
 
-The browser proof executes **four cases** — 390 and 1280 in light/normal motion and in dark/reduced motion — against four served
-variants (the committed rich section, `end`, an explicit decorative figure and the bare previously accepted composition). Each
-case proves, from the actual page: the real media settings; every image **loaded** with its 64×64 intrinsic size and served from
-this Page's own owned locator; the authored `alt`, or an empty alt with **no** accessible name of any kind for the decorative
-form; the caption **owned by the figure that owns the image**, rendered from the shared AST with its emphasis and its classified
-link, and never carrying raw syntax; at 1280 the two **equal tracks** of a positioned section in the authored DOM order, and at
-390 one column in that same order; a `muted` and a `bordered` surface that really paint while `plain` and absent paint nothing;
-no horizontal overflow; and real keyboard access to the family's own caption link — reached by Tab, left again by Tab, no
-navigation and no foreign request, with no new console error. `browser` is the conjunction of the four cases, and both temporary
-fixture transactions (Columns and Media) are restored in `finally` and re-verified by digest **and** by a fresh response that
-serves the committed Page without any variant anchor.
+The browser proof executes **four cases** — 390 and 1280 in light/normal motion and in dark/reduced motion — against **six** served
+variants (the committed rich section; `end` with the other surface and a plain caption; an explicitly decorative figure whose alt
+is omitted and whose surface is genuinely authored `plain`; the bare previously accepted composition; and both textless
+positions). Each case proves, from the actual page: the real media settings; every image **loaded** with its 64×64 intrinsic size
+and served from this Page's own owned locator; the authored `alt`, or the normalized empty alt with **no** accessible name of any
+kind for the decorative form; the caption **owned by the figure that owns the image**, rendered from the shared AST with its
+emphasis and its classified link, and never carrying raw syntax; at 1280 the two **equal tracks** of a positioned section in the
+authored DOM order, and for a textless position the one figure filling its own track and starting exactly where that track starts
+(measured: `start` at the section's content edge, `end` one track plus the gap to its right); at 390 one column in the same
+authored order with every child flush to the content edge; a `muted` and a `bordered` surface that really paint while the
+authored `plain` and the absent surface paint nothing; no horizontal overflow; and real keyboard access to the family's own
+caption link — reached by Tab, left again by Tab, no navigation and no foreign request, with no new console error. `browser` is
+the conjunction of the four cases, and both temporary fixture transactions (Columns and Media) are restored in `finally` and
+re-verified by digest **and** by a fresh response that serves the committed Page without any variant anchor.
 
 **The Columns browser evidence in full (`UNO-WO-119 / R02`).** R01's dedicated Columns transaction measured only light/normal
 motion at 1280 and 390, and its asymmetric predicate merely asked which cell was wider. R02 **supersedes** that: the same
@@ -287,7 +301,8 @@ and this ledger claims no link engine, route resolver or publication authority.
   (`heading`, `lede`, `align`, `surface`, `links`, `visibility`, `href`, `route`, `link`, `html`, `style`, `onClick`,
   a hero `route`/`link` action destination, a stats entry link, a `steps` item state/date, a `faq` item `href`/`icon`/`open`, a `columns` item
   `href`/`icon`/`style`, a `cards`/`features` item `image`/`meta`/`action`/`icon`, an `actions` entry `variant`/`route`/
-  `link`/`target`/`rel`/`download`, a `media` section `heading`/`lede`/`position`/`surface` or image `decorative`/`href`,
+  `link`/`target`/`rel`/`download`, a `media` section `heading`/`lede`/`position`/`surface` or image `href` or a
+  non-boolean `decorative` (an authored `true`/`false` is the donor's own form),
   a `gallery` parent `heading`/`lede`/`surface`/`align`/`position`/`links`/`visibility`/`style`/`onClick`, a gallery item
   `href`/`meta`/`action`/`icon` or image `decorative`/`width`/`height`/`srcset`/`style`,
   a `contactForm` section without a string `formRef` or with any other key, a `contactForms` acknowledgement that is
@@ -297,7 +312,8 @@ and this ledger claims no link engine, route resolver or publication authority.
   a section `ratio` on
   `cards`/`features`, a `ratio` authored on three columns, a column declaring both `body` and `items` or neither,
   any extra key), a missing subset body (hero with neither `lede` nor `support`, a
-  `cards`/`features` section without its required `columns`, `media` without `image.src`/`image.alt`, `gallery` without
+  `cards`/`features` section without its required `columns`, `media` without `image.src`, without an `image.alt` and without the
+explicit decorative flag, `gallery` without
   `columns` or with a non-array `items`), an `actions`
   destination outside the accepted literal
   fragment spelling (external URL, site route, `mailto:`, `tel:`, percent-encoded, whitespace/query/suffix), a `media` or
@@ -314,7 +330,8 @@ and this ledger claims no link engine, route resolver or publication authority.
 - **Target refused** (`family:target-refused`): malformed values inside accepted fields (empty/overlong text, bad
   `align`/`surface`/`ratio`/`columns` literal, zero or seven stats items, zero or nine FAQ entries, one/four or more
   than three columns, zero or nine card/feature/action items, blank or 160-plus action label, unresolved or nested
-  action target, an empty/whitespace/321-code-point/safe-text-refused `media` or `gallery` alt or caption, a `gallery`
+  action target, an empty/whitespace/321-code-point/safe-text-refused `media` or `gallery` alt, an undeclared `media` caption
+  past its own bound or a refused `gallery` caption, a `gallery`
   `columns` other than literally `2`/`3`/`4` or an item count outside 2..8, an invalid owned ref
   (zone/path/extension/purpose/generated digest), a `formRef` that is empty, whitespace-padded, longer than 64
   characters or outside the pinned donor grammar (upper case, `_`, `/`, `.`, `@` or a leading hyphen; a trailing hyphen is
@@ -549,7 +566,7 @@ durable bounded composition Page of section 7 now exists, but it evidences the b
 future order must add those explicitly; this ledger authorises no new module ID, no new schema
 variant and no publication
 authority. The **B2** row is earned: its three declared families (`quote`, `faq` and `columns`) are all credited by
-executed evidence at the declared `11/17` / `53/59`, and `UNO-WO-120 / R01` credits `media` beyond it at the
+executed evidence at the declared `11/17` / `53/59`, and `UNO-WO-120 / R02` credits `media` beyond it at the
 checkpoint-free `12/17` / `54/59`. The `C1` row is **not** claimed: its declared families are `media` and `gallery`, and
 `gallery` remains bounded.
 
@@ -595,7 +612,7 @@ Evidence, all from the committed head:
 
 **No parity uplift and no stage closure follow from this.** It is one durable bounded composition of sixteen
 still-incomplete families plus the single `divider` candidate: the donor Markdown, links, rich forms, card
-media/meta/actions, feature icons, decorative media, gallery list wrapper, heading outlines and delivery semantics
+media/meta/actions, feature icons, gallery list wrapper, heading outlines and delivery semantics
 listed in section 6 remain absent. The accounting is unchanged at **22/22** module IDs, **4/4** asset zones,
 **16/16** browser matrix, **17/17** bounded mappings, **1/17** accepted full parity (`divider`) and **43/59 =
 72.88%** proxy. The reserved `.example` canonical is illustrative sample data, not a domain, deployment or ownership
@@ -640,7 +657,7 @@ light and dark, and under reduced motion, with one `main`, one `h1`, no `h4`, no
 and no overflow.
 
 **Still absent (unchanged):** donor Markdown, links and target resolution, rich forms and transport, card media/meta/
-actions, feature icons, decorative media and gallery list wrapper, other optional donor types, and the lifecycle and
+actions, feature icons and gallery list wrapper, other optional donor types, and the lifecycle and
 design semantics listed in section 6. Three families gained one heading level; nothing became full parity.
 
 Accounting is unchanged: **22/22** module IDs, **4/4** asset zones, **16/16** browser matrix, **17/17** bounded mappings,

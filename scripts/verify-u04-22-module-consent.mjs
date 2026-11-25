@@ -327,7 +327,7 @@ async function walkToSafeLink(tab, expectedHref) {
 }
 
 /**
- * `UNO-WO-120 / R01`: one browser reading of the four served Media variants. It is a module-level function so the gate's
+ * `UNO-WO-120 / R01`: one browser reading of the served Media variants. It is a module-level function so the gate's
  * transaction stays orchestration, and it reads only what a visitor's browser can observe about the served page. Each
  * variant is scrolled into the viewport first — the shipped images are `loading="lazy"`, so an off-screen figure has genuinely
  * not requested its bytes yet — and the read waits for that image's own `load` before measuring it.
@@ -363,9 +363,17 @@ async function readMediaCase(input) {
       surface: root.getAttribute("data-uno-surface"),
       display: style.display,
       gridTracks: style.gridTemplateColumns === "none" ? 0 : style.gridTemplateColumns.split(" ").length,
+      // The resolved track list and gap: a textless position has one child, so the tracks themselves are the only honest
+      // measure of the donor's two-column placement.
+      gridColumns: style.gridTemplateColumns === "none" ? null : style.gridTemplateColumns,
+      columnGap: Number.parseFloat(style.columnGap) || 0,
       trackWidths: children.map((child) => Math.round(child.getBoundingClientRect().width)),
       childTops: children.map((child) => Math.round(child.getBoundingClientRect().top)),
+      childLefts: children.map((child) => Math.round(child.getBoundingClientRect().left)),
       rootWidth: Math.round(root.getBoundingClientRect().width),
+      contentLeft: Math.round(
+        root.getBoundingClientRect().left + (Number.parseFloat(style.paddingLeft) || 0),
+      ),
       contentWidth: Math.round(
         root.clientWidth
           - (Number.parseFloat(style.paddingLeft) || 0)
@@ -402,6 +410,7 @@ async function readMediaCase(input) {
       captionLinkText: link === null ? null : link.textContent,
       captionHasRawSyntax: caption === null ? false : /(\*\*|\[[^\]]*\]\()/u.test(caption.textContent ?? ""),
       heading: root.querySelector("h2.uno-json-heading")?.textContent ?? null,
+      lede: root.querySelector("section.uno-json-prose")?.textContent ?? null,
       ledeStrong: root.querySelector("section.uno-json-prose strong.uno-family-md-strong")?.textContent ?? null,
       surfaceStyle: {
         backgroundColor: style.backgroundColor,
@@ -5561,22 +5570,38 @@ async function consentPhase(base) {
           module: "media.image",
           props: { asset: { zone: "page", path: FAMILY_PLATE }, alt: "Bare plate" },
         });
-      // `end` reverses the two children and keeps a plain caption plain; the decorative form is explicit.
+      // `end` reverses the two children and keeps a plain caption plain.
       const endOutcome = composeSource(clone(MEDIA_VARIANT_SOURCES[0]));
-      const decorativeOutcome = composeSource(clone(MEDIA_VARIANT_SOURCES[1]));
       const endSourceOk = endOutcome.status === "composed"
         && endOutcome.document.sections[0].props.position === "end"
         && endOutcome.document.sections[0].children[0].id === "family-0-media-text"
         && endOutcome.document.sections[0].children[1].id === "family-0-media-figure"
         && mediaFigureOf(endOutcome.document.sections[0])?.props.markdown === undefined;
+      // `UNO-WO-120 / R02`: the donor omits the alternative entirely, and the adopted `plain` surface is genuinely authored;
+      // the composed node therefore carries the native empty alternative beside the explicit flag.
+      const decorativeSource = MEDIA_VARIANT_SOURCES[1];
+      const decorativeOutcome = composeSource(clone(decorativeSource));
+      const decorativeFigure = decorativeOutcome.status === "composed"
+        ? mediaFigureOf(decorativeOutcome.document.sections[0])
+        : null;
       const decorativeSourceOk = decorativeOutcome.status === "composed"
-        && mediaFigureOf(decorativeOutcome.document.sections[0])?.props.alt === ""
-        && mediaFigureOf(decorativeOutcome.document.sections[0])?.props.decorative === true;
-      localA2.media.source = sourceOk && endSourceOk && decorativeSourceOk;
+        && !Object.prototype.hasOwnProperty.call(decorativeSource.image, "alt")
+        && decorativeFigure?.props.alt === ""
+        && decorativeFigure?.props.decorative === true
+        && decorativeOutcome.document.sections[0].props.surface === "plain";
+      // Both textless positions: one figure, placed by the position alone, with no heading, no lede and no second image.
+      const textlessComposed = [3, 4].map((index) => composeSource(clone(MEDIA_VARIANT_SOURCES[index])));
+      const textlessOk = textlessComposed.every((outcome, index) => outcome.status === "composed"
+        && outcome.document.sections[0].module === "layout.stack"
+        && outcome.document.sections[0].props.position === (index === 0 ? "start" : "end")
+        && outcome.document.sections[0].children.length === 1
+        && outcome.document.sections[0].children[0].id === "family-0-media-figure"
+        && (mediaFigureOf(outcome.document.sections[0])?.props.alt ?? "").length > 0);
+      localA2.media.source = sourceOk && endSourceOk && decorativeSourceOk && textlessOk;
       check(
-        "FAMILY_MEDIA_SOURCE the real adapter composes the donor's Media surface — authored heading and Markdown lede, closed position and surface, a Markdown caption, the explicit decorative form and the byte-identical bare section",
+        "FAMILY_MEDIA_SOURCE the real adapter composes the donor's Media surface — authored heading and Markdown lede, closed position and surface, a Markdown caption, the optional decorative form, both textless positions and the byte-identical bare section",
         localA2.media.source === true,
-        JSON.stringify({ position: committedMedia?.props?.position, surface: committedMedia?.props?.surface, end: endSourceOk }),
+        JSON.stringify({ position: committedMedia?.props?.position, surface: committedMedia?.props?.surface, end: endSourceOk, decorative: decorativeSourceOk, textless: textlessOk }),
       );
     }
     // `UNO-WO-120 / R01` (§2 `reader`/`refusal`): the composed Page round-trips through the unchanged reader, the donor
@@ -5595,13 +5620,64 @@ async function consentPhase(base) {
       };
       const richRead = composeFamilyFixture(composeMediaRead);
       const richAccepted = richRead.status === "composed" && readUnoPageDocument(richRead.document).accepted === true;
-      // The two caption forms are disjoint: 4,000 Markdown code points is inside the donor bound, 4,001 is not, and the plain
-      // (non-Markdown) form keeps the native 320-point contract it has always had.
+      // The two caption forms are disjoint and now both reach 4,000: the flagged form is the donor's own bound, 4,001 is
+      // outside it, and the **unflagged** form keeps the native 320-point contract it has always had — proven directly on the
+      // reader, because the adapter declares the long form rather than widening the native one.
+      const figureProps = (extra) => ({ asset: { zone: "page", path: FAMILY_PLATE }, alt: "Probe plate", ...extra });
+      const readFigureAccepts = (props) => readUnoPageDocument({
+        version: 1,
+        title: "Media caption probe",
+        sections: [{ id: "media-caption-probe", module: "media.image", props }],
+      }).accepted === true;
+      const nativeBound = readFigureAccepts(figureProps({ caption: "c".repeat(320) })) === true
+        && readFigureAccepts(figureProps({ caption: "c".repeat(321) })) === false;
+      // `UNO-WO-120 / R02`: every donor-supported caption is representable through 4,000 code points, including text that
+      // carries no Markdown at all — the adapter declares the accepted Markdown-capable form instead of formatting the text.
       const markdownCaption = (length) => `**${"c".repeat(length - 4)}**`;
-      const donorBound = readAccepts({ ...clone(MEDIA_SOURCE), caption: markdownCaption(4000) }) === true
-        && readAccepts({ ...clone(MEDIA_SOURCE), caption: markdownCaption(4001) }) === false;
-      const nativeBound = readAccepts({ ...clone(MEDIA_SOURCE), caption: "c".repeat(320) }) === true
-        && readAccepts({ ...clone(MEDIA_SOURCE), caption: "c".repeat(321) }) === false;
+      const donorBound = readFigureAccepts(figureProps({ caption: "c".repeat(321), markdown: true })) === true
+        && readFigureAccepts(figureProps({ caption: "c".repeat(4000), markdown: true })) === true
+        && readFigureAccepts(figureProps({ caption: "c".repeat(4001), markdown: true })) === false
+        && readFigureAccepts(figureProps({ caption: markdownCaption(4000), markdown: true })) === true
+        && readFigureAccepts(figureProps({ caption: markdownCaption(4001), markdown: true })) === false;
+      const longComposed = composeSource({ ...clone(MEDIA_SOURCE), caption: "c".repeat(400) });
+      const longDeclared = longComposed.status === "composed"
+        && mediaFigureOf(longComposed.document.sections[0])?.props.markdown === true
+        && mediaFigureOf(longComposed.document.sections[0])?.props.caption === "c".repeat(400)
+        && readAccepts({ ...clone(MEDIA_SOURCE), caption: "c".repeat(400) }) === true
+        && readAccepts({ ...clone(MEDIA_SOURCE), caption: "c".repeat(4000) }) === true
+        && readAccepts({ ...clone(MEDIA_SOURCE), caption: "c".repeat(4001) }) === false;
+      // `UNO-WO-120 / R02`: one shared well-formedness decision covers **both** native caption forms, and a valid
+      // supplementary pair still counts once and stays accepted in each.
+      const loneHigh = `${"c".repeat(10)}\ud800${"c".repeat(10)}`;
+      const loneLow = `${"c".repeat(10)}\udc00${"c".repeat(10)}`;
+      const supplement = `${"c".repeat(10)}\u{1f600}${"c".repeat(10)}`;
+      const unicodeShared = readFigureAccepts(figureProps({ caption: loneHigh })) === false
+        && readFigureAccepts(figureProps({ caption: loneLow })) === false
+        && readFigureAccepts(figureProps({ caption: loneHigh, markdown: true })) === false
+        && readFigureAccepts(figureProps({ caption: loneLow, markdown: true })) === false
+        && readFigureAccepts(figureProps({ caption: supplement })) === true
+        && readFigureAccepts(figureProps({ caption: supplement, markdown: true })) === true;
+      // The donor's optional boolean: a described image may say `false`, `true` may omit the alternative (normalized to the
+      // native empty one) or carry it explicitly empty; a contradiction or a missing description still refuses.
+      const normalized = readUnoPageDocument({
+        version: 1,
+        title: "Media decorative probe",
+        sections: [{
+          id: "media-decorative-probe",
+          module: "media.image",
+          props: { asset: { zone: "page", path: FAMILY_PLATE }, decorative: true },
+        }],
+      });
+      const decorativeOptional = readFigureAccepts(figureProps({ alt: "Described plate", decorative: false })) === true
+        && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE }, decorative: true }) === true
+        && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE }, alt: "", decorative: true }) === true
+        && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE }, alt: "Described plate", decorative: true }) === false
+        && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE } }) === false
+        && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE }, alt: "" }) === false
+        && readFigureAccepts({ asset: { zone: "page", path: FAMILY_PLATE }, alt: "Described plate", decorative: "true" }) === false
+        // The omission is normalized, not preserved: the accepted node carries the native empty alternative.
+        && normalized.accepted === true
+        && normalized.document.sections[0].props.alt === "";
       // The document-level closed members, each refused by the reader itself rather than silently defaulted.
       const documentRefusals = [
         (document) => {
@@ -5627,11 +5703,12 @@ async function consentPhase(base) {
           return readUnoPageDocument(document).accepted === false;
         },
       ].every((probe) => probe(clone(richRead.document)));
-      localA2.media.reader = richAccepted && donorBound && nativeBound && documentRefusals;
+      localA2.media.reader = richAccepted && donorBound && nativeBound && longDeclared && unicodeShared
+        && decorativeOptional && documentRefusals;
       check(
-        "FAMILY_MEDIA_READER the composed Page round-trips, the donor caption bound is 4,000 for the Markdown form only, the plain caption stays at 320 and the closed position/surface/decorative members refuse any other shape",
+        "FAMILY_MEDIA_READER the composed Page round-trips, the donor caption bound is 4,000 for both declared forms while the unflagged caption stays at 320, one shared Unicode decision covers both, the optional decorative form is normalized to the native empty alt and the closed position/surface members refuse any other shape",
         localA2.media.reader === true,
-        JSON.stringify({ richAccepted, donorBound, nativeBound, documentRefusals }),
+        JSON.stringify({ richAccepted, donorBound, nativeBound, longDeclared, unicodeShared, decorativeOptional, documentRefusals }),
       );
 
       // --- refusal ------------------------------------------------------------------------------------------------------
@@ -5650,7 +5727,7 @@ async function consentPhase(base) {
       }
       localA2.media.refusal = mediaRefusals === MEDIA_REFUSAL_CASES.length;
       check(
-        "FAMILY_MEDIA_REFUSAL every one of the twelve media probes refuses the whole Page with its own closed reason and no partial document",
+        `FAMILY_MEDIA_REFUSAL every one of the ${MEDIA_REFUSAL_CASES.length} media probes refuses the whole Page with its own closed reason and no partial document`,
         localA2.media.refusal === true,
         `${mediaRefusals}/${MEDIA_REFUSAL_CASES.length}`,
       );
@@ -5720,8 +5797,9 @@ async function consentPhase(base) {
       );
     }
     // `UNO-WO-120 / R01` (§2 `browser`): four independently executed cases — 390 and 1280 in light/normal motion and in
-    // dark/reduced motion — each measuring the four served Media variants: the loaded image and its intrinsic size, the alt or
-    // explicit decorative semantics, the caption the figure owns, the closed position's two equal tracks (or one column in
+    // dark/reduced motion — each measuring the six served Media variants: the loaded image and its intrinsic size, the alt or
+    // explicit decorative semantics, the caption the figure owns, the closed position's two equal tracks (or, for a textless
+    // position, the donor track that one figure occupies), one column in
     // authored order), the closed surface's computed presentation, and real keyboard access to the Markdown caption link.
     {
       const familyPath = resolve(ROOT, SOURCES[4]);
@@ -5754,23 +5832,37 @@ async function consentPhase(base) {
         const decorativeRegion = mediaVariantRegionOf(swappedHtml, MEDIA_VARIANTS[2].id);
         const bareRegion = mediaVariantRegionOf(swappedHtml, MEDIA_VARIANTS[3].id);
         const endCaption = mediaCaptionOf(endRegion) ?? "";
+        // `UNO-WO-120 / R02`: the authored `plain` surface is served as the closed literal beside the omitted alternative,
+        // and both textless positions serve one figure with no heading, no lede and no surface.
+        const textlessStartRegion = mediaVariantRegionOf(swappedHtml, MEDIA_VARIANTS[4].id);
+        const textlessEndRegion = mediaVariantRegionOf(swappedHtml, MEDIA_VARIANTS[5].id);
+        const textlessServed = [[textlessStartRegion, "start"], [textlessEndRegion, "end"]].every(([textlessRegion, position]) =>
+          textlessRegion.includes(`data-uno-position="${position}"`)
+          && !textlessRegion.includes("data-uno-surface")
+          && !textlessRegion.includes("<h2")
+          && !textlessRegion.includes("uno-json-prose")
+          && (textlessRegion.match(/<img\b/gu) ?? []).length === 1);
         const variantsServed = swappedHtml.length > 0
           && endRegion.includes(`data-uno-position="end"`)
           && endRegion.includes(`data-uno-surface="bordered"`)
           // `end` puts the authored text before the figure in the served DOM, which is also the mobile order.
           && endRegion.indexOf(`id="${MEDIA_VARIANTS[1].id}-text"`) < endRegion.indexOf(`id="${MEDIA_VARIANTS[1].id}-figure"`)
           && !/<strong|<a /u.test(endCaption)
+          // The decorative form: an omitted donor alternative normalized to the native empty one, beside the authored `plain`.
           && decorativeRegion.includes(`alt=""`)
+          && decorativeRegion.includes(`data-uno-surface="plain"`)
           && !decorativeRegion.includes("data-uno-position")
           && /Decorative, so the caption carries the meaning\./u.test(decorativeRegion)
+          // Both textless positions keep the donor's placement with no invented text.
+          && textlessServed
           // The bare previously accepted section stays one plain figure at its anchor: no wrapper, no heading, no caption.
           && bareRegion.includes(`<figure class="uno-json-media" id="${MEDIA_VARIANTS[3].id}">`)
           && !bareRegion.includes("<h2") && !bareRegion.includes("<figcaption");
         localA2.media.renderer = localA2.media.renderer && variantsServed;
         check(
-          "FAMILY_MEDIA_HTTP the temporary page serves the end position with a plain caption, the decorative figure with an empty alt and the byte-identical bare figure",
+          "FAMILY_MEDIA_HTTP the temporary page serves the end position with a plain caption, the decorative figure with a normalized empty alt and an authored plain surface, both textless positions and the byte-identical bare figure",
           variantsServed,
-          `${endRegion.length}/${decorativeRegion.length}/${bareRegion.length}`,
+          `${endRegion.length}/${decorativeRegion.length}/${textlessStartRegion.length}/${textlessEndRegion.length}/${bareRegion.length}`,
         );
         const variantIds = MEDIA_VARIANTS.map((variant) => variant.id);
         for (const testCase of MEDIA_CASES) {
@@ -5793,7 +5885,7 @@ async function consentPhase(base) {
           readings.push(reading);
           if (verdict.ok && reading.errors === 0) mediaCases.add(testCase.key);
           check(
-            `FAMILY_MEDIA_BROWSER ${testCase.key} the four served variants load their owned image, own their caption, keep their alt or decorative semantics, lay out their position and surface and reach the caption link by keyboard`,
+            `FAMILY_MEDIA_BROWSER ${testCase.key} the six served variants load their owned image, own their caption, keep their alt or decorative semantics, lay out their position and surface and reach the caption link by keyboard`,
             verdict.ok && reading.errors === 0,
             `${verdict.detail} errors=${reading.errors}`,
           );
@@ -5809,6 +5901,7 @@ async function consentPhase(base) {
         process.stdout.write(
           `  INFO  media ${reading.case} ${reading.width}px dark=${reading.dark} reduce=${reading.reduce} `
           + `tracks=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, variant.trackWidths]))} `
+          + `lefts=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, variant.childLefts]))} `
           + `images=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, variant.image?.naturalWidth, variant.image?.naturalHeight, variant.image?.alt]))} `
           + `surfaces=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, variant.surface, variant.surfaceStyle?.backgroundColor]))} `
           + `keyboard=${reading.keyboard?.presses} presses at=${reading.keyboard?.at} left=${reading.keyboard?.leftAfterTab} `

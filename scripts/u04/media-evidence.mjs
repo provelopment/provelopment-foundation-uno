@@ -41,8 +41,11 @@ export const MEDIA_EXPECTED = Object.freeze({
 });
 
 /**
- * The four served Media variants, with the ids the temporary append gives them. `rich` is the committed section itself;
- * the other three are appended only for the browser transaction and removed again by its `finally`.
+ * The six served Media variants, with the ids the temporary append gives them. `rich` is the committed section itself;
+ * the other five are appended only for the browser transaction and removed again by its `finally`.
+ *
+ * `UNO-WO-120 / R02`: the set now separates an **authored** `plain` surface (index 2) from **no** surface at all (index 3), and
+ * adds both **textless** positions (indices 4 and 5), so every adopted donor shape is executed rather than inferred.
  */
 export const MEDIA_VARIANTS = Object.freeze(
   [MEDIA_SOURCE, ...MEDIA_VARIANT_SOURCES].map((source, index) =>
@@ -53,8 +56,13 @@ export const MEDIA_VARIANTS = Object.freeze(
       surface: source.surface ?? null,
       heading: source.heading ?? null,
       lede: source.lede ?? null,
-      alt: source.image.alt,
+      /** The alternative the served image must carry; an omitted donor `alt` is normalized to the native empty one. */
+      alt: source.image.alt ?? "",
+      /** True when the donor omitted `alt` entirely — the optional boolean form the reader normalizes. */
+      altOmitted: !Object.prototype.hasOwnProperty.call(source.image, "alt"),
       decorative: source.image.decorative === true,
+      /** True when the section authors a position but no heading and no lede: one figure, placed by the position alone. */
+      textless: source.position !== undefined && source.heading === undefined && source.lede === undefined,
       caption: source.caption ?? null,
       markdownCaption: typeof source.caption === "string" && /[*_`\[]/u.test(source.caption),
     }),
@@ -174,7 +182,7 @@ const captionOwned = (figure) =>
   figure.captionIsChild === true && figure.imgIsChild === true && /<figcaption/u.test(figure.html ?? "");
 
 /**
- * The verdict for one executed case: the actual media settings, the four served variants, the loaded image with its intrinsic
+ * The verdict for one executed case: the actual media settings, the six served variants, the loaded image with its intrinsic
  * size, its alternative (or explicit decorative form), the caption the figure owns, the closed position's two equal tracks at
  * a wide viewport and one column in authored order at a narrow one, the closed surface's computed presentation in this
  * scheme, and the keyboard access the gate exercised on the real Markdown caption link.
@@ -249,10 +257,21 @@ export function mediaCaseVerdict(reading, testCase) {
     expect(found.overflow === 0, `overflow:${tag}:${found.overflow}`);
   }
   // --- The closed position: two equal tracks at a wide viewport, one column in authored order at a narrow one ---------------
-  const rich = byId.get(MEDIA_ID);
-  const endVariant = byId.get(MEDIA_VARIANTS[1].id);
-  const decorative = byId.get(MEDIA_VARIANTS[2].id);
-  const bare = byId.get(MEDIA_VARIANTS[3].id);
+  const variantAt = (index) => byId.get(MEDIA_VARIANTS[index].id);
+  const rich = variantAt(0);
+  const endVariant = variantAt(1);
+  const decorative = variantAt(2);
+  const bare = variantAt(3);
+  const textlessStart = variantAt(4);
+  const textlessEnd = variantAt(5);
+  /** The two resolved grid tracks in CSS pixels, or an empty list when the stack is not a grid. */
+  const tracksOf = (variant) =>
+    variant === undefined || variant.gridColumns == null
+      ? []
+      : variant.gridColumns
+          .split(" ")
+          .map((track) => Number.parseFloat(track))
+          .filter((next) => Number.isFinite(next));
   if (testCase.width >= 1000) {
     for (const [variant, order] of [
       [rich, ["figure", "text"]],
@@ -260,16 +279,52 @@ export function mediaCaseVerdict(reading, testCase) {
     ]) {
       if (variant === undefined) continue;
       expect(variant.display === "grid", `display:${variant.id}:${variant.display}`);
-      expect((variant.gridTracks ?? 0) === 2, `tracks:${variant.id}:${variant.gridTracks}`);
+      const tracks = tracksOf(variant);
+      expect(tracks.length === 2, `tracks:${variant.id}:${variant.gridTracks}`);
+      expect(
+        tracks.length === 2 && tracks.every((width) => width > 0) && near(tracks[0], tracks[1]),
+        `equal-tracks:${variant.id}:${JSON.stringify(tracks)}`,
+      );
       expect(
         variant.trackWidths?.length === 2 && variant.trackWidths.every((width) => width > 0)
           && near(variant.trackWidths[0], variant.trackWidths[1]),
-        `equal-tracks:${variant.id}:${JSON.stringify(variant.trackWidths)}`,
+        `equal-columns:${variant.id}:${JSON.stringify(variant.trackWidths)}`,
       );
       // Both children sit on one row: the figure and its text are side by side, not stacked.
       expect(variant.childTops?.length === 2 && near(variant.childTops[0], variant.childTops[1]), `row:${variant.id}`);
       // The DOM order is the authored order, which is what a screen reader and a narrow viewport both follow.
       expect(JSON.stringify(variant.order) === JSON.stringify(order), `order:${variant.id}:${JSON.stringify(variant.order)}`);
+    }
+    // `UNO-WO-120 / R02`: a textless position keeps the donor's placement — the same two equal tracks, one authored figure and
+    // no invented text — with `start` in the first track and `end` in the second.
+    for (const [variant, trackIndex, label] of [
+      [textlessStart, 0, "textless-start"],
+      [textlessEnd, 1, "textless-end"],
+    ]) {
+      if (variant === undefined) continue;
+      expect(variant.display === "grid", `${label}-display:${variant.display}`);
+      const tracks = tracksOf(variant);
+      expect(tracks.length === 2, `${label}-tracks:${variant.gridTracks}`);
+      expect(
+        tracks.length === 2 && tracks.every((width) => width > 0) && near(tracks[0], tracks[1]),
+        `${label}-equal-tracks:${JSON.stringify(tracks)}`,
+      );
+      // Exactly one child, and it is the figure: no heading, no lede, no duplicate image and no emptied text stack.
+      expect(JSON.stringify(variant.order) === JSON.stringify(["figure"]), `${label}-order:${JSON.stringify(variant.order)}`);
+      expect(variant.trackWidths?.length === 1, `${label}-children:${JSON.stringify(variant.trackWidths)}`);
+      expect(variant.heading === null && variant.lede === null, `${label}-invented-text:${variant.heading}/${variant.lede}`);
+      // The figure fills its own track and really begins where that track begins.
+      expect(
+        tracks.length === 2 && variant.trackWidths?.[0] !== undefined && near(variant.trackWidths[0], tracks[trackIndex]),
+        `${label}-column:${JSON.stringify(variant.trackWidths)}/${JSON.stringify(tracks)}`,
+      );
+      const expectedLeft = trackIndex === 0
+        ? (variant.contentLeft ?? 0)
+        : (variant.contentLeft ?? 0) + tracks[0] + (variant.columnGap ?? 0);
+      expect(
+        variant.childLefts?.length === 1 && near(variant.childLefts[0], expectedLeft),
+        `${label}-placement:${JSON.stringify(variant.childLefts)}/${expectedLeft}`,
+      );
     }
     // An absent position is the ordinary vertical stack at every width.
     for (const variant of [decorative, bare]) {
@@ -277,7 +332,7 @@ export function mediaCaseVerdict(reading, testCase) {
       expect(variant.display !== "grid", `no-grid:${variant.id}:${variant.display}`);
     }
   } else {
-    for (const variant of [rich, endVariant, decorative, bare]) {
+    for (const variant of [rich, endVariant, decorative, bare, textlessStart, textlessEnd]) {
       if (variant === undefined) continue;
       // One column: every child is as wide as the section, and the children keep the authored order top to bottom.
       expect(variant.display !== "grid", `narrow-display:${variant.id}:${variant.display}`);
@@ -291,6 +346,13 @@ export function mediaCaseVerdict(reading, testCase) {
           && variant.childTops.every((top, index) => index === 0 || top > variant.childTops[index - 1]),
         `narrow-order:${variant.id}:${JSON.stringify(variant.childTops)}`,
       );
+      // A textless position is still one column at this width, flush with the section's own content edge.
+      if (variant === textlessStart || variant === textlessEnd) {
+        expect(
+          variant.childLefts?.length === 1 && near(variant.childLefts[0], variant.contentLeft ?? 0),
+          `narrow-placement:${variant.id}:${JSON.stringify(variant.childLefts)}`,
+        );
+      }
     }
     expect(JSON.stringify(rich?.order) === JSON.stringify(["figure", "text"]), `narrow-rich-order:${JSON.stringify(rich?.order)}`);
     expect(
@@ -299,6 +361,10 @@ export function mediaCaseVerdict(reading, testCase) {
     );
   }
   // --- The closed surface: the emphasised values are real effects, plain and absent are no effect at all -------------------
+  // `UNO-WO-120 / R02`: `plain` is now a **genuinely authored** value (the decorative variant authors `surface: "plain"`), so the
+  // comparison proves the closed literal against the donor's own absence instead of comparing two unauthored stacks.
+  expect(decorative?.surface === "plain", `plain-authored:${decorative?.surface}`);
+  expect(bare?.surface === null, `absent-unauthored:${bare?.surface}`);
   const surfaces = {
     muted: rich?.surfaceStyle,
     bordered: endVariant?.surfaceStyle,
@@ -373,10 +439,32 @@ export const MEDIA_REFUSAL_CASES = Object.freeze([
     },
   }),
   Object.freeze({
-    label: "non-literal decorative value",
+    label: "missing alt without the decorative flag",
+    expected: "family:target-refused",
+    mutate: (section) => {
+      delete section.image.alt;
+    },
+  }),
+  Object.freeze({
+    label: "non-boolean decorative value",
     expected: "family:unsupported-feature",
     mutate: (section) => {
-      section.image.decorative = false;
+      section.image.decorative = "true";
+    },
+  }),
+  Object.freeze({
+    label: "malformed Unicode plain caption",
+    expected: "family:unsupported-feature",
+    mutate: (section) => {
+      // A lone high surrogate is not text: the shared decision refuses it in the unflagged caption form too.
+      section.caption = "A caption with a lone high surrogate \ud800 in it.";
+    },
+  }),
+  Object.freeze({
+    label: "malformed Unicode Markdown caption",
+    expected: "family:unsupported-feature",
+    mutate: (section) => {
+      section.caption = "A **caption** with a lone low surrogate \udc00 in it.";
     },
   }),
   Object.freeze({
@@ -412,14 +500,6 @@ export const MEDIA_REFUSAL_CASES = Object.freeze([
     expected: "family:unsupported-feature",
     mutate: (section) => {
       section.surface = "raised";
-    },
-  }),
-  Object.freeze({
-    label: "position without authored text",
-    expected: "family:target-refused",
-    mutate: (section) => {
-      delete section.heading;
-      delete section.lede;
     },
   }),
   Object.freeze({

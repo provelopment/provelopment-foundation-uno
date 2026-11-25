@@ -2712,23 +2712,56 @@ describe("composeUnoFoundationSubset — media donor-shape refusals", () => {
       decorative: true,
     });
 
-    // A position with no authored text places the figure against nothing, so it refuses the target instead of inventing text.
-    expectRefusal(
-      envelope({ type: "media", position: "start", image: { src: "/assets/portrait.png", alt: "Described" } }),
-      "family:target-refused",
+    // `UNO-WO-120 / R02`: an omitted alternative beside the literal flag is the donor's own boolean form and is normalized to
+    // the native empty alternative — the composed node always carries a real `alt`.
+    const omittedAltPage = composed(
+      envelope({
+        type: "media",
+        heading: "Decorative heading",
+        lede: "Lede.",
+        image: { src: "/assets/portrait.png", decorative: true },
+      }),
       portraitBinding(),
     );
+    expect(child(node(omittedAltPage.sections[0]), 2).props).toEqual({
+      asset: { zone: "page", path: "images/portrait.png" },
+      alt: "",
+      decorative: true,
+    });
+    // An explicit `false` beside a real description is the donor's ordinary described form, not a crossed shape.
+    const describedFalsePage = composed(
+      envelope({ type: "media", image: { src: "/assets/portrait.png", alt: "Described", decorative: false } }),
+      portraitBinding(),
+    );
+    expect(node(describedFalsePage.sections[0]).props).toEqual({
+      asset: { zone: "page", path: "images/portrait.png" },
+      alt: "Described",
+      decorative: false,
+    });
+
+    // A position with no authored text still places the one figure — first, or in the donor's second track — with no invented
+    // heading, no invented text, no duplicate image and no emptied text stack.
+    for (const position of ["start", "end"] as const) {
+      const textlessPage = composed(
+        envelope({ type: "media", position, image: { src: "/assets/portrait.png", alt: "Described" } }),
+        portraitBinding(),
+      );
+      const textlessSection = node(textlessPage.sections[0]);
+      expect(textlessSection.module).toBe("layout.stack");
+      expect(textlessSection.props).toEqual({ position });
+      expect(textlessSection.children?.map((child) => child.id)).toEqual(["family-0-media-figure"]);
+      expect(textlessSection.children?.[0]?.module).toBe("media.image");
+    }
   });
 
   it("refuses donor media fields outside the described-image subset", () => {
     const cases: unknown[] = [
       { type: "media", image: { src: "/assets/portrait.png", alt: "Described" }, surface: "raised" },
       { type: "media", image: { src: "/assets/portrait.png", alt: "Described" }, position: "middle" },
-      { type: "media", image: { src: "/assets/portrait.png" } },
       { type: "media", image: { alt: "Described" } },
       { type: "media", image: { src: "/assets/portrait.png", alt: "Described", href: "/elsewhere" } },
       { type: "media", image: { src: "/assets/portrait.png", alt: "Described", width: 2 } },
-      { type: "media", image: { src: "/assets/portrait.png", alt: "", decorative: false } },
+      { type: "media", image: { src: "/assets/portrait.png", alt: "Described", decorative: "true" } },
       { type: "media", image: "portrait" },
       { type: "media", image: { src: "/assets/portrait.png", alt: 5 } },
       { type: "media", image: { src: "/assets/portrait.png", alt: "**bold**" } },
@@ -2737,10 +2770,12 @@ describe("composeUnoFoundationSubset — media donor-shape refusals", () => {
     for (const section of cases) {
       expectRefusal(envelope(section), "family:unsupported-feature", portraitBinding());
     }
-    // A decorative flag beside a real description, and an empty alt without the flag, are contradictions of the target.
+    // A decorative flag beside a real description, an empty alt without the flag, and a **missing** alt without it are
+    // contradictions of the target: nothing is invented and nothing is silently reinterpreted as decorative.
     for (const image of [
       { src: "/assets/portrait.png", alt: "Described", decorative: true },
       { src: "/assets/portrait.png", alt: "" },
+      { src: "/assets/portrait.png" },
     ]) {
       expectRefusal(envelope({ type: "media", image }), "family:target-refused", portraitBinding());
     }
@@ -2756,25 +2791,66 @@ describe("composeUnoFoundationSubset — media donor-shape refusals", () => {
     }
     // `UNO-WO-120 / R01`: a caption without Markdown keeps the native 320-point bound; markup no longer degrades to plain text,
     // it is refused as an unsupported construct by the shared Markdown rule.
-    for (const caption of ["   ", "c".repeat(321)]) {
-      expectRefusal(
-        envelope({ type: "media", image: { src: "/assets/portrait.png", alt: "Described" }, caption }),
-        "family:target-refused",
-        portraitBinding(),
+    expectRefusal(
+      envelope({ type: "media", image: { src: "/assets/portrait.png", alt: "Described" }, caption: "   " }),
+      "family:target-refused",
+      portraitBinding(),
+    );
+    // `UNO-WO-120 / R02`: donor captions to 4,000 code points are representable **including unformatted text**, and the adapter
+    // declares the accepted Markdown-capable form rather than padding, wrapping or formatting the words to fit. Nothing is
+    // inserted: the composed caption is the authored string, and the unflagged 320-point bound is untouched.
+    for (const length of [321, 4000]) {
+      const unformatted = "c".repeat(length);
+      const captionNode = node(
+        composed(
+          envelope({ type: "media", image: { src: "/assets/portrait.png", alt: "Described" }, caption: unformatted }),
+          portraitBinding(),
+        ).sections[0],
       );
+      expect(captionNode.module).toBe("media.image");
+      expect(captionNode.props.caption).toBe(unformatted);
+      expect(captionNode.props.markdown).toBe(true);
     }
+    // The legacy plain form is byte-identical for a caption the native bound already accepted.
+    expect(
+      node(
+        composed(
+          envelope({ type: "media", image: { src: "/assets/portrait.png", alt: "Described" }, caption: "c".repeat(320) }),
+          portraitBinding(),
+        ).sections[0],
+      ).props,
+    ).toEqual({ asset: { zone: "page", path: "images/portrait.png" }, alt: "Described", caption: "c".repeat(320) });
     expectRefusal(
       envelope({ type: "media", image: { src: "/assets/portrait.png", alt: "Described" }, caption: "<script>alert(1)</script>" }),
       "family:unsupported-feature",
       portraitBinding(),
     );
-    // The donor's Markdown caption bound is its own 4,000, so 4,001 refuses the target and 4,000 composes.
+    // The donor's Markdown caption bound is its own 4,000, so 4,001 refuses the target and 4,000 composes — and the same bound
+    // holds for unformatted text, which is the form R02 makes representable.
     const markdownCaption = (length: number) => `**${"c".repeat(length - 4)}**`;
     expectRefusal(
       envelope({ type: "media", image: { src: "/assets/portrait.png", alt: "Described" }, caption: markdownCaption(4001) }),
       "family:target-refused",
       portraitBinding(),
     );
+    expectRefusal(
+      envelope({ type: "media", image: { src: "/assets/portrait.png", alt: "Described" }, caption: "c".repeat(4001) }),
+      "family:target-refused",
+      portraitBinding(),
+    );
+    // `UNO-WO-120 / R02`: one shared well-formedness decision refuses an unpaired surrogate in **both** caption forms, so no
+    // lone surrogate can reach a visitor as a literal replacement character through the unflagged path.
+    for (const caption of [
+      `${"c".repeat(10)}\ud800${"c".repeat(10)}`,
+      `${"c".repeat(10)}\udc00${"c".repeat(10)}`,
+      `**${"c".repeat(10)}\ud800${"c".repeat(10)}**`,
+    ]) {
+      expectRefusal(
+        envelope({ type: "media", image: { src: "/assets/portrait.png", alt: "Described" }, caption }),
+        "family:unsupported-feature",
+        portraitBinding(),
+      );
+    }
     expect(
       composed(
         envelope({ type: "media", image: { src: "/assets/portrait.png", alt: "Described" }, caption: markdownCaption(4000) }),

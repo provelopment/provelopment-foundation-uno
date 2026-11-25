@@ -1308,28 +1308,37 @@ function composeSection(
       const rawImage = record["image"];
       if (rawImage === null || typeof rawImage !== "object" || Array.isArray(rawImage)) refuseUnsupportedFeature();
       const image = rawImage as PlainRecord;
-      requireExactKeys(image, ["src", "alt"], ["decorative"]);
+      // `UNO-WO-120 / R02`: the donor's `alt` is optional beside its own optional `decorative` boolean, so absence is read
+      // here rather than refused outright — but only in the decorative form.
+      requireExactKeys(image, ["src"], ["alt", "decorative"]);
       const source = readMediaSourceIdentity(image["src"]);
       if (source === null) refuseUnsupportedFeature();
-      // The donor's optional boolean semantics: only ever the literal `true`, and then the alt is exactly empty — a decorative
-      // image is announced as nothing. A nonempty alt alongside `decorative: true` is a contradiction, not a preference.
+      // The donor's optional boolean semantics: only a real boolean, and only `true` — the literal — makes the image
+      // decorative. `false` beside a described alternative is the donor's ordinary described form, not a crossed shape.
       const rawDecorative = image["decorative"];
-      if (rawDecorative !== undefined && rawDecorative !== true) refuseUnsupportedFeature();
+      if (rawDecorative !== undefined && typeof rawDecorative !== "boolean") refuseUnsupportedFeature();
       const decorative = rawDecorative === true;
       const rawAlt = image["alt"];
-      if (typeof rawAlt !== "string") refuseUnsupportedFeature();
+      if (rawAlt !== undefined && typeof rawAlt !== "string") refuseUnsupportedFeature();
+      let alt = "";
       if (decorative) {
-        if (rawAlt.length !== 0) refuseTarget();
-      } else if (rawAlt.trim().length === 0) {
-        // An empty alt without the explicit flag is not silently reinterpreted as decorative.
+        // A decorative image is announced as nothing. An omitted alternative maps to the native empty one; a nonempty
+        // alternative beside the flag is a contradiction, not a preference.
+        if (rawAlt !== undefined && rawAlt.length !== 0) refuseTarget();
+      } else if (rawAlt === undefined || rawAlt.trim().length === 0) {
+        // An absent or empty alternative without the explicit flag is not silently reinterpreted as decorative.
         refuseTarget();
+      } else {
+        alt = readNewFamilyText(rawAlt);
       }
-      const alt = decorative ? "" : readNewFamilyText(rawAlt);
       // The donor caption is Markdown-capable, read by the one shared reader at the donor's own 4,000 bound; a caption without
       // Markdown keeps the byte-identical plain form and its native 320-point contract.
+      // `UNO-WO-120 / R02`: an **unformatted** caption above that native bound is donor-supported too, so it is declared
+      // through this same accepted Markdown-capable form — never padded, wrapped or decorated with invented formatting.
       const hasCaption = ownsKey(record, "caption");
       const caption = hasCaption ? readRichFamilyText(record["caption"], 4000) : undefined;
-      const captionMarkdown = caption !== undefined && hasFamilyMarkdown(caption);
+      const captionMarkdown = caption !== undefined
+        && (hasFamilyMarkdown(caption) || codePointLength(caption) > UNO_PAGE_DOCUMENT_LIMITS.mediaCaptionCodePoints);
       // Closed presentation options. A member outside the set is an unsupported feature, never coerced to a neighbour.
       const positionAuthored = ownsKey(record, "position");
       const surfaceAuthored = ownsKey(record, "surface");
@@ -1349,7 +1358,9 @@ function composeSection(
       if (owned === undefined) refuseUnsupportedFeature();
       media.usedSources.add(source);
       const imageProps: Record<string, unknown> = { asset: owned, alt };
-      if (decorative) imageProps["decorative"] = true;
+      // `UNO-WO-120 / R02`: an authored boolean is preserved as authored — `false` is the donor's described form, and `true`
+      // stays the literal flag — while an omitted flag stays omitted.
+      if (rawDecorative !== undefined) imageProps["decorative"] = rawDecorative;
       if (caption !== undefined) imageProps["caption"] = caption;
       if (captionMarkdown) imageProps["markdown"] = true;
       const figure: CandidateSection = { id, module: "media.image", props: imageProps };
@@ -1373,16 +1384,17 @@ function composeSection(
           props: hasFamilyMarkdown(lede) ? { text: lede, markdown: true } : { text: lede },
         });
       }
-      // A position places the figure against its authored text, so it needs text to place it against: nothing is invented.
-      if (positionAuthored && textChildren.length === 0) refuseTarget();
+      // A position places the figure against its authored text. `UNO-WO-120 / R02`: the donor also accepts a position with no
+      // heading and no lede, so the one figure is still placed by it — first, or in the second track at a wide viewport —
+      // with no invented heading, no invented text and no duplicate image.
       const wrappedFigure: CandidateSection = { ...figure, id: `${id}-figure` };
       const wrapped: CandidateSection[] = [];
       if (positionAuthored) {
         // `start` puts the figure first and `end` the text first. The authoring order is the DOM order, which is also the mobile
         // order; at a wide viewport the two children become two equal tracks. The text stays one owned stack of its own fields.
         const text: CandidateSection = { id: `${id}-text`, module: "layout.stack", props: {}, children: textChildren };
-        if (record["position"] === "start") wrapped.push(wrappedFigure, text);
-        else wrapped.push(text, wrappedFigure);
+        if (record["position"] === "start") wrapped.push(wrappedFigure, ...(textChildren.length === 0 ? [] : [text]));
+        else wrapped.push(...(textChildren.length === 0 ? [] : [text]), wrappedFigure);
       } else {
         // Absent position: the authored text above the figure, in one ordinary vertical stack.
         wrapped.push(...textChildren, wrappedFigure);

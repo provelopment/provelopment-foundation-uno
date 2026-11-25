@@ -131,6 +131,11 @@ export const UNO_PAGE_DOCUMENT_LIMITS = Object.freeze({
    * `UNO-WO-120 / R01`: the donor's own Markdown caption bound for `media.image`. The **native plain caption keeps its
    * `mediaCaptionCodePoints` (320) bound untouched** — only a caption explicitly declared as Markdown is read at this
    * donor limit, so adopting the donor's 4,000 admits no wider contract anywhere else.
+   *
+   * `UNO-WO-120 / R02`: every donor-supported caption is representable through 4,000 code points, including **unformatted**
+   * text, because the adapter declares any caption above the native bound through this same accepted Markdown-capable form
+   * rather than padding it, wrapping it or formatting it to fit. The unflagged bound, and every unrelated caption limit,
+   * stay exactly where they were.
    */
   mediaCaptionMarkdownCodePoints: 4000,
   watermarkTextCodePoints: 160,
@@ -472,6 +477,10 @@ export interface UnoMediaItem {
  * `UNO-WO-120 / R01`: a caption may be the donor's Markdown form. `markdown` is only ever the literal `true`, is set by the
  * adapter from the donor's own Markdown-capable `caption`, and is read at the donor's 4,000 bound instead of the native
  * plain caption's 320 — the two forms are disjoint, so no native caption bound is loosened.
+ *
+ * `UNO-WO-120 / R02`: the donor's `alt` is optional beside `decorative`, so the *reader* accepts its absence — but only when
+ * `decorative` is the literal `true`, and then the normalized node carries the native empty alternative. An omitted `alt`
+ * without that flag is a missing description and still refuses, exactly as an empty one does.
  */
 export interface UnoMediaImageProps {
   readonly asset: UnoOwnedAssetRef;
@@ -1996,6 +2005,20 @@ function readOwnedAsset(value: unknown, purpose: UnoOwnedMediaPurpose): UnoOwned
   return decision.decision.ref;
 }
 
+/**
+ * One optional `media.image` caption in its **native plain** form; an absent caption stays absent rather than becoming an
+ * empty string.
+ *
+ * `UNO-WO-120 / R02`: this form keeps its 320-point bound and its newline and unsafe-text policies exactly, and now shares the
+ * one well-formedness decision with the declared-Markdown form — an unpaired surrogate refuses here too instead of reaching a
+ * visitor as a literal replacement character. Only this native `media.image` field gains the decision; no other plain field,
+ * gallery item, carousel item or video caption changes.
+ */
+function optionalMediaCaption(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  return readMarkdownCapableText(value, UNO_PAGE_DOCUMENT_LIMITS.mediaCaptionCodePoints, true);
+}
+
 /** One optional media caption; an absent caption stays absent rather than becoming an empty string. */
 function readOptionalCaption(value: unknown): string | undefined {
   return optionalBoundedText(value, UNO_PAGE_DOCUMENT_LIMITS.mediaCaptionCodePoints, true);
@@ -2393,7 +2416,8 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "media.image") {
-    if (!hasExactlyKeys(props, ["asset", "alt"], ["decorative", "caption", "markdown"])) {
+    // `UNO-WO-120 / R02`: `alt` is optional **only** beside `decorative: true`; every described image still requires it.
+    if (!hasExactlyKeys(props, ["asset"], ["alt", "decorative", "caption", "markdown"])) {
       throw new RefusedDocument("document:invalid-props");
     }
     const rawDecorative = props["decorative"];
@@ -2402,23 +2426,34 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
     }
     const decorative = rawDecorative === true;
     const asset = readOwnedAsset(props["asset"], "image");
-    // A decorative image is announced as nothing, so its `alt` must be exactly empty; a meaningful one must say something.
-    const alt = readBoundedText(
-      props["alt"],
-      UNO_PAGE_DOCUMENT_LIMITS.mediaAltCodePoints,
-      "document:invalid-props",
-      decorative,
-      false,
-    );
-    if (decorative && alt.length !== 0) throw new RefusedDocument("document:invalid-props");
+    // A decorative image is announced as nothing. The donor's own boolean is optional, so `decorative: true` with the
+    // alternative omitted is normalized to the native empty `alt`; a described image must say something, and a nonempty
+    // alternative beside the flag is a contradiction rather than a preference.
+    const rawAlt = props["alt"];
+    let alt: string;
+    if (rawAlt === undefined) {
+      if (!decorative) throw new RefusedDocument("document:invalid-props");
+      alt = "";
+    } else {
+      alt = readBoundedText(
+        rawAlt,
+        UNO_PAGE_DOCUMENT_LIMITS.mediaAltCodePoints,
+        "document:invalid-props",
+        decorative,
+        false,
+      );
+      if (decorative && alt.length !== 0) throw new RefusedDocument("document:invalid-props");
+    }
     // `UNO-WO-120 / R01`: the two caption forms are disjoint. A declared Markdown caption is the donor's form and is read at
     // the donor's bound; anything else keeps the native plain caption and its unchanged 320-point bound.
+    // `UNO-WO-120 / R02`: both forms share the one well-formedness decision, so no lone surrogate reaches a visitor as a
+    // literal replacement character through the unflagged form while the flagged one refuses it.
     const markdown = optionalProseMarkdown(props["markdown"]);
     if (markdown === true && props["caption"] === undefined) throw new RefusedDocument("document:invalid-props");
     const caption =
       markdown === true
         ? requireFamilyMarkdown(props["caption"], UNO_PAGE_DOCUMENT_LIMITS.mediaCaptionMarkdownCodePoints)
-        : readOptionalCaption(props["caption"]);
+        : optionalMediaCaption(props["caption"]);
     return {
       id,
       module: "media.image",

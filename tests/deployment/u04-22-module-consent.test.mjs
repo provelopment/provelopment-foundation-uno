@@ -547,15 +547,21 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_COLUMNS_RESTORE the temporary Columns fixture was restored byte-exactly and a fresh response serves the committed Page without any variant anchor",
   "FAMILY_COLUMNS_RIGHTS the served columns region carries no donor identity, owned asset, foreign resource or provider",
   // `UNO-WO-120 / R01`: the Media family's own seven dimensions, its closed refusal probes and its restore proof.
-  "FAMILY_MEDIA_SOURCE the real adapter composes the donor's Media surface — authored heading and Markdown lede, closed position and surface, a Markdown caption, the explicit decorative form and the byte-identical bare section",
-  "FAMILY_MEDIA_READER the composed Page round-trips, the donor caption bound is 4,000 for the Markdown form only, the plain caption stays at 320 and the closed position/surface/decorative members refuse any other shape",
-  "FAMILY_MEDIA_REFUSAL every one of the twelve media probes refuses the whole Page with its own closed reason and no partial document",
+  "FAMILY_MEDIA_SOURCE the real adapter composes the donor's Media surface — authored heading and Markdown lede, closed position and surface, a Markdown caption, the optional decorative form, both textless positions and the byte-identical bare section",
+  "FAMILY_MEDIA_READER the composed Page round-trips, the donor caption bound is 4,000 for both declared forms while the unflagged caption stays at 320, one shared Unicode decision covers both, the optional decorative form is normalized to the native empty alt and the closed position/surface members refuse any other shape",
+  "FAMILY_MEDIA_REFUSAL every one of the ${MEDIA_REFUSAL_CASES.length} media probes refuses the whole Page with its own closed reason and no partial document",
   "FAMILY_MEDIA_HTTP the served Media section is one positioned and surfaced stack whose figure owns its loaded 64x64 PNG and its Markdown caption, with the authored heading and Markdown lede",
-  "FAMILY_MEDIA_HTTP the temporary page serves the end position with a plain caption, the decorative figure with an empty alt and the byte-identical bare figure",
-  "FAMILY_MEDIA_BROWSER ${testCase.key} the four served variants load their owned image, own their caption, keep their alt or decorative semantics, lay out their position and surface and reach the caption link by keyboard",
+  "FAMILY_MEDIA_HTTP the temporary page serves the end position with a plain caption, the decorative figure with a normalized empty alt and an authored plain surface, both textless positions and the byte-identical bare figure",
+  "FAMILY_MEDIA_BROWSER ${testCase.key} the six served variants load their owned image, own their caption, keep their alt or decorative semantics, lay out their position and surface and reach the caption link by keyboard",
   "FAMILY_MEDIA_BROWSER the browser dimension is the conjunction of all four executed cases at 390px and 1280px in light and dark/reduced motion",
   "FAMILY_MEDIA_RIGHTS the served media region renders no donor identity, no remote source, no provider and no locator outside this Page's own owned route",
   "FAMILY_MEDIA_RESTORE the temporary Media fixture was restored byte-exactly and a fresh response serves the committed Page without any variant anchor",
+  // `UNO-WO-120 / R02`: the four adopted corrections each stay executed — the unformatted caption declared through the accepted
+  // Markdown form, the one shared Unicode decision, the normalized optional decorative boolean and the textless placement.
+  "mediaFigureOf(longComposed.document.sections[0])?.props.markdown === true",
+  "readFigureAccepts(figureProps({ caption: loneHigh, markdown: true })) === false",
+  'normalized.document.sections[0].props.alt === ""',
+  '!textlessRegion.includes("uno-json-prose")',
   "localA2.media.browser = conjunction(mediaCases) && mediaBrowser.ok;",
   "localA2.media.renderer = rendererOk;",
   "const mediaBrowser = mediaBrowserReport(readings);",
@@ -922,9 +928,31 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
         "FAMILY_MEDIA_RESTORE",
       ],
       [
-        "FAMILY_MEDIA_REFUSAL every one of the twelve media probes refuses the whole Page with its own closed reason and no partial document",
+        "FAMILY_MEDIA_REFUSAL every one of the ${MEDIA_REFUSAL_CASES.length} media probes refuses the whole Page with its own closed reason and no partial document",
         "refusals unchecked",
         "FAMILY_MEDIA_REFUSAL",
+      ],
+      // `UNO-WO-120 / R02`: each adopted correction is load-bearing too — dropping the declared unformatted caption, the shared
+      // Unicode decision, the normalized optional alternative or the textless served shape must each fail the audit.
+      [
+        "mediaFigureOf(longComposed.document.sections[0])?.props.markdown === true",
+        "true",
+        "mediaFigureOf(longComposed.document.sections[0])?.props.markdown === true",
+      ],
+      [
+        "readFigureAccepts(figureProps({ caption: loneHigh, markdown: true })) === false",
+        "true",
+        "readFigureAccepts(figureProps({ caption: loneHigh, markdown: true }))",
+      ],
+      [
+        "normalized.document.sections[0].props.alt === \"\"",
+        "true",
+        "normalized.document.sections[0].props.alt",
+      ],
+      [
+        "!textlessRegion.includes(\"uno-json-prose\")",
+        "true",
+        "!textlessRegion.includes(\"uno-json-prose\")",
       ],
     ];
     for (const [from, to, contract] of shapes) {

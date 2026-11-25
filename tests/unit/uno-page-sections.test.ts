@@ -1220,6 +1220,37 @@ describe("the eleven remaining module renderers", () => {
     expect(html).toContain('<figcaption class="uno-json-media-caption">Plain caption.</figcaption>');
   });
 
+  it("renders a textless positioned stack as the one figure in its own track", () => {
+    // `UNO-WO-120 / R02`: the position is the section's own attribute at both widths, and a textless section renders one
+    // figure — no invented heading, no invented paragraph and no second image.
+    for (const position of ["start", "end"] as const) {
+      const html = renderWithMedia(
+        {
+          version: 1,
+          title: "Textless media",
+          sections: [
+            {
+              id: "textless",
+              module: "layout.stack",
+              props: { position },
+              children: [
+                { id: "textless-figure", module: "media.image", props: { asset: { zone: "page", path: "hero.png" }, alt: "A plate" } },
+              ],
+            },
+          ],
+        },
+        new Map([["textless-figure", { image: image("0") }]]),
+      );
+      expect(html).toContain(
+        `<div class="uno-json-stack" data-uno-gap="normal" data-uno-position="${position}" id="textless">`,
+      );
+      expect((html.match(/<img /gu) ?? []).length).toBe(1);
+      expect(html.includes("<h2")).toBe(false);
+      expect(html.includes("uno-json-prose")).toBe(false);
+      expect(html).toMatch(/<figure class="uno-json-media" id="textless-figure">/u);
+    }
+  });
+
   it("renders an owned image with its authored alternative and a served locator", () => {
     const html = renderWithMedia(
       {

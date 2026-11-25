@@ -198,9 +198,15 @@ export const MEDIA_SOURCE = Object.freeze({
 });
 
 /**
- * The three further Media variants the browser transaction serves temporarily: the donor's other `position` with the other
- * surface and a **plain** (non-Markdown) caption, an explicitly **decorative** image, and the bare previously accepted
- * composition that must stay byte-identical.
+ * The further Media variants the browser transaction serves temporarily: the donor's other `position` with the other surface
+ * and a **plain** (non-Markdown) caption, an explicitly **decorative** image carrying a genuinely **authored** `plain`
+ * surface with its alternative omitted, the bare previously accepted composition that must stay byte-identical, and both
+ * textless positions.
+ *
+ * `UNO-WO-120 / R02`: R01 compared `plain` against `absent` with two variants that both authored no surface at all. Indices 1
+ * and 2 here now author the closed surface literally — `"plain"` — so the *absence* of a surface (index 3) is a different
+ * authored shape from an authored `plain`, and both still present no visual surface. The decorative image also omits `alt`
+ * entirely, so the donor's optional boolean semantics and the native empty-alt normalization are executed, not asserted.
  */
 export const MEDIA_VARIANT_SOURCES = Object.freeze([
   Object.freeze({
@@ -216,9 +222,9 @@ export const MEDIA_VARIANT_SOURCES = Object.freeze([
     type: "media",
     heading: "Synthetic decorative heading",
     lede: "A **decorative** plate with no accessible name.",
+    surface: "plain",
     image: Object.freeze({
       src: FAMILY_DONOR_SOURCE,
-      alt: "",
       decorative: true,
     }),
     caption: "Decorative, so the caption carries the meaning.",
@@ -226,6 +232,18 @@ export const MEDIA_VARIANT_SOURCES = Object.freeze([
   Object.freeze({
     type: "media",
     image: Object.freeze({ src: FAMILY_DONOR_SOURCE, alt: "Synthetic bare plate" }),
+  }),
+  // `UNO-WO-120 / R02`: a position with no heading and no lede — the figure keeps the donor's first track.
+  Object.freeze({
+    type: "media",
+    position: "start",
+    image: Object.freeze({ src: FAMILY_DONOR_SOURCE, alt: "Synthetic textless start plate" }),
+  }),
+  // ... and the same shape in the donor's second track, with no text invented to fill the first.
+  Object.freeze({
+    type: "media",
+    position: "end",
+    image: Object.freeze({ src: FAMILY_DONOR_SOURCE, alt: "Synthetic textless end plate" }),
   }),
 ]);
 

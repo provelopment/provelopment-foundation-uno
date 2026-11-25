@@ -621,6 +621,16 @@ main {
     gap: 1.25rem;
     align-items: start;
   }
+
+  /*
+   * `UNO-WO-120 / R02`: a position with no authored text is still a two-track placement, so the one authored figure keeps the
+   * donor's track instead of collapsing into the first column. `start` is already the first column; `end` is the second. The
+   * rule is scoped to the single-child stack, so every positioned section with its own text is untouched, and it never applies
+   * below the breakpoint, where the stack stays one column in authored order.
+   */
+  .uno-json-stack[data-uno-position="end"] > :only-child {
+    grid-column: 2;
+  }
 }
 
 .uno-json-grid {

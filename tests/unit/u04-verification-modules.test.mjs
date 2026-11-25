@@ -712,24 +712,43 @@ describe("the extracted Media evidence module", () => {
     });
     const variants = MEDIA_VARIANTS.map((authored, index) => {
       const position = authored.position;
-      const order = position === "start" ? ["figure", "text"] : ["text", "figure"];
       const twoTracks = position !== null;
+      const textless = authored.textless === true;
+      // The authored children: a positioned section has its figure and (unless textless) its own text stack; an
+      // unpositioned one keeps its heading, lede and figure; the bare section is the figure itself, whose one child is its img.
+      const childCount = textless ? 1 : twoTracks ? 2 : authored.heading !== null ? 3 : 1;
+      const order = textless ? ["figure"] : twoTracks && position === "start" ? ["figure", "text"] : twoTracks ? ["text", "figure"] : ["text"];
       const style = authored.surface === "muted"
         ? surfaced(muted, "0px")
         : authored.surface === "bordered"
           ? surfaced(bordered, "1px")
           : plainStyle;
+      const wideTrack = 246;
+      const gap = 20;
+      const contentLeft = 20;
       return {
         id: authored.id,
         position,
         surface: authored.surface,
         display: twoTracks && !narrow ? "grid" : "flex",
         gridTracks: twoTracks && !narrow ? 2 : 0,
-        trackWidths: twoTracks ? (narrow ? [310, 310] : [246, 246]) : narrow ? [310, 310, 310] : [246, 246, 246],
-        childTops: twoTracks ? (narrow ? [10, 240] : [10, 10]) : narrow ? [10, 120, 240] : [10, 10, 10],
-        rootWidth: twoTracks ? 350 : 310,
-        contentWidth: 310,
-        order: twoTracks ? order : ["text", "figure"],
+        gridColumns: twoTracks && !narrow ? `${wideTrack}px ${wideTrack}px` : null,
+        columnGap: twoTracks && !narrow ? gap : 0,
+        trackWidths: twoTracks
+          ? (narrow ? Array(childCount).fill(310) : Array(childCount).fill(wideTrack))
+          : Array(childCount).fill(narrow ? 310 : wideTrack),
+        childTops: twoTracks && !narrow
+          ? Array(childCount).fill(10)
+          : Array.from({ length: childCount }, (_, child) => 10 + child * 110),
+        childLefts: twoTracks && !narrow
+          ? (textless
+            ? [position === "start" ? contentLeft : contentLeft + wideTrack + gap]
+            : [contentLeft, contentLeft + wideTrack + gap])
+          : Array(childCount).fill(contentLeft),
+        rootWidth: 350,
+        contentWidth: narrow ? 310 : wideTrack * 2 + gap,
+        contentLeft,
+        order,
         image: {
           src: `/uno-media/en-001/wo066-family-composition/${index}`,
           alt: authored.alt,
@@ -759,6 +778,7 @@ describe("the extracted Media evidence module", () => {
         captionLinkText: authored.markdownCaption ? MEDIA_EXPECTED.captionLinkText : null,
         captionHasRawSyntax: false,
         heading: authored.heading,
+        lede: authored.lede,
         ledeStrong: null,
         surfaceStyle: style,
         overflow: 0,
@@ -855,7 +875,7 @@ describe("the extracted Media evidence module", () => {
     // Merely unequal tracks, a lost grid and two rows all refuse at 1280.
     expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { trackWidths: [300, 190] })).ok).toBe(false);
     expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { display: "flex" })).ok).toBe(false);
-    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { gridTracks: 1 })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { gridColumns: "496px" })).ok).toBe(false);
     expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { childTops: [10, 200] })).ok).toBe(false);
     // The authored order is the evidence: reversing it refuses at both widths.
     expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { order: ["text", "figure"] })).ok).toBe(false);
@@ -866,6 +886,43 @@ describe("the extracted Media evidence module", () => {
     expect(mediaBrowserReport(at(readings, "light:390", MEDIA_ID, { trackWidths: [150, 150] })).ok).toBe(false);
     expect(mediaBrowserReport(at(readings, "dark:390", MEDIA_VARIANTS[3].id, { childTops: [10, 10, 10] })).ok).toBe(false);
     expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_VARIANTS[3].id, { overflow: 4 })).ok).toBe(false);
+  });
+  it("refuses a textless position that loses its track, its placement or gains invented text", () => {
+    const readings = allCases();
+    const startId = MEDIA_VARIANTS[4].id;
+    const endId = MEDIA_VARIANTS[5].id;
+    // `UNO-WO-120 / R02`: both textless positions are two equal tracks with exactly one authored figure.
+    expect(mediaBrowserReport(at(readings, "light:1280", startId, { display: "flex", gridColumns: null })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", endId, { gridColumns: "246px" })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", endId, { trackWidths: [246, 246] })).ok).toBe(false);
+    // The donor track is the evidence: `start` may not drift into the second track, and `end` may not fall back to the first.
+    expect(mediaBrowserReport(at(readings, "light:1280", startId, { childLefts: [286] })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", endId, { childLefts: [20] })).ok).toBe(false);
+    // Nothing may be invented to fill the empty track, and a narrow textless position stays one full-width column.
+    expect(mediaBrowserReport(at(readings, "light:1280", startId, { heading: "Invented heading" })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", endId, { lede: "Invented lede." })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "dark:390", startId, { childLefts: [96] })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "dark:390", endId, { trackWidths: [150] })).ok).toBe(false);
+  });
+  it("refuses an authored plain surface that was never authored, and an unauthentic absence", () => {
+    const readings = allCases();
+    // The proof is authorship, not only computed style: the decorative variant *authored* `plain`, the bare one authored none.
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_VARIANTS[2].id, { surface: null })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_VARIANTS[3].id, { surface: "plain" })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "dark:1280", MEDIA_VARIANTS[2].id, { surface: "muted" })).ok).toBe(false);
+  });
+  it("refuses a decorative image whose omitted alternative was not normalized, and a described one that lost its name", () => {
+    const readings = allCases();
+    const decorativeId = MEDIA_VARIANTS[2].id;
+    expect(MEDIA_VARIANTS[2].altOmitted).toBe(true);
+    expect(MEDIA_VARIANTS[2].alt).toBe("");
+    // The reader normalizes the omission to the native empty alternative, so an absent `alt` in the served markup refuses.
+    expect(mediaBrowserReport(at(readings, "light:390", decorativeId, { image: { ...readings[1].variants[2].image, alt: null } })).ok)
+      .toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:390", decorativeId, { image: { ...readings[1].variants[2].image, accessibleName: "" } })).ok)
+      .toBe(true);
+    expect(mediaBrowserReport(at(readings, "light:390", MEDIA_ID, { image: { ...readings[1].variants[0].image, accessibleName: "" } })).ok)
+      .toBe(false);
   });
   it("refuses a collapsed or absent surface and a weakened keyboard access", () => {
     const readings = allCases();
@@ -928,16 +985,26 @@ describe("the extracted Media evidence module", () => {
       props: {},
     });
     expect(mediaFigureOf({ id: "d", module: "layout.grid", children: [] })).toBeNull();
-    // The refusal probes are closed, each with its own literal reason and its own label.
-    expect(MEDIA_REFUSAL_CASES).toHaveLength(12);
+    // The refusal probes are closed, each with its own literal reason and its own label, and the six served variants are
+    // exactly the six authored shapes.
+    expect(MEDIA_REFUSAL_CASES).toHaveLength(14);
     expect(MEDIA_REFUSAL_CASES.every((probe) => probe.expected.startsWith("family:"))).toBe(true);
-    expect(new Set(MEDIA_REFUSAL_CASES.map((probe) => probe.label)).size).toBe(12);
+    expect(new Set(MEDIA_REFUSAL_CASES.map((probe) => probe.label)).size).toBe(14);
     expect(MEDIA_VARIANTS.map((variant) => variant.id)).toEqual([
       "family-4-media",
       "family-17-media",
       "family-18-media",
       "family-19-media",
+      "family-20-media",
+      "family-21-media",
     ]);
+    // `UNO-WO-120 / R02`: the authored shapes the six variants must cover — an authored `plain` surface beside the donor's own
+    // absence of one, an omitted alternative, and both textless positions.
+    expect(MEDIA_VARIANTS.filter((variant) => variant.surface === "plain")).toHaveLength(1);
+    expect(MEDIA_VARIANTS[2].surface).toBe("plain");
+    expect(MEDIA_VARIANTS[3].surface).toBeNull();
+    expect(MEDIA_VARIANTS.filter((variant) => variant.altOmitted)).toHaveLength(1);
+    expect(MEDIA_VARIANTS.filter((variant) => variant.textless).map((variant) => variant.position)).toEqual(["start", "end"]);
   });
 
 });
