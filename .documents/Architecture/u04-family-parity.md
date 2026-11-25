@@ -106,10 +106,23 @@ the global cap is not moved, and the twenty-fifth label refuses the whole Page. 
 on the section **wrapper**, so it covers the authored heading, the Markdown lede **and** the column grid — the whole authored
 section, as the donor's own outer section does. `plain` keeps the ordinary stack, the absence convention every Uno surface
 module follows, and the bare grid without a heading, lede or surface is byte-identical to the previously accepted output. The
-geometry is proven in real Chromium from four served variants at 1280 and 390 px in light and dark/reduced motion: two equal
-columns are equal, `start-wide` widens the first, `end-wide` the second, three columns are equal with no ratio attribute, every
-grid collapses to one column in authored reading order on mobile, the computed surfaces differ (`muted` ≠ `plain` ≠ `bordered`),
-and nothing overflows.
+browser proof for these four served variants is **completed by `UNO-WO-119 / R02`** below, which executes all four
+width × scheme cases; R01 measured only the light/normal pair and asked merely which cell was wider.
+
+**The Columns browser evidence in full (`UNO-WO-119 / R02`).** R01's dedicated Columns transaction measured only light/normal
+motion at 1280 and 390, and its asymmetric predicate merely asked which cell was wider. R02 **supersedes** that: the same
+production HTTP/Chromium transaction now executes **four independent cases** — 390 and 1280 in light/normal motion and in
+dark/reduced motion — and each case proves, from the actual page: the real media settings (`prefers-color-scheme`,
+`prefers-reduced-motion`, no forced colours); the four served variants in authored order with their native ratio attributes
+(three columns carry none); every cell a positive nonzero box with no horizontal overflow; at 1280 equal two-column and equal
+three-column widths, and **exact 2:1 / 1:2** asymmetry within a documented ±2 px rounding tolerance (`wider ≈ 2 × narrower`,
+never merely wider); at 390 a single column per variant, the authored cell count, the authored DOM order and the same visual order;
+the 24 plain labels in two native lists; and the computed surfaces in both schemes — `plain` identical to no surface at all, with
+no background, border or padding effect, while `muted` and `bordered` differ from it and from each other with real background,
+1 px border and token padding/radius. Each case also walks the browser's own focus order to the real rich safe link, asserts its
+exact destination and `rel="noopener noreferrer"`, proves focus can leave it again without trapping, and confirms the visit never
+navigated and made no foreign request, with no new console or page error. `browser` is the conjunction of the four cases: a
+missing, failed or duplicated case leaves it false, and the fixture bytes are restored in `finally` and re-verified by digest.
 
 **The FAQ surface is presentation, not an attribute (`UNO-WO-118 / R02`).** R01 closed the schema and composed the donor's
 `surface` onto every disclosure group, but the shipped stylesheet had no rule for it, so `plain`, `muted` and `bordered`

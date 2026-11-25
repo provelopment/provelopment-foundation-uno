@@ -542,12 +542,18 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_COLUMNS_READER the composed Page round-trips, the 1/12/13/24 label boundary holds as consecutive native lists, twenty-five refuses, three columns drop an authored ratio and the native grid still refuses one",
   "FAMILY_COLUMNS_REFUSAL every columns refusal probe refuses the whole Page with its closed reason and no partial document",
   "FAMILY_COLUMNS_HTTP the served rich section is one surfaced stack of authored heading, Markdown lede and body, a two-column grid and two native label lists — and the three-column grid carries no ratio attribute",
-  "FAMILY_COLUMNS_BROWSER the four served column variants lay out as authored at 1280px, stack in reading order at 390px and present their surfaces distinctly",
+  "FAMILY_COLUMNS_BROWSER the browser dimension is the conjunction of all four executed cases at 390px and 1280px in light and dark/reduced motion",
+  "FAMILY_COLUMNS_BROWSER ${testCase.key} the four served variants lay out as authored, present their surfaces distinctly, keep their labels and reach the safe link by keyboard",
+  "FAMILY_COLUMNS_RESTORE the temporary Columns fixture was restored byte-exactly and the served Page is the committed one again",
   "FAMILY_COLUMNS_RIGHTS the served columns region carries no donor identity, owned asset, foreign resource or provider",
   "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_EVIDENCE=56/56 (table, list, hero, stats, steps, quote, faq and columns credited; P6 destination proof in the three-Site gate)",
-  "localA2.columns.browser = geometry.ok;",
+  "localA2.columns.browser = conjunction(columnsCases) && geometry.ok;",
   "localA2.columns.renderer = rendererOk;",
-  "const geometry = columnsGeometryReport(wide, narrow);",
+  "columnsCaseVerdict(reading, testCase)",
+  "const geometry = columnsGeometryReport(readings);",
+  "exerciseColumnsKeyboard(COLUMNS_RICH.bodyLink)",
+  "reading.keyboard.pageUrlBefore = pageUrlBefore;",
+  "for (const testCase of COLUMNS_CASES) {",
   "COLUMNS_REFUSAL_CASES.map((probe) =>",
   // `UNO-WO-118 / R02` (§2): the executed stylesheet check, the computed-appearance proof of the closed surface, its long-FAQ
   // coverage and the temporary fixture restoration.
@@ -813,24 +819,44 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
   // `UNO-WO-067 / R01` §5: five independent mutations over the appended families, each failing for its own token.
   // `UNO-WO-118 / R02`: the surface proof must be load-bearing in both directions — deleting a computed-appearance comparison
   // and neutering the long-FAQ coverage each have to fail the audit for their own token.
-  // `UNO-WO-119 / R01`: the Columns proof is load-bearing — neutering the geometry comparison, the label ceiling, the ratio
-  // suppression or the served-markup check each has to fail the audit for its own token.
+  // `UNO-WO-119 / R02`: the four-case Columns browser proof is load-bearing — collapsing the case conjunction, neutering the
+  // keyboard walk, the surface comparison, the case loop or the restoration each have to fail the audit for its own token.
   it("the audit genuinely fails when the columns evidence is deleted or neutered", () => {
     const shapes = [
       [
-        "const geometry = columnsGeometryReport(wide, narrow);",
+        "localA2.columns.browser = conjunction(columnsCases) && geometry.ok;",
+        "localA2.columns.browser = true;",
+        "localA2.columns.browser = conjunction(columnsCases) && geometry.ok;",
+      ],
+      [
+        "const geometry = columnsGeometryReport(readings);",
         "const geometry = { ok: true, detail: \"\" };",
-        "columnsGeometryReport(wide, narrow)",
+        "columnsGeometryReport(readings)",
+      ],
+      [
+        "exerciseColumnsKeyboard(COLUMNS_RICH.bodyLink)",
+        "Promise.resolve({ reached: true })",
+        "exerciseColumnsKeyboard(COLUMNS_RICH.bodyLink)",
+      ],
+      [
+        "columnsCaseVerdict(reading, testCase)",
+        "{ ok: true, detail: \"\" }",
+        "columnsCaseVerdict(reading, testCase)",
+      ],
+      [
+        "for (const testCase of COLUMNS_CASES) {",
+        "for (const testCase of COLUMNS_CASES.slice(0, 2)) {",
+        "for (const testCase of COLUMNS_CASES) {",
+      ],
+      [
+        "FAMILY_COLUMNS_RESTORE the temporary Columns fixture was restored byte-exactly and the served Page is the committed one again",
+        "restore unchecked",
+        "FAMILY_COLUMNS_RESTORE",
       ],
       [
         "localA2.columns.renderer = rendererOk;",
         "localA2.columns.renderer = true;",
         "localA2.columns.renderer = rendererOk",
-      ],
-      [
-        "FAMILY_COLUMNS_BROWSER the four served column variants lay out as authored at 1280px, stack in reading order at 390px and present their surfaces distinctly",
-        "columns layout unverified",
-        "four served column variants",
       ],
     ];
     for (const [from, to, contract] of shapes) {

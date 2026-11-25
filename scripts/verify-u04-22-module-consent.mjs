@@ -45,6 +45,7 @@ import {
 } from "./u04/family-fixture.mjs";
 import {
   COLUMNS_BODY_ID,
+  COLUMNS_CASES,
   COLUMNS_EXPECTED,
   COLUMNS_GRID_ID,
   COLUMNS_HEADING_ID,
@@ -54,6 +55,7 @@ import {
   COLUMNS_RICH,
   COLUMNS_TITLE_ID,
   COLUMNS_VARIANTS,
+  columnsCaseVerdict,
   columnsGeometryReport,
   columnsGridOf,
   columnsLabelsOf,
@@ -5096,8 +5098,19 @@ async function consentPhase(base) {
       const original = readFileSync(familyPath);
       const originalDigest = sha256Of(SOURCES[4]);
       let rendered = "";
-      const wide = [];
-      const narrow = [];
+      // `UNO-WO-119 / R02` (§2 `browser`): four independently executed cases — 390 and 1280 in light/normal motion and in
+      // dark/reduced motion — each with the actual media, the four served variants, the computed surfaces and real keyboard
+      // access to the rich safe link. `columnsCaseVerdict` owns the contract; this block only executes and records, so a missing
+      // or failed case leaves the conjunction incomplete rather than satisfied by the three that worked.
+      const readings = [];
+      const columnsCases = new Set();
+      const foreignRequests = [];
+      const onColumnsRequest = (request) => {
+        if (/^https?:\/\//u.test(request.url()) && !/^https?:\/\/127\.0\.0\.1[:/]/u.test(request.url())) {
+          foreignRequests.push(request.url());
+        }
+      };
+      tab.on("request", onColumnsRequest);
       try {
         const adapterSpecifier = "../src/application/compose-uno-foundation-families.ts";
         const { composeUnoFoundationSubset: composeColumns } = await import(adapterSpecifier);
@@ -5116,46 +5129,154 @@ async function consentPhase(base) {
         const swapOutcome = composeColumns(swapSource, familyBindings());
         if (swapOutcome.status !== "composed") throw new Error(String(swapOutcome.reason));
         writeFileSync(familyPath, `${JSON.stringify(swapOutcome.document, null, 2)}\n`, "utf8");
-        const swapped = await fetch(`${FAMILY_URL}?wo119r01=columns`, { redirect: "manual" });
+        const swapped = await fetch(`${FAMILY_URL}?wo119r02=columns`, { redirect: "manual" });
         rendered = swapped.status === 200 ? await swapped.text() : "";
-        const readVariants = (ids) => {
-          const readings = ids.map((id) => {
+        // One reading per served case: the actual media, the four variants' geometry, DOM order, labels and computed surfaces.
+        const readCase = (input) => {
+          const readVariant = (id) => {
             const root = document.getElementById(id);
             if (root === null) return null;
             const grid = root.matches(".uno-json-grid") ? root : root.querySelector(".uno-json-grid");
             const cells = [...(grid?.querySelectorAll(":scope > .uno-json-cell") ?? [])];
             const rects = cells.map((cell) => cell.getBoundingClientRect());
             const style = getComputedStyle(root);
+            const link = root.querySelector("a.uno-family-md-link");
+            const lists = [...root.querySelectorAll("ul.uno-json-list")];
             return {
               id,
               columns: cells.length,
               widths: rects.map((rect) => Math.round(rect.width)),
               tops: rects.map((rect) => Math.round(rect.top)),
+              titles: cells.map((cell) => cell.querySelector("h3.uno-json-heading")?.textContent ?? ""),
+              labels: lists.flatMap((list) => [...list.querySelectorAll("li > span")].map((span) => span.textContent ?? "")),
+              labelLists: lists.length,
+              bodyLinkHref: link?.getAttribute("href") ?? null,
+              bodyLinkRel: link?.getAttribute("rel") ?? null,
+              surface: root.getAttribute("data-uno-surface"),
               backgroundColor: style.backgroundColor,
               borderWidth: `${Number.parseFloat(style.borderTopWidth) || 0}px`,
+              borderRadius: style.borderTopLeftRadius,
+              padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft].join(" "),
               ratioAttribute: grid?.getAttribute("data-uno-ratio") ?? null,
               overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
             };
+          };
+          return {
+            case: input.case,
+            width: window.innerWidth,
+            href: location.href,
+            servedIds: [...document.querySelectorAll("[id]")].map((element) => element.id).slice(0, 60),
+            dark: matchMedia("(prefers-color-scheme: dark)").matches,
+            reduce: matchMedia("(prefers-reduced-motion: reduce)").matches,
+            forced: matchMedia("(forced-colors: active)").matches,
+            contrast: matchMedia("(prefers-contrast: more)").matches,
+            variants: input.ids.map(readVariant).filter((variant) => variant !== null),
+            linkTabIndex: (() => {
+              const target = document.querySelector(`#${input.richId}-column-0-body a.uno-family-md-link`);
+              if (target === null) return -1;
+              const focusables = [
+                ...document.querySelectorAll(
+                  'a[href], button:not([disabled]), summary, input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                ),
+              ].filter((element) => element.getClientRects().length > 0);
+              return focusables.indexOf(target);
+            })(),
+          };
+        };
+        // The keyboard walk: focus the document, then press Tab until the browser's own focus order reaches the rich safe link,
+        // assert the link is focused with its exact destination and rel, and press Tab once more to prove focus can leave it.
+        // The presses are real key events; each step is observed, so the trace names what actually received focus.
+        const exerciseColumnsKeyboard = async (expectedHref) => {
+          await tab.evaluate(() => {
+            document.body.setAttribute("tabindex", "-1");
+            document.body.focus();
+            window.scrollTo(0, 0);
           });
-          return readings.filter((reading) => reading !== null);
+          const trace = [];
+          let atLink = { reached: false, href: "", rel: "", visible: false };
+          let presses = 0;
+          for (let press = 1; press <= 200 && atLink.reached === false; press += 1) {
+            await tab.keyboard.press("Tab");
+            presses = press;
+            atLink = await tab.evaluate((expected) => {
+              const active = document.activeElement;
+              const isLink = active instanceof HTMLAnchorElement && active.classList.contains("uno-family-md-link");
+              const href = isLink ? (active.getAttribute("href") ?? "") : "";
+              const tag = active === null
+                ? "none"
+                : `${active.tagName}${active.id === "" ? "" : `#${active.id}`}${href === "" ? "" : `[${href}]`}`;
+              return {
+                // The walk continues past every other family's safe link: only this family's exact destination counts.
+                reached: isLink && href === expected,
+                href,
+                rel: isLink ? (active.getAttribute("rel") ?? "") : "",
+                visible: active instanceof HTMLElement && active.getBoundingClientRect().width > 0,
+                at: tag,
+              };
+            }, expectedHref);
+            if (trace.length < 6) trace.push(atLink.at);
+          }
+          const pageUrlAfter = tab.url();
+          await tab.keyboard.press("Tab");
+          const leftAfterTab = await tab.evaluate(() => {
+            const active = document.activeElement;
+            return !(active instanceof HTMLAnchorElement && active.classList.contains("uno-family-md-link"));
+          });
+          return { ...atLink, leftAfterTab, presses, trace, pageUrlAfter };
         };
         const variantIds = COLUMNS_VARIANTS.map((variant) => variant.id);
-        await tab.setViewportSize({ width: 1280, height: 900 });
-        await tab.goto(`${FAMILY_URL}?wo119r01=columns`, { waitUntil: "networkidle" });
-        wide.push(...(await tab.evaluate(readVariants, variantIds)));
-        await tab.setViewportSize({ width: 390, height: 900 });
-        await tab.goto(`${FAMILY_URL}?wo119r01=columns-narrow`, { waitUntil: "networkidle" });
-        narrow.push(...(await tab.evaluate(readVariants, variantIds)));
+        for (const testCase of COLUMNS_CASES) {
+          await tab.setViewportSize({ width: testCase.width, height: 900 });
+          await tab.emulateMedia({ colorScheme: testCase.scheme, reducedMotion: testCase.motion });
+          const errorsBefore = consoleErrors.length;
+          const foreignBefore = foreignRequests.length;
+          await tab.goto(`${FAMILY_URL}?wo119r02=${testCase.key}`, { waitUntil: "networkidle" });
+          const reading = await tab.evaluate(readCase, { case: testCase.key, ids: variantIds, richId: COLUMNS_ID });
+          const pageUrlBefore = tab.url();
+          reading.keyboard = await exerciseColumnsKeyboard(COLUMNS_RICH.bodyLink);
+          reading.keyboard.pageUrlBefore = pageUrlBefore;
+          reading.url = tab.url();
+          reading.foreignRequests = foreignRequests.length - foreignBefore;
+          reading.errors = consoleErrors.length - errorsBefore;
+          reading.keyboard.foreignRequests = reading.foreignRequests;
+          const verdict = columnsCaseVerdict(reading, testCase);
+          readings.push(reading);
+          if (verdict.ok && reading.errors === 0) columnsCases.add(testCase.key);
+          check(
+            `FAMILY_COLUMNS_BROWSER ${testCase.key} the four served variants lay out as authored, present their surfaces distinctly, keep their labels and reach the safe link by keyboard`,
+            verdict.ok && reading.errors === 0,
+            `${verdict.detail} errors=${reading.errors}`,
+          );
+        }
       } finally {
         writeFileSync(familyPath, original);
+        tab.off("request", onColumnsRequest);
       }
-      const geometry = columnsGeometryReport(wide, narrow);
+      const geometry = columnsGeometryReport(readings);
+      // The measured evidence for each executed case, printed once so the run log itself records the widths, surfaces and keyboard
+      // presses an independent reviewer needs — not only the pass/fail of the conjunction.
+      for (const reading of readings) {
+        process.stdout.write(
+          `  INFO  columns ${reading.case} ${reading.width}px dark=${reading.dark} reduce=${reading.reduce} `
+          + `widths=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, variant.widths]))} `
+          + `surfaces=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.surface, variant.backgroundColor, variant.borderWidth, variant.padding]))} `
+          + `keyboard=${reading.keyboard?.presses} presses at=${reading.keyboard?.at} left=${reading.keyboard?.leftAfterTab} url=${reading.keyboard?.pageUrlAfter} `
+          + `errors=${reading.errors} foreign=${reading.foreignRequests}\n`,
+        );
+      }
+      // `UNO-WO-119 / R02` (§2 `browser`): the credited conjunction and the restored fixture, asserted separately so a missing
+      // case, a failed case and an un-restored fixture each name their own failure.
+      localA2.columns.browser = conjunction(columnsCases) && geometry.ok;
       check(
-        "FAMILY_COLUMNS_BROWSER the four served column variants lay out as authored at 1280px, stack in reading order at 390px and present their surfaces distinctly",
-        geometry.ok && sha256Of(SOURCES[4]) === originalDigest,
-        geometry.detail,
+        "FAMILY_COLUMNS_BROWSER the browser dimension is the conjunction of all four executed cases at 390px and 1280px in light and dark/reduced motion",
+        localA2.columns.browser,
+        `${conjunctionDetail(columnsCases)} ${geometry.detail}`,
       );
-      localA2.columns.browser = geometry.ok;
+      check(
+        "FAMILY_COLUMNS_RESTORE the temporary Columns fixture was restored byte-exactly and the served Page is the committed one again",
+        sha256Of(SOURCES[4]) === originalDigest && rendered.length > 0,
+        `restored=${sha256Of(SOURCES[4]) === originalDigest} served=${rendered.length}`,
+      );
       // Renderer and HTTP: the served markup of the rich section and the three further variants, parsed from the real response.
       {
         const region = columnsRegionOf(rendered);

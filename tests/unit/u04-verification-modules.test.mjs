@@ -55,6 +55,7 @@ import {
 } from "../../scripts/u04/steps-evidence.mjs";
 // `UNO-WO-119 / R01`: the Columns evidence module, exercised on its own below.
 import {
+  COLUMNS_CASES,
   COLUMNS_EXPECTED,
   COLUMNS_REFUSAL_CASES,
   COLUMNS_RICH,
@@ -464,54 +465,194 @@ describe("the extracted Columns evidence module", () => {
     expect(columnsLabelsOf(region)).toEqual(["One", "Two", "Three"]);
     expect(columnsLabelsOf('<ul class="uno-json-list"></ul>')).toEqual([]);
   });
-
-  it("accepts the authored geometry and rejects each weakening of it", () => {
-    const reading = (id, widths, backgroundColor, borderWidth, tops, ratioAttribute = null) => ({
-      id,
-      columns: widths.length,
-      widths,
-      tops: tops ?? widths.map(() => 10),
-      backgroundColor,
-      borderWidth,
-      ratioAttribute,
-      overflow: 0,
+  /**
+   * One faithful reading for one case, so a test can weaken exactly one property and see the verdict refuse it.
+   *
+   * The widths are the ones production Chromium reported at 1280 (`[246,246]`, `[327,163]`, `[177,355]`, `[171,171,171]`) and at
+   * 390 (a single column per variant). The surfaces are each scheme's computed token values.
+   */
+  const caseReading = (testCase, overrides = {}) => {
+    const narrow = testCase.width < 1000;
+    const light = testCase.scheme === "light";
+    const muted = light ? "rgb(245, 247, 251)" : "rgb(20, 27, 36)";
+    const bordered = light ? "rgb(255, 255, 255)" : "rgb(12, 17, 24)";
+    const authored = [
+      { id: "family-14-columns", ratioAttribute: "equal", surface: "muted", backgroundColor: muted },
+      { id: "family-17-columns", ratioAttribute: "start-wide", surface: "bordered", backgroundColor: bordered },
+      { id: "family-18-columns", ratioAttribute: "end-wide", surface: "plain", backgroundColor: "rgba(0, 0, 0, 0)" },
+      { id: "family-19-columns", ratioAttribute: null, surface: null, backgroundColor: "rgba(0, 0, 0, 0)" },
+    ];
+    const titlesByVariant = [
+      ["Rich left", "Rich right"],
+      ["Start-wide left", "Start-wide right"],
+      ["End-wide left", "End-wide right"],
+      ["Three one", "Three two", "Three three"],
+    ];
+    const widthsByVariant = [[246, 246], [327, 163], [177, 355], [171, 171, 171]];
+    const variants = authored.map((variant, index) => {
+      const titles = titlesByVariant[index];
+      const surfaced = variant.surface === "muted" || variant.surface === "bordered";
+      return {
+        ...variant,
+        columns: titles.length,
+        widths: narrow ? titles.map(() => 350) : widthsByVariant[index],
+        tops: narrow ? titles.map((_, cell) => 10 + cell * 90) : titles.map(() => 10),
+        titles,
+        labels: index === 0 ? [...COLUMNS_RICH.labels] : [],
+        labelLists: index === 0 ? 2 : 0,
+        bodyLinkHref: index === 0 ? COLUMNS_RICH.bodyLink : null,
+        bodyLinkRel: index === 0 ? "noopener noreferrer" : null,
+        borderWidth: variant.surface === "bordered" ? "1px" : "0px",
+        borderRadius: surfaced ? "20px" : "0px",
+        padding: surfaced ? "16px 20px 16px 20px" : "0px 0px 0px 0px",
+        overflow: 0,
+      };
     });
-    const wide = [
-      reading("family-14-columns", [420, 420], "rgb(245, 247, 251)", "0px"),
-      reading("family-17-columns", [560, 280], "rgb(255, 255, 255)", "1px", undefined, "start-wide"),
-      reading("family-18-columns", [280, 560], "rgba(0, 0, 0, 0)", "0px", undefined, "end-wide"),
-      reading("family-19-columns", [280, 280, 280], "rgba(0, 0, 0, 0)", "0px", undefined, null),
-    ];
-    const narrow = [
-      reading("family-14-columns", [350], "rgb(245, 247, 251)", "0px", [10]),
-      reading("family-17-columns", [350], "rgb(255, 255, 255)", "1px", [10]),
-      reading("family-18-columns", [350], "rgba(0, 0, 0, 0)", "0px", [10]),
-      reading("family-19-columns", [350], "rgba(0, 0, 0, 0)", "0px", [10]),
-    ];
-    expect(columnsGeometryReport(wide, narrow).ok).toBe(true);
-    // Two equal columns that are not equal refuse.
-    const unequal = wide.map((row) => (row.id === "family-14-columns" ? { ...row, widths: [420, 380] } : row));
-    expect(columnsGeometryReport(unequal, narrow).ok).toBe(false);
-    // `start-wide` with the wider column second refuses, and so does `end-wide` with the wider column first.
-    const swapped = wide.map((row) => (row.id === "family-17-columns" ? { ...row, widths: [280, 560] } : row));
-    expect(columnsGeometryReport(swapped, narrow).ok).toBe(false);
-    const endSwapped = wide.map((row) => (row.id === "family-18-columns" ? { ...row, widths: [560, 280] } : row));
-    expect(columnsGeometryReport(endSwapped, narrow).ok).toBe(false);
-    // A three-column grid that kept its authored ratio attribute fails, as does a narrower third column.
-    const keptRatio = wide.map((row) => (row.id === "family-19-columns" ? { ...row, ratioAttribute: "start-wide" } : row));
-    expect(columnsGeometryReport(keptRatio, narrow).ok).toBe(false);
-    const ragged = wide.map((row) => (row.id === "family-19-columns" ? { ...row, widths: [280, 280, 240] } : row));
-    expect(columnsGeometryReport(ragged, narrow).ok).toBe(false);
-    // `plain` must present exactly like no surface at all; a muted column that lost its fill refuses.
-    const collapsed = wide.map((row) => (row.id === "family-14-columns" ? { ...row, backgroundColor: "rgba(0, 0, 0, 0)" } : row));
-    expect(columnsGeometryReport(collapsed, narrow).ok).toBe(false);
-    // Narrow must stack: equal widths in authored top order, never side by side.
-    const sideBySide = narrow.map((row) => (row.id === "family-19-columns" ? { ...row, tops: [10, 10, 10] } : row));
-    expect(columnsGeometryReport(wide, sideBySide).ok).toBe(false);
-    // Any overflow refuses.
-    const overflowing = wide.map((row) => (row.id === "family-17-columns" ? { ...row, overflow: 12 } : row));
-    expect(columnsGeometryReport(overflowing, narrow).ok).toBe(false);
+    return {
+      case: testCase.key,
+      width: testCase.width,
+      dark: testCase.scheme === "dark",
+      reduce: testCase.motion === "reduce",
+      forced: false,
+      variants,
+      keyboard: {
+        reached: true,
+        href: COLUMNS_RICH.bodyLink,
+        rel: "noopener noreferrer",
+        visible: true,
+        leftAfterTab: true,
+        presses: 12,
+        pageUrlBefore: "http://127.0.0.1/x/en-001/wo066-family-composition",
+        pageUrlAfter: "http://127.0.0.1/x/en-001/wo066-family-composition",
+        foreignRequests: 0,
+      },
+      ...overrides,
+    };
+  };
+  const readingsForAllCases = () => COLUMNS_CASES.map((testCase) => caseReading(testCase));
+  const weaken = (readings, key, mutate) =>
+    readings.map((reading) =>
+      reading.case === key
+        ? mutate({ ...reading, variants: reading.variants.map((variant) => ({ ...variant })) })
+        : reading,
+    );
+  it("accepts exactly the four executed cases and refuses a missing, duplicated or mislabelled case", () => {
+    const readings = readingsForAllCases();
+    expect(columnsGeometryReport(readings).ok).toBe(true);
+    expect(COLUMNS_CASES.map((entry) => entry.key)).toEqual(["light:390", "light:1280", "dark:390", "dark:1280"]);
+    // Three good cases are not four: each of the four is required on its own.
+    expect(columnsGeometryReport(readings.filter((reading) => reading.case !== "dark:390")).ok).toBe(false);
+    expect(columnsGeometryReport(readings.filter((reading) => reading.case !== "light:1280")).ok).toBe(false);
+    // A duplicate case does not stand in for the missing one.
+    expect(columnsGeometryReport([...readings, readings[0]]).ok).toBe(false);
+    expect(columnsGeometryReport([]).ok).toBe(false);
+    expect(columnsGeometryReport([{ ...readings[0], case: undefined }]).ok).toBe(false);
+    // A mislabelled case is refused by the media check itself.
+    expect(columnsGeometryReport(weaken(readings, "dark:1280", (reading) => ({ ...reading, dark: false }))).ok).toBe(false);
+    expect(columnsGeometryReport(weaken(readings, "dark:390", (reading) => ({ ...reading, reduce: false }))).ok).toBe(false);
+    expect(columnsGeometryReport(weaken(readings, "light:1280", (reading) => ({ ...reading, width: 1024 }))).ok).toBe(false);
   });
+
+  it("refuses every wrong asymmetric proportion, including merely wider", () => {
+    const readings = readingsForAllCases();
+    const withWidths = (key, id, widths) =>
+      weaken(readings, key, (reading) => ({
+        ...reading,
+        variants: reading.variants.map((variant) => (variant.id === id ? { ...variant, widths } : variant)),
+      }));
+    // `start-wide` that is merely wider than its neighbour is not 2:1, and 3:1 is not either.
+    expect(columnsGeometryReport(withWidths("light:1280", "family-17-columns", [250, 240])).ok).toBe(false);
+    expect(columnsGeometryReport(withWidths("light:1280", "family-17-columns", [360, 120])).ok).toBe(false);
+    // `end-wide` the wrong way round is refused, and so are unequal equal-grids and a ragged three-column grid.
+    expect(columnsGeometryReport(withWidths("light:1280", "family-18-columns", [355, 177])).ok).toBe(false);
+    expect(columnsGeometryReport(withWidths("light:1280", "family-14-columns", [260, 232])).ok).toBe(false);
+    expect(columnsGeometryReport(withWidths("light:1280", "family-19-columns", [171, 171, 150])).ok).toBe(false);
+    // A two-pixel rounding difference is inside the documented tolerance and still passes.
+    expect(columnsGeometryReport(withWidths("light:1280", "family-17-columns", [326, 164])).ok).toBe(true);
+    // A ratio attribute on the three-column grid is refused at either width.
+    const keptRatio = weaken(readings, "dark:1280", (reading) => ({
+      ...reading,
+      variants: reading.variants.map((variant) =>
+        variant.id === "family-19-columns" ? { ...variant, ratioAttribute: "start-wide" } : variant,
+      ),
+    }));
+    expect(columnsGeometryReport(keptRatio).ok).toBe(false);
+  });
+  it("refuses a narrow case that is not one column in authored order, and any zero width or overflow", () => {
+    const readings = readingsForAllCases();
+    const withVariant = (key, id, patch) =>
+      weaken(readings, key, (reading) => ({
+        ...reading,
+        variants: reading.variants.map((variant) => (variant.id === id ? { ...variant, ...patch } : variant)),
+      }));
+    // Two cells side by side at 390 refuse: the narrow layout must be one column in authored order.
+    expect(columnsGeometryReport(withVariant("light:390", "family-19-columns", { tops: [10, 10, 10] })).ok).toBe(false);
+    expect(columnsGeometryReport(withVariant("dark:390", "family-17-columns", { tops: [100, 10] })).ok).toBe(false);
+    // A zero-width cell is never a laid-out column, at either width.
+    expect(columnsGeometryReport(withVariant("light:1280", "family-14-columns", { widths: [0, 0] })).ok).toBe(false);
+    expect(columnsGeometryReport(withVariant("dark:390", "family-17-columns", { widths: [0, 0] })).ok).toBe(false);
+    // Any horizontal overflow refuses.
+    expect(columnsGeometryReport(withVariant("dark:390", "family-19-columns", { overflow: 8 })).ok).toBe(false);
+    // A wrong cell count or a reordered DOM refuses, at both widths.
+    expect(columnsGeometryReport(withVariant("light:1280", "family-19-columns", { columns: 2 })).ok).toBe(false);
+    expect(
+      columnsGeometryReport(withVariant("light:1280", "family-14-columns", { titles: ["Rich right", "Rich left"] })).ok,
+    ).toBe(false);
+    expect(columnsGeometryReport(withVariant("dark:390", "family-18-columns", { columns: 3 })).ok).toBe(false);
+  });
+
+  it("refuses incorrect surface effects and a weakened keyboard access", () => {
+    const readings = readingsForAllCases();
+    const withSurface = (value, patch) =>
+      weaken(readings, "light:1280", (reading) => ({
+        ...reading,
+        variants: reading.variants.map((variant) => (variant.surface === value ? { ...variant, ...patch } : variant)),
+      }));
+    // `plain` must present exactly like the absent surface, and neither may carry an effect.
+    expect(columnsGeometryReport(withSurface("plain", { padding: "16px 20px 16px 20px" })).ok).toBe(false);
+    expect(columnsGeometryReport(withSurface("plain", { borderWidth: "1px" })).ok).toBe(false);
+    expect(columnsGeometryReport(withSurface("muted", { backgroundColor: "rgba(0, 0, 0, 0)" })).ok).toBe(false);
+    // The two emphasised values cannot collapse into one another or into plain.
+    expect(columnsGeometryReport(withSurface("bordered", { backgroundColor: "rgb(245, 247, 251)" })).ok).toBe(false);
+    expect(columnsGeometryReport(withSurface("muted", { backgroundColor: "rgb(255, 255, 255)" })).ok).toBe(false);
+    // Border, padding and radius are the shipped token effects, so losing any of them refuses.
+    expect(columnsGeometryReport(withSurface("bordered", { borderWidth: "0px" })).ok).toBe(false);
+    expect(columnsGeometryReport(withSurface("muted", { padding: "0px 0px 0px 0px" })).ok).toBe(false);
+    expect(columnsGeometryReport(withSurface("muted", { borderRadius: "0px" })).ok).toBe(false);
+    // Keyboard: unreachable, wrong destination, wrong rel, trapped focus, a navigation or a foreign request all refuse.
+    const keyboard = (patch) =>
+      weaken(readings, "dark:1280", (reading) => ({ ...reading, keyboard: { ...reading.keyboard, ...patch } }));
+    expect(columnsGeometryReport(keyboard({ reached: false })).ok).toBe(false);
+    expect(columnsGeometryReport(keyboard({ href: "https://example.org/notes" })).ok).toBe(false);
+    expect(columnsGeometryReport(keyboard({ rel: "" })).ok).toBe(false);
+    expect(columnsGeometryReport(keyboard({ visible: false })).ok).toBe(false);
+    expect(columnsGeometryReport(keyboard({ leftAfterTab: false })).ok).toBe(false);
+    expect(columnsGeometryReport(keyboard({ pageUrlAfter: "https://example.org/columns" })).ok).toBe(false);
+    expect(columnsGeometryReport(keyboard({ foreignRequests: 1 })).ok).toBe(false);
+    // The served rich content is part of the case: dropping a label, a list or the safe rel refuses.
+    const labels = weaken(readings, "light:390", (reading) => ({
+      ...reading,
+      variants: reading.variants.map((variant) =>
+        variant.id === "family-14-columns" ? { ...variant, labels: variant.labels.slice(1) } : variant,
+      ),
+    }));
+    expect(columnsGeometryReport(labels).ok).toBe(false);
+    const list = weaken(readings, "dark:390", (reading) => ({
+      ...reading,
+      variants: reading.variants.map((variant) => (variant.id === "family-14-columns" ? { ...variant, labelLists: 1 } : variant)),
+    }));
+    expect(columnsGeometryReport(list).ok).toBe(false);
+    const link = weaken(readings, "light:1280", (reading) => ({
+      ...reading,
+      variants: reading.variants.map((variant) =>
+        variant.id === "family-14-columns" ? { ...variant, bodyLinkRel: "" } : variant,
+      ),
+    }));
+    expect(columnsGeometryReport(link).ok).toBe(false);
+  });
+
+
+
 
   it("publishes the ten closed refusal probes with their own literal reasons", () => {
     expect(COLUMNS_REFUSAL_CASES).toHaveLength(10);
