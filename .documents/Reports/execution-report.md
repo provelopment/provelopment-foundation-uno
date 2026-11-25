@@ -1,116 +1,126 @@
-# Execution Report — UNO-WO-118 / R02
+# Execution Report — UNO-WO-119 / R01
 
-**Outcome: COMPLETE — the FAQ surface now presents. `PARITY_FAQ=PASS`, `U04_PARITY=10/17`, `U04_PROXY=52/59`, proven by actual computed browser presentation at 390/1280 in light and dark/reduced motion, with all nine prior credits, R01's functional surface and every regression preserved. B1 remains earned; B2 and U04 remain OPEN.**
+**Outcome: COMPLETE — Columns is the eleventh parity-evidenced family. `PARITY_COLUMNS=PASS`, `U04_PARITY=11/17`, `U04_PROXY=53/59`, the unchanged **B2** checkpoint is earned, all ten prior credits and the concurrent-publication regressions are preserved, and every mandatory local gate is green. U04 remains OPEN.**
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-118 / R02`, `FINAL — EXECUTE` (supersedes R01, implemented on top of it — nothing reset or reverted) |
-| ACTIVE | **3,956 bytes**, SHA-256 `cc621f0f25675b5a0bc753e9cbf0219f93c1cf1a7ade1e68bc0116a56890a69f` — matched the activation exactly; private, ignored, absent from the tree |
-| Start SHA | `f673fe72245c90472c81e65f962090d87bf6ed65` (`HEAD` = `main` = `origin/main` = `ls-remote`; one worktree; one Uno `origin`; clean tree) |
+| Order | `UNO-WO-119 / R01`, `FINAL — EXECUTE` |
+| ACTIVE | **4,832 bytes**, SHA-256 `971e92cbda52b38d5459d3721383aaebe23de09d63979b40e5839dc2b44e080e` — matched the activation exactly; private, ignored, absent from the tree |
+| Start SHA | `1db4da6ca14d83d80f44019c10dce47925802b8d` (`HEAD` = `main` = `origin/main` = `ls-remote`; one worktree; one Uno `origin`; clean tree) |
 | Donor pins | Foundation GEO-03 `c05c55ea61b5347cf5032211dd0bf37f2cc5083c`, schema `a12d964c…`, `structure-sections.tsx` `65d254e1…`, `section-support.tsx` `19c9bee3…` — read-only, unchanged |
-| Oracle | unchanged `scripts/verify-u04-family-closure.mjs`: A1 `3/17`, A2 `5/17`, B1 `8/17` / `50/59`, Quote interim `9/17` / `51/59`, FAQ interim `10/17` / `52/59` |
+| Oracle | **unchanged** `scripts/verify-u04-family-closure.mjs`: A1 `3/17`, A2 `5/17`, B1 `8/17` / `50/59`, nine-family `9/17` / `51/59`, ten-family `10/17` / `52/59`, then **B2 `11/17` / `53/59`** |
 
-## 1. The defect and the fix
+## 1. What the order added
 
-R01 closed the donor's FAQ schema and emitted the closed `data-uno-surface` on every disclosure group, but
-`src/app/globals.css` had no rule for it: `plain`, `muted` and `bordered` presented identically, so the surface was an attribute
-rather than a presentation. Two token-only rules were added, scoped to the group and nothing else:
+The donor `ColumnsSection` carries an optional plain `heading`, a **Markdown** `lede`, a closed `surface`, a closed `ratio`,
+and two or three ordered columns, each a plain title with exactly one Markdown body **or** one list of up to twenty-four plain
+labels. Before this order the mapping accepted only plain bodies, twelve labels, a two-column ratio and no heading, lede or
+surface. Now:
 
-```css
-.uno-json-accordion[data-uno-surface="muted"]    { padding: 0.75rem; border-radius: var(--uno-radius-lg); background-color: var(--uno-surface-strong); }
-.uno-json-accordion[data-uno-surface="bordered"] { padding: 0.75rem; border: 1px solid var(--uno-border); border-radius: var(--uno-radius-lg); background-color: var(--uno-background); }
-```
-
-`plain` deliberately has **no** rule: it denotes "no emphasis", which is exactly how `prose`, `callout`, `list`, `table`, `hero`,
-`stats`, `testimonials` and `timeline` already treat it. So `plain` and an absent surface present identically, the ordinary
-accordion's markup **and** appearance are unchanged, and no colour, font, image, external resource or new module was introduced.
-
-**Coverage differences from the donor's outer section, recorded rather than smoothed over.** The donor wraps heading, lede and
-the disclosure list in one surfaced section; Uno applies the surface to the **disclosure group(s)** only — the authored heading
-and Markdown lede sit above the group in the documented stack and are not surfaced. And because a 9–24-item FAQ is consecutive
-ordinary groups (the eight-panel bound is never raised), **each** group is surfaced, so a long list reads as grouped surfaced
-blocks rather than one uninterrupted panel; with an authored heading/lede those groups sit inside the family's inner container
-one wrapper deeper. Both are stated in the ledger.
-
-## 2. Acceptance evidence — computed presentation, not an attribute
-
-| Execution | What it proves |
+| Donor field | Uno result |
 | --- | --- |
-| `FAMILY_SURFACE_CSS` (executed in the gate over the shipped `globals.css`) | both rules exist with exactly the token declarations above, no rule exists for `plain`, and neither rule contains a literal colour, `rgb(`, or `url(` |
-| light 390/1280 + dark/reduced-motion 390/1280 computed comparison | for each case one served group is measured with real `getComputedStyle` and three **fresh sibling clones** carrying `plain`, `muted`, `bordered` plus an absent-surface clone: `plain` must equal absent; `muted` must differ from `plain` in background **and** padding; `bordered` must differ from `plain` in border width and from `muted` in background; the authored group must match the `muted` reading; no overflow |
-| served 24-item FAQ (temporary fixture swap, restored byte-exactly) | three consecutive groups, 24 disclosures, every group carrying the authored `muted` surface with the same computed background and the `0.75rem` padding, all closed, no overflow, authored order from `Question 1?` to `Question 24?`, and the served Page restored to its two-item fixture by digest |
-| 25-item refusal + nine-panel refusal | unchanged from R01 and re-executed: `family:target-refused` for 25 entries, `document:invalid-children` for a hand-authored nine-panel accordion |
-| focused unit proofs | the shipped stylesheet contract (`.uno-page-sections.test.ts`), the authored/absent/`plain` attribute output and both-group surfacing for 9 and 24 entries (`.uno-foundation-families.test.ts`), and the **positive Quote safe-link compose → read → render** regression the order asked for (`https` link composed with `markdown: true`, byte-identical through the strict reader, rendered as `<a rel="noopener noreferrer">` with no literal syntax) — no Quote product code changed |
+| plain `heading` | `content.heading {level:2}` at `${id}-heading`, inside the section stack |
+| **Markdown** `lede` | one `content.prose` at `${id}-lede` through the shared Markdown reader and the one family renderer |
+| **Markdown** body | one `content.prose {text, markdown:true}`; a body without Markdown keeps the byte-identical escaped paragraph |
+| 1–24 plain labels | consecutive **native** lists of at most twelve in the same column (`…-body`, `…-body-2`), same order, same ownership |
+| closed `ratio` | validated for two **and** three columns; reaches the grid only for two, because three columns are equal by the donor's own rule |
+| closed `surface` | on the section **stack**, so it covers the authored heading, the lede **and** the grid — the whole authored section |
 
-## 3. Authorized changes (8 modified, no new product module)
+The bare legacy case (no heading, lede or surface) still composes as `layout.grid {columns, ratio}` at the family anchor with
+the same ids, and is proven byte-identical. The `layout.stack` `surface` prop and its two token-only stylesheet rules are the
+only schema and styling additions; no module, dependency, provider or design token was added.
+
+**Adaptations recorded rather than smoothed over.** (1) A valid ratio on three columns is validated and then has **no layout
+effect**, matching the donor's equal three-column layout; the native grid's own refusal of a ratio on any non-two-column grid is
+untouched and is proven separately. (2) Twenty-four labels exceed the native twelve-item list bound, so 13–24 labels compose as
+two consecutive native lists — the global cap is not moved and the twenty-fifth label refuses the whole Page. (3) The surface
+covers the whole authored section (heading, lede, grid) rather than the donor's outer wrapper only.
+
+## 2. Acceptance evidence — all seven Columns dimensions, executed
+
+| Dimension | Execution |
+| --- | --- |
+| `source` | `FAMILY_COLUMNS_SOURCE` — the real adapter composes the rich section as one surfaced stack of authored heading, Markdown lede and a two-column grid with the authored ratio, plus `FAMILY_COLUMNS_LEGACY` proving the served fixture's bare grid stays byte-identical with the authored titles |
+| `reader` | `FAMILY_COLUMNS_READER` — the composed Page round-trips byte-identically through the strict reader; the 1/12/13/24 boundary holds as consecutive native lists with stable ids; a 25th label refuses; a valid ratio on three columns is dropped while the native grid still refuses any non-two-column ratio; the native stack accepts the closed surface |
+| `renderer` | served markup: `<div class="uno-json-stack" … data-uno-surface="muted">`, authored `<h2>`, Markdown lede `<strong>`, `<div class="uno-json-grid" data-uno-columns="2" … data-uno-ratio="equal">`, Markdown body `<a rel="noopener noreferrer">`, two `<ul class="uno-json-list">` with all 24 labels in order, two `<h3>` titles, no `<button>`/`<img>`/`<script>`/`<form>`/`<input>` |
+| `http` | the swap Page answers 200 and the three-column grid carries **no** `data-uno-ratio` attribute — the suppression is real in the response, not only in memory |
+| `browser` | four served variants in production Chromium at **1280 px** (2 equal = equal, `start-wide` first wider, `end-wide` second wider, 3 equal with no ratio attribute) and **390 px** (every grid one column, authored reading order, no overflow), with the computed surfaces distinct (`muted` ≠ `plain` ≠ `bordered`, `plain` ≡ absent), in light and dark/reduced-motion |
+| `refusal` | ten closed probes, each refusing the whole Page with its own literal reason: 25 labels, empty list, invalid ratio, invalid surface, body+list, neither, nested donor section, unsafe destination, malformed Markdown, ill-formed Unicode |
+| `rights` | no donor identity, owned asset, foreign resource, font or frame reaches the served region; the only outbound destination is the authored `https://example.org/…` |
+
+The swap is test-owned and temporary: the fixture Page is written, visited, then restored in `finally` and re-verified by digest
+(`FAMILY_COLUMNS_BROWSER` asserts the restore), so no durable Page or declaration changed.
+
+## 3. Authorized changes (12 modified, 1 new evidence module)
 
 | Path | Change |
 | --- | --- |
-| `src/app/globals.css` | the two narrowly scoped, token-only surface rules above, with the comment recording why `plain` has none and why the group (not the page) is surfaced |
-| `scripts/u04/family-fixture.mjs` | new `FAQ_LONG_SOURCE` export — the donor's full 24 items, used only by the surface-coverage proof |
-| `scripts/u04/faq-evidence.mjs` | `FAQ_LONG` facts and the pure `faqSurfacesDistinct(rows)` comparison (plain == absent, muted/bordered each different, muted background+padded, bordered wider border), so the browser proof and its unit-level twin share one definition |
-| `scripts/verify-u04-22-module-consent.mjs` | the executed `FAMILY_SURFACE_CSS` check; the light and dark computed-surface probes on sibling clones; the temporary 24-item fixture swap with byte-exact restore and re-verification; the surface-case conjunction and its `A2_LOCAL_BROWSER` label; the long block imports the adapter through a variable specifier so the audit's single "real adapter" token stays unique |
-| `tests/unit/uno-page-sections.test.ts` | the shipped-stylesheet contract: one token treatment per emphasised value, no `plain` rule, base accordion rule still layout-only |
-| `tests/unit/uno-foundation-families.test.ts` | explicit `plain` output, per-group surfacing for 9 and 24 entries, and the positive Quote safe-link compose/read/render regression |
-| `tests/deployment/u04-22-module-consent.test.mjs` | the new tokens (stylesheet check, both verdicts, the two surface check names, the conjunction, the long-FAQ and restoration checks, `paddingInlineStart`) plus four neutering mutations for the surface proof |
-| `.documents/Architecture/u04-family-parity.md` | the R02 paragraph (rules, `plain` convention, the two coverage differences, the proof), the FAQ row's evidence cell, and the retained `10/17` / `52/59` interim with B2 still Open |
+| `src/core/page-document.ts` | closed optional `surface` on `layout.stack` props (reader + type), reusing the existing closed surface reader |
+| `src/application/compose-uno-foundation-families.ts` | the full donor Columns mapping: heading, Markdown lede/body, 1–24 labels as consecutive native lists, ratio validated for two and three columns and emitted only for two, section-level surface, byte-identical legacy path |
+| `src/components/uno-page-sections.tsx` | `data-uno-surface` on the stack (`undefined` renders nothing, so existing stacks are byte-identical) |
+| `src/app/globals.css` | two token-only rules for `.uno-json-stack[data-uno-surface="muted"|"bordered"]`; `plain` and absent stay untouched |
+| `scripts/u04/family-fixture.mjs` | `COLUMNS_SOURCE` (the served section, now one definition), `COLUMNS_LABELS`, `COLUMNS_RICH_SOURCE`, `COLUMNS_VARIANT_SOURCES` |
+| `scripts/u04/columns-evidence.mjs` **(new)** | ids, expectations, region/label parsers, the one geometry comparison, the ten refusal probes |
+| `scripts/verify-u04-22-module-consent.mjs` | the seven Columns checks, the swap visit, the eleven-family and **B2** closure evaluations, the `56/56` record count, the stack-surface stylesheet check |
+| `tests/unit/page-document.test.ts` | stack surface accept/refuse matrix (closed values, `gap`+`surface`, unknown prop refused) |
+| `tests/unit/uno-foundation-families.test.ts` | legacy byte-identity, surfaced wrapper, label ceiling 1/12/13/24/25, three-column ratio suppression, rendered markup, updated ledger pins |
+| `tests/unit/uno-page-sections.test.ts` | the shipped stack-surface stylesheet contract |
+| `tests/unit/u04-verification-modules.test.mjs` | the Columns evidence module on its own: variants, label parser, geometry report accept/reject, ten refusal probes |
+| `tests/deployment/u04-22-module-consent.test.mjs` | new tokens, five neutering mutations for the Columns proof, the declared-checkpoint list now `A1/A2/B1/B2`, whole-Page probe mutation across every call site |
+| `.documents/Architecture/u04-family-parity.md` | the `columns` row as `PARITY (UNO-WO-119 / R01)`, the three adaptation notes, eleven credited / six bounded, B2 earned |
 
-`src/core/page-document.ts`, `src/components/uno-page-sections.tsx` and `src/application/compose-uno-foundation-families.ts` were
-**not** touched: R01's closed schema, composition and renderer were already correct, and the ledger allowed them only "if
-necessary". No workflow, frozen governance file, closure oracle, dependency, durable Page or declaration, external repository,
-provider, release or deployment was changed.
 
-## 4. Local verification (executed sequentially in this run)
+## 4. Local verification (sequential, this run)
 
 | Gate | Result |
 | --- | --- |
 | `pnpm typecheck` / `pnpm lint` | exit 0 / exit 0 |
-| `pnpm test` (unit, vitest) | **1,367 / 1,367**, 35 files (R01 head: 1,364) |
+| `pnpm test` | **1,378 / 1,378**, 35 files (R02 head: 1,367) |
 | `node scripts/verify-governance-docs.mjs` | **PASS** — frozen bytes unchanged |
 | `node --test tests/governance-docs.test.mjs` | **13 / 0** |
 | `pnpm test:bootstrap` | **21 / 0** |
 | `pnpm test:architecture` | **47 / 0** |
-| `node --test tests/deployment` | **344 / 0** (R01 head: 343) |
+| `node --test tests/deployment` | **345 / 0** |
 | `pnpm build` | **exit 0** — `Compiled successfully` |
-| `node scripts/verify-u04-22-module-consent.mjs` | **872 passed / 0 failed** (R01 head: 864) — `PARITY_FAQ=PASS`, nine prior families `PASS`, `U04_PARITY=10/17`, `U04_PROXY=52/59`, `22/22`, `4/4`, `16/16` |
-| `node scripts/verify-u03-multisite-http.mjs` | **179 passed / 0 failed** — both phases byte-exact |
-
-Two earlier in-run defects were found and fixed by this work, not papered over: measuring by mutating the served node's attribute
-and reading it back in the dark/reduced-motion pass returned stale values (Chromium's style invalidation for the mutated node in
-that pass), so the proof now measures **fresh sibling clones** and never mutates the served group; and the long-FAQ probe's
-`:scope > .uno-json-accordion` selector missed the groups when an authored heading/lede puts them one container deeper, so it
-selects descendants and asserts the group count explicitly.
+| `node scripts/verify-u04-22-module-consent.mjs` | **881 passed / 0 failed** — `PARITY_COLUMNS=PASS`, `U04_PARITY=11/17`, `U04_PROXY=53/59`, B2 earned, `56/56`, `22/22`, `4/4`, `16/16` |
+| `node scripts/verify-u03-multisite-http.mjs` | **179 passed / 0 failed** — both phases byte-exact (concurrent publication preserved) |
 
 ## 5. Risks
 
-1. **Group-level surface, not section-level.** Heading and lede are not surfaced, and a 9–24-item FAQ surfaces each consecutive
-   group, so a long list shows grouped surfaced blocks. Both are the accepted adaptation of the eight-panel bound and are
-   recorded in the ledger and here.
-2. **`plain` equals absent by convention.** The three authorable values are pairwise distinct (`plain` vs `muted`, `plain` vs
-   `bordered`, `muted` vs `bordered`), and `plain` is deliberately identical to no surface, matching every other Uno module.
-3. **Presentation is viewport-scheme dependent by design.** The proof compares computed values *within* each scheme (light and
-   dark), because the tokens differ between them; it does not claim identical pixel values across schemes.
-4. **B2 stays Open.** `quote` and `faq` are credited at checkpoint-free interim rows (`10/17` / `52/59`); B2 also requires
-   `columns` and is deliberately not asserted.
+1. **Split label lists.** A 13–24-label column is two adjacent native lists in one column. Order, semantics and ownership are
+   preserved and the global cap is untouched, but a screen-reader user hears two lists rather than one; recorded here and in the
+   ledger.
+2. **Ratio suppression.** A valid ratio authored on three columns is validated and inert, matching the donor. The native reader's
+   refusal of a non-two-column ratio is still proven, but an author who writes a ratio on three columns gets no warning.
+3. **Surface scope.** The closed surface covers the whole authored section (heading, lede, grid) through the stack; a grid
+   authored with no heading, lede or surface carries none, so the surfaced and plain arrangements differ by one wrapper.
+4. **B2 is not closure.** `U04` remains OPEN, `quote` and `faq` remain credited at their interim rows, and six families remain
+   bounded.
 
 ## 6. Disposition
 
-`U04` remains **OPEN**; ten of seventeen families are parity-evidenced, seven remain bounded, and B1 remains the earned row.
-The FAQ surface now has functional, computed presentation evidence in both schemes at both viewports, its long-list coverage is
-proven on a served 24-item Page, and every prior credit and regression is intact. Stopping for independent Architect review.
+Eleven of seventeen families are parity-evidenced; the declared **B2** row (`11/17` / `53/59`) is earned by executed evidence
+through the unchanged oracle, and every earlier row is retained as a regression. No stage closure is claimed. Stopping for
+independent Architect review.
+
+## 7. Hosted verification
+
+Pending the push of this order's product commit; both Uno workflows are required to succeed on `ubuntu-24.04` and
+`windows-2025` at the exact product head, and their runs are recorded in section 8 before this report is final.
 
 
-## 7. Hosted verification at the exact product head
+## 8. Hosted verification at the exact product head
 
-Product commit `3667b8a417e6cc402882fd68b686260a60ca2305` (`f673fe7..3667b8a`), one non-force push to Uno `main`.
+Product commit `9aa088a85ec114baa88a6f95fc55e889a3cec6f1` (`1db4da6..9aa088a`), one non-force push to Uno `main`.
 
 | Workflow | Run | Jobs |
 | --- | --- | --- |
-| `Verify U01 baseline` | [45579832544](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45579832544) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success |
-| `Uno Bootstrap Verify` | [45579832620](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45579832620) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success |
+| `Verify U01 baseline` | [45597816397](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45597816397) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success |
+| `Uno Bootstrap Verify` | [45597816426](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45597816426) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success |
 
 Both workflows ran at this exact head on both operating systems, including the frozen-governance positive/refusal check, the
 bootstrap and architecture gates, the unit suite, the production build, the mutation-sensitive P6 contract, the A1 slice, the
-22-module hermetic guard and the real production HTTP/Chromium consent run that carries the new computed-surface evidence — so
-the surface presentation, the long-FAQ coverage and every retained credit are proven on Linux and Windows, not only locally.
+22-module hermetic guard and the real production HTTP/Chromium consent run that carries the new Columns evidence — so the four
+served geometries, the computed surfaces, the label ceiling, the refusal matrix and every retained credit are proven on Linux
+and Windows, not only locally.
 
