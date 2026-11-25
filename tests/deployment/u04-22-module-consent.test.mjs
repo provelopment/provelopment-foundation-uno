@@ -330,7 +330,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_TEXT_FIVE_BROWSER the five authored-text families were measured in real Chromium at both viewports",
   "textFiveGetterCalls === 0",
   "textFiveBrowserChecks === 2",
-  "familyAccepted.sections.filter((section) => section.module === \"layout.stack\").length === 7",
+  "familyAccepted.sections.filter((section) => section.module === \"layout.stack\").length === 8",
   'id="family-0-prose" data-uno-align="center"',
   "family-13-table-table",
   "family-3-faq-accordion",
@@ -378,7 +378,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   'localA2.table.browser = conjunction(tableBrowserCases);',
   "if (tableLightOk) tableBrowserCases.add(`light:${width}`);",
   "if (darkTableOk) tableBrowserCases.add(`dark:${width}`);",
-  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_EVIDENCE=56/56 (table, list, hero, stats, steps, quote, faq and columns credited; P6 destination proof in the three-Site gate)",
+  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_MEDIA_EVIDENCE=63/63 (table, list, hero, stats, steps, quote, faq, columns and media credited; P6 destination proof in the three-Site gate)",
   "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table and divider",
   'JSON.stringify(closureFour.credited) === JSON.stringify(["prose", "callout", "table", "divider"])',
   "closureFour.parity === 4",
@@ -498,7 +498,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "const quoteFacts = quoteServed(quoteRegion);",
   "const quoteItems = quoteItemsOf(quoteRegion);",
   "JSON.stringify(familyAccepted.sections[12]?.props) === JSON.stringify(quoteNodeProps())",
-  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_EVIDENCE=56/56 (table, list, hero, stats, steps, quote, faq and columns credited; P6 destination proof in the three-Site gate)",
+  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_MEDIA_EVIDENCE=63/63 (table, list, hero, stats, steps, quote, faq, columns and media credited; P6 destination proof in the three-Site gate)",
   "A2_LOCAL_BROWSER the rich quote family was observed at 390px and 1280px in light and dark/reduced motion with its parsed Markdown quotation",
   "A2_LOCAL_REFUSAL every malformed quote family refuses the whole source Page with the family's own reason",
   "A2_LOCAL_READER the quote quotation is Markdown-validated and Unicode-checked in both forms while a native role-only caption stays accepted",
@@ -544,9 +544,24 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_COLUMNS_HTTP the served rich section is one surfaced stack of authored heading, Markdown lede and body, a two-column grid and two native label lists — and the three-column grid carries no ratio attribute",
   "FAMILY_COLUMNS_BROWSER the browser dimension is the conjunction of all four executed cases at 390px and 1280px in light and dark/reduced motion",
   "FAMILY_COLUMNS_BROWSER ${testCase.key} the four served variants lay out as authored, present their surfaces distinctly, keep their labels and reach the safe link by keyboard",
-  "FAMILY_COLUMNS_RESTORE the temporary Columns fixture was restored byte-exactly and the served Page is the committed one again",
+  "FAMILY_COLUMNS_RESTORE the temporary Columns fixture was restored byte-exactly and a fresh response serves the committed Page without any variant anchor",
   "FAMILY_COLUMNS_RIGHTS the served columns region carries no donor identity, owned asset, foreign resource or provider",
-  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_EVIDENCE=56/56 (table, list, hero, stats, steps, quote, faq and columns credited; P6 destination proof in the three-Site gate)",
+  // `UNO-WO-120 / R01`: the Media family's own seven dimensions, its closed refusal probes and its restore proof.
+  "FAMILY_MEDIA_SOURCE the real adapter composes the donor's Media surface — authored heading and Markdown lede, closed position and surface, a Markdown caption, the explicit decorative form and the byte-identical bare section",
+  "FAMILY_MEDIA_READER the composed Page round-trips, the donor caption bound is 4,000 for the Markdown form only, the plain caption stays at 320 and the closed position/surface/decorative members refuse any other shape",
+  "FAMILY_MEDIA_REFUSAL every one of the twelve media probes refuses the whole Page with its own closed reason and no partial document",
+  "FAMILY_MEDIA_HTTP the served Media section is one positioned and surfaced stack whose figure owns its loaded 64x64 PNG and its Markdown caption, with the authored heading and Markdown lede",
+  "FAMILY_MEDIA_HTTP the temporary page serves the end position with a plain caption, the decorative figure with an empty alt and the byte-identical bare figure",
+  "FAMILY_MEDIA_BROWSER ${testCase.key} the four served variants load their owned image, own their caption, keep their alt or decorative semantics, lay out their position and surface and reach the caption link by keyboard",
+  "FAMILY_MEDIA_BROWSER the browser dimension is the conjunction of all four executed cases at 390px and 1280px in light and dark/reduced motion",
+  "FAMILY_MEDIA_RIGHTS the served media region renders no donor identity, no remote source, no provider and no locator outside this Page's own owned route",
+  "FAMILY_MEDIA_RESTORE the temporary Media fixture was restored byte-exactly and a fresh response serves the committed Page without any variant anchor",
+  "localA2.media.browser = conjunction(mediaCases) && mediaBrowser.ok;",
+  "localA2.media.renderer = rendererOk;",
+  "const mediaBrowser = mediaBrowserReport(readings);",
+  "mediaCaseVerdict(reading, testCase)",
+  "walkToSafeLink(tab, MEDIA_EXPECTED.captionLinkHref)",
+  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_MEDIA_EVIDENCE=63/63 (table, list, hero, stats, steps, quote, faq, columns and media credited; P6 destination proof in the three-Site gate)",
   "localA2.columns.browser = conjunction(columnsCases) && geometry.ok;",
   "localA2.columns.renderer = rendererOk;",
   "columnsCaseVerdict(reading, testCase)",
@@ -849,7 +864,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
         "for (const testCase of COLUMNS_CASES) {",
       ],
       [
-        "FAMILY_COLUMNS_RESTORE the temporary Columns fixture was restored byte-exactly and the served Page is the committed one again",
+        "FAMILY_COLUMNS_RESTORE the temporary Columns fixture was restored byte-exactly and a fresh response serves the committed Page without any variant anchor",
         "restore unchecked",
         "FAMILY_COLUMNS_RESTORE",
       ],
@@ -857,6 +872,59 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
         "localA2.columns.renderer = rendererOk;",
         "localA2.columns.renderer = true;",
         "localA2.columns.renderer = rendererOk",
+      ],
+    ];
+    for (const [from, to, contract] of shapes) {
+      const mutated = source.replace(from, to);
+      assert.notEqual(mutated, source, from);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
+  // `UNO-WO-120 / R01`: the Media proof is load-bearing in both directions — collapsing the four-case conjunction, replacing the
+  // shared keyboard walk, deleting the surface/style comparison, the loaded-image comparison or the fresh-response restore each
+  // has to fail the audit for its own token.
+  it("the audit genuinely fails when the media evidence is deleted or neutered", () => {
+    const shapes = [
+      [
+        "localA2.media.browser = conjunction(mediaCases) && mediaBrowser.ok;",
+        "localA2.media.browser = true;",
+        "localA2.media.browser = conjunction(mediaCases) && mediaBrowser.ok;",
+      ],
+      [
+        "const mediaBrowser = mediaBrowserReport(readings);",
+        "const mediaBrowser = { ok: true, detail: \"\" };",
+        "mediaBrowserReport(readings)",
+      ],
+      [
+        "const verdict = mediaCaseVerdict(reading, testCase);",
+        "const verdict = { ok: true, detail: \"\" };",
+        "mediaCaseVerdict(reading, testCase)",
+      ],
+      [
+        "reading.keyboard = await walkToSafeLink(tab, MEDIA_EXPECTED.captionLinkHref);",
+        "reading.keyboard = { reached: true };",
+        "walkToSafeLink(tab, MEDIA_EXPECTED.captionLinkHref)",
+      ],
+      [
+        "localA2.media.renderer = rendererOk;",
+        "localA2.media.renderer = true;",
+        "localA2.media.renderer = rendererOk;",
+      ],
+      [
+        "FAMILY_MEDIA_HTTP the served Media section is one positioned and surfaced stack whose figure owns its loaded 64x64 PNG and its Markdown caption, with the authored heading and Markdown lede",
+        "media http unverified",
+        "FAMILY_MEDIA_HTTP",
+      ],
+      [
+        "FAMILY_MEDIA_RESTORE the temporary Media fixture was restored byte-exactly and a fresh response serves the committed Page without any variant anchor",
+        "restore unchecked",
+        "FAMILY_MEDIA_RESTORE",
+      ],
+      [
+        "FAMILY_MEDIA_REFUSAL every one of the twelve media probes refuses the whole Page with its own closed reason and no partial document",
+        "refusals unchecked",
+        "FAMILY_MEDIA_REFUSAL",
       ],
     ];
     for (const [from, to, contract] of shapes) {
@@ -1305,7 +1373,8 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ["textFiveGetterCalls === 0", "true"],
       ["textFiveBrowserChecks === 2", "true"],
       ["found.ledeBeforeNative", "true"],
-      ['familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7', "true"],
+      // `UNO-WO-120 / R01`: Media is the eighth top-level stack.
+      ['familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 8', "true"],
     ];
     for (const [token, replacement] of mutations) {
       const mutated = source.split(token).join(replacement);

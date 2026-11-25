@@ -181,6 +181,55 @@ export const COLUMNS_VARIANT_SOURCES = Object.freeze([
  * beside a plain `role` (the donor draws a role only with an attribution), and the donor's closed `align`/`surface` pair.
  * The donor authors no heading or lede for this family, so neither is present.
  */
+/**
+ * `UNO-WO-120 / R01`: the donated Media surface, exactly as authored for the served fixture — a plain h2 heading, the donor's
+ * Markdown-capable lede, the closed `position` (the figure first) and `surface`, one owned image with an authored alternative,
+ * and a Markdown caption carrying an approved safe link. It is exported so the gate, the evidence module and the served Page
+ * all read one definition.
+ */
+export const MEDIA_SOURCE = Object.freeze({
+  type: "media",
+  heading: "Synthetic media heading",
+  lede: "A **bounded** figure on one published Page.",
+  position: "start",
+  surface: "muted",
+  caption: "The plate is **owned**, with [the media notes](https://example.org/media-notes).",
+  image: Object.freeze({ src: FAMILY_DONOR_SOURCE, alt: "Synthetic blue image plate" }),
+});
+
+/**
+ * The three further Media variants the browser transaction serves temporarily: the donor's other `position` with the other
+ * surface and a **plain** (non-Markdown) caption, an explicitly **decorative** image, and the bare previously accepted
+ * composition that must stay byte-identical.
+ */
+export const MEDIA_VARIANT_SOURCES = Object.freeze([
+  Object.freeze({
+    type: "media",
+    heading: "Synthetic end position",
+    lede: "The **figure** follows its text.",
+    position: "end",
+    surface: "bordered",
+    caption: "A plain caption, not Markdown.",
+    image: Object.freeze({ src: FAMILY_DONOR_SOURCE, alt: "Synthetic end-position plate" }),
+  }),
+  Object.freeze({
+    type: "media",
+    heading: "Synthetic decorative heading",
+    lede: "A **decorative** plate with no accessible name.",
+    image: Object.freeze({
+      src: FAMILY_DONOR_SOURCE,
+      alt: "",
+      decorative: true,
+    }),
+    caption: "Decorative, so the caption carries the meaning.",
+  }),
+  Object.freeze({
+    type: "media",
+    image: Object.freeze({ src: FAMILY_DONOR_SOURCE, alt: "Synthetic bare plate" }),
+  }),
+]);
+
+/** The donated Quote surface, unchanged by `UNO-WO-120 / R01`. */
 export const QUOTE_SOURCE = Object.freeze({
   type: "quote",
   body: "The fixture records **bounded** evidence; it does not establish full parity.",
@@ -266,7 +315,12 @@ export function familySource() {
         ...FAQ_SOURCE,
         items: FAQ_SOURCE.items.map((item) => ({ ...item })),
       },
-      { type: "media", image: { src: FAMILY_DONOR_SOURCE, alt: "Synthetic blue image plate" } },
+      {
+        // `UNO-WO-120 / R01`: index 4 now authors the donor's full Media surface from the exported definition — the authored
+        // heading and Markdown lede, the closed position and surface, and a Markdown caption with an approved safe link.
+        ...MEDIA_SOURCE,
+        image: { ...MEDIA_SOURCE.image },
+      },
       {
         type: "gallery",
         columns: 2,

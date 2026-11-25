@@ -1161,6 +1161,65 @@ describe("the eleven remaining module renderers", () => {
     expect(html.includes("fetch(")).toBe(false);
   });
 
+  it("renders the donor's positioned, surfaced section with a Markdown caption and the decorative form", () => {
+    // `UNO-WO-120 / R01`: the two-track position is the section's own attribute, the caption renders as Markdown inside the
+    // figure that owns it, and a decorative image is announced as nothing.
+    const html = renderWithMedia(
+      {
+        version: 1,
+        title: "Rich media",
+        sections: [
+          {
+            id: "media",
+            module: "layout.stack",
+            props: { position: "start", surface: "muted" },
+            children: [
+              {
+                id: "media-figure",
+                module: "media.image",
+                props: {
+                  asset: { zone: "page", path: "hero.png" },
+                  alt: "A described plate",
+                  caption: "The **plate** with [notes](https://example.org/media-notes).",
+                  markdown: true,
+                },
+              },
+              {
+                id: "media-text",
+                module: "layout.stack",
+                props: {},
+                children: [{ id: "media-heading", module: "content.heading", props: { text: "Heading", level: 2 } }],
+              },
+            ],
+          },
+          {
+            id: "decorative",
+            module: "media.image",
+            props: { asset: { zone: "page", path: "hero.png" }, alt: "", decorative: true, caption: "Plain caption." },
+          },
+        ],
+      },
+      new Map([
+        ["media-figure", { image: image("0") }],
+        ["decorative", { image: image("1") }],
+      ]),
+    );
+    expect(html).toContain(
+      '<div class="uno-json-stack" data-uno-gap="normal" data-uno-position="start" data-uno-surface="muted" id="media">',
+    );
+    // The caption belongs to the figure that owns the image, and its Markdown is drawn from the shared AST.
+    expect(html).toMatch(
+      /<figure class="uno-json-media" id="media-figure">[\s\S]*?<figcaption class="uno-json-media-caption">[\s\S]*?<strong class="uno-family-md-strong">plate<\/strong>[\s\S]*?<a class="uno-family-md-link" href="https:\/\/example\.org\/media-notes"/u,
+    );
+    // No Markdown syntax survives as literal text.
+    expect(html.includes("**plate**")).toBe(false);
+    expect(html.includes("[notes](")).toBe(false);
+    // The decorative form: exactly an empty alt and no accessible name of any other kind.
+    expect(html).toMatch(/<figure class="uno-json-media" id="decorative"><img alt=""[^>]*\/>/u);
+    expect(html.includes('aria-label="') === false).toBe(true);
+    expect(html).toContain('<figcaption class="uno-json-media-caption">Plain caption.</figcaption>');
+  });
+
   it("renders an owned image with its authored alternative and a served locator", () => {
     const html = renderWithMedia(
       {

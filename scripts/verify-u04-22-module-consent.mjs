@@ -39,6 +39,8 @@ import {
   COLUMNS_SOURCE,
   COLUMNS_VARIANT_SOURCES,
   FAQ_LONG_SOURCE,
+  MEDIA_SOURCE,
+  MEDIA_VARIANT_SOURCES,
   composeFamilyFixture,
   familyBindings,
   familySource,
@@ -61,6 +63,26 @@ import {
   columnsLabelsOf,
   columnsRegionOf,
 } from "./u04/columns-evidence.mjs";
+// `UNO-WO-120 / R01`: the Media family's own reusable evidence module — the four browser cases, the served-region parsers,
+// the loaded-image and caption-ownership contract, and the twelve closed refusal probes.
+import {
+  MEDIA_CASES,
+  MEDIA_EXPECTED,
+  MEDIA_FIGURE_ID,
+  MEDIA_HEADING_ID,
+  MEDIA_ID,
+  MEDIA_LEDE_ID,
+  MEDIA_REFUSAL_CASES,
+  MEDIA_TEXT_ID,
+  MEDIA_VARIANTS,
+  mediaBrowserReport,
+  mediaCaptionOf,
+  mediaCaseVerdict,
+  mediaFigureOf,
+  mediaImagesOf,
+  mediaRegionOf,
+  mediaVariantRegionOf,
+} from "./u04/media-evidence.mjs";
 import { conjunction, conjunctionDetail, createFamilyEvidence, isCreditable } from "./u04/family-evidence.mjs";
 import { HERO_EXPECTED, HERO_REFUSAL_CASES, heroActionsOf, heroRegionOf, heroServed } from "./u04/hero-evidence.mjs";
 import {
@@ -214,6 +236,8 @@ const localA2 = {
   faq: createFamilyEvidence(),
   // `UNO-WO-119 / R01`: the eleventh credited family's own seven-dimension record.
   columns: createFamilyEvidence(),
+  // `UNO-WO-120 / R01`: the twelfth credited family's own seven-dimension record.
+  media: createFamilyEvidence(),
 };
 // Diagnostics only: the executed refusal codes, so a red `refusal` dimension names its own reason.
 let refusalReasons = "";
@@ -256,6 +280,159 @@ function check(name, condition, detail = "") {
   failures.push({ name, detail });
   process.stdout.write(`  FAIL  ${name}${detail ? ` - ${detail}` : ""}\n`);
   return false;
+}
+
+/**
+ * `UNO-WO-120 / R01`: walk the browser's own focus order from the top of the document until the **exact** classified safe link
+ * with `expectedHref` holds focus, then press Tab once more to prove focus can leave it without being trapped. The presses are
+ * real key events and each step is observed, so the returned trace names what actually received focus.
+ */
+async function walkToSafeLink(tab, expectedHref) {
+  await tab.evaluate(() => {
+    document.body.setAttribute("tabindex", "-1");
+    document.body.focus();
+    window.scrollTo(0, 0);
+  });
+  const trace = [];
+  let atLink = { reached: false, href: "", rel: "", visible: false };
+  let presses = 0;
+  for (let press = 1; press <= 240 && atLink.reached === false; press += 1) {
+    await tab.keyboard.press("Tab");
+    presses = press;
+    atLink = await tab.evaluate((expected) => {
+      const active = document.activeElement;
+      const isLink = active instanceof HTMLAnchorElement;
+      const href = isLink ? (active.getAttribute("href") ?? "") : "";
+      const tag = active === null
+        ? "none"
+        : `${active.tagName}${active.id === "" ? "" : `#${active.id}`}${href === "" ? "" : `[${href}]`}`;
+      return {
+        reached: isLink && href === expected,
+        href,
+        rel: isLink ? (active.getAttribute("rel") ?? "") : "",
+        visible: active instanceof HTMLElement && active.getBoundingClientRect().width > 0,
+        at: tag,
+      };
+    }, expectedHref);
+    if (trace.length < 6) trace.push(atLink.at);
+  }
+  const pageUrlAfter = tab.url();
+  await tab.keyboard.press("Tab");
+  const leftAfterTab = await tab.evaluate((expected) => {
+    const active = document.activeElement;
+    // Leaving means the focused element is no longer that link: focus is not trapped on a single anchor.
+    return !(active instanceof HTMLAnchorElement && active.getAttribute("href") === expected);
+  }, expectedHref);
+  return { ...atLink, leftAfterTab, presses, trace, pageUrlAfter };
+}
+
+/**
+ * `UNO-WO-120 / R01`: one browser reading of the four served Media variants. It is a module-level function so the gate's
+ * transaction stays orchestration, and it reads only what a visitor's browser can observe about the served page. Each
+ * variant is scrolled into the viewport first — the shipped images are `loading="lazy"`, so an off-screen figure has genuinely
+ * not requested its bytes yet — and the read waits for that image's own `load` before measuring it.
+ */
+async function readMediaCase(input) {
+  const awaitImage = async (image) => {
+    if (image === null || (image.complete && image.naturalWidth > 0)) return;
+    await new Promise((resolve) => {
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      image.addEventListener("load", done, { once: true });
+      image.addEventListener("error", done, { once: true });
+      setTimeout(done, 4000);
+    });
+  };
+  const readVariant = (id) => {
+    const root = document.getElementById(id);
+    if (root === null) return null;
+    const children = [...root.children];
+    const figure = root.matches("figure.uno-json-media") ? root : root.querySelector("figure.uno-json-media");
+    const image = figure?.querySelector("img") ?? null;
+    const caption = figure?.querySelector("figcaption") ?? null;
+    const link = caption?.querySelector("a") ?? null;
+    const strong = caption?.querySelector("strong.uno-family-md-strong") ?? null;
+    const style = getComputedStyle(root);
+    return {
+      id,
+      position: root.getAttribute("data-uno-position"),
+      surface: root.getAttribute("data-uno-surface"),
+      display: style.display,
+      gridTracks: style.gridTemplateColumns === "none" ? 0 : style.gridTemplateColumns.split(" ").length,
+      trackWidths: children.map((child) => Math.round(child.getBoundingClientRect().width)),
+      childTops: children.map((child) => Math.round(child.getBoundingClientRect().top)),
+      rootWidth: Math.round(root.getBoundingClientRect().width),
+      contentWidth: Math.round(
+        root.clientWidth
+          - (Number.parseFloat(style.paddingLeft) || 0)
+          - (Number.parseFloat(style.paddingRight) || 0),
+      ),
+      order: children.map((child) =>
+        child.matches("figure.uno-json-media") || child.querySelector("figure.uno-json-media") !== null ? "figure" : "text",
+      ),
+      image: image === null
+        ? null
+        : {
+            src: image.getAttribute("src") ?? "",
+            alt: image.getAttribute("alt"),
+            width: image.getAttribute("width"),
+            height: image.getAttribute("height"),
+            complete: image.complete === true,
+            naturalWidth: image.naturalWidth,
+            naturalHeight: image.naturalHeight,
+            ariaLabel: image.getAttribute("aria-label"),
+            title: image.getAttribute("title"),
+            accessibleName: image.getAttribute("aria-label") ?? image.getAttribute("alt") ?? "",
+          },
+      figure: figure === null
+        ? null
+        : {
+            id: figure.id,
+            imgIsChild: image !== null && image.parentElement === figure,
+            captionIsChild: caption !== null && caption.parentElement === figure,
+            html: figure.outerHTML.slice(0, 400),
+          },
+      caption: caption === null ? null : caption.textContent,
+      captionStrong: strong === null ? null : strong.textContent,
+      captionLinkHref: link === null ? null : link.getAttribute("href"),
+      captionLinkText: link === null ? null : link.textContent,
+      captionHasRawSyntax: caption === null ? false : /(\*\*|\[[^\]]*\]\()/u.test(caption.textContent ?? ""),
+      heading: root.querySelector("h2.uno-json-heading")?.textContent ?? null,
+      ledeStrong: root.querySelector("section.uno-json-prose strong.uno-family-md-strong")?.textContent ?? null,
+      surfaceStyle: {
+        backgroundColor: style.backgroundColor,
+        borderWidth: `${Number.parseFloat(style.borderTopWidth) || 0}px`,
+        borderRadius: style.borderTopLeftRadius,
+        padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft].join(" "),
+      },
+      overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+    };
+  };
+  return {
+    case: input.case,
+    width: window.innerWidth,
+    dark: matchMedia("(prefers-color-scheme: dark)").matches,
+    reduce: matchMedia("(prefers-reduced-motion: reduce)").matches,
+    forced: matchMedia("(forced-colors: active)").matches,
+    // A lazy image is only requested once its figure enters the viewport, exactly as for a visitor who scrolls to it — so each
+    // variant is visited in authored order, scrolled into view and awaited, before the whole set is measured.
+    captionLinkCount: document.querySelectorAll(
+      `a[href="${input.captionHref}"]`,
+    ).length,
+    variants: await (async () => {
+      for (const id of input.ids) {
+        const root = document.getElementById(id);
+        const figure = root?.matches("figure.uno-json-media") ? root : root?.querySelector("figure.uno-json-media");
+        root?.scrollIntoView({ block: "center" });
+        await awaitImage(figure?.querySelector("img") ?? null);
+      }
+      return input.ids.map(readVariant).filter((variant) => variant !== null);
+    })(),
+  };
 }
 
 function sha256Of(relativePath) {
@@ -1419,8 +1596,9 @@ async function main() {
       check(
         "FAMILY_LEDE_SOURCE the ledes add no node outside the two families and keep the seventeen top-level ids",
         JSON.stringify(ledeIds) === JSON.stringify(FAMILY_IDS)
-          // `UNO-WO-075 / R01` wraps five further families, so the fixture now holds nine top-level stacks.
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7
+          // `UNO-WO-075 / R01` wraps five further families and `UNO-WO-120 / R01` wraps Media, so the fixture now holds
+          // eight top-level stacks.
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 8
           && familyAccepted.sections[8]?.id === "family-8-divider"
           && JSON.stringify(familyAccepted.sections[8]?.props) === JSON.stringify({ variant: "divider" }),
         `${ledeIds.length}/${ledeIds.join(",")}`,
@@ -1486,7 +1664,8 @@ async function main() {
       check(
         "FAMILY_STATS_STEPS_SOURCE the authored-text families keep the seventeen ids and no other family changes",
         JSON.stringify(familyAccepted.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS)
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7
+          // `UNO-WO-120 / R01`: Media contributes the eighth top-level stack.
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 8
           && familyAccepted.sections[7]?.module === "content.actions"
           && familyAccepted.sections[8]?.id === "family-8-divider"
           && familyAccepted.sections[12]?.module === "content.testimonials",
@@ -2411,7 +2590,8 @@ async function main() {
       check(
         "FAMILY_TEXT_FIVE_SOURCE the three remaining authored-text families add no top-level node and keep the seventeen ids",
         JSON.stringify(familyAccepted.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS)
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7
+          // `UNO-WO-120 / R01`: Media contributes the eighth top-level stack.
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 8
           && textFiveEvidence.every((evidence) => evidence.ok),
         `${familyAccepted.sections.filter((section) => section.module === "layout.stack").length} stacks`,
       );
@@ -2434,7 +2614,9 @@ async function main() {
       check(
         "FAMILY_SERVING_SERVED one JSON Page and exactly three owned image occurrences in document order",
         occurrences.length === 3
-          && JSON.stringify(labelled) === JSON.stringify(["family-4-media#0", "family-5-gallery#0", "family-5-gallery#1"])
+          // `UNO-WO-120 / R01`: the Media figure is now the wrapper's `${MEDIA_FIGURE_ID}` child, so the planner labels that
+          // node; the section anchor itself is still `family-4-media` and the occurrence count is unchanged.
+          && JSON.stringify(labelled) === JSON.stringify(["family-4-media-figure#0", "family-5-gallery#0", "family-5-gallery#1"])
           && occurrences.every((entry) => entry.slot === "image"),
         labelled.join(","),
       );
@@ -2974,7 +3156,8 @@ async function main() {
       }
       check(
         "FAMILY_TEXT_FIVE_HTTP the three remaining authored-text families add seven stacks and three headings with no duplicate id, extra main or external destination",
-        (familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length === 7
+        // `UNO-WO-120 / R01`: Media adds its section stack and one inner text stack, so nine `normal` stacks are served.
+        (familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length === 9
           && (familyHtml.match(/<h2 class="uno-json-heading" id="family-(?:2-list|3-faq|13-table)-heading"/gu) ?? []).length === 3
           && (familyHtml.match(/<section class="uno-json-prose" id="family-3-faq-lede"/gu) ?? []).length === 1
           && (familyHtml.match(/<div class="uno-family-md uno-json-list-lede">/gu) ?? []).length === 1
@@ -3029,7 +3212,8 @@ async function main() {
           && (familyHtml.match(/<h1[\s>]/giu) ?? []).length === 1
           // `UNO-WO-080 / R01`: the composed outlines are level-3 headings — the two step titles, the two column titles and
           // every FAQ question — so the counts move with the authored FAQ items rather than a fixed single question.
-          && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 9
+          // `UNO-WO-120 / R01`: the Media section authors one more level-2 heading, so ten are served.
+          && (familyHtml.match(/<h2[\s>]/giu) ?? []).length === 10
           && (familyHtml.match(/<h3[\s>]/giu) ?? []).length === 8 + FAQ_EXPECTED.items.length
           && !familyHtml.includes(FAMILY_DONOR_SOURCE)
           && !familyHtml.includes("formRef"),
@@ -5272,10 +5456,16 @@ async function consentPhase(base) {
         localA2.columns.browser,
         `${conjunctionDetail(columnsCases)} ${geometry.detail}`,
       );
+      // `UNO-WO-120 / R01`: R02 verified the restored **bytes** but then re-read the swap's own response; this re-requests the
+      // Page after the restore, so the check observes a fresh served original rather than the body it already had.
+      const columnsRestoredResponse = await fetch(`${FAMILY_URL}?wo119r02=restored`, { redirect: "manual" });
+      const columnsRestoredHtml = columnsRestoredResponse.status === 200 ? await columnsRestoredResponse.text() : "";
       check(
-        "FAMILY_COLUMNS_RESTORE the temporary Columns fixture was restored byte-exactly and the served Page is the committed one again",
-        sha256Of(SOURCES[4]) === originalDigest && rendered.length > 0,
-        `restored=${sha256Of(SOURCES[4]) === originalDigest} served=${rendered.length}`,
+        "FAMILY_COLUMNS_RESTORE the temporary Columns fixture was restored byte-exactly and a fresh response serves the committed Page without any variant anchor",
+        sha256Of(SOURCES[4]) === originalDigest
+          && columnsRestoredHtml.includes(`id="${COLUMNS_ID}"`)
+          && COLUMNS_VARIANTS.slice(1).every((variant) => !columnsRestoredHtml.includes(`id="${variant.id}"`)),
+        `restored=${sha256Of(SOURCES[4]) === originalDigest} fresh=${columnsRestoredHtml.length}`,
       );
       // Renderer and HTTP: the served markup of the rich section and the three further variants, parsed from the real response.
       {
@@ -5329,6 +5519,321 @@ async function consentPhase(base) {
           JSON.stringify({ foreign }),
         );
       }
+    }
+    // `UNO-WO-120 / R01` (§2 `source`/`reader`/`refusal`): the Media family's donor-shaped surface, its closed optional
+    // members, the shared Markdown and Unicode decision on both caption forms, and the twelve closed refusal probes. The
+    // adapter is imported once, by a variable specifier, exactly as the other family transactions do.
+    {
+      const adapterSpecifier = "../src/application/compose-uno-foundation-families.ts";
+      const { composeUnoFoundationSubset: composeMedia } = await import(adapterSpecifier);
+      const mediaBindings = { images: familyBindings().images };
+      const mediaBase = (sections) => ({ version: 1, title: "Media family probe", sections });
+      const clone = (value) => JSON.parse(JSON.stringify(value));
+      const composeSource = (section) => composeMedia(mediaBase([section]), mediaBindings);
+
+      // --- source -------------------------------------------------------------------------------------------------------
+      const committed = composeFamilyFixture(composeMedia);
+      const committedAccepted = committed.status === "composed";
+      const committedMedia = committedAccepted
+        ? committed.document.sections.find((section) => section.id === MEDIA_ID)
+        : undefined;
+      const committedFigure = mediaFigureOf(committedMedia);
+      const bareComposed = composeSource({ type: "media", image: { src: FAMILY_DONOR_SOURCE, alt: "Bare plate" } });
+      const sourceOk = committedAccepted
+        && committedMedia?.module === "layout.stack"
+        && committedMedia.props.position === MEDIA_EXPECTED.position
+        && committedMedia.props.surface === MEDIA_EXPECTED.surface
+        // The figure comes first for `start`, and the authored text is one owned stack of its own fields.
+        && committedMedia.children.length === 2
+        && committedMedia.children[0].id === MEDIA_FIGURE_ID
+        && committedMedia.children[1].id === MEDIA_TEXT_ID
+        && committedMedia.children[1].children[0].id === MEDIA_HEADING_ID
+        && committedMedia.children[1].children[0].props.level === 2
+        && committedMedia.children[1].children[1].id === MEDIA_LEDE_ID
+        && committedMedia.children[1].children[1].props.markdown === true
+        && committedFigure?.props.alt === MEDIA_EXPECTED.alt
+        && committedFigure?.props.caption === MEDIA_EXPECTED.caption
+        && committedFigure?.props.markdown === true
+        && committedFigure?.props.decorative === undefined
+        // The bare previously accepted composition is still one `media.image` at the anchor, with no wrapper or extra prop.
+        && JSON.stringify(bareComposed.document?.sections?.[0]) === JSON.stringify({
+          id: "family-0-media",
+          module: "media.image",
+          props: { asset: { zone: "page", path: FAMILY_PLATE }, alt: "Bare plate" },
+        });
+      // `end` reverses the two children and keeps a plain caption plain; the decorative form is explicit.
+      const endOutcome = composeSource(clone(MEDIA_VARIANT_SOURCES[0]));
+      const decorativeOutcome = composeSource(clone(MEDIA_VARIANT_SOURCES[1]));
+      const endSourceOk = endOutcome.status === "composed"
+        && endOutcome.document.sections[0].props.position === "end"
+        && endOutcome.document.sections[0].children[0].id === "family-0-media-text"
+        && endOutcome.document.sections[0].children[1].id === "family-0-media-figure"
+        && mediaFigureOf(endOutcome.document.sections[0])?.props.markdown === undefined;
+      const decorativeSourceOk = decorativeOutcome.status === "composed"
+        && mediaFigureOf(decorativeOutcome.document.sections[0])?.props.alt === ""
+        && mediaFigureOf(decorativeOutcome.document.sections[0])?.props.decorative === true;
+      localA2.media.source = sourceOk && endSourceOk && decorativeSourceOk;
+      check(
+        "FAMILY_MEDIA_SOURCE the real adapter composes the donor's Media surface — authored heading and Markdown lede, closed position and surface, a Markdown caption, the explicit decorative form and the byte-identical bare section",
+        localA2.media.source === true,
+        JSON.stringify({ position: committedMedia?.props?.position, surface: committedMedia?.props?.surface, end: endSourceOk }),
+      );
+    }
+    // `UNO-WO-120 / R01` (§2 `reader`/`refusal`): the composed Page round-trips through the unchanged reader, the donor
+    // caption bound applies to the Markdown form only, and each of the twelve probes refuses the whole Page.
+    {
+      const adapterSpecifier = "../src/application/compose-uno-foundation-families.ts";
+      const { composeUnoFoundationSubset: composeMediaRead } = await import(adapterSpecifier);
+      const { readUnoPageDocument } = await import("../src/core/page-document.ts");
+      const mediaBindings = { images: familyBindings().images };
+      const composeSource = (section) =>
+        composeMediaRead({ version: 1, title: "Media family probe", sections: [section] }, mediaBindings);
+      const clone = (value) => JSON.parse(JSON.stringify(value));
+      const readAccepts = (section) => {
+        const outcome = composeSource(section);
+        return outcome.status === "composed" && readUnoPageDocument(outcome.document).accepted === true;
+      };
+      const richRead = composeFamilyFixture(composeMediaRead);
+      const richAccepted = richRead.status === "composed" && readUnoPageDocument(richRead.document).accepted === true;
+      // The two caption forms are disjoint: 4,000 Markdown code points is inside the donor bound, 4,001 is not, and the plain
+      // (non-Markdown) form keeps the native 320-point contract it has always had.
+      const markdownCaption = (length) => `**${"c".repeat(length - 4)}**`;
+      const donorBound = readAccepts({ ...clone(MEDIA_SOURCE), caption: markdownCaption(4000) }) === true
+        && readAccepts({ ...clone(MEDIA_SOURCE), caption: markdownCaption(4001) }) === false;
+      const nativeBound = readAccepts({ ...clone(MEDIA_SOURCE), caption: "c".repeat(320) }) === true
+        && readAccepts({ ...clone(MEDIA_SOURCE), caption: "c".repeat(321) }) === false;
+      // The document-level closed members, each refused by the reader itself rather than silently defaulted.
+      const documentRefusals = [
+        (document) => {
+          const figure = mediaFigureOf(document.sections.find((section) => section.id === MEDIA_ID));
+          if (figure === null || figure === undefined) return false;
+          // A declared-Markdown caption with no caption at all.
+          delete figure.props.caption;
+          return readUnoPageDocument(document).accepted === false;
+        },
+        (document) => {
+          document.sections.find((section) => section.id === MEDIA_ID).props.position = "middle";
+          return readUnoPageDocument(document).accepted === false;
+        },
+        (document) => {
+          document.sections.find((section) => section.id === MEDIA_ID).props.surface = "raised";
+          return readUnoPageDocument(document).accepted === false;
+        },
+        (document) => {
+          const figure = mediaFigureOf(document.sections.find((section) => section.id === MEDIA_ID));
+          if (figure === null || figure === undefined) return false;
+          // A decorative image that also carries a description is a contradiction the reader refuses.
+          figure.props.decorative = true;
+          return readUnoPageDocument(document).accepted === false;
+        },
+      ].every((probe) => probe(clone(richRead.document)));
+      localA2.media.reader = richAccepted && donorBound && nativeBound && documentRefusals;
+      check(
+        "FAMILY_MEDIA_READER the composed Page round-trips, the donor caption bound is 4,000 for the Markdown form only, the plain caption stays at 320 and the closed position/surface/decorative members refuse any other shape",
+        localA2.media.reader === true,
+        JSON.stringify({ richAccepted, donorBound, nativeBound, documentRefusals }),
+      );
+
+      // --- refusal ------------------------------------------------------------------------------------------------------
+      let mediaRefusals = 0;
+      for (const probe of MEDIA_REFUSAL_CASES) {
+        const section = clone(MEDIA_SOURCE);
+        probe.mutate(section);
+        const outcome = composeSource(section);
+        const refused = outcome.status !== "composed" && outcome.reason === probe.expected && outcome.document === undefined;
+        if (refused) mediaRefusals += 1;
+        check(
+          `FAMILY_MEDIA_REFUSAL ${probe.label} refuses the whole Page with ${probe.expected} and no document`,
+          refused,
+          outcome.status === "composed" ? "composed" : String(outcome.reason),
+        );
+      }
+      localA2.media.refusal = mediaRefusals === MEDIA_REFUSAL_CASES.length;
+      check(
+        "FAMILY_MEDIA_REFUSAL every one of the twelve media probes refuses the whole Page with its own closed reason and no partial document",
+        localA2.media.refusal === true,
+        `${mediaRefusals}/${MEDIA_REFUSAL_CASES.length}`,
+      );
+    }
+    // `UNO-WO-120 / R01` (§2 `renderer`/`http`/`rights`): the committed Page's own served Media region — the authored heading,
+    // the Markdown lede, the figure that owns its image and its Markdown caption, the closed position and surface attributes,
+    // the real owned locator with its real bytes, and nothing of the donor's identity, no remote source and no provider.
+    {
+      // A fresh request for the committed Page: the Media block must observe the served original itself.
+      const committedResponse = await fetch(`${FAMILY_URL}?wo120r01=committed`, { redirect: "manual" });
+      const committedHtml = committedResponse.status === 200 ? await committedResponse.text() : "";
+      const region = mediaRegionOf(committedHtml);
+      const images = mediaImagesOf(region);
+      const caption = mediaCaptionOf(region);
+      const locator = images[0]?.src ?? "";
+      const served = locator === "" ? null : await fetch(`${base}${locator}`);
+      const servedBytes = served === null ? Buffer.alloc(0) : Buffer.from(await served.arrayBuffer());
+      const pngHeader = servedBytes.length >= 24
+        && servedBytes[0] === 0x89 && servedBytes[1] === 0x50 && servedBytes[2] === 0x4e && servedBytes[3] === 0x47;
+      const intrinsicWidth = pngHeader ? servedBytes.readUInt32BE(16) : -1;
+      const intrinsicHeight = pngHeader ? servedBytes.readUInt32BE(20) : -1;
+      const rendererOk = region.length > 0
+        && region.includes(
+          `<div class="uno-json-stack" data-uno-gap="normal" data-uno-position="${MEDIA_EXPECTED.position}" data-uno-surface="${MEDIA_EXPECTED.surface}" id="${MEDIA_ID}">`,
+        )
+        // The figure comes first and is the one element that owns the image and its caption.
+        && region.indexOf(`id="${MEDIA_FIGURE_ID}"`) > 0
+        && region.indexOf(`id="${MEDIA_FIGURE_ID}"`) < region.indexOf(`id="${MEDIA_TEXT_ID}"`)
+        && region.includes(`<h2 class="uno-json-heading" id="${MEDIA_HEADING_ID}">${MEDIA_EXPECTED.heading}</h2>`)
+        && region.includes(`<section class="uno-json-prose" id="${MEDIA_LEDE_ID}">`)
+        && /<strong class="uno-family-md-strong">bounded<\/strong>/u.test(region)
+        && images.length === 1
+        && images[0].alt === MEDIA_EXPECTED.alt
+        && images[0].width === String(MEDIA_EXPECTED.intrinsicWidth)
+        && images[0].height === String(MEDIA_EXPECTED.intrinsicHeight)
+        && caption !== null
+        && /<strong class="uno-family-md-strong">owned<\/strong>/u.test(caption)
+        && caption.includes(`<a class="uno-family-md-link" href="${MEDIA_EXPECTED.captionLinkHref}"`)
+        && caption.includes(`>${MEDIA_EXPECTED.captionLinkText}</a>`)
+        && !/<button\b|<script\b|<form\b|<input\b|<iframe\b/iu.test(region);
+      localA2.media.renderer = rendererOk;
+      localA2.media.http = served !== null
+        && served.status === 200
+        && served.headers.get("content-type") === "image/png"
+        && pngHeader
+        && intrinsicWidth === MEDIA_EXPECTED.intrinsicWidth
+        && intrinsicHeight === MEDIA_EXPECTED.intrinsicHeight
+        && servedBytes.equals(readFileSync(resolve(ROOT, CAPSULE_DIR, FAMILY_PLATE)));
+      check(
+        "FAMILY_MEDIA_HTTP the served Media section is one positioned and surfaced stack whose figure owns its loaded 64x64 PNG and its Markdown caption, with the authored heading and Markdown lede",
+        rendererOk && localA2.media.http === true,
+        `${locator} status=${served?.status ?? "none"} type=${served?.headers?.get("content-type") ?? "none"} ${intrinsicWidth}x${intrinsicHeight}`,
+      );
+      // Rights: the donor identity is a migration key only, and no foreign resource, provider or unowned source is reachable.
+      const foreign = [...region.matchAll(/(?:href|src)="([^"]*)"/gu)]
+        .map((match) => match[1])
+        .filter((value) => !value.startsWith("https://example.org/") && !value.startsWith("/uno-media/"));
+      localA2.media.rights = !region.includes(FAMILY_DONOR_SOURCE)
+        && !region.includes("wo066-family-plate")
+        && !/url\(|@font-face|<iframe|https?:\/\/(?!example\.org)/iu.test(region)
+        && foreign.length === 0
+        && images.every((image) => MEDIA_EXPECTED.servedLocator.test(image.src ?? ""));
+      check(
+        "FAMILY_MEDIA_RIGHTS the served media region renders no donor identity, no remote source, no provider and no locator outside this Page's own owned route",
+        localA2.media.rights === true,
+        JSON.stringify({ foreign, locator }),
+      );
+    }
+    // `UNO-WO-120 / R01` (§2 `browser`): four independently executed cases — 390 and 1280 in light/normal motion and in
+    // dark/reduced motion — each measuring the four served Media variants: the loaded image and its intrinsic size, the alt or
+    // explicit decorative semantics, the caption the figure owns, the closed position's two equal tracks (or one column in
+    // authored order), the closed surface's computed presentation, and real keyboard access to the Markdown caption link.
+    {
+      const familyPath = resolve(ROOT, SOURCES[4]);
+      const original = readFileSync(familyPath);
+      const originalDigest = sha256Of(SOURCES[4]);
+      const readings = [];
+      const mediaCases = new Set();
+      const foreignRequests = [];
+      const onMediaRequest = (request) => {
+        if (/^https?:\/\//u.test(request.url()) && !/^https?:\/\/127\.0\.0\.1[:/]/u.test(request.url())) {
+          foreignRequests.push(request.url());
+        }
+      };
+      tab.on("request", onMediaRequest);
+      try {
+        const adapterSpecifier = "../src/application/compose-uno-foundation-families.ts";
+        const { composeUnoFoundationSubset: composeSwap } = await import(adapterSpecifier);
+        const swapSource = familySource();
+        MEDIA_VARIANT_SOURCES.forEach((variant, index) => {
+          swapSource.sections[17 + index] = { ...variant, image: { ...variant.image } };
+        });
+        const swapOutcome = composeSwap(swapSource, familyBindings());
+        if (swapOutcome.status !== "composed") throw new Error(String(swapOutcome.reason));
+        writeFileSync(familyPath, `${JSON.stringify(swapOutcome.document, null, 2)}\n`, "utf8");
+        // The served markup of the three appended variants is a separate observation from the geometry: it is the SSR output a
+        // visitor receives, and it is where the closed `position`/`surface`, the plain caption and the decorative form must show.
+        const swappedResponse = await fetch(`${FAMILY_URL}?wo120r01=markup`, { redirect: "manual" });
+        const swappedHtml = swappedResponse.status === 200 ? await swappedResponse.text() : "";
+        const endRegion = mediaVariantRegionOf(swappedHtml, MEDIA_VARIANTS[1].id);
+        const decorativeRegion = mediaVariantRegionOf(swappedHtml, MEDIA_VARIANTS[2].id);
+        const bareRegion = mediaVariantRegionOf(swappedHtml, MEDIA_VARIANTS[3].id);
+        const endCaption = mediaCaptionOf(endRegion) ?? "";
+        const variantsServed = swappedHtml.length > 0
+          && endRegion.includes(`data-uno-position="end"`)
+          && endRegion.includes(`data-uno-surface="bordered"`)
+          // `end` puts the authored text before the figure in the served DOM, which is also the mobile order.
+          && endRegion.indexOf(`id="${MEDIA_VARIANTS[1].id}-text"`) < endRegion.indexOf(`id="${MEDIA_VARIANTS[1].id}-figure"`)
+          && !/<strong|<a /u.test(endCaption)
+          && decorativeRegion.includes(`alt=""`)
+          && !decorativeRegion.includes("data-uno-position")
+          && /Decorative, so the caption carries the meaning\./u.test(decorativeRegion)
+          // The bare previously accepted section stays one plain figure at its anchor: no wrapper, no heading, no caption.
+          && bareRegion.includes(`<figure class="uno-json-media" id="${MEDIA_VARIANTS[3].id}">`)
+          && !bareRegion.includes("<h2") && !bareRegion.includes("<figcaption");
+        localA2.media.renderer = localA2.media.renderer && variantsServed;
+        check(
+          "FAMILY_MEDIA_HTTP the temporary page serves the end position with a plain caption, the decorative figure with an empty alt and the byte-identical bare figure",
+          variantsServed,
+          `${endRegion.length}/${decorativeRegion.length}/${bareRegion.length}`,
+        );
+        const variantIds = MEDIA_VARIANTS.map((variant) => variant.id);
+        for (const testCase of MEDIA_CASES) {
+          await tab.setViewportSize({ width: testCase.width, height: 900 });
+          await tab.emulateMedia({ colorScheme: testCase.scheme, reducedMotion: testCase.motion });
+          const errorsBefore = consoleErrors.length;
+          const foreignBefore = foreignRequests.length;
+          await tab.goto(`${FAMILY_URL}?wo120r01=${testCase.key}`, { waitUntil: "networkidle" });
+          const reading = await tab.evaluate(readMediaCase, {
+            case: testCase.key,
+            ids: variantIds,
+            captionHref: MEDIA_EXPECTED.captionLinkHref,
+          });
+          const pageUrlBefore = tab.url();
+          reading.keyboard = await walkToSafeLink(tab, MEDIA_EXPECTED.captionLinkHref);
+          reading.keyboard.pageUrlBefore = pageUrlBefore;
+          reading.keyboard.foreignRequests = foreignRequests.length - foreignBefore;
+          reading.errors = consoleErrors.length - errorsBefore;
+          const verdict = mediaCaseVerdict(reading, testCase);
+          readings.push(reading);
+          if (verdict.ok && reading.errors === 0) mediaCases.add(testCase.key);
+          check(
+            `FAMILY_MEDIA_BROWSER ${testCase.key} the four served variants load their owned image, own their caption, keep their alt or decorative semantics, lay out their position and surface and reach the caption link by keyboard`,
+            verdict.ok && reading.errors === 0,
+            `${verdict.detail} errors=${reading.errors}`,
+          );
+        }
+      } finally {
+        writeFileSync(familyPath, original);
+        tab.off("request", onMediaRequest);
+      }
+      const mediaBrowser = mediaBrowserReport(readings);
+      // The measured evidence for each executed case, printed once so the run log itself records the tracks, surfaces, image
+      // sizes and keyboard presses an independent reviewer needs — not only the pass/fail of the conjunction.
+      for (const reading of readings) {
+        process.stdout.write(
+          `  INFO  media ${reading.case} ${reading.width}px dark=${reading.dark} reduce=${reading.reduce} `
+          + `tracks=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, variant.trackWidths]))} `
+          + `images=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, variant.image?.naturalWidth, variant.image?.naturalHeight, variant.image?.alt]))} `
+          + `surfaces=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, variant.surface, variant.surfaceStyle?.backgroundColor]))} `
+          + `keyboard=${reading.keyboard?.presses} presses at=${reading.keyboard?.at} left=${reading.keyboard?.leftAfterTab} `
+          + `errors=${reading.errors} foreign=${reading.keyboard?.foreignRequests}\n`,
+        );
+      }
+      localA2.media.browser = conjunction(mediaCases) && mediaBrowser.ok;
+      check(
+        "FAMILY_MEDIA_BROWSER the browser dimension is the conjunction of all four executed cases at 390px and 1280px in light and dark/reduced motion",
+        localA2.media.browser,
+        `${conjunctionDetail(mediaCases)} ${mediaBrowser.detail}`,
+      );
+      // The order also requires a **fresh** served original, not only restored bytes: after the restore a new request must
+      // answer the committed Page again, with the committed Media region and none of the temporary variant anchors.
+      const freshResponse = await fetch(`${FAMILY_URL}?wo120r01=restored`, { redirect: "manual" });
+      const freshHtml = freshResponse.status === 200 ? await freshResponse.text() : "";
+      const freshOk = sha256Of(SOURCES[4]) === originalDigest
+        && freshHtml.length > 0
+        && freshHtml.includes(`id="${MEDIA_ID}"`)
+        && MEDIA_VARIANTS.slice(1).every((variant) => !freshHtml.includes(`id="${variant.id}"`));
+      check(
+        "FAMILY_MEDIA_RESTORE the temporary Media fixture was restored byte-exactly and a fresh response serves the committed Page without any variant anchor",
+        freshOk,
+        `digest=${sha256Of(SOURCES[4]) === originalDigest} fresh=${freshHtml.length}`,
+      );
     }
     // `UNO-WO-118 / R02` (§2 `browser`, long FAQ): the surface must hold on **every** group, so the served Page is temporarily
     // replaced by the same fixture with its FAQ section swapped for the donor's full twenty-four items. Nothing durable
@@ -5437,12 +5942,14 @@ async function consentPhase(base) {
         quote: localA2.quote,
         faq: localA2.faq,
         columns: localA2.columns,
+        // `UNO-WO-120 / R01`: the eighth credited family, so the seven-dimension total is 63.
+        media: localA2.media,
       };
       const dimensions = Object.values(records).reduce((total, record) => total + Object.keys(record).length, 0);
       check(
-        "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_EVIDENCE=56/56 (table, list, hero, stats, steps, quote, faq and columns credited; P6 destination proof in the three-Site gate)",
+        "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_MEDIA_EVIDENCE=63/63 (table, list, hero, stats, steps, quote, faq, columns and media credited; P6 destination proof in the three-Site gate)",
         Object.values(records).every((record) => Object.keys(record).length > 0)
-          && dimensions === 56
+          && dimensions === 63
           && Object.values(localA2).every((record) => isCreditable(record)),
         JSON.stringify({ ...records, refusalReasons }),
       );
@@ -5825,9 +6332,51 @@ async function consentPhase(base) {
           && closureB2.labels.includes("PARITY_COLUMNS=PASS"),
         closureB2.ok ? `${closureB2.parity}/17 ${closureB2.proxy}/59` : String(closureB2.reason),
       );
-      const creditedNames = new Set(closureEleven.credited.map((family) => `PARITY_${family.toUpperCase()}`));
-      const pendingNames = new Set(closureEleven.pending.map((family) => `PARITY_${family.toUpperCase()}`));
-      for (const label of closureEleven.labels) {
+      // `UNO-WO-120 / R01` (§2): the **twelve**-family row, evaluated by the same unchanged oracle **without** a checkpoint
+      // selector. `media` is credited here and only here, so the earned row is 12/17 and 54/59 while the declared B2 row above
+      // stays exactly the eleven families and 53/59 it declared. No C1 selector is used: thirteen families are not claimed.
+      const closureTwelve = evaluateU04FamilyClosure({
+        families: {
+          divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
+          prose: a1Evidence.prose,
+          callout: a1Evidence.callout,
+          table: localA2.table,
+          list: localA2.list,
+          hero: localA2.hero,
+          stats: localA2.stats,
+          steps: localA2.steps,
+          quote: localA2.quote,
+          faq: localA2.faq,
+          columns: localA2.columns,
+          media: localA2.media,
+        },
+        modules: UNO_RENDERABLE_MODULES.length,
+        zones: UNO_OWNED_MEDIA_ZONES.length,
+        browserMatrix: matrixCases.length,
+      });
+      check(
+        "U04_CLOSURE_ORACLE the unchanged oracle credits exactly twelve families at 12/17 and 54/59 without a checkpoint selector",
+        closureTwelve.ok === true
+          && JSON.stringify(closureTwelve.credited)
+            === JSON.stringify([
+              "prose", "callout", "table", "list", "hero", "stats", "steps", "quote", "faq", "columns", "media", "divider",
+            ])
+          && closureTwelve.parity === 12
+          && closureTwelve.proxy === 54
+          && closureTwelve.labels.includes("PARITY_MEDIA=PASS")
+          && closureTwelve.labels.includes("U04_PARITY=12/17")
+          && closureTwelve.labels.includes("U04_PROXY=54/59")
+          && closureTwelve.labels.includes("PARITY_GALLERY=PENDING")
+          && closureTwelve.labels.includes("PARITY_CARDS=PENDING")
+          && familyOk
+          && dividerOk,
+        closureTwelve.ok
+          ? `${closureTwelve.parity}/17 ${closureTwelve.proxy}/59 ${closureTwelve.credited.join(",")}`
+          : String(closureTwelve.reason),
+      );
+      const creditedNames = new Set(closureTwelve.credited.map((family) => `PARITY_${family.toUpperCase()}`));
+      const pendingNames = new Set(closureTwelve.pending.map((family) => `PARITY_${family.toUpperCase()}`));
+      for (const label of closureTwelve.labels) {
         const equals = label.lastIndexOf("=");
         const name = label.slice(0, equals);
         const value = label.slice(equals + 1);
@@ -5836,9 +6385,9 @@ async function consentPhase(base) {
           : pendingNames.has(name)
             ? value === "PENDING"
             : name === "U04_PARITY"
-              ? value === `${closureEleven.parity}/17`
+              ? value === `${closureTwelve.parity}/17`
               : name === "U04_PROXY"
-                ? value === `${closureEleven.proxy}/59`
+                ? value === `${closureTwelve.proxy}/59`
                 : value === `${UNO_RENDERABLE_MODULES.length}/${UNO_RENDERABLE_MODULES.length}`
                   || value === `${UNO_OWNED_MEDIA_ZONES.length}/${UNO_OWNED_MEDIA_ZONES.length}`
                   || value === `${matrixCases.length}/${matrixCases.length}`;

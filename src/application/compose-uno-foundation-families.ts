@@ -1300,30 +1300,97 @@ function composeSection(
       return { id, module: "content.actions", props: { items } };
     }
     case "media": {
-      // The donor also accepts decorative images, a remote source, heading/lede, position and surface. This subset
-      // composes one descriptive owned image per section, and only from an explicit caller-supplied binding.
-      requireExactKeys(record, ["type", "image"], ["caption"]);
+      // `UNO-WO-120 / R01`: the donor's full Media surface. The section may author a plain h2 heading, the shared validated
+      // Markdown lede and figure caption, the closed `surface` and the closed `position`; the image may be descriptive or
+      // explicitly decorative. The bare section (no heading, lede, position or surface) still composes as the one owned
+      // `media.image` at the family anchor, byte-identically to the previously accepted output.
+      requireExactKeys(record, ["type", "image"], ["caption", "heading", "lede", "position", "surface"]);
       const rawImage = record["image"];
       if (rawImage === null || typeof rawImage !== "object" || Array.isArray(rawImage)) refuseUnsupportedFeature();
       const image = rawImage as PlainRecord;
-      requireExactKeys(image, ["src", "alt"], []);
+      requireExactKeys(image, ["src", "alt"], ["decorative"]);
       const source = readMediaSourceIdentity(image["src"]);
       if (source === null) refuseUnsupportedFeature();
-      const alt = readNewFamilyText(image["alt"]);
-      // A donor decorative image (empty alt) is a different semantic and is not composed as a described image.
-      if (alt.trim().length === 0) refuseTarget();
+      // The donor's optional boolean semantics: only ever the literal `true`, and then the alt is exactly empty — a decorative
+      // image is announced as nothing. A nonempty alt alongside `decorative: true` is a contradiction, not a preference.
+      const rawDecorative = image["decorative"];
+      if (rawDecorative !== undefined && rawDecorative !== true) refuseUnsupportedFeature();
+      const decorative = rawDecorative === true;
+      const rawAlt = image["alt"];
+      if (typeof rawAlt !== "string") refuseUnsupportedFeature();
+      if (decorative) {
+        if (rawAlt.length !== 0) refuseTarget();
+      } else if (rawAlt.trim().length === 0) {
+        // An empty alt without the explicit flag is not silently reinterpreted as decorative.
+        refuseTarget();
+      }
+      const alt = decorative ? "" : readNewFamilyText(rawAlt);
+      // The donor caption is Markdown-capable, read by the one shared reader at the donor's own 4,000 bound; a caption without
+      // Markdown keeps the byte-identical plain form and its native 320-point contract.
       const hasCaption = ownsKey(record, "caption");
-      const caption = hasCaption ? readNewFamilyText(record["caption"]) : undefined;
-      if (caption !== undefined && caption.trim().length === 0) refuseTarget();
+      const caption = hasCaption ? readRichFamilyText(record["caption"], 4000) : undefined;
+      const captionMarkdown = caption !== undefined && hasFamilyMarkdown(caption);
+      // Closed presentation options. A member outside the set is an unsupported feature, never coerced to a neighbour.
+      const positionAuthored = ownsKey(record, "position");
+      const surfaceAuthored = ownsKey(record, "surface");
+      if (positionAuthored && record["position"] !== "start" && record["position"] !== "end") refuseUnsupportedFeature();
+      if (
+        surfaceAuthored
+        && record["surface"] !== "plain"
+        && record["surface"] !== "muted"
+        && record["surface"] !== "bordered"
+      ) {
+        refuseUnsupportedFeature();
+      }
+      const headingAuthored = ownsKey(record, "heading");
+      const ledeAuthored = ownsKey(record, "lede");
       // An unbound source has no owned reference: refuse rather than substitute a path or an external URL.
       const owned = media.lookup.get(source);
       if (owned === undefined) refuseUnsupportedFeature();
       media.usedSources.add(source);
-      return {
-        id,
-        module: "media.image",
-        props: { asset: owned, alt, ...(caption === undefined ? {} : { caption }) },
-      };
+      const imageProps: Record<string, unknown> = { asset: owned, alt };
+      if (decorative) imageProps["decorative"] = true;
+      if (caption !== undefined) imageProps["caption"] = caption;
+      if (captionMarkdown) imageProps["markdown"] = true;
+      const figure: CandidateSection = { id, module: "media.image", props: imageProps };
+      if (!headingAuthored && !ledeAuthored && !positionAuthored && !surfaceAuthored) {
+        // Byte-compatible legacy output: the original figure root with the original id, no wrapper and no extra props.
+        return figure;
+      }
+      const textChildren: CandidateSection[] = [];
+      if (headingAuthored) {
+        textChildren.push({
+          id: `${id}-heading`,
+          module: "content.heading",
+          props: { text: readSectionHeading(record["heading"]), level: 2 },
+        });
+      }
+      if (ledeAuthored) {
+        const lede = readFamilyLede(record["lede"]);
+        textChildren.push({
+          id: `${id}-lede`,
+          module: "content.prose",
+          props: hasFamilyMarkdown(lede) ? { text: lede, markdown: true } : { text: lede },
+        });
+      }
+      // A position places the figure against its authored text, so it needs text to place it against: nothing is invented.
+      if (positionAuthored && textChildren.length === 0) refuseTarget();
+      const wrappedFigure: CandidateSection = { ...figure, id: `${id}-figure` };
+      const wrapped: CandidateSection[] = [];
+      if (positionAuthored) {
+        // `start` puts the figure first and `end` the text first. The authoring order is the DOM order, which is also the mobile
+        // order; at a wide viewport the two children become two equal tracks. The text stays one owned stack of its own fields.
+        const text: CandidateSection = { id: `${id}-text`, module: "layout.stack", props: {}, children: textChildren };
+        if (record["position"] === "start") wrapped.push(wrappedFigure, text);
+        else wrapped.push(text, wrappedFigure);
+      } else {
+        // Absent position: the authored text above the figure, in one ordinary vertical stack.
+        wrapped.push(...textChildren, wrappedFigure);
+      }
+      const stackProps: Record<string, unknown> = {};
+      if (surfaceAuthored) stackProps["surface"] = record["surface"];
+      if (positionAuthored) stackProps["position"] = record["position"];
+      return { id, module: "layout.stack", props: stackProps, children: wrapped };
     }
     case "gallery": {
       // The donor also accepts optional heading/lede/surface, decorative images, Markdown captions and an implicit

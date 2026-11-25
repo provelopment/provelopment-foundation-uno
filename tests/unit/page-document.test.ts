@@ -1475,6 +1475,24 @@ describe("readUnoPageDocument — the eleven remaining owned modules", () => {
     return integrity === undefined ? { zone, path } : { zone, path, integrity };
   }
 
+  describe("layout.stack", () => {
+    // `UNO-WO-120 / R01`: the closed section position — `start` or `end`, never a third value and never a non-string.
+    it("accepts the closed two-track position and refuses any other literal", () => {
+      for (const position of ["start", "end"]) {
+        expect(readUnoPageDocument(probe("layout.stack", { position }, [leaf("s-one")])).accepted).toBe(true);
+      }
+      for (const position of ["middle", "", 1, null, true]) {
+        expectRefusal(probe("layout.stack", { position }, [leaf("s-one")]), "document:invalid-props");
+      }
+      // The position composes with the surface and the gap it has always had, and a stack without one is unchanged.
+      expect(
+        readUnoPageDocument(probe("layout.stack", { gap: "wide", surface: "muted", position: "end" }, [leaf("s-one")]))
+          .accepted,
+      ).toBe(true);
+      expect(readUnoPageDocument(probe("layout.stack", {}, [leaf("s-one")])).accepted).toBe(true);
+    });
+  });
+
   describe("layout.layers", () => {
     it("accepts two to four layers and refuses anything outside that bound", () => {
       expect(
@@ -1521,6 +1539,49 @@ describe("readUnoPageDocument — the eleven remaining owned modules", () => {
         probe("media.image", { asset: asset("hero.png"), alt: "A", decorative: "yes" }),
         "document:invalid-props",
       );
+    });
+
+    it("accepts the donor's Markdown caption form at its own 4,000 bound and keeps the plain form at 320", () => {
+      const markdownCaption = (length: number) => `**${"c".repeat(length - 4)}**`;
+      // `UNO-WO-120 / R01`: the two caption forms are disjoint; the donor's bound governs only the declared Markdown form.
+      expect(
+        readUnoPageDocument(
+          probe("media.image", { asset: asset("hero.png"), alt: "A", caption: markdownCaption(4000), markdown: true }),
+        ).accepted,
+      ).toBe(true);
+      expectRefusal(
+        probe("media.image", { asset: asset("hero.png"), alt: "A", caption: markdownCaption(4001), markdown: true }),
+        "document:invalid-props",
+      );
+      // The native plain caption keeps the 320 bound it has always had.
+      expect(
+        readUnoPageDocument(probe("media.image", { asset: asset("hero.png"), alt: "A", caption: "c".repeat(320) })).accepted,
+      ).toBe(true);
+      expectRefusal(
+        probe("media.image", { asset: asset("hero.png"), alt: "A", caption: "c".repeat(321) }),
+        "document:invalid-props",
+      );
+      // A declared-Markdown caption without a caption, a non-literal switch and an unparseable caption all refuse.
+      expectRefusal(
+        probe("media.image", { asset: asset("hero.png"), alt: "A", markdown: true }),
+        "document:invalid-props",
+      );
+      expectRefusal(
+        probe("media.image", { asset: asset("hero.png"), alt: "A", caption: "Plain", markdown: "true" }),
+        "document:invalid-props",
+      );
+      // An unparseable Markdown construct refuses through the shared reader's own reason…
+      expectRefusal(
+        probe("media.image", { asset: asset("hero.png"), alt: "A", caption: "An **unbalanced caption", markdown: true }),
+        "document:invalid-props",
+      );
+      // …while raw markup and a scheme the classifier refuses are unsafe text, and that narrower reason is kept.
+      for (const caption of ["<b>raw</b>", "[x](javascript:alert(1))"]) {
+        expectRefusal(
+          probe("media.image", { asset: asset("hero.png"), alt: "A", caption, markdown: true }),
+          "document:unsafe-text",
+        );
+      }
     });
 
     it("refuses an unsupported type, an unrelated purpose and a hostile path", () => {

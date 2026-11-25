@@ -607,6 +607,22 @@ main {
   background-color: var(--uno-background);
 }
 
+/*
+ * `UNO-WO-120 / R01`: the donor's closed Media `position`. At a wide viewport the authored figure and its authored text sit
+ * in one row of **two equal tracks**, in the DOM order the composer wrote (`start`: figure first, `end`: text first). Below
+ * that breakpoint the stack stays the ordinary single column, so the mobile order is exactly the authored order. A stack
+ * without a position is untouched, which keeps every other family pixel-identical.
+ */
+@media (min-width: 64rem) {
+  .uno-json-stack[data-uno-position="start"],
+  .uno-json-stack[data-uno-position="end"] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+  }
+}
+
 .uno-json-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1460,6 +1476,19 @@ main {
 .uno-json-media-caption {
   color: var(--uno-muted);
   font-size: 0.9375rem;
+}
+
+/*
+ * `UNO-WO-120 / R01`: a Markdown caption is drawn from the shared AST, so its blocks sit inside the owning `figcaption`
+ * without borrowing the page flow — no extra vertical rhythm, and the caption's own colour and size stay authoritative.
+ */
+.uno-json-media-caption-body > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.uno-json-media-caption-body > * + * {
+  margin-top: 0.5rem;
 }
 
 .uno-json-video-player {

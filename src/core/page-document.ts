@@ -127,6 +127,12 @@ export const UNO_PAGE_DOCUMENT_LIMITS = Object.freeze({
   carouselItems: 8,
   mediaAltCodePoints: 320,
   mediaCaptionCodePoints: 320,
+  /**
+   * `UNO-WO-120 / R01`: the donor's own Markdown caption bound for `media.image`. The **native plain caption keeps its
+   * `mediaCaptionCodePoints` (320) bound untouched** — only a caption explicitly declared as Markdown is read at this
+   * donor limit, so adopting the donor's 4,000 admits no wider contract anywhere else.
+   */
+  mediaCaptionMarkdownCodePoints: 4000,
   watermarkTextCodePoints: 160,
   contactDescriptionCodePoints: 400,
   sectionIdLength: 48,
@@ -140,6 +146,12 @@ export type UnoPageVisibility = "public" | "unlisted";
 /** The three closed stack gaps. */
 export type UnoStackGap = "tight" | "normal" | "wide";
 
+/**
+ * `UNO-WO-120 / R01`: the donor's closed Media `position`. `start` puts the figure first and `end` puts the authored text
+ * first; either way the two sit in one row of equal tracks at a wide viewport and keep that same order as one column on a
+ * narrow one. The absence of a position is the ordinary vertical stack, never a third value.
+ */
+export type UnoSectionPosition = "start" | "end";
 /** The two closed grid item semantics; `article` is a semantic wrapper, never a hidden module. */
 export type UnoGridItemSemantics = "plain" | "article";
 
@@ -151,6 +163,12 @@ export interface UnoLayoutStackProps {
    * stack can carry an authored surface **around the whole section** rather than only around its inner grid.
    */
   readonly surface?: UnoSectionSurface;
+  /**
+   * `UNO-WO-120 / R01`: the donor's closed `position` for the Media family. `start` places the figure before its authored
+   * text and `end` after it, both laid out as two equal tracks at a wide viewport and as one column, in the same authored
+   * order, at a narrow one. An absent position keeps the ordinary vertical stack, so every other family is untouched.
+   */
+  readonly position?: UnoSectionPosition;
 }
 
 /** The grid-only third item semantic: one native list with one `<li>` per authored child, in source order. */
@@ -448,12 +466,19 @@ export interface UnoMediaItem {
   readonly caption?: string;
 }
 
-/** `media.image` props: one owned raster, an authored alt (empty only when decorative) and an optional caption. */
+/**
+ * `media.image` props: one owned raster, an authored alt (empty only when decorative) and an optional caption.
+ *
+ * `UNO-WO-120 / R01`: a caption may be the donor's Markdown form. `markdown` is only ever the literal `true`, is set by the
+ * adapter from the donor's own Markdown-capable `caption`, and is read at the donor's 4,000 bound instead of the native
+ * plain caption's 320 — the two forms are disjoint, so no native caption bound is loosened.
+ */
 export interface UnoMediaImageProps {
   readonly asset: UnoOwnedAssetRef;
   readonly alt: string;
   readonly decorative?: boolean;
   readonly caption?: string;
+  readonly markdown?: true;
 }
 
 /** `media.video` props: one owned video, its **required** owned caption track and an authored accessible name. */
@@ -1246,12 +1271,23 @@ function readContentActions(value: unknown, state: WalkState): UnoContentActionE
 
 
 /** The three optional-value helpers that keep `exactOptionalPropertyTypes` honest. */
-function optionalStackProps(gap: unknown, surface: unknown): UnoLayoutStackProps {
+function optionalStackProps(gap: unknown, surface: unknown, position: unknown): UnoLayoutStackProps {
   const resolvedSurface = optionalProseSurface(surface);
-  if (gap === undefined) return resolvedSurface === undefined ? {} : { surface: resolvedSurface };
-  if (gap === "tight" || gap === "normal" || gap === "wide") {
-    return resolvedSurface === undefined ? { gap } : { gap, surface: resolvedSurface };
+  const resolvedPosition = optionalSectionPosition(position);
+  const props: { gap?: UnoStackGap; surface?: UnoSectionSurface; position?: UnoSectionPosition } = {};
+  if (gap !== undefined) {
+    if (gap !== "tight" && gap !== "normal" && gap !== "wide") throw new RefusedDocument("document:invalid-props");
+    props.gap = gap;
   }
+  if (resolvedSurface !== undefined) props.surface = resolvedSurface;
+  if (resolvedPosition !== undefined) props.position = resolvedPosition;
+  return props;
+}
+
+/** `UNO-WO-120 / R01`: the closed two-track section position, or its honest absence. */
+function optionalSectionPosition(value: unknown): UnoSectionPosition | undefined {
+  if (value === undefined) return undefined;
+  if (value === "start" || value === "end") return value;
   throw new RefusedDocument("document:invalid-props");
 }
 
@@ -2131,8 +2167,8 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   if (props === null) throw new RefusedDocument("document:invalid-props");
 
   if (moduleName === "layout.stack") {
-    if (!hasExactlyKeys(props, [], ["gap", "surface"])) throw new RefusedDocument("document:invalid-props");
-    const stackProps = optionalStackProps(props["gap"], props["surface"]);
+    if (!hasExactlyKeys(props, [], ["gap", "surface", "position"])) throw new RefusedDocument("document:invalid-props");
+    const stackProps = optionalStackProps(props["gap"], props["surface"], props["position"]);
     const children = readChildren(record["children"], depth + 1, state, seen);
     return { id, module: "layout.stack", props: stackProps, children };
   }
@@ -2357,7 +2393,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "media.image") {
-    if (!hasExactlyKeys(props, ["asset", "alt"], ["decorative", "caption"])) {
+    if (!hasExactlyKeys(props, ["asset", "alt"], ["decorative", "caption", "markdown"])) {
       throw new RefusedDocument("document:invalid-props");
     }
     const rawDecorative = props["decorative"];
@@ -2375,7 +2411,14 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
       false,
     );
     if (decorative && alt.length !== 0) throw new RefusedDocument("document:invalid-props");
-    const caption = readOptionalCaption(props["caption"]);
+    // `UNO-WO-120 / R01`: the two caption forms are disjoint. A declared Markdown caption is the donor's form and is read at
+    // the donor's bound; anything else keeps the native plain caption and its unchanged 320-point bound.
+    const markdown = optionalProseMarkdown(props["markdown"]);
+    if (markdown === true && props["caption"] === undefined) throw new RefusedDocument("document:invalid-props");
+    const caption =
+      markdown === true
+        ? requireFamilyMarkdown(props["caption"], UNO_PAGE_DOCUMENT_LIMITS.mediaCaptionMarkdownCodePoints)
+        : readOptionalCaption(props["caption"]);
     return {
       id,
       module: "media.image",
@@ -2384,6 +2427,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
         alt,
         ...(rawDecorative === undefined ? {} : { decorative }),
         ...(caption === undefined ? {} : { caption }),
+        ...(markdown === undefined ? {} : { markdown }),
       },
     };
   }

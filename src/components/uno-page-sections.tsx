@@ -62,18 +62,27 @@ function mediaOf(media: UnoPageMedia | undefined, id: string): UnoSectionMedia {
   return media?.get(id) ?? {};
 }
 
-/** One resolved figure: a real owned image with its authored alternative and optional caption. */
+/**
+ * One resolved figure: a real owned image with its authored alternative and optional caption.
+ *
+ * `UNO-WO-120 / R01`: a caption the document declared as Markdown is drawn from the same accepted AST the rest of the family
+ * uses, inside the same owning `figcaption`; a plain caption stays one escaped string. A caption that no longer parses renders
+ * no caption text rather than half a sentence.
+ */
 function MediaFigure({
   id,
   image,
   alt,
   caption,
+  markdown,
 }: {
   readonly id: string;
   readonly image: UnoResolvedImage;
   readonly alt: string;
   readonly caption: string | undefined;
+  readonly markdown?: true;
 }) {
+  const parsed = markdown === true && caption !== undefined ? readUnoFamilyMarkdown(caption) : null;
   return (
     <figure className="uno-json-media" id={id}>
       <Image
@@ -84,7 +93,15 @@ function MediaFigure({
         unoptimized
         width={image.width}
       />
-      {caption === undefined ? null : <figcaption className="uno-json-media-caption">{caption}</figcaption>}
+      {caption === undefined ? null : (
+        <figcaption className="uno-json-media-caption">
+          {parsed !== null && parsed.ok ? (
+            <UnoFamilyMarkdown blocks={parsed.blocks} className="uno-json-media-caption-body" />
+          ) : parsed === null ? (
+            caption
+          ) : null}
+        </figcaption>
+      )}
     </figure>
   );
 }
@@ -180,7 +197,13 @@ function SectionNode({
     case "layout.stack": {
       const gap = node.props.gap ?? "normal";
       return (
-        <div className="uno-json-stack" data-uno-gap={gap} data-uno-surface={node.props.surface} id={node.id}>
+        <div
+          className="uno-json-stack"
+          data-uno-gap={gap}
+          data-uno-position={node.props.position}
+          data-uno-surface={node.props.surface}
+          id={node.id}
+        >
           {node.children.map((child) => (
             <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} />
           ))}
@@ -677,7 +700,7 @@ function SectionNode({
       // Serving already refused the Page when a declared asset was unreadable, so an unresolved image here means the
       // document changed after acceptance; rendering nothing is the honest outcome.
       if (resolved === undefined) return null;
-      return <MediaFigure alt={node.props.alt} caption={node.props.caption} id={node.id} image={resolved} />;
+      return <MediaFigure alt={node.props.alt} caption={node.props.caption} id={node.id} image={resolved} markdown={node.props.markdown} />;
     }
     case "media.video": {
       if (isUnoExternalVideoProps(node.props)) {

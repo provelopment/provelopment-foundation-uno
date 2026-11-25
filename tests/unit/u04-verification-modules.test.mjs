@@ -63,6 +63,21 @@ import {
   columnsGeometryReport,
   columnsLabelsOf,
 } from "../../scripts/u04/columns-evidence.mjs";
+import {
+  MEDIA_CASES,
+  MEDIA_EXPECTED,
+  MEDIA_ID,
+  MEDIA_REFUSAL_CASES,
+  MEDIA_VARIANTS,
+  mediaBrowserReport,
+  mediaCaptionOf,
+  mediaCaseVerdict,
+  mediaFigureOf,
+  mediaImagesOf,
+  mediaRegionOf,
+  mediaVariantRegionOf,
+  plainCaptionOf,
+} from "../../scripts/u04/media-evidence.mjs";
 import { freeLoopbackPort, killChild, nextBinPath, runChild, waitForServer } from "../../scripts/u04/serving-harness.mjs";
 
 const ROOT = process.cwd();
@@ -672,6 +687,261 @@ describe("the extracted Columns evidence module", () => {
       if (outcome.status === "refused") expect(outcome.reason).toBe(probe.expected);
     }
   });
+
+describe("the extracted Media evidence module", () => {
+  /**
+   * One faithful reading for one case, so a test can weaken exactly one property and see the verdict refuse it. The values are
+   * the ones the production transaction reports: a 64x64 owned plate, two equal tracks at 1280 and one column at 390.
+   */
+  const caseReading = (testCase, overrides = {}) => {
+    const narrow = testCase.width < 1000;
+    const light = testCase.scheme === "light";
+    const muted = light ? "rgb(245, 247, 251)" : "rgb(20, 27, 36)";
+    const bordered = light ? "rgb(255, 255, 255)" : "rgb(12, 17, 24)";
+    const plainStyle = {
+      backgroundColor: "rgba(0, 0, 0, 0)",
+      borderWidth: "0px",
+      borderRadius: "0px",
+      padding: "0px 0px 0px 0px",
+    };
+    const surfaced = (background, border) => ({
+      backgroundColor: background,
+      borderWidth: border,
+      borderRadius: "20px",
+      padding: "16px 20px 16px 20px",
+    });
+    const variants = MEDIA_VARIANTS.map((authored, index) => {
+      const position = authored.position;
+      const order = position === "start" ? ["figure", "text"] : ["text", "figure"];
+      const twoTracks = position !== null;
+      const style = authored.surface === "muted"
+        ? surfaced(muted, "0px")
+        : authored.surface === "bordered"
+          ? surfaced(bordered, "1px")
+          : plainStyle;
+      return {
+        id: authored.id,
+        position,
+        surface: authored.surface,
+        display: twoTracks && !narrow ? "grid" : "flex",
+        gridTracks: twoTracks && !narrow ? 2 : 0,
+        trackWidths: twoTracks ? (narrow ? [310, 310] : [246, 246]) : narrow ? [310, 310, 310] : [246, 246, 246],
+        childTops: twoTracks ? (narrow ? [10, 240] : [10, 10]) : narrow ? [10, 120, 240] : [10, 10, 10],
+        rootWidth: twoTracks ? 350 : 310,
+        contentWidth: 310,
+        order: twoTracks ? order : ["text", "figure"],
+        image: {
+          src: `/uno-media/en-001/wo066-family-composition/${index}`,
+          alt: authored.alt,
+          width: "64",
+          height: "64",
+          complete: true,
+          naturalWidth: 64,
+          naturalHeight: 64,
+          ariaLabel: null,
+          title: null,
+          accessibleName: authored.alt,
+        },
+        figure: {
+          id: `${authored.id}-figure`,
+          imgIsChild: true,
+          captionIsChild: true,
+          html: "<figure><img/><figcaption></figcaption></figure>",
+        },
+        caption:
+          authored.caption === null
+            ? null
+            : authored.markdownCaption
+              ? plainCaptionOf(authored.caption)
+              : authored.caption,
+        captionStrong: authored.markdownCaption ? "owned" : null,
+        captionLinkHref: authored.markdownCaption ? MEDIA_EXPECTED.captionLinkHref : null,
+        captionLinkText: authored.markdownCaption ? MEDIA_EXPECTED.captionLinkText : null,
+        captionHasRawSyntax: false,
+        heading: authored.heading,
+        ledeStrong: null,
+        surfaceStyle: style,
+        overflow: 0,
+      };
+    });
+    return {
+      case: testCase.key,
+      width: testCase.width,
+      dark: testCase.scheme === "dark",
+      reduce: testCase.motion === "reduce",
+      forced: false,
+      captionLinkCount: 1,
+      variants,
+      keyboard: {
+        reached: true,
+        href: MEDIA_EXPECTED.captionLinkHref,
+        visible: true,
+        leftAfterTab: true,
+        presses: 12,
+        pageUrlBefore: "http://127.0.0.1/x/en-001/wo066-family-composition",
+        pageUrlAfter: "http://127.0.0.1/x/en-001/wo066-family-composition",
+        foreignRequests: 0,
+      },
+      ...overrides,
+    };
+  };
+  const allCases = () => MEDIA_CASES.map((testCase) => caseReading(testCase));
+  const weaken = (readings, key, mutate) =>
+    readings.map((reading) =>
+      reading.case === key ? mutate({ ...reading, variants: reading.variants.map((variant) => ({ ...variant })) }) : reading,
+    );
+  const at = (readings, key, id, patch) =>
+    weaken(readings, key, (reading) => ({
+      ...reading,
+      variants: reading.variants.map((variant) => (variant.id === id ? { ...variant, ...patch } : variant)),
+    }));
+  it("accepts exactly the four executed cases and refuses a missing, duplicated or mislabelled one", () => {
+    const readings = allCases();
+    expect(mediaBrowserReport(readings).ok).toBe(true);
+    expect(MEDIA_CASES.map((entry) => entry.key)).toEqual(["light:390", "light:1280", "dark:390", "dark:1280"]);
+    expect(mediaBrowserReport(readings.filter((reading) => reading.case !== "dark:390")).ok).toBe(false);
+    expect(mediaBrowserReport([...readings, readings[0]]).ok).toBe(false);
+    expect(mediaBrowserReport([]).ok).toBe(false);
+    expect(mediaBrowserReport(weaken(readings, "dark:1280", (reading) => ({ ...reading, dark: false }))).ok).toBe(false);
+    expect(mediaBrowserReport(weaken(readings, "light:390", (reading) => ({ ...reading, width: 391 }))).ok).toBe(false);
+    // Every single case, taken alone, is the same contract the aggregate applies.
+    expect(mediaCaseVerdict(readings[1], MEDIA_CASES[1]).ok).toBe(true);
+  });
+
+  it("refuses an image that did not load, the wrong intrinsic size, the donor path and a wrong alternative", () => {
+    const readings = allCases();
+    const image = readings[1].variants[0].image;
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { image: { ...image, complete: false } })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { image: { ...image, naturalWidth: 0 } })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { image: { ...image, naturalHeight: 32 } })).ok).toBe(false);
+    expect(
+      mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { image: { ...image, src: "/assets/wo066-donor-plate.png" } })).ok,
+    ).toBe(false);
+    expect(
+      mediaBrowserReport(at(readings, "dark:390", MEDIA_VARIANTS[1].id, { image: { ...readings[2].variants[1].image, alt: "Other" } }))
+        .ok,
+    ).toBe(false);
+    // The decorative form must stay nameless, and a described image must keep its own name.
+    expect(
+      mediaBrowserReport(
+        at(readings, "light:390", MEDIA_VARIANTS[2].id, { image: { ...readings[0].variants[2].image, accessibleName: "A plate" } }),
+      ).ok,
+    ).toBe(false);
+    expect(
+      mediaBrowserReport(
+        at(readings, "light:390", MEDIA_ID, { image: { ...readings[0].variants[0].image, accessibleName: "" } }),
+      ).ok,
+    ).toBe(false);
+  });
+
+  it("refuses a caption that escapes its figure, loses its Markdown meaning or is not the authored one", () => {
+    const readings = allCases();
+    expect(
+      mediaBrowserReport(
+        at(readings, "light:1280", MEDIA_ID, { figure: { ...readings[1].variants[0].figure, captionIsChild: false } }),
+      ).ok,
+    ).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { captionHasRawSyntax: true })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { captionLinkHref: "https://example.org/notes" })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { captionStrong: null })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { caption: "Another caption" })).ok).toBe(false);
+    // A plain caption that gained emphasis, a link or different text is no longer the plain caption that was authored.
+    expect(mediaBrowserReport(at(readings, "dark:1280", MEDIA_VARIANTS[1].id, { captionLinkHref: "https://example.org/x" })).ok)
+      .toBe(false);
+    expect(mediaBrowserReport(at(readings, "dark:1280", MEDIA_VARIANTS[1].id, { caption: "Something else" })).ok).toBe(false);
+  });
+  it("refuses a position that is not two equal tracks, the wrong authored order and any overflow", () => {
+    const readings = allCases();
+    // Merely unequal tracks, a lost grid and two rows all refuse at 1280.
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { trackWidths: [300, 190] })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { display: "flex" })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { gridTracks: 1 })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { childTops: [10, 200] })).ok).toBe(false);
+    // The authored order is the evidence: reversing it refuses at both widths.
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { order: ["text", "figure"] })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "dark:390", MEDIA_VARIANTS[1].id, { order: ["figure", "text"] })).ok).toBe(false);
+    // An absent position must not become a grid, a narrow section must stay one column, and nothing may overflow.
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_VARIANTS[2].id, { display: "grid", gridTracks: 2 })).ok)
+      .toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:390", MEDIA_ID, { trackWidths: [150, 150] })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "dark:390", MEDIA_VARIANTS[3].id, { childTops: [10, 10, 10] })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_VARIANTS[3].id, { overflow: 4 })).ok).toBe(false);
+  });
+  it("refuses a collapsed or absent surface and a weakened keyboard access", () => {
+    const readings = allCases();
+    const transparent = { backgroundColor: "rgba(0, 0, 0, 0)", borderWidth: "0px", borderRadius: "0px", padding: "0px 0px 0px 0px" };
+    const muted = readings[1].variants[0].surfaceStyle;
+    const bordered = readings[1].variants[1].surfaceStyle;
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { surfaceStyle: transparent })).ok).toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { surfaceStyle: { ...muted, padding: "0px 0px 0px 0px" } })).ok)
+      .toBe(false);
+    expect(mediaBrowserReport(at(readings, "light:1280", MEDIA_ID, { surfaceStyle: { ...muted, borderRadius: "0px" } })).ok)
+      .toBe(false);
+    expect(
+      mediaBrowserReport(at(readings, "light:1280", MEDIA_VARIANTS[1].id, { surfaceStyle: { ...bordered, borderWidth: "0px" } }))
+        .ok,
+    ).toBe(false);
+    // The two emphasised values cannot collapse into one another, and plain/absent must carry no effect at all.
+    expect(
+      mediaBrowserReport(
+        at(readings, "light:1280", MEDIA_VARIANTS[1].id, { surfaceStyle: { ...bordered, backgroundColor: muted.backgroundColor } }),
+      ).ok,
+    ).toBe(false);
+    expect(
+      mediaBrowserReport(
+        at(readings, "light:1280", MEDIA_VARIANTS[2].id, { surfaceStyle: { ...transparent, padding: "16px 20px 16px 20px" } }),
+      ).ok,
+    ).toBe(false);
+    const keyboard = (patch) => weaken(readings, "dark:1280", (reading) => ({ ...reading, keyboard: { ...reading.keyboard, ...patch } }));
+    expect(mediaBrowserReport(keyboard({ reached: false })).ok).toBe(false);
+    expect(mediaBrowserReport(keyboard({ href: "https://example.org/notes" })).ok).toBe(false);
+    expect(mediaBrowserReport(keyboard({ visible: false })).ok).toBe(false);
+    expect(mediaBrowserReport(keyboard({ leftAfterTab: false })).ok).toBe(false);
+    expect(mediaBrowserReport(keyboard({ pageUrlAfter: MEDIA_EXPECTED.captionLinkHref })).ok).toBe(false);
+    expect(mediaBrowserReport(keyboard({ foreignRequests: 1 })).ok).toBe(false);
+    expect(mediaBrowserReport(weaken(readings, "dark:1280", (reading) => ({ ...reading, captionLinkCount: 2 }))).ok).toBe(false);
+  });
+
+  it("parses the served region, its image attributes and its caption, and publishes twelve closed probes", () => {
+    const html =
+      '<div class="uno-json-stack" data-uno-gap="normal" data-uno-position="start" data-uno-surface="muted" id="family-4-media">'
+      + '<figure class="uno-json-media" id="family-4-media-figure"><img alt="A plate" width="64" height="64" src="/uno-media/en-001/wo066-family-composition/0"/>'
+      + '<figcaption class="uno-json-media-caption"><p>The <strong class="uno-family-md-strong">plate</strong>.</p></figcaption></figure></div>';
+    const region = mediaRegionOf(html);
+    expect(region).toContain('id="family-4-media"');
+    expect(mediaImagesOf(region).map((found) => [found.alt, found.src, found.width, found.height])).toEqual([
+      ["A plate", "/uno-media/en-001/wo066-family-composition/0", "64", "64"],
+    ]);
+    expect(mediaCaptionOf(region)).toContain("uno-family-md-strong");
+    // A bare figure is its own region root, and a variant region stops at its own figure's close.
+    const bare = '<figure class="uno-json-media" id="family-19-media"><img alt="Bare" src="/x"/></figure><div>after</div>';
+    expect(mediaVariantRegionOf(bare, "family-19-media")).toBe(
+      '<figure class="uno-json-media" id="family-19-media"><img alt="Bare" src="/x"/></figure>',
+    );
+    expect(mediaRegionOf("<div>no media here</div>")).toBe("");
+    expect(plainCaptionOf("The **plate** with [notes](https://example.org/media-notes).")).toBe("The plate with notes.");
+    // The figure locator is the composed node's own module, whether it is the anchor or a wrapper child.
+    expect(mediaFigureOf({ id: "a", module: "media.image", props: {} })).toEqual({ id: "a", module: "media.image", props: {} });
+    expect(mediaFigureOf({ id: "b", module: "layout.stack", children: [{ id: "c", module: "media.image", props: {} }] })).toEqual({
+      id: "c",
+      module: "media.image",
+      props: {},
+    });
+    expect(mediaFigureOf({ id: "d", module: "layout.grid", children: [] })).toBeNull();
+    // The refusal probes are closed, each with its own literal reason and its own label.
+    expect(MEDIA_REFUSAL_CASES).toHaveLength(12);
+    expect(MEDIA_REFUSAL_CASES.every((probe) => probe.expected.startsWith("family:"))).toBe(true);
+    expect(new Set(MEDIA_REFUSAL_CASES.map((probe) => probe.label)).size).toBe(12);
+    expect(MEDIA_VARIANTS.map((variant) => variant.id)).toEqual([
+      "family-4-media",
+      "family-17-media",
+      "family-18-media",
+      "family-19-media",
+    ]);
+  });
+
+});
+
 });
 
 
