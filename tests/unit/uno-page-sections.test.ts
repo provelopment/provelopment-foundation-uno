@@ -466,6 +466,72 @@ describe("UnoPageSections — hero, statistics and testimonials", () => {
     expect((markup.match(/<figcaption /gu) ?? []).length).toBe(2);
     expect(markup).not.toContain("cite");
   });
+
+  /**
+   * `UNO-WO-117 / R01`: the donor `quote.body` is Markdown-capable. An adapter-flagged node draws the quotation through
+   * the one shared family renderer inside its own `<blockquote>`; an unflagged node keeps the byte-identical escaped text,
+   * and a native role-only caption still renders because only the *donor* rule suppresses it.
+   */
+  it("renders a declared Markdown quotation through the shared renderer inside its blockquote", () => {
+    const document = accept({
+      version: 1,
+      title: "Declared quote fixture",
+      sections: [
+        {
+          id: "voices",
+          module: "content.testimonials",
+          props: {
+            markdown: true,
+            align: "center",
+            surface: "bordered",
+            items: [
+              {
+                quote: "A **bounded** quotation with `code` and a [link](https://example.org/notes).",
+                attribution: "Contributor A",
+                role: "Reviewer",
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const markup = render(document);
+    expect(markup).toContain(
+      '<section class="uno-json-testimonials" data-uno-align="center" data-uno-surface="bordered" id="voices">',
+    );
+    expect((markup.match(/<figure class="uno-json-testimonial">/gu) ?? []).length).toBe(1);
+    // The quotation is parsed Markdown, not its source syntax, and it stays inside the same blockquote element.
+    const blockquote = /<blockquote class="uno-json-testimonial-quote">([\s\S]*?)<\/blockquote>/u.exec(markup);
+    expect(blockquote).not.toBeNull();
+    const quoteMarkup = blockquote?.[1] ?? "";
+    expect(quoteMarkup).toContain('<strong class="uno-family-md-strong">bounded</strong>');
+    expect(quoteMarkup).toContain('<code class="uno-family-md-code">code</code>');
+    expect(quoteMarkup).toContain('<a class="uno-family-md-link"');
+    expect(markup).not.toContain("**bounded**");
+    // The caption keeps its separate attribution and role spans.
+    expect(markup).toContain('<span class="uno-json-testimonial-attribution">Contributor A</span>');
+    expect(markup).toContain('<span class="uno-json-testimonial-role">Reviewer</span>');
+    expect(markup).not.toContain("<script");
+  });
+
+  it("keeps an unflagged quotation byte-identical and a native role-only caption rendered", () => {
+    const document = accept({
+      version: 1,
+      title: "Plain quote fixture",
+      sections: [
+        {
+          id: "voices",
+          module: "content.testimonials",
+          props: { items: [{ quote: "A **literal** line.", role: "Editor" }] },
+        },
+      ],
+    });
+    const markup = render(document);
+    // No switch: the authored characters are the quotation, escaped as text.
+    expect(markup).toContain('<blockquote class="uno-json-testimonial-quote">A **literal** line.</blockquote>');
+    expect(markup).not.toContain("uno-family-md");
+    expect(markup).toContain('<span class="uno-json-testimonial-role">Editor</span>');
+  });
 });
 
 describe("UnoPageSections — bento, pricing and timeline", () => {

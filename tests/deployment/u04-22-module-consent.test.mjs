@@ -378,7 +378,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   'localA2.table.browser = conjunction(tableBrowserCases);',
   "if (tableLightOk) tableBrowserCases.add(`light:${width}`);",
   "if (darkTableOk) tableBrowserCases.add(`dark:${width}`);",
-  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_EVIDENCE=35/35 (table, list, hero, stats and steps credited; P6 destination proof in the three-Site gate)",
+  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_EVIDENCE=42/42 (table, list, hero, stats, steps and quote credited; P6 destination proof in the three-Site gate)",
   "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table and divider",
   'JSON.stringify(closureFour.credited) === JSON.stringify(["prose", "callout", "table", "divider"])',
   "closureFour.parity === 4",
@@ -483,6 +483,32 @@ const PHASE_C_REQUIRED = Object.freeze([
   "dark ${width}px the steps family keeps its ordered titles and both Markdown bodies with no invented state",
   '  checkpoint: "B1",',
   "composeFamilyFixture(composeUnoFoundationSubset)",
+  // `UNO-WO-117 / R01` (§1–§3): the extracted Quote module, the credited family's own seven executed dimensions, and the
+  // checkpoint-free nine-family interim row the unchanged oracle derives.
+  'from "./u04/quote-evidence.mjs";',
+  "quote: createFamilyEvidence(),",
+  "localA2.quote.source = familyAccepted.sections[12]?.module === \"content.testimonials\"",
+  "localA2.quote.reader = quoteReaderOk;",
+  "localA2.quote.refusal = quoteRefusalOk;",
+  "localA2.quote.renderer = quoteRegion.length > 0 && quoteFacts.ok;",
+  "localA2.quote.http = familyHtmlResponse.status === 200 && quoteFacts.ok;",
+  "localA2.quote.browser = conjunction(quoteBrowserCases);",
+  "localA2.quote.rights = !familyHtml.includes(FAMILY_DONOR_SOURCE)",
+  "const quoteRegion = quoteRegionOf(familyHtml);",
+  "const quoteFacts = quoteServed(quoteRegion);",
+  "const quoteItems = quoteItemsOf(quoteRegion);",
+  "JSON.stringify(familyAccepted.sections[12]?.props) === JSON.stringify(quoteNodeProps())",
+  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_EVIDENCE=42/42 (table, list, hero, stats, steps and quote credited; P6 destination proof in the three-Site gate)",
+  "A2_LOCAL_BROWSER the rich quote family was observed at 390px and 1280px in light and dark/reduced motion with its parsed Markdown quotation",
+  "A2_LOCAL_REFUSAL every malformed quote family refuses the whole source Page with the family's own reason",
+  "A2_LOCAL_READER the quote quotation is Markdown-validated and Unicode-checked in both forms while a native role-only caption stays accepted",
+  "FAMILY_QUOTE_HTTP the served quote carries its parsed Markdown quotation, closed presentation and separate caption spans",
+  "FAMILY_QUOTE_HTTP the quote holds no donor identity, declaration key, invented heading, form control or frame",
+  "dark ${width}px the quote family keeps its parsed Markdown quotation, closed presentation and caption spans",
+  "U04_CLOSURE_ORACLE the unchanged oracle credits exactly nine families at 9/17 and 51/59 without a checkpoint selector",
+  'closureInterim.labels.includes("U04_PARITY=9/17")',
+  'closureInterim.labels.includes("U04_PROXY=51/59")',
+  'closureB1.labels.includes("PARITY_QUOTE=PENDING")',
 ]);
 /** Audit one runner source and return every invariant it fails. An empty list means the gate is intact. */
 function audit(text) {
@@ -1197,6 +1223,14 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ["localA2.steps.http = familyHtmlResponse.status === 200 && stepsFacts.ok;", "localA2.steps.http = true;"],
       ["localA2.steps.browser = conjunction(stepsBrowserCases);", "localA2.steps.browser = true;"],
       ["const stepsFacts = stepsServed(stepsRegion);", "const stepsFacts = { ok: true, detail: \"\" };"],
+      // `UNO-WO-117 / R01`: the credited Quote family, its shared predicates, its conjunction and the checkpoint-free
+      // interim row cannot be neutered either.
+      ["quote: createFamilyEvidence(),", ""],
+      ["localA2.quote.http = familyHtmlResponse.status === 200 && quoteFacts.ok;", "localA2.quote.http = true;"],
+      ["localA2.quote.browser = conjunction(quoteBrowserCases);", "localA2.quote.browser = true;"],
+      ["const quoteFacts = quoteServed(quoteRegion);", "const quoteFacts = { ok: true, detail: \"\" };"],
+      ['closureInterim.labels.includes("U04_PARITY=9/17")', "true"],
+      ['closureB1.labels.includes("PARITY_QUOTE=PENDING")', "true"],
       ["composeFamilyFixture(composeUnoFoundationSubset)", "composeUnoFoundationSubset(familySource(), familyBindings())"],
     ];
     for (const [token, replacement] of mutations) {

@@ -917,23 +917,92 @@ describe("composeUnoFoundationSubset — steps and quote React markup", () => {
 });
 
 describe("composeUnoFoundationSubset — quote refusal", () => {
-  it("refuses quote fields, caption semantics and Markdown outside the bounded subset", () => {
+  it("refuses quote fields and invalid Markdown outside the bounded subset", () => {
+    // `UNO-WO-117 / R01`: the donor authors no `heading`/`lede`, so those stay out-of-subset keys; a link, handler or any
+    // other extra key is refused the same way. The donor's Markdown `body` now composes, so what refuses here is Markdown
+    // the shared reader itself rejects — never a literal render of it.
     for (const extra of ["heading", "lede", "href", "onClick"]) {
       expectRefusal(envelope({ type: "quote", body: "Q", [extra]: "X" }), "family:unsupported-feature");
     }
-    expectRefusal(envelope({ type: "quote", body: "Q", role: "Reviewer" }), "family:unsupported-feature");
-    for (const body of ["**bold**", "*italic*", "[x](https://example.org)", "a `code` span", "~~strike~~"]) {
+    for (const body of [
+      "<script>alert(1)</script>",
+      "![alt](https://example.org/i.png)",
+      "An **unbalanced body",
+      "[x](javascript:alert(1))",
+      "[x](//example.org/protocol-relative)",
+    ]) {
       expectRefusal(envelope({ type: "quote", body }), "family:unsupported-feature");
     }
+    // The caption fields stay single-line plain text: Markdown in a role or an attribution is still out of subset.
+    expectRefusal(
+      envelope({ type: "quote", body: "Q", attribution: "A", role: "**bold**" }),
+      "family:unsupported-feature",
+    );
   });
 
   it("refuses malformed quote values through the Uno target", () => {
     expectRefusal(envelope({ type: "quote", body: "" }), "family:target-refused");
     expectRefusal(envelope({ type: "quote", body: "q".repeat(4001) }), "family:target-refused");
+    expectRefusal(envelope({ type: "quote", body: " Q" }), "family:target-refused");
     expectRefusal(envelope({ type: "quote", body: "Q", align: "end" }), "family:target-refused");
     expectRefusal(envelope({ type: "quote", body: "Q", surface: "loud" }), "family:target-refused");
     expectRefusal(envelope({ type: "quote", body: "Q", attribution: "" }), "family:target-refused");
     expectRefusal(envelope({ type: "quote", body: "Q", attribution: "a".repeat(161) }), "family:target-refused");
+    // A suppressed role-only caption is still validated: its bound is the same label bound.
+    expectRefusal(envelope({ type: "quote", body: "Q", role: "r".repeat(161) }), "family:target-refused");
+  });
+});
+
+/**
+ * `UNO-WO-117 / R01`: the donor's Markdown quotation and its own caption presentation rule.
+ *
+ * The donor `quote.body` is Markdown-capable, so the composed node declares Markdown only when the body authors it. The
+ * donor draws a role **only** beside an attribution, so a role-only caption is suppressed — after the supplied role has
+ * still been validated, so a malformed role can never be hidden by the suppression. No attribution, role, caption or
+ * Markdown feature is ever invented.
+ */
+describe("composeUnoFoundationSubset — quote Markdown and caption presentation", () => {
+  it("composes a Markdown body as the declared rich quotation and keeps a plain body byte-identical", () => {
+    const rich = composed(envelope({ type: "quote", body: "A **bounded** quotation." }));
+    expect(rich.sections[0]?.props).toEqual({ items: [{ quote: "A **bounded** quotation." }], markdown: true });
+    const plain = composed(envelope({ type: "quote", body: "A bounded quotation." }));
+    expect(plain.sections[0]?.props).toEqual({ items: [{ quote: "A bounded quotation." }] });
+    // An authored multi-line body is Markdown too, and the shared reader accepts it as such.
+    const multiline = composed(envelope({ type: "quote", body: "First line\n\nSecond *line*." }));
+    expect(multiline.sections[0]?.props).toEqual({
+      items: [{ quote: "First line\n\nSecond *line*." }],
+      markdown: true,
+    });
+  });
+
+  it("keeps an attribution with its role and suppresses a role-only caption after validating it", () => {
+    const attributed = composed(envelope({ type: "quote", body: "Q", attribution: "A name", role: "Reviewer" }));
+    expect(attributed.sections[0]?.props).toEqual({ items: [{ quote: "Q", attribution: "A name", role: "Reviewer" }] });
+    // The donor presents nothing for a role without an attribution: the role is validated, then not composed.
+    const roleOnly = composed(envelope({ type: "quote", body: "Q", role: "Reviewer" }));
+    expect(roleOnly.sections[0]?.props).toEqual({ items: [{ quote: "Q" }] });
+    // No attribution is ever invented, and the bare quotation stays exactly that.
+    const bare = composed(envelope({ type: "quote", body: "Q" }));
+    expect(bare.sections[0]?.props).toEqual({ items: [{ quote: "Q" }] });
+  });
+
+  /**
+   * `UNO-WO-117 / R01`: the donor's Markdown quotation and its caption rule as the real renderer draws them — parsed
+   * Markdown inside the one `<blockquote>`, separate attribution and role spans, and nothing presented for a role-only
+   * donor input.
+   */
+  it("renders the donor's Markdown quotation as parsed Markdown and suppresses a role-only caption", () => {
+    const html = render(composed(envelope({ type: "quote", body: "A **bounded** quotation.", attribution: "A", role: "R" })));
+    const quote = /<blockquote class="uno-json-testimonial-quote">([\s\S]*?)<\/blockquote>/u.exec(html)?.[1] ?? "";
+    expect(quote).toContain('<strong class="uno-family-md-strong">bounded</strong>');
+    expect(html).not.toContain("**bounded**");
+    expect(html).toContain('<span class="uno-json-testimonial-attribution">A</span>');
+    expect(html).toContain('<span class="uno-json-testimonial-role">R</span>');
+    // A role without an attribution is presented as nothing at all: no caption element is created for it.
+    const roleOnly = render(composed(envelope({ type: "quote", body: "A bounded quotation.", role: "Reviewer" })));
+    expect(roleOnly).toContain('<blockquote class="uno-json-testimonial-quote">A bounded quotation.</blockquote>');
+    expect(roleOnly).not.toContain("uno-json-testimonial-caption");
+    expect(roleOnly).not.toContain("Reviewer");
   });
 });
 
@@ -2540,11 +2609,11 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/FAMILY_PARITY=17\/17/u);
     expect(ledger).toContain("ADAPT (divider semantic parity candidate)");
-    expect(ledger).toContain("eight of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("nine of seventeen fully parity-evidenced candidates");
     // `UNO-WO-071 / R01` normalizes the divider wording to its already independently accepted status.
     expect(ledger).toContain("independently accepted under `UNO-WO-069 / R01`");
     expect(ledger).not.toContain("awaiting independent Architect acceptance");
-    expect(ledger).toContain("nine still bounded");
+    expect(ledger).toContain("eight still bounded");
     // `UNO-WO-070 / R01`: the two grid families gained a bounded authored-heading mode, which must never be recorded as
     // full parity, a second/third accepted family or a closed stage.
     expect(ledger).toContain("ADAPT (bounded grid plus authored section heading and plain-text lede)");
@@ -2554,7 +2623,7 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).toContain("byte-identically");
     expect(ledger).toContain("heading-less");
     expect(ledger).toContain("bounded capability, not parity");
-    expect(ledger).toContain("Nine of the seventeen remain bounded");
+    expect(ledger).toContain("Eight of the seventeen remain bounded");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
@@ -4267,7 +4336,7 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
     expect(ledger).toContain("lede-only");
     expect(ledger).toContain("no-lede");
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("eight of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("nine of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
@@ -4640,7 +4709,7 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
     expect(ledger.split("ADAPT (bounded authored plain-text heading/lede)").length - 1).toBe(0);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("eight of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("nine of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/stats[^.\n]*full semantic parity/u);
@@ -5053,20 +5122,24 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     expect(ledger.split("PARITY (A1, UNO-WO-084 / R01)").length - 1).toBe(2);
     expect(ledger.split("PARITY (UNO-WO-110 / R01)").length - 1).toBe(1);
     expect(ledger.split("PARITY (UNO-WO-111 / R01)").length - 1).toBe(1);
+    // `UNO-WO-117 / R01` credited quote, so exactly one row carries this order's parity disposition.
+    expect(ledger.split("PARITY (UNO-WO-117 / R01)").length - 1).toBe(1);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("eight of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("nine of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("sixteen still bounded");
-    expect(ledger).toContain("nine still bounded");
-    expect(ledger).toContain("Nine of the seventeen remain bounded");
+    expect(ledger).toContain("eight still bounded");
+    expect(ledger).toContain("Eight of the seventeen remain bounded");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("16/17");
-    // `UNO-WO-114 / R01`: the ledger now records the delivered B1 row (`8/17` / `50/59`); what it must never claim is any
-    // later one, so those counts stay forbidden while every delivered count is pinned positively.
+    // `UNO-WO-114 / R01`: the ledger records the delivered B1 row (`8/17` / `50/59`); `UNO-WO-117 / R01` records the
+    // checkpoint-free nine-family interim (`9/17` / `51/59`). What it must never claim is any later row, so those counts stay
+    // forbidden while every delivered count is pinned positively.
     expect(ledger).toContain("6/17");
     expect(ledger).toContain("7/17");
     expect(ledger).toContain("8/17");
     expect(ledger).toContain("50/59");
-    expect(ledger).not.toContain("9/17");
+    expect(ledger).toContain("9/17");
+    expect(ledger).toContain("51/59");
     expect(ledger).not.toContain("11/17");
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/prose[^.\n]*full semantic parity/u);

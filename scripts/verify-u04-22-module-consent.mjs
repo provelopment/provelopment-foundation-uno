@@ -56,6 +56,14 @@ import {
   stepsRegionOf,
   stepsServed,
 } from "./u04/steps-evidence.mjs";
+import {
+  QUOTE_EXPECTED,
+  QUOTE_REFUSAL_CASES,
+  quoteItemsOf,
+  quoteNodeProps,
+  quoteRegionOf,
+  quoteServed,
+} from "./u04/quote-evidence.mjs";
 import { freeLoopbackPort, killChild, nextBinPath, runChild, waitForServer } from "./u04/serving-harness.mjs";
 
 registerHooks({
@@ -166,6 +174,7 @@ const localA2 = {
   hero: createFamilyEvidence(),
   stats: createFamilyEvidence(),
   steps: createFamilyEvidence(),
+  quote: createFamilyEvidence(),
 };
 // Diagnostics only: the executed refusal codes, so a red `refusal` dimension names its own reason.
 let refusalReasons = "";
@@ -182,6 +191,9 @@ const statsBrowserCases = new Set();
 // `UNO-WO-114 / R01`: and for the credited Steps family, whose Markdown lede, Markdown body, ordered titles and closed surface
 // must hold in all four cases at both viewports.
 const stepsBrowserCases = new Set();
+// `UNO-WO-117 / R01`: and for the credited Quote family, whose parsed Markdown quotation, closed presentation pair and
+// separate caption spans must hold in all four cases at both viewports.
+const quoteBrowserCases = new Set();
 const a1Evidence = {
   prose: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
   callout: { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: true },
@@ -795,6 +807,8 @@ async function main() {
 
     // `UNO-WO-067 / R01`: five representative whole-Page refusals in the four newly appended families. Each probe gets a
     // fresh source, mutates one value, and must refuse with the adapter's own vocabulary and no own `document` key.
+    // `UNO-WO-117 / R01`: the Quote probe moved from the role-only caption — which the donor suppresses rather than refuses
+    // — to a Markdown construct the shared reader rejects.
     const familyProbes = [
       {
         // `UNO-WO-112 / R01`: the hero's own matrix now covers its route, unsafe and malformed cases exhaustively; this
@@ -814,9 +828,11 @@ async function main() {
         mutate: (source) => { source.sections[11].items[0].status = "current"; },
       },
       {
-        label: "quote role without an attribution",
+        // `UNO-WO-117 / R01`: the donor's Markdown body now composes, so this representative appended-family probe is a
+        // construct the shared reader itself refuses rather than a literal rendering of it.
+        label: "quote body carrying an image",
         expected: "family:unsupported-feature",
-        mutate: (source) => { source.sections[12] = { type: "quote", body: "Q", role: "Reviewer" }; },
+        mutate: (source) => { source.sections[12] = { type: "quote", body: "A quotation ![alt](https://example.test/i.png)." }; },
       },
       {
         label: "hero with an empty lede",
@@ -1559,6 +1575,11 @@ async function main() {
         && JSON.stringify(familyAccepted.sections[11]?.children?.[1]?.props)
           === JSON.stringify({ text: STEPS_EXPECTED.lede, markdown: true })
         && JSON.stringify(familyAccepted.sections[11]?.children?.[2]?.props) === JSON.stringify(stepsNodeProps());
+      // `UNO-WO-117 / R01`: the quote family's accepted composition — one native testimonials node carrying the donor's
+      // Markdown body, its plain attribution and role, the closed presentation pair and the closed Markdown switch.
+      localA2.quote.source = familyAccepted.sections[12]?.module === "content.testimonials"
+        && familyAccepted.sections[12]?.id === QUOTE_EXPECTED.id
+        && JSON.stringify(familyAccepted.sections[12]?.props) === JSON.stringify(quoteNodeProps());
       // `UNO-WO-108 / R01` (R4): the strict reader is compared field by field, because a re-read record may order its own
       // keys differently. The composed props and the re-read props must still describe exactly the same authored surface.
       {
@@ -1655,6 +1676,14 @@ async function main() {
           && sameKeys(rereadStepsNode.props, familyAccepted.sections[11]?.children?.[2]?.props)
           && Object.isFrozen(familyReparsed.document);
         localA2.steps.reader = stepsReaderOk;
+        // `UNO-WO-117 / R01`: the strict reader round-trip of the quote family — one native node whose re-read props are
+        // exactly the authored quotation, caption labels, presentation pair and Markdown switch.
+        const rereadQuote = familyReparsed.accepted === true ? familyReparsed.document.sections[12] : undefined;
+        const quoteReaderOk = rereadQuote?.module === "content.testimonials"
+          && JSON.stringify(rereadQuote.props) === JSON.stringify(quoteNodeProps())
+          && sameKeys(rereadQuote.props, familyAccepted.sections[12]?.props)
+          && Object.isFrozen(familyReparsed.document);
+        localA2.quote.reader = quoteReaderOk;
         // `UNO-WO-108 / R01` (§4 `refusal`): two real refusals are executed against the authored source — an undeclared
         // `link` id and an unsafe URL scheme — and the rich list depends on them.
         const undeclaredLink = familySource();
@@ -1759,6 +1788,64 @@ async function main() {
           JSON.stringify(stepsRefusalProbes),
         );
         localA2.steps.refusal = stepsRefusalOk;
+        // `UNO-WO-117 / R01`: the quote family's whole-source refusal matrix — Markdown the shared reader refuses, a
+        // donor-only field, the 4,000 code-point bound, a malformed value, and a **suppressed** role-only caption that is
+        // still validated — plus direct-document refusals through the strict reader itself.
+        const quoteRefusalProbes = QUOTE_REFUSAL_CASES.map((probe) => {
+          const source = familySource();
+          probe.mutate(source);
+          const outcome = composeUnoFoundationSubset(source, familyBindings());
+          return {
+            label: probe.label,
+            expected: probe.expected,
+            reason: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+            partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+          };
+        });
+        const quoteRefusalOk = quoteRefusalProbes.every(
+          (probe) => probe.reason === probe.expected && probe.partial === false,
+        );
+        check(
+          "A2_LOCAL_REFUSAL every malformed quote family refuses the whole source Page with the family's own reason",
+          quoteRefusalOk,
+          JSON.stringify(quoteRefusalProbes),
+        );
+        localA2.quote.refusal = quoteRefusalOk;
+        {
+          const quoteDocument = (props) => ({
+            version: 1,
+            title: "Quote direct document",
+            sections: [{ id: "quote", module: "content.testimonials", props }],
+          });
+          const declaredInvalid = ["A **unclosed quotation", "A ![alt](https://example.invalid/i.png)"].map((body) =>
+            readUnoPageDocument(quoteDocument({ items: [{ quote: body }], markdown: true })));
+          const unicodeBothForms = ["A \uD800 tail", "A \uDC00 tail"].map((body) =>
+            readUnoPageDocument(quoteDocument({ items: [{ quote: body }] })));
+          const unicodeFlagged = readUnoPageDocument(
+            quoteDocument({ items: [{ quote: "A \uD800 tail" }], markdown: true }),
+          );
+          const closedFlag = readUnoPageDocument(quoteDocument({ items: [{ quote: "Q" }], markdown: false }));
+          // An ordinary native role-only caption keeps its own contract: the reader still accepts it.
+          const roleOnlyNative = readUnoPageDocument(quoteDocument({ items: [{ quote: "Q", role: "Editor" }] }));
+          const reasonOf = (probe) => (probe.accepted === true ? "accepted" : probe.reason);
+          check(
+            "A2_LOCAL_READER the quote quotation is Markdown-validated and Unicode-checked in both forms while a native role-only caption stays accepted",
+            declaredInvalid.every((probe) => probe.accepted === false && probe.reason === "document:invalid-props")
+              && unicodeBothForms.every((probe) => probe.accepted === false && probe.reason === "document:invalid-props")
+              && unicodeFlagged.accepted === false
+              && unicodeFlagged.reason === "document:invalid-props"
+              && closedFlag.accepted === false
+              && closedFlag.reason === "document:invalid-props"
+              && roleOnlyNative.accepted === true,
+            JSON.stringify({
+              declaredInvalid: declaredInvalid.map(reasonOf),
+              unicodeBothForms: unicodeBothForms.map(reasonOf),
+              unicodeFlagged: reasonOf(unicodeFlagged),
+              closedFlag: reasonOf(closedFlag),
+              roleOnlyNative: reasonOf(roleOnlyNative),
+            }),
+          );
+        }
         // `UNO-WO-116 / R01`: the malformed-Unicode probes are part of every Markdown-capable family matrix, and no earlier
         // refusal case was dropped to make room for them. One extracted case list, one presence rule, no per-family patch.
         const unicodeProbes = {
@@ -2201,17 +2288,21 @@ async function main() {
     check(
       "FAMILY_QUOTE_HTTP the quote region is one figure, blockquote and caption with separate attribution and role",
       (() => {
-        const quoteRegion = familyRegionOf("family-12-quote");
-        return quoteRegion.startsWith('<section class="uno-json-testimonials" data-uno-align="center" data-uno-surface="bordered" id="family-12-quote">')
-          && (quoteRegion.match(/<figure class="uno-json-testimonial">/gu) ?? []).length === 1
-          && (quoteRegion.match(/<blockquote class="uno-json-testimonial-quote">/gu) ?? []).length === 1
-          && quoteRegion.includes("The fixture does not establish full parity.")
-          && (quoteRegion.match(/<figcaption class="uno-json-testimonial-caption">/gu) ?? []).length === 1
-          && quoteRegion.includes('<span class="uno-json-testimonial-attribution">Synthetic contributor</span>')
-          && quoteRegion.includes('<span class="uno-json-testimonial-role">Reviewer</span>')
+        // `UNO-WO-117 / R01`: the region is read from the fixture-derived parser, so this shape check cannot drift from the
+        // authored quotation; the credited predicate below repeats it together with the Markdown and rights dimensions.
+        const quoteRegion = quoteRegionOf(familyHtml);
+        const items = quoteItemsOf(quoteRegion);
+        return quoteRegion.length > 0
+          && items.figures === 1
+          && items.quotes.length === 1
+          && items.captions.length === 1
+          && items.attribution === QUOTE_EXPECTED.attribution
+          && items.role === QUOTE_EXPECTED.role
+          && items.quotes[0].includes(`<strong class="uno-family-md-strong">${QUOTE_EXPECTED.bodyStrong}</strong>`)
+          && !items.quotes[0].includes("**")
           && !/<a\b|<iframe\b|<form\b|<button\b/iu.test(quoteRegion);
       })(),
-      familyRegionOf("family-12-quote").slice(0, 200),
+      quoteRegionOf(familyHtml).slice(0, 200),
     );
     {
       const appendedRegions = ["family-9-hero", "family-10-stats", "family-11-steps", "family-12-quote"].map(familyRegionOf);
@@ -2701,6 +2792,34 @@ async function main() {
         && stepsItems[1]?.markdownDescription === ""
         && stepsItems.every((item) => !item.hasStatus && !item.ariaCurrent && !item.hasDate),
       JSON.stringify(stepsItems),
+    );
+    // `UNO-WO-117 / R01` (§2 `renderer`/`http`/`rights`): the credited Quote family's served proof is the extracted
+    // predicate — one figure whose single blockquote holds the authored Markdown through the shared renderer, one caption
+    // with separate attribution and role spans, the closed `align`/`surface` pair, and no invented heading, destination,
+    // control, frame, donor identity or declaration key.
+    const quoteRegion = quoteRegionOf(familyHtml);
+    const quoteFacts = quoteServed(quoteRegion);
+    const quoteItems = quoteItemsOf(quoteRegion);
+    localA2.quote.renderer = quoteRegion.length > 0 && quoteFacts.ok;
+    localA2.quote.http = familyHtmlResponse.status === 200 && quoteFacts.ok;
+    localA2.quote.rights = !familyHtml.includes(FAMILY_DONOR_SOURCE)
+      && !quoteRegion.includes("example.help")
+      && !quoteRegion.includes("wo066-donor")
+      && (quoteRegion.match(/class="uno-json-testimonial-quote"/gu) ?? []).length === 1;
+    check(
+      "FAMILY_QUOTE_HTTP the served quote carries its parsed Markdown quotation, closed presentation and separate caption spans",
+      localA2.quote.http,
+      quoteFacts.detail,
+    );
+    check(
+      "FAMILY_QUOTE_HTTP the quote holds no donor identity, declaration key, invented heading, form control or frame",
+      localA2.quote.rights
+        && quoteItems.figures === 1
+        && quoteItems.quotes.length === 1
+        && quoteItems.attribution === QUOTE_EXPECTED.attribution
+        && quoteItems.role === QUOTE_EXPECTED.role
+        && !/<button\b|<form\b|<iframe\b|<img\b/iu.test(quoteRegion),
+      JSON.stringify(quoteItems).slice(0, 400),
     );
 
     check(
@@ -3448,6 +3567,10 @@ async function consentPhase(base) {
               figures: region?.querySelectorAll("figure.uno-json-testimonial").length ?? -1,
               quotes: [...(region?.querySelectorAll("blockquote.uno-json-testimonial-quote") ?? [])]
                 .map((node) => node.textContent ?? ""),
+              // `UNO-WO-117 / R01`: the quotation is parsed Markdown, so the shared renderer's own element is asserted.
+              markdownStrong: region?.querySelector("blockquote.uno-json-testimonial-quote strong.uno-family-md-strong")
+                ?.textContent ?? "",
+              literalSyntax: (region?.querySelector("blockquote.uno-json-testimonial-quote")?.textContent ?? "").includes("**"),
               captions: region?.querySelectorAll("figcaption.uno-json-testimonial-caption").length ?? -1,
               attribution: region?.querySelector(".uno-json-testimonial-attribution")?.textContent ?? "",
               role: region?.querySelector(".uno-json-testimonial-role")?.textContent ?? "",
@@ -3566,13 +3689,17 @@ async function consentPhase(base) {
           steps: [seen.steps.headingTag, seen.steps.ledeTag, seen.steps.ledeAfterHeading, seen.steps.ledeBeforeList],
           overflow: seen.overflow,
         }));
-      familyCheck(`${width}px quote shows one figure, blockquote and caption with separate attribution and role`,
+      const quoteLightOk = familyCheck(`${width}px quote shows one figure, blockquote and caption with separate attribution and role`,
         seen.quote.figures === 1 && seen.quote.quotes.length === 1
-          && seen.quote.quotes[0] === "The fixture does not establish full parity."
-          && seen.quote.captions === 1 && seen.quote.attribution === "Synthetic contributor"
-          && seen.quote.role === "Reviewer" && seen.quote.align === "center" && seen.quote.surface === "bordered"
+          && seen.quote.quotes[0] === QUOTE_EXPECTED.bodyText
+          && seen.quote.markdownStrong === QUOTE_EXPECTED.bodyStrong
+          && seen.quote.literalSyntax === false
+          && seen.quote.captions === 1 && seen.quote.attribution === QUOTE_EXPECTED.attribution
+          && seen.quote.role === QUOTE_EXPECTED.role
+          && seen.quote.align === QUOTE_EXPECTED.align && seen.quote.surface === QUOTE_EXPECTED.surface
           && seen.quote.anchors === 0,
         JSON.stringify(seen.quote));
+      if (quoteLightOk) quoteBrowserCases.add(`light:${width}`);
       // `UNO-WO-068 / R03`: the last four families, each scoped to its own composed region.
       // `UNO-WO-110 / R01` (§2 `browser`): the light-viewport observation is recorded under its own key only when this exact
       // assertion passed at this width — heading, Markdown lede and caption, two columns, four cells, no link, and the
@@ -4150,6 +4277,43 @@ async function consentPhase(base) {
         JSON.stringify(darkSteps),
       );
       if (darkStepsOk) stepsBrowserCases.add(`dark:${width}`);
+      // `UNO-WO-117 / R01` (§2 `browser`): the credited Quote family under dark and reduced motion at this viewport — the
+      // parsed Markdown quotation, the closed presentation pair and the separate caption spans, with no invented control.
+      const darkQuote = await tab.evaluate(() => {
+        const region = document.querySelector("#family-12-quote");
+        const quote = region?.querySelector("blockquote.uno-json-testimonial-quote") ?? null;
+        const box = region?.getBoundingClientRect() ?? null;
+        return {
+          scheme: matchMedia("(prefers-color-scheme: dark)").matches,
+          reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+          align: region?.getAttribute("data-uno-align") ?? "",
+          surface: region?.getAttribute("data-uno-surface") ?? "",
+          figures: region?.querySelectorAll("figure.uno-json-testimonial").length ?? -1,
+          quoteTag: quote?.tagName ?? "",
+          quoteText: quote?.textContent ?? "",
+          markdownStrong: quote?.querySelector("strong.uno-family-md-strong")?.textContent ?? "",
+          literalSyntax: (quote?.textContent ?? "").includes("**"),
+          captions: region?.querySelectorAll("figcaption.uno-json-testimonial-caption").length ?? -1,
+          attribution: region?.querySelector(".uno-json-testimonial-attribution")?.textContent ?? "",
+          role: region?.querySelector(".uno-json-testimonial-role")?.textContent ?? "",
+          headings: region?.querySelectorAll("h1, h2, h3").length ?? -1,
+          controls: region?.querySelectorAll("button, form, iframe, input, select, textarea, a, img").length ?? -1,
+          visible: box !== null && box.width > 0 && box.height > 0,
+          overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        };
+      });
+      const darkQuoteOk = familyCheck(
+        `dark ${width}px the quote family keeps its parsed Markdown quotation, closed presentation and caption spans`,
+        darkQuote.scheme && darkQuote.reducedMotion && darkQuote.align === QUOTE_EXPECTED.align
+          && darkQuote.surface === QUOTE_EXPECTED.surface && darkQuote.figures === 1
+          && darkQuote.quoteTag === "BLOCKQUOTE" && darkQuote.quoteText === QUOTE_EXPECTED.bodyText
+          && darkQuote.markdownStrong === QUOTE_EXPECTED.bodyStrong && darkQuote.literalSyntax === false
+          && darkQuote.captions === 1 && darkQuote.attribution === QUOTE_EXPECTED.attribution
+          && darkQuote.role === QUOTE_EXPECTED.role && darkQuote.headings === 0
+          && darkQuote.controls === 0 && darkQuote.visible && darkQuote.overflow === 0,
+        JSON.stringify(darkQuote),
+      );
+      if (darkQuoteOk) quoteBrowserCases.add(`dark:${width}`);
     }
     // `UNO-WO-111 / R01` (§2 `browser`): `list.browser` is the conjunction of the same four executed observations, so a
     // deleted, skipped or superficial case can never leave the credited family true. `UNO-WO-112 / R01` moves the rule into
@@ -4192,6 +4356,14 @@ async function consentPhase(base) {
       localA2.steps.browser,
       conjunctionDetail(stepsBrowserCases),
     );
+    // `UNO-WO-117 / R01` (§2 `browser`): the credited Quote family's four-case conjunction, each key added only by a real
+    // Chromium assertion that its parsed Markdown quotation, closed presentation and caption spans survived that case.
+    localA2.quote.browser = conjunction(quoteBrowserCases);
+    check(
+      "A2_LOCAL_BROWSER the rich quote family was observed at 390px and 1280px in light and dark/reduced motion with its parsed Markdown quotation",
+      localA2.quote.browser,
+      conjunctionDetail(quoteBrowserCases),
+    );
     await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
     familyCheck("the family Page raised no new console or page error", consoleErrors.length === errorsBefore,
       consoleErrors.slice(errorsBefore).join(" | ").slice(0, 180));
@@ -4225,12 +4397,19 @@ async function consentPhase(base) {
     // complete when all seven dimensions executed. `isCreditable()` is the one definition of "complete", so a missing or
     // mistyped dimension can never be counted here.
     {
-      const records = { list: localA2.list, table: localA2.table, hero: localA2.hero, stats: localA2.stats, steps: localA2.steps };
+      const records = {
+        list: localA2.list,
+        table: localA2.table,
+        hero: localA2.hero,
+        stats: localA2.stats,
+        steps: localA2.steps,
+        quote: localA2.quote,
+      };
       const dimensions = Object.values(records).reduce((total, record) => total + Object.keys(record).length, 0);
       check(
-        "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_EVIDENCE=35/35 (table, list, hero, stats and steps credited; P6 destination proof in the three-Site gate)",
-        records.list && records.table && records.hero && records.stats && records.steps
-          && dimensions === 35
+        "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_EVIDENCE=42/42 (table, list, hero, stats, steps and quote credited; P6 destination proof in the three-Site gate)",
+        records.list && records.table && records.hero && records.stats && records.steps && records.quote
+          && dimensions === 42
           && Object.values(localA2).every((record) => isCreditable(record)),
         JSON.stringify({ ...records, refusalReasons }),
       );
@@ -4460,18 +4639,56 @@ async function consentPhase(base) {
         && closureB1.labels.includes("PARITY_STEPS=PASS")
         && closureB1.labels.includes("PARITY_HERO=PASS")
         && closureB1.labels.includes("PARITY_STATS=PASS")
+        && closureB1.labels.includes("PARITY_QUOTE=PENDING")
         && familyOk
         && dividerOk,
       closureB1.ok
         ? `${closureB1.parity}/17 ${closureB1.proxy}/59 ${closureB1.credited.join(",")}`
         : String(closureB1.reason),
     );
-    if (closureB1.ok) {
-      // Every printed label is re-derived from the B1 result's own credit set, so a label cannot appear without its reason and
-      // no earlier row can print a fuller one.
-      const creditedNames = new Set(closureB1.credited.map((family) => `PARITY_${family.toUpperCase()}`));
-      const pendingNames = new Set(closureB1.pending.map((family) => `PARITY_${family.toUpperCase()}`));
-      for (const label of closureB1.labels) {
+    // `UNO-WO-117 / R01` (§3): the newly credited **Quote** family, evaluated by the same unchanged oracle **without** a
+    // checkpoint selector, so the interim row is whatever the executed records actually earn — nine families, `9/17` and
+    // `51/59`. The B1 row above stays a retained regression: it must still credit exactly its own eight, and it must still
+    // report Quote pending, so adding a family can never silently rewrite an already-declared checkpoint.
+    const closureInterim = evaluateU04FamilyClosure({
+      families: {
+        divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
+        prose: a1Evidence.prose,
+        callout: a1Evidence.callout,
+        table: localA2.table,
+        list: localA2.list,
+        hero: localA2.hero,
+        stats: localA2.stats,
+        steps: localA2.steps,
+        quote: localA2.quote,
+      },
+      modules: UNO_RENDERABLE_MODULES.length,
+      zones: UNO_OWNED_MEDIA_ZONES.length,
+      browserMatrix: matrixCases.length,
+    });
+    check(
+      "U04_CLOSURE_ORACLE the unchanged oracle credits exactly nine families at 9/17 and 51/59 without a checkpoint selector",
+      closureInterim.ok === true
+        && JSON.stringify(closureInterim.credited)
+          === JSON.stringify(["prose", "callout", "table", "list", "hero", "stats", "steps", "quote", "divider"])
+        && closureInterim.parity === 9
+        && closureInterim.proxy === 51
+        && closureInterim.labels.includes("PARITY_QUOTE=PASS")
+        && closureInterim.labels.includes("U04_PARITY=9/17")
+        && closureInterim.labels.includes("U04_PROXY=51/59")
+        && closureInterim.labels.includes("PARITY_FAQ=PENDING")
+        && familyOk
+        && dividerOk,
+      closureInterim.ok
+        ? `${closureInterim.parity}/17 ${closureInterim.proxy}/59 ${closureInterim.credited.join(",")}`
+        : String(closureInterim.reason),
+    );
+    if (closureInterim.ok) {
+      // Every printed label is re-derived from the interim result's own credit set, so a label cannot appear without its
+      // reason and no earlier row can print a fuller one.
+      const creditedNames = new Set(closureInterim.credited.map((family) => `PARITY_${family.toUpperCase()}`));
+      const pendingNames = new Set(closureInterim.pending.map((family) => `PARITY_${family.toUpperCase()}`));
+      for (const label of closureInterim.labels) {
         const equals = label.lastIndexOf("=");
         const name = label.slice(0, equals);
         const value = label.slice(equals + 1);
@@ -4480,9 +4697,9 @@ async function consentPhase(base) {
           : pendingNames.has(name)
             ? value === "PENDING"
             : name === "U04_PARITY"
-              ? value === `${closureB1.parity}/17`
+              ? value === `${closureInterim.parity}/17`
               : name === "U04_PROXY"
-                ? value === `${closureB1.proxy}/59`
+                ? value === `${closureInterim.proxy}/59`
                 : value === `${UNO_RENDERABLE_MODULES.length}/${UNO_RENDERABLE_MODULES.length}`
                   || value === `${UNO_OWNED_MEDIA_ZONES.length}/${UNO_OWNED_MEDIA_ZONES.length}`
                   || value === `${matrixCases.length}/${matrixCases.length}`;

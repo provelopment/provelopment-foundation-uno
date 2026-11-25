@@ -338,6 +338,12 @@ export interface UnoContentTestimonialsProps {
   readonly items: readonly UnoTestimonialItem[];
   readonly align?: UnoSectionAlign;
   readonly surface?: UnoSectionSurface;
+  /**
+   * `UNO-WO-117 / R01`: the closed Markdown switch for the quotation body. The donor `quote.body` is Markdown-capable, so
+   * a declared node carries Markdown the shared reader accepted and the renderer draws through the shared renderer; an
+   * undeclared node keeps the byte-identical escaped `<blockquote>`.
+   */
+  readonly markdown?: true;
 }
 
 /**
@@ -1709,8 +1715,15 @@ function readStatItems(value: unknown, markdown: boolean): UnoStatItem[] {
   return items;
 }
 
-/** 1–6 bounded authored quotations, each exactly `{quote, attribution?, role?}`; nothing is ever fabricated. */
-function readTestimonialItems(value: unknown): UnoTestimonialItem[] {
+/**
+ * 1–6 bounded authored quotations, each exactly `{quote, attribution?, role?}`; nothing is ever fabricated.
+ *
+ * `UNO-WO-117 / R01`: the donor `quote.body` is Markdown-capable, so the quotation is read as a Markdown-capable field —
+ * its plain form is held to the same Unicode well-formedness decision, and a node that declares `markdown: true` must
+ * also parse by the shared reader, so no accepted Page can fall back to printing raw syntax. `attribution` and `role`
+ * stay plain single-line labels: the donor authors them as plain text and a role is a caption, never a quotation.
+ */
+function readTestimonialItems(value: unknown, markdown: boolean): UnoTestimonialItem[] {
   if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
   if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.testimonialItems) {
     throw new RefusedDocument("document:invalid-props");
@@ -1723,13 +1736,10 @@ function readTestimonialItems(value: unknown): UnoTestimonialItem[] {
     if (!hasExactlyKeys(item, ["quote"], ["attribution", "role"])) {
       throw new RefusedDocument("document:invalid-props");
     }
-    const quote = readBoundedText(
-      item["quote"],
-      UNO_PAGE_DOCUMENT_LIMITS.textCodePoints,
-      "document:invalid-props",
-      false,
-      true,
-    );
+    // The quotation keeps the multi-line policy it has always had; declaring Markdown adds the parse requirement only.
+    const quote = markdown
+      ? requireFamilyMarkdown(item["quote"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
+      : readMarkdownCapableText(item["quote"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
     const attribution = optionalBoundedText(item["attribution"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, false);
     const role = optionalBoundedText(item["role"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, false);
     items.push({
@@ -2247,16 +2257,23 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "content.testimonials") {
-    if (!hasExactlyKeys(props, ["items"], ["align", "surface"])) {
+    if (!hasExactlyKeys(props, ["items"], ["align", "surface", "markdown"])) {
       throw new RefusedDocument("document:invalid-props");
     }
-    const items = readTestimonialItems(props["items"]);
+    // `UNO-WO-117 / R01`: the closed Markdown switch for the quotation body — only ever the literal `true`.
+    const markdown = optionalProseMarkdown(props["markdown"]);
+    const items = readTestimonialItems(props["items"], markdown === true);
     const align = optionalAlign(props["align"]);
     const surface = optionalSurface(props["surface"]);
     return {
       id,
       module: "content.testimonials",
-      props: { items, ...(align === undefined ? {} : { align }), ...(surface === undefined ? {} : { surface }) },
+      props: {
+        items,
+        ...(align === undefined ? {} : { align }),
+        ...(surface === undefined ? {} : { surface }),
+        ...(markdown === undefined ? {} : { markdown }),
+      },
     };
   }
 

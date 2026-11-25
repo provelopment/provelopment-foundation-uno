@@ -4,14 +4,17 @@
 document — `prose`, `callout`, `table`, `list`, `divider`, `hero`, `stats`, `steps`, `quote`, `faq`, `columns`, `cards`,
 `features`, `actions`, `media`, `gallery`, `contactForm` — out of the donor's **seventeen** families. It is a narrow
 provenance and rights ledger, not a parity record: **seventeen bounded source mappings; zero entirely unimplemented donor
-families; eight of seventeen fully parity-evidenced candidates (`divider`, `prose`/`callout` under `UNO-WO-084 / R01`
+families; nine of seventeen fully parity-evidenced candidates (`divider`, `prose`/`callout` under `UNO-WO-084 / R01`
 checkpoint A1, `table` under `UNO-WO-110 / R01`, `list` under `UNO-WO-111 / R01` at the earned `5/17` / `47/59` A2 row,
-`hero` under `UNO-WO-112 / R01` at `6/17` / `48/59`, `stats` under `UNO-WO-113 / R01` at `7/17` / `49/59`, and `steps`
-under `UNO-WO-114 / R01` at the declared **B1** `8/17` / `50/59` row), nine still bounded/non-parity (with the bounded
+`hero` under `UNO-WO-112 / R01` at `6/17` / `48/59`, `stats` under `UNO-WO-113 / R01` at `7/17` / `49/59`, `steps` under
+`UNO-WO-114 / R01` at the earned **B1** `8/17` / `50/59` row, and `quote` under `UNO-WO-117 / R01` at the checkpoint-free
+interim `9/17` / `51/59`), eight still bounded/non-parity (with the bounded
 authored-heading and plain-text-lede modes for `cards`/`features`, and the bounded plain-text heading/lede and item-outline
 modes for `faq`, which add no parity credit); one **durable** family composition published on the existing committed
 Components Page under `UNO-WO-078 / R01`**, verified over real production HTTP and Chromium and still a bounded
-composition, never a parity uplift.** U04 remains OPEN.
+composition, never a parity uplift.** U04 remains OPEN, and the declared **B2** row is **not** claimed:
+`quote` is credited at the checkpoint-free interim row only, so B1 stays exactly the row it was earned at and no later
+checkpoint target is asserted here.
 That one `divider` candidate was independently accepted under `UNO-WO-069 / R01` and is not Owner closure.
 
 ## 1. Provenance and licence
@@ -55,7 +58,7 @@ features; they are **not** additional donor family keys and must never be listed
 | `hero` | `page-document.ts` `a12d964c…` (`heroSectionSchema`: optional `eyebrow`, `lede`, `actions`, `support`, `align`, `surface`; `PAGE_MARKDOWN_FIELDS` lists `hero.lede` and `hero.support`); `media-sections.tsx` `e3f3a12e…` | `PARITY (UNO-WO-112 / R01)` | `type`, at least one of the Markdown-capable `lede`/`support` (≤4000 code points each), optional plain-text `eyebrow` (≤160 code points), optional closed `align`/`surface`, and 1–3 `actions[{label, href, variant?}]` whose single destination is a static `mailto`/`https` `href` classified by the unchanged safe-destination policy, each with the closed `primary`/`secondary`/`link` variant | donor `route`/`link` action destinations (site-local route projection belongs to the serving boundary, and an application link is inert elsewhere), a body-less hero, four or more actions, unknown variants, unsafe or relative action destinations, Markdown in `eyebrow`, unknown keys | `content.hero {eyebrow?, lede?, support?, markdown?, align?, surface?, actions?}` → `<section class="uno-json-hero" data-uno-align data-uno-surface>` whose plain field stays the byte-identical `<p>`, whose Markdown-capable `lede`/`support` render through the shared family Markdown renderer inside `uno-json-hero-lede`/`-support` when the adapter set `markdown`, and whose actions render one `<ul class="uno-json-actions uno-json-hero-actions">` of ordinary anchors (`rel="noreferrer noopener"`, `data-uno-variant`) or same-document `#<section-id>` anchors | composed + reader round-trip + markup (plain byte-identical, Markdown, both actions) + six whole-source hero refusals + served-HTTP region predicate with both actions parsed independently + four 390/1280 light and dark/reduced-motion Chromium observations asserting both Markdown bodies, both actions' href/rel/variant/focus and no control |
 | `stats` | `page-document.ts` `a12d964c…` (`statsSectionSchema` spreads `headingFields` — optional `heading`, Markdown-capable `lede` — and `surfaceField`; `statItemSchema.detail` is `markdownTextSchema`); `items-sections.tsx` `bc729d6a…` (`StatsSection` renders `SectionHeading` before the stat list, each item a value, a label and an optional Markdown detail) | `PARITY (UNO-WO-113 / R01)` | `type`, `items[1..6]{value,label,detail?}` with a Markdown-capable `detail` (≤320 code points), optional plain-text `heading` (≤160 code points), optional **Markdown** `lede` (≤4000 code points) and the donor's closed `surface` | donor `heading` **Markdown**, item `href`/`icon`/`route`/`link`, embedded images or markup in any field, seven or more entries, blank values or labels, unknown keys or surfaces, and the donor's own heading/lede typography | no text: unchanged `content.stats {items}` → `<section class="uno-json-stats">` with `<dl>`/`<dt>`/`<dd>`; heading/lede/surface: one `layout.stack {}` on the same family id holding the authored `content.heading {level:2}` at `${id}-heading`, the Markdown-capable `content.prose {text, markdown?}` at `${id}-lede`, then `content.stats {items, surface?, markdown?}` at `${id}-stats` | one authored `<h2>`, the Markdown lede through the shared family renderer, and the unchanged `<dl class="uno-json-stats-list">` whose first item's Markdown detail renders `<div class="uno-json-stat-detail">` while a plain detail keeps the escaped `<span>`; no invented heading, second list, link, currency or control | composed (legacy JSON byte-identical, plain lede byte-identical) + reader round-trip + markup (plain and Markdown) + six whole-source stats refusals + served-HTTP region predicate and pair parser + four 390/1280 light and dark/reduced-motion Chromium observations asserting both Markdown bodies, the surface and the pairs |
 | `steps` | `page-document.ts` `a12d964c…` (`stepsSectionSchema` spreads `headingFields` — optional `heading`, Markdown-capable `lede` — and `surfaceField`; `stepItemSchema.body` is `markdownTextSchema`; `itemsOf(stepItemSchema, 12)`); `items-sections.tsx` `bc729d6a…` (`StepsSection` renders `SectionHeading` before a native `<ol>` whose items are a level-3 title plus an optional Markdown body) | `PARITY (UNO-WO-114 / R01)` | `type`, `items[1..12]{title, body?}` with a Markdown-capable `body` (≤320 code points), optional plain-text `heading` (≤160 code points), optional **Markdown** `lede` (≤4000 code points) and the donor's closed `surface` | donor `heading` **Markdown**, item `href`/`route`/`link`/`status`/`dateLabel`/`icon`, embedded images or markup in any field, thirteen or more entries, blank titles, unknown keys or surfaces, and the donor's own ordinal-marker presentation | no text: unchanged `content.timeline {items,surface?}` → `<ol class="uno-json-timeline-list">`, one `<li>` per authored step in source order; heading/lede/surface: one `layout.stack {}` on the same family id holding `content.heading {level:2}` at `${id}-heading`, the Markdown-capable `content.prose {text, markdown?}` at `${id}-lede`, then `content.timeline {items, surface?, itemHeadingLevel:3, markdown?}` at `${id}-timeline` | one authored `<h2>`, the Markdown lede through the shared family renderer, and the unchanged native `<ol>`/`<li>` sequence carrying one `<h3 class="uno-json-timeline-title">` per authored step and the authored Markdown body as `<div class="uno-json-timeline-description">` (a plain body keeps the escaped `<p>`); no invented status, current step, date, icon, heading, second list, control or link | composed (legacy JSON byte-identical incl. `surface`, plain lede/body byte-identical) + reader round-trip + markup (plain and Markdown) + seven whole-source steps refusals + served-HTTP region and ordered-item predicates + four 390/1280 light and dark/reduced-motion Chromium observations asserting both Markdown bodies, the surface and the ordered titles |
-| `quote` | `page-document.ts` `a12d964c…`; `text-sections.tsx` `caeee577…` | `COMPOSE (plain-text figure subset)` | `type`, `body`, optional `attribution`, `role` (only with `attribution`), `align`, `surface` | donor `heading`/`lede`, Markdown, links, and the donor's role-only caption suppression | `content.testimonials {items:[{quote,attribution?,role?}],align?,surface?}` → one `<figure>` with `<blockquote>` and an authored `<figcaption>` | composed + caption/Markdown refusal + markup |
+| `quote` | `page-document.ts` `a12d964c…` (`quoteSectionSchema`: required Markdown-capable `body`, optional plain `attribution`/`role`, `align`, `surface`, no `heading`/`lede`; `PAGE_MARKDOWN_FIELDS` lists `quote.body`); `text-sections.tsx` `caeee577…` (`QuoteSection` renders one `<figure>` with a `<blockquote>` and a caption that appears **only** when an attribution exists, so a role-only caption is suppressed) | `PARITY (UNO-WO-117 / R01)` | `type`, required Markdown-capable `body` (≤4000 code points), optional plain-text `attribution` (≤160 code points) and `role` (≤160 code points, drawn only beside an attribution), and the donor's closed `align`/`surface` | donor `heading`/`lede`, a role-only **caption** (suppressed by the donor, not rendered), item collections, links/HTML/images inside the quotation, an unsafe or protocol-relative destination, Markdown in `attribution`/`role`, unknown keys | `content.testimonials {items:[{quote, attribution?, role?}], align?, surface?, markdown?}` → one `<figure class="uno-json-testimonial">` holding one `<blockquote class="uno-json-testimonial-quote">` whose quotation renders through the shared family Markdown renderer when the adapter flagged it (and as the byte-identical escaped text otherwise), plus one `<figcaption>` with separate attribution and role spans only when a caption is authored | composed (plain form byte-identical, Markdown form declared) + reader round-trip from data and JSON text + twelve whole-source quote refusals + four direct-document refusals (declared Markdown, Unicode in both forms, closed flag) with the native role-only caption still accepted + served-HTTP region predicate and item parser + four 390/1280 light and dark/reduced-motion Chromium observations asserting the parsed quotation, the closed presentation pair, both caption spans and no invented heading or control |
 | `faq` | `page-document.ts` `a12d964c…` (schema spreads `headingFields`); `structure-sections.tsx` `65d254e1…` | `ADAPT (bounded plain-text heading/lede)` | `type`, `items[1..8]{question,answer}`, optional plain-text `heading` (≤160 code points) and `lede` (≤4000 code points), literal and Markdown-free | donor `surface`, Markdown and links, item `href`/`icon`/`open`, any delivery or independent state | no text: one `interaction.accordion {items:[{sectionId,label}]}` with one `content.prose` answer child per entry; with text: one `layout.stack {}` whose heading/lede precede that accordion under `family-N-faq-accordion`, with every `sectionId` still equal to its own child id | nine no-text baselines + cap/feature/Markdown refusal + composed/refusal/markup |
 | `columns` | `page-document.ts` `a12d964c…`; `structure-sections.tsx` `65d254e1…` | `COMPOSE (bounded columns)` | `type`, `items[2..3]` of `{title,body}` **or** `{title,items[1..12]}`, optional `ratio` (`equal`/`start-wide`/`end-wide`, two columns only) | donor `heading`/`lede`/`surface`, Markdown and links, item `href`/`icon`/`style`, one or four columns, a ratio on three columns | one `layout.grid {columns,ratio?}` holding one `layout.stack {gap:"tight"}` per column, each with `content.heading {level:2}` then one `content.prose` body or native list | `data-uno-columns`, `data-uno-ratio` only when authored, `.uno-json-cell`, `<h2>`, paragraph and native `<ul class="uno-json-list">` | composed + count/ratio/Markdown refusal + markup |
 | `cards` | `page-document.ts` `a12d964c…` (strict `cardsSectionSchema`, `cardItemSchema`, `headingFields` with optional `heading` and Markdown-capable `lede`, `itemColumnsField`); `media-sections.tsx` `e3f3a12e…` (native `<li>` cards with optional media/meta/action, `SectionHeading` `<h2>` + Markdown lede, `ItemTitle` `<h3>`); `section-support.tsx` `19c9bee3…` (`SectionHeading`, `ItemTitle`, `columnsClass` default) | `ADAPT (bounded grid plus authored section heading and plain-text lede)` | `type`, required `columns` 2\|3\|4, `items[1..8]{title,body?}`, optional plain-text `heading` (nonempty, unpadded, ≤160 code points, no Markdown or markup), optional plain-text `lede` (nonempty, unpadded, ≤4000 code points, no Markdown, markup, control text or unpaired surrogate) | donor `surface`, an omitted `columns`, item `image`/`meta`/`action`/`href`/`icon`/`style`, Markdown and links — including the donor's Markdown-capable `lede` — donor borders, and the donor heading-less `<h3>` outline | **no-lede** (heading-less or headed-only) is byte-identical to the previously accepted output; `heading+lede` is one `layout.stack {}` holding `content.heading {level:2}`, one `content.prose {text}` at `${id}-lede` and the grid, whose item titles are `content.heading {level:3}`; `lede-only` is the same stack with `[content.prose {text}, layout.grid]` and heading-less level-2 item titles, inventing no heading | heading-less `<ul data-uno-item-semantics="list" role="list">` of `<li>` with `<h2>` titles; headed `<div class="uno-json-stack">` with one authored `<h2>`, then exactly one escaped `<p class="uno-json-prose" id="family-N-cards-lede">` in source order before the native `<ul>/<li>` list of `<h3>` titles; lede-only renders the paragraph before the list with no invented `<h2>` and only authored card bodies as further paragraphs | composed (four pre-WO-071 baselines byte-identical + `heading+lede` + `lede-only`) + required-columns/count/Markdown/heading/lede refusal + `<h2>/<p>/<h3>` order and markup |
@@ -68,6 +71,23 @@ features; they are **not** additional donor family keys and must never be listed
 Each accepted output is one validated, deep-frozen `UnoPageDocument` with `version: 1`, the donor title and one node
 per input section (`family-<index>-<type>`). Absent optional fields stay absent; the renderer owns visual defaults.
 No donor Markdown, link destination, image or media form is rendered by this subset.
+
+**The Quote family and the donor's caption rule (`UNO-WO-117 / R01`).** The pinned donor `quote` schema requires a
+Markdown-capable `body`, accepts optional plain `attribution` and `role` beside the closed `align`/`surface`, and has no
+`heading` or `lede` at all (`PAGE_MARKDOWN_FIELDS` lists `quote.body`). Its renderer draws **one** `<figure>` with one
+`<blockquote>` for the quotation, and a caption only when an `attribution` is present — so a role supplied without an
+attribution produces **no caption at all**. This order adopts that presentation rule instead of refusing the shape it
+previously refused: the role is read, **validated** through the strict reader's own caption contract, and then not
+composed, because presenting it would invent a caption the donor never draws. Validation is not skipped by suppression — a
+role over the label bound, or one carrying Markdown, still refuses the whole source. Ordinary **native** testimonials keep
+their previous contract, including a role-only caption, because that native shape is Uno's own and this order changes only
+the donor mapping. The composed node declares `markdown: true` only when the authored body actually carries Markdown, so a
+plain quotation stays byte-identical to what was published before. **Bound audit:** the donor's 4,000 code-point body limit
+is exactly Uno's existing `textCodePoints`, so the body contract is neither widened nor narrowed; the donor caps
+`attribution`/`role` at 120 code points while Uno's established label bound is 160, so an accepted donor caption may be up to
+40 code points longer than the donor itself would render. That is a **pre-existing** Uno bound, retained deliberately
+rather than narrowed here, and it is recorded rather than smoothed over. No donor Markdown feature, destination policy,
+heading or link is added by this mapping.
 
 **Bounded authored plain-text heading and lede, five families (`UNO-WO-075 / R01`).** The pinned donor schema spreads the
 same optional `heading`/`lede` pair into `prose`, `callout`, `list`, `faq` and `table` (`src/core/page-document.ts`
@@ -173,7 +193,7 @@ and this ledger claims no link engine, route resolver or publication authority.
   binding envelope,
   a section `ratio` on
   `cards`/`features`, a `ratio` authored on three columns, a column declaring both `body` and `items` or neither,
-  any extra key), a missing subset body (hero with neither `lede` nor `support`, `quote` `role` without `attribution`, a
+  any extra key), a missing subset body (hero with neither `lede` nor `support`, a
   `cards`/`features` section without its required `columns`, `media` without `image.src`/`image.alt`, `gallery` without
   `columns` or with a non-array `items`), an `actions`
   destination outside the accepted literal
@@ -311,7 +331,8 @@ ingress JSON-depth bounds that disagreed with the frozen Page-document contract 
   `<h2>`, the Markdown lede through the shared renderer, the closed `muted` surface and one native `<ol>` of two `<li>` items
   whose titles `Draft` then `Review` are `<h3>`s and whose first item's Markdown body is a real `<strong>`, with no
   `data-uno-status`, `aria-current` or date; quote one
-  `figure`/`blockquote`/`figcaption` with separate attribution and role spans and the authored
+  `figure`/`blockquote`/`figcaption` whose quotation is the authored Markdown parsed by the shared renderer (a real
+  `<strong>`, never its source syntax), with separate attribution and role spans and the authored
   `center`/`bordered` presentation; `table` one keyboard-focusable `.uno-json-table-scroll` wrapping a genuine
   `<table class="uno-json-table">` with one authored `<caption>Synthetic table</caption>`, two `<th scope="col">` headers
   in `Phase`/`Count` order and a 2×2 `<tbody>` in `First/1`, `Second/2` order; `columns` one
@@ -411,13 +432,13 @@ ingress JSON-depth bounds that disagreed with the frozen Page-document contract 
 
 ## 6. Remaining obligations
 
-No donor family is entirely unimplemented (the exact line in section 2). **Nine of the seventeen remain bounded subsets,
-not parity**; the eight parity-evidenced candidates are listed in section 2, while the authored-text modes for
+No donor family is entirely unimplemented (the exact line in section 2). **Eight of the seventeen remain bounded subsets,
+not parity**; the nine parity-evidenced candidates are listed in section 2, while the authored-text modes for
 `cards`/`features`, `faq` and the five families in `UNO-WO-075 / R01` are a bounded capability, not parity, and give none of
 those families parity credit.
-Outstanding for those nine shapes: donor Markdown rendering, link/destination representation beyond
+Outstanding for those eight shapes: donor Markdown rendering, link/destination representation beyond
 same-document fragments, rich donor forms, the
-other quote, FAQ, columns, cards, features and actions options, the heading-less `cards`/`features`
+other FAQ, columns, cards, features and actions options, the heading-less `cards`/`features`
 outline, the donor `faq` and `columns` heading outlines, donor card borders/media/meta/actions and feature icons, the donor decorative
 media form, media headings/lede/position/surface, the donor native gallery list wrapper with its optional
 heading/lede/surface and implicit column default, remote image sources and Markdown captions, the donor per-render
@@ -425,7 +446,8 @@ contact seam and every authored form/delivery semantic, and full-parity browser 
 durable bounded composition Page of section 7 now exists, but it evidences the bounded subset only). Any
 future order must add those explicitly; this ledger authorises no new module ID, no new schema
 variant and no publication
-authority.
+authority. The **B2** row stays Open: only `quote` of its three declared families is credited, at the checkpoint-free
+interim `9/17` / `51/59`, and no B2 target is claimed here.
 
 ## 7. Durable family Page (`UNO-WO-078 / R01`)
 

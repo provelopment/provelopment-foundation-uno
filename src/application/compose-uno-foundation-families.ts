@@ -538,6 +538,35 @@ function readNewFamilyText(value: PlainValue | undefined): string {
   return text;
 }
 
+/**
+ * Validate a supplied donor `quote.role` even when the donor's own caption rule suppresses it.
+ *
+ * `UNO-WO-117 / R01`: the donor draws a role only beside an attribution, so a role-only caption is presented as nothing.
+ * Suppression is a presentation rule, never a validation exemption: the role must still satisfy the strict reader's caption
+ * contract. That contract is the reader's own, so instead of duplicating its bound and character rules here the value is
+ * read by that same reader on a minimal probe node — a suppressed role can therefore never be one the Page would have
+ * refused if the attribution had been present. A refusal maps to `family:target-refused`, exactly as any other reader
+ * refusal of the composed candidate does.
+ */
+function requireQuoteRoleLabel(role: string): string {
+  const probe = readUnoPageDocument(
+    {
+      version: 1,
+      title: "quote role probe",
+      sections: [
+        {
+          id: "quote-role-probe",
+          module: "content.testimonials",
+          props: { items: [{ quote: "Probe.", attribution: "Probe", role }] },
+        },
+      ],
+    },
+    { reservedHome: false },
+  );
+  if (!probe.accepted) refuseTarget();
+  return role;
+}
+
 /** Markdown constructs a donor field may author; their presence switches the composed node to the accepted Markdown form. */
 const FAMILY_MARKDOWN_PATTERN =
   /(?:\*\*|`|\[[^\]\n]*\]\([^)\n]*\)|(?:^|\n)[ \t]{0,3}(?:#{1,6}[ \t]|[-*+][ \t]|\d{1,9}[.)][ \t]|>)|_[^_\n]+_|~~[^~\n]+~~|\*[^*\n]+\*|<|\n|\r|\t)/u;
@@ -968,17 +997,28 @@ function composeSection(
     }
     case "quote": {
       requireExactKeys(record, ["type", "body"], ["attribution", "role", "align", "surface"]);
-      // The donor suppresses a role-only caption; Uno would render it, so a role without attribution refuses.
-      if (ownsKey(record, "role") && !ownsKey(record, "attribution")) refuseUnsupportedFeature();
-      const item: Record<string, unknown> = { quote: readNewFamilyText(record["body"]) };
-      if (ownsKey(record, "attribution")) item["attribution"] = readNewFamilyText(record["attribution"]);
-      if (ownsKey(record, "role")) item["role"] = readNewFamilyText(record["role"]);
+      // `UNO-WO-117 / R01`: the donor `quote.body` is Markdown-capable, so it is read through the shared Markdown reader at
+      // the donor's own 4,000 code-point limit and the composed node declares Markdown only when the body authors it.
+      const body = readRichFamilyText(record["body"], 4000);
+      const item: Record<string, unknown> = { quote: body };
+      // `attribution` and `role` stay plain single-line labels: the donor authors plain text and a role is a caption.
+      const attributed = ownsKey(record, "attribution");
+      if (attributed) item["attribution"] = readNewFamilyText(record["attribution"]);
+      if (ownsKey(record, "role")) {
+        // The donor's own presentation rule: a role is drawn only beside an attribution, so a role-only caption is
+        // suppressed. The supplied role is still **validated** — through the strict reader's own caption contract — before
+        // it is suppressed, so a malformed role can never pass because its caption would not be shown.
+        const role = readNewFamilyText(record["role"]);
+        if (attributed) item["role"] = role;
+        else requireQuoteRoleLabel(role);
+      }
       const props: Record<string, unknown> = { items: [item] };
       // `align`/`surface` are copied as authored closed literals; the Uno reader refuses anything outside its own
       // enumeration, so no permissive coercion happens here and absent optionals stay truly absent.
       for (const field of ["align", "surface"] as const) {
         if (ownsKey(record, field)) props[field] = record[field];
       }
+      if (hasFamilyMarkdown(body)) props["markdown"] = true;
       return { id, module: "content.testimonials", props };
     }
     case "faq": {

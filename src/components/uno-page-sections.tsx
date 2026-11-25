@@ -546,7 +546,7 @@ function SectionNode({
       );
     }
     case "content.testimonials": {
-      const { items, align, surface } = node.props;
+      const { items, align, surface, markdown } = node.props;
       return (
         <section
           className="uno-json-testimonials"
@@ -554,21 +554,28 @@ function SectionNode({
           data-uno-surface={surface ?? "plain"}
           id={node.id}
         >
-          {items.map((item, index) => (
-            <figure className="uno-json-testimonial" key={`${item.quote}:${index}`}>
-              <blockquote className="uno-json-testimonial-quote">{item.quote}</blockquote>
-              {item.attribution === undefined && item.role === undefined ? null : (
-                <figcaption className="uno-json-testimonial-caption">
-                  {item.attribution === undefined ? null : (
-                    <span className="uno-json-testimonial-attribution">{item.attribution}</span>
-                  )}
-                  {item.role === undefined ? null : (
-                    <span className="uno-json-testimonial-role">{item.role}</span>
-                  )}
-                </figcaption>
-              )}
-            </figure>
-          ))}
+          {items.map((item, index) => {
+            // `UNO-WO-117 / R01`: the donor's quotation body is Markdown-capable, so an adapter-flagged node draws it with
+            // the one shared family renderer; an unflagged node keeps the byte-identical escaped `<blockquote>` text.
+            const quoteBlocks = markdown === true ? parseFamilyMarkdown(item.quote) : null;
+            return (
+              <figure className="uno-json-testimonial" key={`${item.quote}:${index}`}>
+                <blockquote className="uno-json-testimonial-quote">
+                  {quoteBlocks === null ? item.quote : <UnoFamilyMarkdown blocks={quoteBlocks} />}
+                </blockquote>
+                {item.attribution === undefined && item.role === undefined ? null : (
+                  <figcaption className="uno-json-testimonial-caption">
+                    {item.attribution === undefined ? null : (
+                      <span className="uno-json-testimonial-attribution">{item.attribution}</span>
+                    )}
+                    {item.role === undefined ? null : (
+                      <span className="uno-json-testimonial-role">{item.role}</span>
+                    )}
+                  </figcaption>
+                )}
+              </figure>
+            );
+          })}
         </section>
       );
     }

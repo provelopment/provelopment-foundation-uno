@@ -830,6 +830,20 @@ describe("readUnoPageDocument — content.hero, content.stats and content.testim
     );
   });
 
+  it("keeps an ordinary native role-only testimonial caption", () => {
+    // `UNO-WO-117 / R01`: the *donor* suppresses a role-only caption; an ordinary native testimonial keeps rendering the
+    // caption it always did, because the native contract is unchanged and this order only adopts the donor's rule.
+    const roleOnly = readUnoPageDocument(
+      single("content.testimonials", { items: [{ quote: "A role only line.", role: "Editor" }] }),
+    );
+    expect(roleOnly.accepted).toBe(true);
+    if (!roleOnly.accepted) return;
+    const node = roleOnly.document.sections[0];
+    if (node?.module !== "content.testimonials") throw new Error("expected a testimonials node");
+    expect(node.props.items[0]).toEqual({ quote: "A role only line.", role: "Editor" });
+    expect(node.props.markdown).toBeUndefined();
+  });
+
   it("refuses hostile structure inside the new item lists", () => {
     // A `__proto__` own key can only arrive as JSON text, so the reader is proved on its real threat surface.
     const hostile =
@@ -1302,16 +1316,24 @@ describe("readUnoPageDocument — codepoint counting after the lint repair", () 
   it("counts a lone surrogate once, never repairs it, and only refuses it where the field is Markdown-capable", () => {
     // `UNO-WO-116 / R01`: the plain-text counting contract is unchanged. A non-Markdown-capable field still counts a lone
     // surrogate as one code point, neither throwing nor merging it into a pair.
-    const plainQuote = (text: string) =>
-      probe("content.testimonials", { items: [{ quote: text }] });
-    expect(readUnoPageDocument(plainQuote("a\uD800b")).accepted).toBe(true);
-    expect(readUnoPageDocument(plainQuote(repeated("\uD800", 4000))).accepted).toBe(true);
-    expectRefusal(plainQuote(repeated("\uD800", 4001)), "document:invalid-props");
+    // `UNO-WO-117 / R01`: the probe moved from the testimonial quotation — which is now Markdown-capable — to its plain
+    // single-line `attribution` label, so the counting contract is proven on a field that is still genuinely plain-only.
+    const plainLabel = (text: string) =>
+      probe("content.testimonials", { items: [{ quote: "A bounded quotation.", attribution: text }] });
+    expect(readUnoPageDocument(plainLabel("a\uD800b")).accepted).toBe(true);
+    expect(readUnoPageDocument(plainLabel(repeated("\uD800", 160))).accepted).toBe(true);
+    expectRefusal(plainLabel(repeated("\uD800", 161)), "document:invalid-props");
 
     // The same value in a Markdown-capable field refuses the whole document: the field can be published as Markdown or as
     // literal text, so it can never carry text that no renderer can represent faithfully.
     expectRefusal(probe("content.prose", { text: "a\uD800b" }), "document:invalid-props");
     expectRefusal(probe("content.prose", { text: repeated("\uD800", 4000) }), "document:invalid-props");
+    // `UNO-WO-117 / R01`: the newly Markdown-capable quotation is refused in both forms, flagged and unflagged.
+    expectRefusal(probe("content.testimonials", { items: [{ quote: "a\uD800b" }] }), "document:invalid-props");
+    expectRefusal(
+      probe("content.testimonials", { items: [{ quote: "a\uD800b" }], markdown: true }),
+      "document:invalid-props",
+    );
   });
 
   it("keeps the bounded-string caps exact for the three new modules", () => {
@@ -2396,7 +2418,14 @@ describe("readUnoPageDocument — Markdown-capable Unicode well-formedness", () 
   it("leaves non-Markdown-capable plain fields on their previous contract", () => {
     // Native plain fields are explicitly outside this order: they keep counting a lone surrogate once and accepting it.
     expect(readUnoPageDocument({ ...minimal(), title: "a\uD800b" }).accepted).toBe(true);
-    expect(readUnoPageDocument(probe("content.testimonials", { items: [{ quote: "a\uD800b" }] })).accepted).toBe(true);
+    // `UNO-WO-117 / R01`: the probe moved from the quotation (now Markdown-capable) to the plain-only caption labels.
+    expect(
+      readUnoPageDocument(probe("content.testimonials", { items: [{ quote: "Q", attribution: "a\uD800b" }] })).accepted,
+    ).toBe(true);
+    expect(
+      readUnoPageDocument(probe("content.testimonials", { items: [{ quote: "Q", attribution: "A", role: "a\uD800b" }] }))
+        .accepted,
+    ).toBe(true);
     expect(readUnoPageDocument(probe("content.heading", { text: "a\uD800b", level: 2 })).accepted).toBe(true);
   });
 });
@@ -2605,6 +2634,86 @@ describe("readUnoPageDocument — declared Markdown is validated for hero, stats
       "document:invalid-props",
     );
     expectRefusal(probe("content.timeline", { items: [{ title: "T" }], markdown: "true" }), "document:invalid-props");
+  });
+});
+
+
+/**
+ * `UNO-WO-117 / R01`: the donor `quote.body` is Markdown-capable, so the strict reader owns the quotation's Markdown too.
+ *
+ * The plain form keeps the byte-identical literal text and, because the field can be published as Markdown, both forms are
+ * held to the one Unicode decision. A node that declares `markdown: true` must also parse by the shared reader, so the
+ * renderer can never fall back to printing raw syntax as if it were the authored quotation.
+ */
+describe("readUnoPageDocument — content.testimonials declared Markdown", () => {
+  function probe(module: string, props: Record<string, unknown>): Record<string, unknown> {
+    return { ...minimal(), sections: [section("probe", module, props)] };
+  }
+  const quote = (props: Record<string, unknown>) => probe("content.testimonials", props);
+
+  it("accepts a declared Markdown quotation, keeps its text exactly and round-trips it", () => {
+    const rich = "A **bounded** quotation with a [safe link](https://example.org/notes).";
+    const result = readUnoPageDocument(quote({ items: [{ quote: rich }], markdown: true, align: "center" }));
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    const node = result.document.sections[0];
+    if (node?.module !== "content.testimonials") throw new Error("expected a testimonials node");
+    expect(node.props.markdown).toBe(true);
+    expect(node.props.items[0]?.quote).toBe(rich);
+    // The accepted document re-reads from its own serialization without a change.
+    const roundTrip = readUnoPageDocument(JSON.stringify(result.document));
+    expect(roundTrip.accepted).toBe(true);
+    if (roundTrip.accepted) expect(JSON.stringify(roundTrip.document)).toBe(JSON.stringify(result.document));
+  });
+
+  it("keeps plain literal text accepted when no Markdown is declared", () => {
+    // Without the flag the field keeps its previous contract: well-formed literal text that resembles Markdown stays text.
+    for (const literal of [
+      "An **unbalanced quotation",
+      "A ![plate](https://example.org/i.png) reference",
+      "A `code` span and a ~~strike~~",
+    ]) {
+      const result = readUnoPageDocument(quote({ items: [{ quote: literal }] }));
+      expect(result.accepted, literal).toBe(true);
+      if (result.accepted) {
+        const node = result.document.sections[0];
+        if (node?.module === "content.testimonials") expect(node.props.items[0]?.quote).toBe(literal);
+      }
+    }
+    // The plain-text layer still refuses raw markup in both forms, so declaring Markdown adds no way past it.
+    expectRefusal(quote({ items: [{ quote: "A <b>t</b> tail" }] }), "document:unsafe-text");
+  });
+
+  it("refuses invalid declared Markdown in the quotation, from plain data and JSON text", () => {
+    const invalid: readonly (readonly [string, string, string])[] = [
+      ["raw element", "A <b>bold</b> tail", "document:unsafe-text"],
+      ["image", "A ![plate](https://example.org/i.png) tail", "document:invalid-props"],
+      ["unbalanced strong", "An **unclosed quotation", "document:invalid-props"],
+      ["script destination", "A [x](javascript:alert(1)) tail", "document:unsafe-text"],
+      ["protocol-relative destination", "A [x](//example.org/p) tail", "document:invalid-props"],
+    ];
+    for (const [label, value, expected] of invalid) {
+      const document = quote({ items: [{ quote: value }], markdown: true });
+      const direct = readUnoPageDocument(document);
+      expect(direct.accepted, label).toBe(false);
+      if (!direct.accepted) expect(direct.reason, label).toBe(expected);
+      const viaText = readUnoPageDocument(JSON.stringify(document));
+      expect(viaText.accepted, `${label} / JSON text`).toBe(false);
+      if (!viaText.accepted) expect(viaText.reason, `${label} / JSON text`).toBe(expected);
+    }
+  });
+
+  it("keeps the closed flag, the multi-line policy and the 4,000 code-point bound", () => {
+    // Only the literal `true` is the switch.
+    expectRefusal(quote({ items: [{ quote: "Q" }], markdown: false }), "document:invalid-props");
+    expectRefusal(quote({ items: [{ quote: "Q" }], markdown: "true" }), "document:invalid-props");
+    // A quotation may span lines in both forms: the donor body is multi-paragraph text.
+    expect(readUnoPageDocument(quote({ items: [{ quote: "One\n\nTwo" }] })).accepted).toBe(true);
+    expect(readUnoPageDocument(quote({ items: [{ quote: "One\n\nTwo" }], markdown: true })).accepted).toBe(true);
+    // The donor's 4,000 code-point body limit is the existing Uno text bound: it is neither widened nor narrowed.
+    const astral = "\u{1F600}";
+    expect(readUnoPageDocument(quote({ items: [{ quote: astral.repeat(4000) }], markdown: true })).accepted).toBe(true);
+    expectRefusal(quote({ items: [{ quote: astral.repeat(4001) }], markdown: true }), "document:invalid-props");
   });
 });
 

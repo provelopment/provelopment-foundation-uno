@@ -58,6 +58,20 @@ export const STATS_SOURCE = Object.freeze({
   ]),
 });
 
+/**
+ * `UNO-WO-117 / R01`: the donated Quote surface, exactly as authored — a Markdown-capable `body`, a plain `attribution`
+ * beside a plain `role` (the donor draws a role only with an attribution), and the donor's closed `align`/`surface` pair.
+ * The donor authors no heading or lede for this family, so neither is present.
+ */
+export const QUOTE_SOURCE = Object.freeze({
+  type: "quote",
+  body: "The fixture records **bounded** evidence; it does not establish full parity.",
+  attribution: "Synthetic contributor",
+  role: "Reviewer",
+  align: "center",
+  surface: "bordered",
+});
+
 /** The exact top-level ids the unchanged adapter must produce for the fixture below, in document order. */
 export const FAMILY_IDS = Object.freeze([
   "family-0-prose",
@@ -178,12 +192,9 @@ export function familySource() {
         items: STEPS_SOURCE.items.map((item) => ({ ...item })),
       },
       {
-        type: "quote",
-        body: "The fixture does not establish full parity.",
-        attribution: "Synthetic contributor",
-        role: "Reviewer",
-        align: "center",
-        surface: "bordered",
+        // `UNO-WO-117 / R01`: index 12 now authors the donor's full Quote surface from the single exported definition —
+        // a Markdown body, its plain attribution and role, and the closed presentation pair.
+        ...QUOTE_SOURCE,
       },
       // `UNO-WO-068 / R03`: appended after the unchanged thirteen; still donor-shaped input to the real adapter.
       {
