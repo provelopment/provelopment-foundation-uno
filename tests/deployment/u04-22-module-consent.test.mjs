@@ -1561,7 +1561,10 @@ describe("the hosted durable-family labels are connected to real predicates", ()
     "DURABLE_FAMILY_SOURCE the committed Page has twenty-three top-level sections",
     "parsed.document.sections.length === 23",
     "DURABLE_FAMILY_SOURCE the appended sections are the composer's own output",
-    "JSON.stringify(parsed.document.sections.slice(6)) === JSON.stringify(composed.document.sections)",
+    // `UNO-WO-121 / R01`: the committed durable Page keeps its ordinary grid while the adapter composes the list, so the
+  // published-Pages gate must distinguish them rather than conflate them.
+  "DURABLE_FAMILY_SOURCE the composed Gallery is the opt-in list while the committed Page keeps its ordinary grid",
+  "return JSON.stringify(differing) === JSON.stringify([\"family-5-gallery\"]);",
     "DURABLE_FAMILY_SOURCE the six original sections still equal the starting committed blob",
     "DURABLE_FAMILY_REFUSALS the composer refuses ${label}",
     'outcome.status === "refused" && outcome.reason === reason',
