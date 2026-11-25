@@ -2979,11 +2979,11 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/FAMILY_PARITY=17\/17/u);
     expect(ledger).toContain("ADAPT (divider semantic parity candidate)");
-    expect(ledger).toContain("eleven of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("twelve of seventeen fully parity-evidenced candidates");
     // `UNO-WO-071 / R01` normalizes the divider wording to its already independently accepted status.
     expect(ledger).toContain("independently accepted under `UNO-WO-069 / R01`");
     expect(ledger).not.toContain("awaiting independent Architect acceptance");
-    expect(ledger).toContain("six still bounded");
+    expect(ledger).toContain("five still bounded");
     // `UNO-WO-070 / R01`: the two grid families gained a bounded authored-heading mode, which must never be recorded as
     // full parity, a second/third accepted family or a closed stage.
     expect(ledger).toContain("ADAPT (bounded grid plus authored section heading and plain-text lede)");
@@ -2993,9 +2993,10 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).toContain("byte-identically");
     expect(ledger).toContain("heading-less");
     expect(ledger).toContain("bounded capability, not parity");
-    expect(ledger).toContain("Seven of the seventeen remain bounded");
-    expect(ledger).not.toContain("2/17");
-    expect(ledger).not.toContain("3/17");
+    expect(ledger).toContain("Five of the seventeen remain bounded");
+    // A bare `2/17` row must never be claimed; `12/17` is the earned twelve-family row and is pinned positively below.
+  expect(ledger).not.toMatch(/(?<!\d)2\/17/u);
+    expect(ledger).not.toMatch(/(?<!\d)3\/17/u);
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
     expect(ledger).not.toMatch(/features[^.\n]*full semantic parity/u);
     expect(ledger).toContain("family-<index>-contactform");
@@ -4706,9 +4707,10 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
     expect(ledger).toContain("lede-only");
     expect(ledger).toContain("no-lede");
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("eleven of seventeen fully parity-evidenced candidates");
-    expect(ledger).not.toContain("2/17");
-    expect(ledger).not.toContain("3/17");
+    expect(ledger).toContain("twelve of seventeen fully parity-evidenced candidates");
+    // A bare `2/17` row must never be claimed; `12/17` is the earned twelve-family row and is pinned positively below.
+  expect(ledger).not.toMatch(/(?<!\d)2\/17/u);
+    expect(ledger).not.toMatch(/(?<!\d)3\/17/u);
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
     expect(ledger).not.toMatch(/features[^.\n]*full semantic parity/u);
   });
@@ -5079,9 +5081,10 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
     expect(ledger.split("ADAPT (bounded authored plain-text heading/lede)").length - 1).toBe(0);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("eleven of seventeen fully parity-evidenced candidates");
-    expect(ledger).not.toContain("2/17");
-    expect(ledger).not.toContain("3/17");
+    expect(ledger).toContain("twelve of seventeen fully parity-evidenced candidates");
+    // A bare `2/17` row must never be claimed; `12/17` is the earned twelve-family row and is pinned positively below.
+  expect(ledger).not.toMatch(/(?<!\d)2\/17/u);
+    expect(ledger).not.toMatch(/(?<!\d)3\/17/u);
     expect(ledger).not.toMatch(/stats[^.\n]*full semantic parity/u);
     expect(ledger).not.toMatch(/steps[^.\n]*full semantic parity/u);
   });
@@ -5500,12 +5503,13 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     expect(ledger.split("PARITY (UNO-WO-117 / R01)").length - 1).toBe(1);
     expect(ledger.split("PARITY (UNO-WO-118 / R01)").length - 1).toBe(1);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("eleven of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("twelve of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("sixteen still bounded");
-    expect(ledger).toContain("six still bounded");
-    expect(ledger).toContain("Seven of the seventeen remain bounded");
-    expect(ledger).not.toContain("2/17");
-    expect(ledger).not.toContain("16/17");
+    expect(ledger).toContain("five still bounded");
+    expect(ledger).toContain("Five of the seventeen remain bounded");
+    // A bare `2/17` row must never be claimed; `12/17` is the earned twelve-family row and is pinned positively below.
+  expect(ledger).not.toMatch(/(?<!\d)2\/17/u);
+    expect(ledger).not.toMatch(/(?<!\d)16\/17/u);
     // `UNO-WO-114 / R01`: the ledger records the delivered B1 row (`8/17` / `50/59`); `UNO-WO-117 / R01` records the
     // checkpoint-free nine-family interim (`9/17` / `51/59`); `UNO-WO-119 / R01` records the earned B2 row (`11/17` / `53/59`).
     // What it must never claim is any later row, so those counts stay forbidden while every delivered count is pinned positively.
@@ -5517,8 +5521,8 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     expect(ledger).toContain("51/59");
     expect(ledger).toContain("11/17");
     expect(ledger).toContain("53/59");
-    expect(ledger).not.toContain("13/17");
-    expect(ledger).not.toContain("15/17");
+    expect(ledger).not.toMatch(/(?<!\d)13\/17/u);
+    expect(ledger).not.toMatch(/(?<!\d)15\/17/u);
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/prose[^.\n]*full semantic parity/u);
     expect(ledger).not.toMatch(/table[^.\n]*full semantic parity/u);

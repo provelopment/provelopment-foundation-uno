@@ -535,21 +535,23 @@ ingress JSON-depth bounds that disagreed with the frozen Page-document contract 
 
 ## 6. Remaining obligations
 
-No donor family is entirely unimplemented (the exact line in section 2). **Seven of the seventeen remain bounded subsets,
-not parity**; the ten parity-evidenced candidates are listed in section 2, while the authored-text modes for
+No donor family is entirely unimplemented (the exact line in section 2). **Five of the seventeen remain bounded subsets,
+not parity**; the twelve parity-evidenced candidates are listed in section 2, while the authored-text modes for
 `cards`/`features` are a bounded capability, not parity, and give neither family parity credit.
-Outstanding for those seven shapes: donor Markdown rendering, link/destination representation beyond
+Outstanding for those five shapes: donor Markdown rendering, link/destination representation beyond
 same-document fragments, rich donor forms, the
 other columns, cards, features and actions options, the heading-less `cards`/`features`
-outline, the donor `faq` and `columns` heading outlines, donor card borders/media/meta/actions and feature icons, the donor decorative
-media form, media headings/lede/position/surface, the donor native gallery list wrapper with its optional
-heading/lede/surface and implicit column default, remote image sources and Markdown captions, the donor per-render
+outline, the donor `faq` and `columns` heading outlines, donor card borders/media/meta/actions and feature icons, the
+donor native gallery list wrapper with its optional heading/lede/surface and implicit column default, remote image sources,
+the donor per-render
 contact seam and every authored form/delivery semantic, and full-parity browser proof of those donor semantics (the
 durable bounded composition Page of section 7 now exists, but it evidences the bounded subset only). Any
 future order must add those explicitly; this ledger authorises no new module ID, no new schema
 variant and no publication
-authority. The **B2** row stays Open: only `quote` and `faq` of its three declared families are credited, at the
-checkpoint-free interim `10/17` / `52/59`, and `columns` is still pending, so no B2 target is claimed here.
+authority. The **B2** row is earned: its three declared families (`quote`, `faq` and `columns`) are all credited by
+executed evidence at the declared `11/17` / `53/59`, and `UNO-WO-120 / R01` credits `media` beyond it at the
+checkpoint-free `12/17` / `54/59`. The `C1` row is **not** claimed: its declared families are `media` and `gallery`, and
+`gallery` remains bounded.
 
 ## 7. Durable family Page (`UNO-WO-078 / R01`)
 
