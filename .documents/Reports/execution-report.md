@@ -110,8 +110,29 @@ region reader stopping at its own wrapper rather than swallowing the page after 
 
 ## 6. Hosted verification at the exact product head
 
-Both workflows ran at the product head on both operating systems; the run and job table is recorded in the paragraph below
-with the exact commit that carried it.
+The product head is `2c41f04bc1d181eed95760494607ba6014299176` (the commit that carries every product, evidence and test change);
+the three commits after it change only the report, one ledger-pinned unit test and one published-Pages assertion, and the head
+that ran CI green is `fe3f942868380c91c32b4f751ac8e86f1cb205b0`, whose tree is the product head plus those three verifications.
+Both workflows ran at that head on both operating systems:
+
+| Workflow | Run | Jobs |
+| --- | --- | --- |
+| `Verify U01 baseline` | [45654952437](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45654952437) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — 38/38 steps each, including governance bytes, **Unit tests**, the A1 slice, the U04 JSON-slice contract, the production build, bounded output tracing, the home and locale-refusal HTTP passes, fixture fault injection, the **published-Pages HTTP/Chromium gate**, the **multi-Site P6** contract and run, the **22-module hermetic guard**, the **22-module production HTTP/Chromium consent run**, and deployment readiness |
+| `Uno Bootstrap Verify` | [45654952589](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45654952589) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — 10/10 steps each |
+
+Two earlier hosted runs at intermediate heads failed and are recorded rather than hidden, because both named a real legacy
+expectation the order itself anticipated: the ledger-pinned unit test still asserted the pre-adoption wording (`twelve of
+seventeen…`, the old Gallery disposition, `five still bounded`), and the published-Pages gate still compared the committed
+durable Page to the recomposition byte-for-byte. Both were corrected — the tests now follow the ledger, and the gate now
+distinguishes the committed ordinary grid from the newly composed list instead of conflating them — and the final head is green
+on both hosts.
+
+## 6a. One evidence-ledger adjustment beyond the literal file list
+
+`scripts/verify-u03-published-http.mjs` needed the durable-fixture distinction described in §1 and §7.6: without it the
+published-Pages gate could only pass by rewriting the committed durable Page, which the order forbids. The change adds no claim
+and removes none — every other appended section is still compared byte-for-byte against the composer's own output, and the
+Gallery is compared by shape (composed list, committed grid).
 
 ## 7. Risks, adaptations and limits
 
