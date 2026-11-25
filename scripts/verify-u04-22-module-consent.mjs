@@ -1759,6 +1759,65 @@ async function main() {
           JSON.stringify(stepsRefusalProbes),
         );
         localA2.steps.refusal = stepsRefusalOk;
+        // `UNO-WO-116 / R01`: the malformed-Unicode probes are part of every Markdown-capable family matrix, and no earlier
+        // refusal case was dropped to make room for them. One extracted case list, one presence rule, no per-family patch.
+        const unicodeProbes = {
+          hero: HERO_REFUSAL_CASES.filter((probe) => /surrogate/u.test(probe.label)).length,
+          stats: STATS_REFUSAL_CASES.filter((probe) => /surrogate/u.test(probe.label)).length,
+          steps: STEPS_REFUSAL_CASES.filter((probe) => /surrogate/u.test(probe.label)).length,
+        };
+        check(
+          "A2_LOCAL_REFUSAL the malformed-Unicode probes are present in the hero, stats and steps matrices and no earlier case was dropped",
+          unicodeProbes.hero >= 1
+            && unicodeProbes.stats >= 1
+            && unicodeProbes.steps >= 2
+            && HERO_REFUSAL_CASES.length >= 6
+            && STATS_REFUSAL_CASES.length >= 6
+            && STEPS_REFUSAL_CASES.length >= 7,
+          JSON.stringify({
+            unicodeProbes,
+            totals: {
+              hero: HERO_REFUSAL_CASES.length,
+              stats: STATS_REFUSAL_CASES.length,
+              steps: STEPS_REFUSAL_CASES.length,
+            },
+          }),
+        );
+        // `UNO-WO-116 / R01`: the strict reader itself refuses a malformed Markdown-capable field on a **native** node — the
+        // hero, stats and timeline forms the composer never builds — from plain data and from raw JSON text alike.
+        const nativeMalformed = [
+          { version: 1, title: "Native hero", sections: [{ id: "hero", module: "content.hero", props: { lede: "Lead \uD800 tail" } }] },
+          {
+            version: 1,
+            title: "Native stats",
+            sections: [{ id: "stats", module: "content.stats", props: { items: [{ value: "1", label: "L", detail: "Lead \uDC00 tail" }] } }],
+          },
+          {
+            version: 1,
+            title: "Native timeline",
+            sections: [{ id: "steps", module: "content.timeline", props: { items: [{ title: "T", description: "Lead \uDC00\uD800 tail" }] } }],
+          },
+        ];
+        const nativeRefusals = nativeMalformed.map((document) => ({
+          object: readUnoPageDocument(document),
+          text: readUnoPageDocument(JSON.stringify(document)),
+        }));
+        check(
+          "A2_LOCAL_READER a native hero, stats and timeline node with a malformed Markdown field is refused from plain data and JSON text",
+          nativeRefusals.every(
+            (probe) =>
+              probe.object.accepted === false
+              && probe.object.reason === "document:invalid-props"
+              && probe.text.accepted === false
+              && probe.text.reason === "document:invalid-props",
+          ),
+          JSON.stringify(
+            nativeRefusals.map((probe) => ({
+              object: probe.object.accepted ? "accepted" : probe.object.reason,
+              text: probe.text.accepted ? "accepted" : probe.text.reason,
+            })),
+          ),
+        );
         refusalReasons = JSON.stringify({
           undeclared: undeclaredLinkOutcome.status === "refused" ? undeclaredLinkOutcome.reason : undeclaredLinkOutcome.status,
           unsafeHref: unsafeHrefOutcome.status === "refused" ? unsafeHrefOutcome.reason : unsafeHrefOutcome.status,

@@ -5506,3 +5506,91 @@ describe("rich table and list (WO-102 D1)", () => {
     expectRefusal(envelope({ type: "table", columns: ["A"], rows: [["1"]], caption: " Padded" }), "family:target-refused");
   });
 });
+
+/**
+ * `UNO-WO-116 / R01`: the composer refuses a malformed Markdown-capable field (even without a single Markdown character) and
+ * never falls back to literal rendering, while valid multilingual content still composes, round-trips and serves unchanged.
+ *
+ * The four malformed shapes are the same ones the shared reader refuses; the point here is that no family can be the exception
+ * and that the refusal is the whole source, never a partial Page.
+ */
+describe("composeUnoFoundationSubset — shared Unicode well-formedness", () => {
+  const MALFORMED = [
+    "Lead \uD800 tail",
+    "Lead \uDC00 tail",
+    "Lead \uDC00\uD800 tail",
+    "Lead \uD800A\uDC00 tail",
+  ] as const;
+
+  /** Every Markdown-capable donor surface of the eight credited families, with its established refusal reason. */
+  const SURFACES: readonly (readonly [string, (value: string) => unknown, string])[] = [
+    ["prose body", (value) => envelope({ type: "prose", body: value }), "family:unsupported-feature"],
+    ["callout body", (value) => envelope({ type: "callout", body: value }), "family:unsupported-feature"],
+    [
+      "table caption",
+      (value) => envelope({ type: "table", columns: ["A"], rows: [["1"]], caption: value }),
+      "family:unsupported-feature",
+    ],
+    [
+      "list item detail",
+      (value) => envelope({ type: "list", items: [{ label: "L", detail: value }] }),
+      "family:unsupported-feature",
+    ],
+    ["hero lede", (value) => envelope({ type: "hero", lede: value }), "family:unsupported-feature"],
+    ["hero support", (value) => envelope({ type: "hero", support: value }), "family:unsupported-feature"],
+    [
+      "stats item detail",
+      (value) => envelope({ type: "stats", items: [{ value: "1", label: "L", detail: value }] }),
+      "family:unsupported-feature",
+    ],
+    [
+      "stats lede",
+      (value) => envelope({ type: "stats", items: [{ value: "1", label: "L" }], lede: value }),
+      "family:unsupported-feature",
+    ],
+    [
+      "steps item body",
+      (value) => envelope({ type: "steps", items: [{ title: "T", body: value }] }),
+      "family:unsupported-feature",
+    ],
+    [
+      "steps lede",
+      (value) => envelope({ type: "steps", items: [{ title: "T" }], lede: value }),
+      "family:unsupported-feature",
+    ],
+    // The four ledes that keep their previous closed target refusal.
+    ["prose lede", (value) => envelope({ type: "prose", body: "Body.", lede: value }), "family:target-refused"],
+    ["list lede", (value) => envelope({ type: "list", items: ["One"], lede: value }), "family:target-refused"],
+    [
+      "table lede",
+      (value) => envelope({ type: "table", columns: ["A"], rows: [["1"]], lede: value }),
+      "family:target-refused",
+    ],
+  ];
+
+  it("refuses every malformed Markdown-capable field without any Markdown punctuation in the source", () => {
+    for (const [label, build, reason] of SURFACES) {
+      for (const value of MALFORMED) {
+        // The value carries no Markdown marker at all: `hasFamilyMarkdown` is false, so only the shared read can catch it.
+        expect(/[*`[\]_~#>-]/u.test(value), `${label} must not carry Markdown punctuation`).toBe(false);
+        expectRefusal(build(value), reason);
+      }
+    }
+  });
+
+  it("keeps valid astral pairs, combining sequences and mixed scripts composed, round-tripped and served", () => {
+    const multilingual = "Übersicht \u{1F600} e\u0301 概要 שלום مرحبا नमस्ते ไทย";
+    for (const [label, build] of SURFACES) {
+      const document = composed(build(multilingual));
+      // The document re-reads from its own serialized JSON, and the authored text is preserved byte-for-byte.
+      expect(readUnoPageDocument(JSON.stringify(document)).accepted, label).toBe(true);
+      expect(JSON.stringify(document), label).toContain("\u{1F600}");
+    }
+    // Served markup carries the supplementary pair instead of a replacement character.
+    const proseHtml = render(composed(envelope({ type: "prose", body: multilingual })));
+    expect(proseHtml).toContain("\u{1F600}");
+    expect(proseHtml).toContain("e\u0301");
+    expect(proseHtml).not.toContain("\uFFFD");
+  });
+});
+

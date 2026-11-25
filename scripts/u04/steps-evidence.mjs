@@ -171,6 +171,27 @@ export const STEPS_REFUSAL_CASES = Object.freeze([
     },
   }),
   Object.freeze({
+    label: "steps body carrying an unpaired surrogate",
+    expected: "family:unsupported-feature",
+    mutate: (source) => {
+      source.sections[11].items[0].body = "Synthetic step \uD800 tail";
+    },
+  }),
+  Object.freeze({
+    label: "steps body carrying a lone low surrogate",
+    expected: "family:unsupported-feature",
+    mutate: (source) => {
+      source.sections[11].items[1].body = "Synthetic step \uDC00 tail";
+    },
+  }),
+  Object.freeze({
+    label: "steps lede carrying an interrupted surrogate pair",
+    expected: "family:unsupported-feature",
+    mutate: (source) => {
+      source.sections[11].lede = "Synthetic lead \uD800A\uDC00 tail";
+    },
+  }),
+  Object.freeze({
     label: "steps with an unknown surface",
     expected: "family:target-refused",
     mutate: (source) => {

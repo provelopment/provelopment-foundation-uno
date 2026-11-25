@@ -71,7 +71,12 @@
  * runtime code,
  * package, image or trademark is imported. See `.documents/Architecture/u04-family-parity.md`.
  */
-import { readUnoFamilyMarkdown, readUnoPageDocument, type UnoPageDocument } from "../core/page-document";
+import {
+  isWellFormedUnicodeText,
+  readUnoFamilyMarkdown,
+  readUnoPageDocument,
+  type UnoPageDocument,
+} from "../core/page-document";
 import {
   readUnoOwnedAssetRef,
   readUnoOwnedMediaPath,
@@ -577,16 +582,8 @@ function readFamilyLede(value: PlainValue | undefined): string {
   if (value.length === 0) refuseTarget();
   if (value.trim() !== value) refuseTarget();
   if (codePointLength(value) > 4000) refuseTarget();
-  for (let index = 0; index < value.length; index += 1) {
-    const unit = value.charCodeAt(index);
-    if (unit >= 0xd800 && unit <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-      if (!(next >= 0xdc00 && next <= 0xdfff)) refuseTarget();
-      index += 1;
-    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
-      refuseTarget();
-    }
-  }
+  // `UNO-WO-116 / R01`: the one shared well-formedness decision, never a per-family surrogate scan.
+  if (!isWellFormedUnicodeText(value)) refuseTarget();
   if (!readUnoFamilyMarkdown(value).ok) refuseUnsupportedFeature();
   return value;
 }
@@ -622,17 +619,8 @@ function readSectionPlainText(value: PlainValue | undefined, codePointLimit: num
   if (value.trim() !== value) refuseTarget();
   if (codePointLength(value) > codePointLimit) refuseTarget();
   // An unpaired surrogate cannot be represented as well-formed text, so it refuses the target rather than being
-  // replaced or normalized.
-  for (let index = 0; index < value.length; index += 1) {
-    const unit = value.charCodeAt(index);
-    if (unit >= 0xd800 && unit <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-      if (!(next >= 0xdc00 && next <= 0xdfff)) refuseTarget();
-      index += 1;
-    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
-      refuseTarget();
-    }
-  }
+  // replaced or normalized. `UNO-WO-116 / R01`: this is the one shared decision, not a per-family scan.
+  if (!isWellFormedUnicodeText(value)) refuseTarget();
   // A heading is literal plain text: markup characters, line breaks and control characters are refused rather than
   // rendered as inert punctuation or silently normalized. `&` and quotes are ordinary text and stay allowed.
   if (/[<>\r\n\t\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value)) refuseUnsupportedFeature();

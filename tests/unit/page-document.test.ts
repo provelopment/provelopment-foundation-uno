@@ -1299,13 +1299,19 @@ describe("readUnoPageDocument — codepoint counting after the lint repair", () 
     expectRefusal(probe("content.prose", { text: repeated("e\u0301", 2001) }), "document:invalid-props");
   });
 
-  it("counts a lone surrogate once and never repairs it", () => {
-    const lone = "a\uD800b";
-    // Three code points, and the reader must neither throw nor merge the surrogate into a pair.
-    expect(readUnoPageDocument(probe("content.prose", { text: lone })).accepted).toBe(true);
-    const manyLone = repeated("\uD800", 4000);
-    expect(readUnoPageDocument(probe("content.prose", { text: manyLone })).accepted).toBe(true);
-    expectRefusal(probe("content.prose", { text: repeated("\uD800", 4001) }), "document:invalid-props");
+  it("counts a lone surrogate once, never repairs it, and only refuses it where the field is Markdown-capable", () => {
+    // `UNO-WO-116 / R01`: the plain-text counting contract is unchanged. A non-Markdown-capable field still counts a lone
+    // surrogate as one code point, neither throwing nor merging it into a pair.
+    const plainQuote = (text: string) =>
+      probe("content.testimonials", { items: [{ quote: text }] });
+    expect(readUnoPageDocument(plainQuote("a\uD800b")).accepted).toBe(true);
+    expect(readUnoPageDocument(plainQuote(repeated("\uD800", 4000))).accepted).toBe(true);
+    expectRefusal(plainQuote(repeated("\uD800", 4001)), "document:invalid-props");
+
+    // The same value in a Markdown-capable field refuses the whole document: the field can be published as Markdown or as
+    // literal text, so it can never carry text that no renderer can represent faithfully.
+    expectRefusal(probe("content.prose", { text: "a\uD800b" }), "document:invalid-props");
+    expectRefusal(probe("content.prose", { text: repeated("\uD800", 4000) }), "document:invalid-props");
   });
 
   it("keeps the bounded-string caps exact for the three new modules", () => {
@@ -2251,6 +2257,126 @@ describe("content.prose variants and layout.grid list/ratio — closed refusals"
       },
       "document:invalid-props",
     );
+  });
+});
+
+
+/**
+ * `UNO-WO-116 / R01`: the shared Unicode well-formedness decision at the strict reader.
+ *
+ * One rule, exercised across every Markdown-capable authored field and through **both** entry points — plain own data and
+ * raw JSON text — plus the positive side: valid astral pairs, combining sequences and mixed scripts must stay accepted, and
+ * valid supplementary characters must still count as one code point against their declared bound.
+ */
+describe("readUnoPageDocument — Markdown-capable Unicode well-formedness", () => {
+  /** One document whose single section is the module under test. */
+  function probe(module: string, props: Record<string, unknown>): Record<string, unknown> {
+    return { ...minimal(), sections: [section("probe", module, props)] };
+  }
+
+  /** The four malformed shapes, each named, so a refusal is never mistaken for another. */
+  const MALFORMED: readonly (readonly [string, string])[] = [
+    ["lone high surrogate", "Lead \uD800 tail"],
+    ["lone low surrogate", "Lead \uDC00 tail"],
+    ["reversed pair", "Lead \uDC00\uD800 tail"],
+    ["interrupted pair", "Lead \uD800A\uDC00 tail"],
+  ];
+
+  /** Every Markdown-capable authored field of the reader, as a fresh document per value. */
+  const FIELDS: readonly (readonly [string, (value: string) => Record<string, unknown>])[] = [
+    ["prose text", (value) => probe("content.prose", { text: value })],
+    ["prose text with markdown", (value) => probe("content.prose", { text: value, markdown: true })],
+    ["prose lede with markdown", (value) => probe("content.prose", { text: "Body.", lede: value, markdown: true })],
+    ["callout text", (value) => probe("content.prose", { variant: "callout", text: value })],
+    [
+      "callout lede with markdown",
+      (value) => probe("content.prose", { variant: "callout", text: "Body.", lede: value, markdown: true }),
+    ],
+    [
+      "list item detail",
+      (value) => probe("content.prose", { variant: "list", items: [{ label: "L", detail: value }] }),
+    ],
+    [
+      "list item detail with markdown",
+      (value) => probe("content.prose", { variant: "list", items: [{ label: "L", detail: value }], markdown: true }),
+    ],
+    [
+      "table caption",
+      (value) => probe("content.prose", { variant: "table", columns: ["A"], rows: [["b"]], caption: value }),
+    ],
+    ["hero lede", (value) => probe("content.hero", { lede: value })],
+    ["hero support", (value) => probe("content.hero", { support: value })],
+    ["hero lede with markdown", (value) => probe("content.hero", { lede: value, markdown: true })],
+    ["stats detail", (value) => probe("content.stats", { items: [{ value: "1", label: "L", detail: value }] })],
+    [
+      "stats detail with markdown",
+      (value) => probe("content.stats", { items: [{ value: "1", label: "L", detail: value }], markdown: true }),
+    ],
+    ["timeline description", (value) => probe("content.timeline", { items: [{ title: "T", description: value }] })],
+    [
+      "timeline description with markdown",
+      (value) => probe("content.timeline", { items: [{ title: "T", description: value }], markdown: true }),
+    ],
+  ];
+
+
+  it("refuses every malformed shape in every Markdown-capable field, from plain data", () => {
+    for (const [fieldLabel, build] of FIELDS) {
+      for (const [shapeLabel, value] of MALFORMED) {
+        const result = readUnoPageDocument(build(value));
+        const where = `${fieldLabel} / ${shapeLabel}`;
+        expect(result.accepted, where).toBe(false);
+        if (!result.accepted) expect(result.reason, where).toBe("document:invalid-props");
+      }
+    }
+  });
+
+  it("refuses the same values through the raw JSON-text entry point, including escaped lone surrogates", () => {
+    // `JSON.stringify` emits a lone surrogate as its own `\uD800`-style escape, so this is a real authored JSON source: the
+    // strict reader decodes it to the same code unit, and the field decision refuses the whole Page rather than a fragment.
+    for (const [fieldLabel, build] of FIELDS) {
+      for (const [shapeLabel, value] of MALFORMED) {
+        const text = JSON.stringify(build(value));
+        expect(text.includes("\\u"), `${fieldLabel} / ${shapeLabel} must be an escaped JSON source`).toBe(true);
+        const result = readUnoPageDocument(text);
+        const where = `${fieldLabel} / ${shapeLabel} / JSON text`;
+        expect(result.accepted, where).toBe(false);
+        if (!result.accepted) expect(result.reason, where).toBe("document:invalid-props");
+      }
+    }
+  });
+
+  it("keeps valid astral pairs, combining sequences and mixed scripts accepted in every Markdown-capable field", () => {
+    // One value mixing a supplementary pair (emoji), a combining sequence, CJK, Hebrew, Arabic, Devanagari and Thai text.
+    const multilingual = "Übersicht \u{1F600} e\u0301 概要 שלום مرحبا नमस्ते ไทย";
+    expect(multilingual.includes("\u{1F600}")).toBe(true);
+    for (const [fieldLabel, build] of FIELDS) {
+      const result = readUnoPageDocument(build(multilingual));
+      expect(result.accepted, fieldLabel).toBe(true);
+      if (!result.accepted) continue;
+      // The accepted document keeps the authored text exactly: nothing is replaced, trimmed or normalised.
+      expect(JSON.stringify(result.document), fieldLabel).toContain("\u{1F600}");
+      expect(JSON.stringify(result.document), fieldLabel).toContain("e\u0301");
+    }
+  });
+
+  it("counts a valid supplementary pair once against the declared field bound", () => {
+    const astral = "\u{1F600}";
+    // Exactly 4000 code points (8000 UTF-16 units) is inside the prose bound and stays accepted.
+    expect(readUnoPageDocument(probe("content.prose", { text: astral.repeat(4000) })).accepted).toBe(true);
+    // One code point past the bound is refused, proving the pair is counted once rather than as two units.
+    expectRefusal(probe("content.prose", { text: astral.repeat(4001) }), "document:invalid-props");
+    // Exactly 320 code points is inside the item-detail bound, and 321 is refused.
+    const detail = (text: string) => probe("content.stats", { items: [{ value: "1", label: "L", detail: text }] });
+    expect(readUnoPageDocument(detail(astral.repeat(320))).accepted).toBe(true);
+    expectRefusal(detail(astral.repeat(321)), "document:invalid-props");
+  });
+
+  it("leaves non-Markdown-capable plain fields on their previous contract", () => {
+    // Native plain fields are explicitly outside this order: they keep counting a lone surrogate once and accepting it.
+    expect(readUnoPageDocument({ ...minimal(), title: "a\uD800b" }).accepted).toBe(true);
+    expect(readUnoPageDocument(probe("content.testimonials", { items: [{ quote: "a\uD800b" }] })).accepted).toBe(true);
+    expect(readUnoPageDocument(probe("content.heading", { text: "a\uD800b", level: 2 })).accepted).toBe(true);
   });
 });
 

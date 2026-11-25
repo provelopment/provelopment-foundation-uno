@@ -468,6 +468,11 @@ const PHASE_C_REQUIRED = Object.freeze([
   "JSON.stringify(familyAccepted.sections[11]?.children?.[2]?.props) === JSON.stringify(stepsNodeProps())",
   "A2_LOCAL_BROWSER the rich steps family was observed at 390px and 1280px in light and dark/reduced motion with both Markdown bodies",
   "A2_LOCAL_REFUSAL every malformed steps family refuses the whole source Page with the family's own reason",
+  // `UNO-WO-116 / R01`: the shared Unicode well-formedness decision, proved at the composer's family matrices and at the
+  // strict reader's native hero/stats/timeline nodes.
+  "A2_LOCAL_REFUSAL the malformed-Unicode probes are present in the hero, stats and steps matrices and no earlier case was dropped",
+  "A2_LOCAL_READER a native hero, stats and timeline node with a malformed Markdown field is refused from plain data and JSON text",
+  "unicodeProbes.steps >= 2",
   "FAMILY_STEPS_HTTP the served steps family carries its heading, Markdown lede, closed surface, ordered titles and Markdown body",
   "FAMILY_STEPS_HTTP the step titles and body are exactly the authored ones in order, with no invented status, current step or date",
   "${width}px steps show both Markdown bodies, the closed surface and two ordered titles",
@@ -505,6 +510,21 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     const mutated = source.replaceAll('"interaction.contact"', '"content.prose"');
     const missing = audit(mutated);
     assert.ok(missing.some((entry) => entry.includes("interaction.contact")), missing.join(","));
+  });
+
+  it("the audit genuinely fails when the shared Unicode well-formedness checks are removed", () => {
+    for (const token of [
+      "A2_LOCAL_REFUSAL the malformed-Unicode probes are present in the hero, stats and steps matrices and no earlier case was dropped",
+      "A2_LOCAL_READER a native hero, stats and timeline node with a malformed Markdown field is refused from plain data and JSON text",
+      "unicodeProbes.steps >= 2",
+    ]) {
+      const mutated = source.replace(token, "");
+      const missing = audit(mutated);
+      assert.ok(
+        missing.some((entry) => entry.includes(token) || entry.includes("unicodeProbes")),
+        `removing ${token} must fail the audit`,
+      );
+    }
   });
 
   it("the audit genuinely fails when the restoration check is removed", () => {

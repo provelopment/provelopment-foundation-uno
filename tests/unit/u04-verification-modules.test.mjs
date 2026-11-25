@@ -389,5 +389,43 @@ describe("the extracted Steps evidence module", () => {
       expect(Object.prototype.hasOwnProperty.call(outcome, "document"), probe.label).toBe(false);
     }
   });
+
+/**
+ * `UNO-WO-116 / R01`: the malformed-Unicode probes are a permanent part of the three Markdown-capable family matrices, and
+ * they prove the shared decision rather than a per-family patch: a field with no Markdown punctuation at all is refused by
+ * the one well-formedness rule the reader, the Markdown field reader and the composer all consume.
+ */
+describe("u04 family evidence — shared Unicode well-formedness probes", () => {
+  const matrices = [
+    ["hero", HERO_REFUSAL_CASES],
+    ["stats", STATS_REFUSAL_CASES],
+    ["steps", STEPS_REFUSAL_CASES],
+  ];
+
+  it("keeps at least one surrogate probe per family and never drops an earlier refusal case", () => {
+    const totals = { hero: 6, stats: 6, steps: 7 };
+    for (const [family, cases] of matrices) {
+      const unicode = cases.filter((probe) => /surrogate/u.test(probe.label));
+      expect(unicode.length, family).toBeGreaterThanOrEqual(family === "steps" ? 2 : 1);
+      expect(cases.length, family).toBeGreaterThanOrEqual(totals[family]);
+      for (const probe of unicode) expect(probe.expected, probe.label).toBe("family:unsupported-feature");
+    }
+  });
+
+  it("refuses each surrogate probe as a whole source with no partial Page", () => {
+    for (const [family, cases] of matrices) {
+      for (const probe of cases.filter((candidate) => /surrogate/u.test(candidate.label))) {
+        const source = familySource();
+        probe.mutate(source);
+        const outcome = composeUnoFoundationSubset(source, familyBindings());
+        expect(outcome.status, `${family} / ${probe.label}`).toBe("refused");
+        if (outcome.status !== "refused") continue;
+        expect(outcome.reason, `${family} / ${probe.label}`).toBe(probe.expected);
+        expect(Object.prototype.hasOwnProperty.call(outcome, "document"), probe.label).toBe(false);
+      }
+    }
+  });
+});
+
 });
 

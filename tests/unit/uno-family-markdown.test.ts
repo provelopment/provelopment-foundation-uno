@@ -148,6 +148,60 @@ describe('readUnoFamilyMarkdown — hostile and malformed refusal matrix', () =>
   });
 });
 
+/**
+ * `UNO-WO-116 / R01`: one well-formedness decision for every authored Markdown field.
+ *
+ * A JavaScript string can carry a lone high surrogate, a lone low surrogate, a reversed pair or an interrupted pair; none of
+ * those is text any renderer can represent, so the whole field is refused with the new closed reason before parsing. Valid
+ * supplementary characters, combining sequences and mixed scripts stay accepted, and a supplementary pair still counts once
+ * against the declared cap.
+ */
+describe('readUnoFamilyMarkdown — Unicode well-formedness', () => {
+  const malformed: readonly (readonly [string, string])[] = [
+    ['lone high surrogate', 'Lead \uD800 tail'],
+    ['lone low surrogate', 'Lead \uDC00 tail'],
+    ['reversed pair', 'Lead \uDC00\uD800 tail'],
+    ['interrupted pair', 'Lead \uD800A\uDC00 tail'],
+    ['lone surrogate inside a code span', 'a `code \uD800` b'],
+    ['lone surrogate inside a link label', '[label \uDC00](https://example.invalid/p)'],
+  ];
+
+  it.each(malformed)('refuses %s with the closed ill-formed reason', (_label, source) => {
+    expect(readUnoFamilyMarkdown(source)).toEqual({ ok: false, reason: 'markdown:ill-formed-unicode' });
+  });
+
+  it('refuses a malformed field before the size cap, so the reason is never a cap', () => {
+    const manyLone = '\uD800'.repeat(UNO_FAMILY_MARKDOWN_LIMITS.blockChars);
+    expect(readUnoFamilyMarkdown(manyLone)).toEqual({ ok: false, reason: 'markdown:ill-formed-unicode' });
+  });
+
+  it('keeps a valid supplementary pair, a combining sequence and mixed scripts as authored text', () => {
+    const multilingual = 'Übersicht \u{1F600} e\u0301 概要 שלום مرحبا नमस्ते ไทย';
+    const result = readUnoFamilyMarkdown(multilingual);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.blocks).toEqual([{ kind: 'paragraph', children: [{ kind: 'text', text: multilingual }] }]);
+  });
+
+  it('counts a supplementary pair once, so the code-point cap is not halved', () => {
+    const astral = '\u{1F600}';
+    const exactly = astral.repeat(UNO_FAMILY_MARKDOWN_LIMITS.blockChars);
+    expect(exactly.length).toBe(UNO_FAMILY_MARKDOWN_LIMITS.blockChars * 2);
+    expect(readUnoFamilyMarkdown(exactly).ok).toBe(true);
+    expect(readUnoFamilyMarkdown(astral.repeat(UNO_FAMILY_MARKDOWN_LIMITS.blockChars + 1))).toEqual({
+      ok: false,
+      reason: 'markdown:too-large',
+    });
+  });
+
+  it('does not repair or normalise accepted text', () => {
+    // A combining sequence and a zero-width joiner sequence are legitimate authored text and stay byte-identical.
+    const sequence = 'e\u0301' + ' ' + '\u{1F469}\u200D\u{1F4BB}';
+    expect(paragraphChildren(sequence)).toEqual([{ kind: 'text', text: sequence }]);
+  });
+});
+
+
 
   it('returns a deep-frozen accepted document', () => {
     const result = readUnoFamilyMarkdown('**strong** and [link](https://example.invalid/p)');

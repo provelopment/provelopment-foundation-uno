@@ -128,6 +128,20 @@ export const HERO_REFUSAL_CASES = Object.freeze([
     },
   }),
   Object.freeze({
+    label: "hero lede carrying an unpaired surrogate",
+    expected: "family:unsupported-feature",
+    mutate: (source) => {
+      source.sections[9].lede = "Synthetic lead \uD800 tail";
+    },
+  }),
+  Object.freeze({
+    label: "hero support carrying a reversed surrogate pair",
+    expected: "family:unsupported-feature",
+    mutate: (source) => {
+      source.sections[9].support = "Synthetic lead \uDC00\uD800 tail";
+    },
+  }),
+  Object.freeze({
     label: "hero with no authored body",
     expected: "family:unsupported-feature",
     mutate: (source) => {

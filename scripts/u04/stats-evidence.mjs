@@ -152,6 +152,20 @@ export const STATS_REFUSAL_CASES = Object.freeze([
     },
   }),
   Object.freeze({
+    label: "stats detail carrying an unpaired surrogate",
+    expected: "family:unsupported-feature",
+    mutate: (source) => {
+      source.sections[10].items[0].detail = "Synthetic detail \uD800 tail";
+    },
+  }),
+  Object.freeze({
+    label: "stats lede carrying an interrupted surrogate pair",
+    expected: "family:unsupported-feature",
+    mutate: (source) => {
+      source.sections[10].lede = "Synthetic lead \uD800A\uDC00 tail";
+    },
+  }),
+  Object.freeze({
     label: "stats with an unknown surface",
     expected: "family:target-refused",
     mutate: (source) => {

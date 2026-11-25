@@ -798,6 +798,34 @@ function codePointLength(value: string): number {
   return count;
 }
 
+/**
+ * `UNO-WO-116 / R01`: the one shared Unicode well-formedness decision.
+ *
+ * A JavaScript string is a UTF-16 code-unit sequence, so it can hold a lone high surrogate, a lone low surrogate, or a
+ * reversed pair — sequences that no well-formed Unicode text can contain and that no UTF-8 encoder will accept. Such a
+ * value cannot be represented faithfully, so every Markdown-capable authored field refuses it here instead of publishing a
+ * replacement character, a mangled glyph or a silently dropped code unit. Valid astral pairs, combining sequences and any
+ * mixture of scripts are all well-formed and stay accepted; nothing is replaced, trimmed or normalised.
+ *
+ * This is a decision, not a repair: the reader, the Markdown field reader and the family composer all consume this one
+ * function, so there is a single definition of "well-formed" rather than a per-family patch.
+ */
+export function isWellFormedUnicodeText(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const unit = value.charCodeAt(index);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      // A high surrogate must be followed by a low surrogate: a lone high surrogate, or a reversed/interrupted pair, fails.
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+      index += 1;
+      continue;
+    }
+    // A low surrogate that was not consumed as the second half of a valid pair has no lead: it can never be well-formed.
+    if (unit >= 0xdc00 && unit <= 0xdfff) return false;
+  }
+  return true;
+}
+
 /** The UTF-8 byte length of one string, so the source cap is a byte cap rather than a character guess. */
 function utf8ByteLength(value: string): number {
   let bytes = 0;
@@ -1249,6 +1277,31 @@ function optionalProseText(value: unknown, maxCodePoints: number): string | unde
   return readBoundedText(value, maxCodePoints, "document:invalid-props", false, false);
 }
 
+/**
+ * `UNO-WO-116 / R01`: one **Markdown-capable** authored field in its plain form.
+ *
+ * Every Markdown-capable field is published either as the accepted Markdown AST or as inert plain text; the two forms are
+ * one contract, so the plain form cannot be laxer than the Markdown form. A lone or reversed surrogate refuses the field
+ * here — by the single shared decision — rather than reaching a visitor as a literal replacement character. Nothing about
+ * the plain-text counting contract changes: a well-formed astral pair still counts once, and a plain field that is not
+ * Markdown-capable keeps its previous acceptance exactly.
+ */
+function readMarkdownCapableText(value: unknown, maxCodePoints: number, allowNewlines: boolean): string {
+  const text = readBoundedText(value, maxCodePoints, "document:invalid-props", false, allowNewlines);
+  if (!isWellFormedUnicodeText(text)) throw new RefusedDocument("document:invalid-props");
+  return text;
+}
+
+/** One optional Markdown-capable field: absent stays absent, a present value must be safe plain and well-formed text. */
+function optionalMarkdownCapableText(
+  value: unknown,
+  maxCodePoints: number,
+  allowNewlines: boolean,
+): string | undefined {
+  if (value === undefined) return undefined;
+  return readMarkdownCapableText(value, maxCodePoints, allowNewlines);
+}
+
 /** The closed optional section alignment adopted from the audited Foundation schema. */
 function optionalProseAlign(value: unknown): UnoSectionAlign | undefined {
   if (value === undefined) return undefined;
@@ -1289,20 +1342,14 @@ function readProseBody(props: DataRecord): UnoContentProseBody {
   const text =
     markdown === true
       ? requireFamilyMarkdown(props["text"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
-      : readBoundedText(
-          props["text"],
-          UNO_PAGE_DOCUMENT_LIMITS.textCodePoints,
-          "document:invalid-props",
-          false,
-          true,
-        );
+      : readMarkdownCapableText(props["text"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
   const heading = optionalProseText(props["heading"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints);
   const lede =
     props["lede"] === undefined
       ? undefined
       : markdown === true
         ? requireFamilyMarkdown(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
-        : optionalProseText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints);
+        : optionalMarkdownCapableText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
   const align = optionalProseAlign(props["align"]);
   const surface = optionalProseSurface(props["surface"]);
   return {
@@ -1457,7 +1504,7 @@ function readProseList(props: DataRecord, state: WalkState): UnoContentProseProp
         ? undefined
         : markdown === true
           ? requireFamilyMarkdown(entry["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints)
-          : optionalProseText(entry["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints);
+          : optionalMarkdownCapableText(entry["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints, false);
     const base = detail === undefined ? { label } : { label, detail };
     if (Object.prototype.hasOwnProperty.call(entry, "href")) {
       items.push({ ...base, href: readListItemHref(entry["href"]) });
@@ -1488,7 +1535,7 @@ function readProseList(props: DataRecord, state: WalkState): UnoContentProseProp
       ? undefined
       : markdown === true
         ? requireFamilyMarkdown(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
-        : optionalProseText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints);
+        : optionalMarkdownCapableText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, false);
   const surface = optionalProseSurface(props["surface"]);
   return {
     variant: "list",
@@ -1555,13 +1602,13 @@ function readProseTable(props: DataRecord): UnoContentProseProps {
       ? undefined
       : markdown === true
         ? requireFamilyMarkdown(props["caption"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints)
-        : optionalProseText(props["caption"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints);
+        : optionalMarkdownCapableText(props["caption"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints, false);
   const lede =
     props["lede"] === undefined
       ? undefined
       : markdown === true
         ? requireFamilyMarkdown(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints)
-        : optionalProseText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints);
+        : optionalMarkdownCapableText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, false);
   const surface = optionalProseSurface(props["surface"]);
   return {
     variant: "table",
@@ -1644,7 +1691,12 @@ function readStatItems(value: unknown): UnoStatItem[] {
       false,
       false,
     );
-    const detail = optionalBoundedText(item["detail"], UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints, false);
+    // `UNO-WO-116 / R01`: the item detail is Markdown-capable, so its plain form must be well-formed too.
+    const detail = optionalMarkdownCapableText(
+      item["detail"],
+      UNO_PAGE_DOCUMENT_LIMITS.statDetailCodePoints,
+      false,
+    );
     items.push(detail === undefined ? { value: statValue, label } : { value: statValue, label, detail });
   }
   return items;
@@ -1775,7 +1827,8 @@ function readTimelineItems(value: unknown): UnoTimelineItem[] {
       false,
       false,
     );
-    const itemDescription = optionalBoundedText(
+    // `UNO-WO-116 / R01`: the milestone description is Markdown-capable, so its plain form must be well-formed too.
+    const itemDescription = optionalMarkdownCapableText(
       item["description"],
       UNO_PAGE_DOCUMENT_LIMITS.timelineDescriptionCodePoints,
       false,
@@ -2116,8 +2169,10 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
       throw new RefusedDocument("document:invalid-props");
     }
     const eyebrow = optionalBoundedText(props["eyebrow"], UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints, false);
-    const lede = optionalBoundedText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
-    const support = optionalBoundedText(props["support"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
+    // `UNO-WO-116 / R01`: both body fields are Markdown-capable, so their plain form is held to the same
+    // well-formedness decision as the Markdown form — a malformed field refuses the Page instead of rendering literally.
+    const lede = optionalMarkdownCapableText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
+    const support = optionalMarkdownCapableText(props["support"], UNO_PAGE_DOCUMENT_LIMITS.textCodePoints, true);
     // A hero with no authored body would be an empty decorative band, so at least one body field is required.
     if (lede === undefined && support === undefined) throw new RefusedDocument("document:invalid-props");
     const align = optionalAlign(props["align"]);
@@ -2677,9 +2732,10 @@ export function readUnoPageDocument(
  * that without flattening it.
  *
  * WHAT IT REFUSES, AND WHY BY NAME. Raw HTML, images, attribute-bearing markup, an unbalanced or malformed construct, a
- * document beyond the declared caps, and any link destination that the unchanged `classifyAuthorDestination` does not
- * admit as `mailto` or `https` are all refused with one closed reason. A partial parse is never returned: the caller
- * either renders the whole accepted AST or refuses the whole field, so a half-read sentence cannot reach a visitor.
+ * document beyond the declared caps, ill-formed Unicode (a lone, reversed or interrupted surrogate pair, `UNO-WO-116 / R01`)
+ * and any link destination that the unchanged `classifyAuthorDestination` does not admit as `mailto` or `https` are all
+ * refused with one closed reason. A partial parse is never returned: the caller either renders the whole accepted AST or
+ * refuses the whole field, so a half-read sentence cannot reach a visitor.
  *
  * WHAT IT IS NOT. No dependency, no `dangerouslySetInnerHTML`, no sanitiser regex over HTML (nothing is ever treated as
  * HTML), no I/O, no locale, no publication, no link resolution, no fetch and no publisher authority. A classified `href`
@@ -2723,6 +2779,7 @@ export type UnoFamilyMarkdownRefusal =
   | "markdown:not-a-string"
   | "markdown:empty"
   | "markdown:too-large"
+  | "markdown:ill-formed-unicode"
   | "markdown:unsupported-html"
   | "markdown:unbalanced"
   | "markdown:malformed-link"
@@ -2904,6 +2961,9 @@ function parseInline(
 export function readUnoFamilyMarkdown(source: unknown): UnoFamilyMarkdownResult {
   if (typeof source !== "string") return { ok: false, reason: "markdown:not-a-string" };
   if (source.length === 0) return { ok: false, reason: "markdown:empty" };
+  // `UNO-WO-116 / R01`: a lone, reversed or interrupted surrogate pair is not text any renderer can represent, so the
+  // whole field is refused before parsing — never replaced, trimmed, normalised or partially rendered.
+  if (!isWellFormedUnicodeText(source)) return { ok: false, reason: "markdown:ill-formed-unicode" };
   if (codePointCount(source) > UNO_FAMILY_MARKDOWN_LIMITS.blockChars) return { ok: false, reason: "markdown:too-large" };
   const normalised = source.replace(/\r\n/gu, "\n").replace(/\r/gu, "\n");
   if (CONTROL_PATTERN.test(normalised)) return { ok: false, reason: "markdown:unsupported-html" };

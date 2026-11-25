@@ -200,6 +200,44 @@ and this ledger claims no link engine, route resolver or publication authority.
   label/value, unsafe script or scheme) and any candidate above the Uno 64 KiB source cap. The whole document refuses; no partial Page is
   ever returned.
 
+### 4a. Shared Unicode well-formedness (`UNO-WO-116 / R01`)
+
+A JavaScript string is a UTF-16 code-unit sequence, so it can hold a lone high surrogate, a lone low surrogate, a reversed
+pair or an interrupted pair. None of those can be encoded as UTF-8 or rendered faithfully — a browser shows a replacement
+character or drops the code unit — so exactly **one** decision governs them: `isWellFormedUnicodeText` in
+`src/core/page-document.ts`. The reader, the Markdown field reader and the family composer all consume that one function, and
+the two duplicated surrogate scans the composer used to carry were deleted, so nothing in the Markdown-capable path is a
+per-family patch. (`src/core/efs/uno-page-header.ts` keeps its own pre-existing scan; that module is outside this order's
+authorized ledger and is unchanged.) Nothing is ever replaced, trimmed, normalised or silently dropped: a malformed value
+refuses, and every well-formed value is published byte-exactly.
+
+- **The Markdown reader** refuses the whole field with the new closed reason `markdown:ill-formed-unicode`, before parsing
+  and before the size cap, so the reason is never a cap or a parse artefact. `requireFamilyMarkdown` therefore refuses the
+  document (`document:invalid-props`) for a `markdown: true` field.
+- **The strict Page reader** refuses the whole Page (`document:invalid-props`) for every Markdown-capable field in **both**
+  its forms — with and without the `markdown` switch — because the plain form is a publication form too: hero `lede`/`support`,
+  stats item `detail`, timeline item `description`, prose and callout `text`/`lede`, list item `detail` and `lede`, table
+  `caption` and `lede`. Both entry points are covered: plain own data and raw JSON text, where the strict reader decodes an
+  authored `\uD800` escape into the same lone code unit.
+- **The composer** refuses the whole source with its established reasons and never a partial Page:
+  `family:unsupported-feature` where the field is read through the shared Markdown reader (prose/callout body, table caption,
+  list `detail`, hero `lede`/`support`, stats `detail`/`lede`, steps body/`lede`), and `family:target-refused` where it is read
+  by the bounded lede reader (`prose`/`list`/`table` `lede`). The refusal does not depend on Markdown punctuation: a value with
+  no Markdown character at all is refused the same way, so no field can fall back to literal rendering.
+- **What stays accepted.** Valid astral pairs, combining sequences, zero-width-joiner sequences and any mixture of scripts
+  (Latin, CJK, Hebrew, Arabic, Devanagari, Thai) remain accepted everywhere, unchanged and byte-identical, and a supplementary
+  pair still counts as **one** code point against the declared bound — 4,000 accepted and 4,001 refused for a body,
+  320 accepted and 321 refused for an item detail.
+
+**Remaining scope, stated rather than implied.** Native *plain* fields are deliberately outside this order and keep their
+previous contract: a `title`, `description`, testimonial `quote`, `heading`, item `label`/`value`, media `alt`, media caption,
+price `amount`/`unit`, contact `description`, action label and similar field still counts a lone surrogate once and accepts it
+— the counting contract is unchanged and pinned by its own tests. Separately, a hand-authored native `content.hero`,
+`content.stats` or `content.timeline` node that declares `markdown: true` but carries Markdown the shared reader refuses still
+renders that field literally at render time; this order validates Unicode well-formedness, it does not make those three native
+modules validate Markdown, and it adds no Markdown feature or destination policy. Neither gap is claimed as closed, and no
+universal text validation is claimed.
+
 ## 5. WO-066/WO-067/WO-068 temporary composed-family production proof
 
 `UNO-WO-066 / R01` closed one narrow evidence gap — that the **adapter's own output** can be accepted, installed, loaded,

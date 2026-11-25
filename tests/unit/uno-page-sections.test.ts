@@ -1366,3 +1366,64 @@ describe("layout.grid list semantics and ratios — static markup", () => {
   });
 });
 
+
+/**
+ * `UNO-WO-116 / R01`: what reaches the renderer.
+ *
+ * The renderer parses Markdown only for an already-accepted document, so a malformed Markdown-capable field must never arrive
+ * here at all — the reader refuses the Page. The positive side proves the served markup still carries valid multilingual text
+ * exactly, including supplementary characters, with no replacement character and no lost code unit.
+ */
+describe("UnoPageSections — Markdown-capable Unicode", () => {
+  const multilingual = "Übersicht \u{1F600} e\u0301 概要 שלום مرحبا नमस्ते ไทย";
+
+  /** One page whose only section is the module under test. */
+  function page(module: string, props: Record<string, unknown>): Record<string, unknown> {
+    return { version: 1, title: "Unicode fixture", sections: [{ id: "probe", module, props }] };
+  }
+
+  it("never renders a malformed Markdown-capable field, because the reader refused the Page first", () => {
+    const malformed = [
+      page("content.prose", { text: "Lead \uD800 tail" }),
+      page("content.prose", { variant: "callout", text: "Lead \uDC00 tail" }),
+      page("content.prose", { variant: "list", items: [{ label: "L", detail: "Lead \uDC00\uD800 tail" }] }),
+      page("content.prose", { variant: "table", columns: ["A"], rows: [["1"]], caption: "Lead \uD800A\uDC00 tail" }),
+      page("content.hero", { lede: "Lead \uD800 tail" }),
+      page("content.hero", { support: "Lead \uDC00 tail" }),
+      page("content.stats", { items: [{ value: "1", label: "L", detail: "Lead \uD800 tail" }] }),
+      page("content.timeline", { items: [{ title: "T", description: "Lead \uD800 tail" }] }),
+    ];
+    for (const fixture of malformed) {
+      const result = readUnoPageDocument(fixture);
+      expect(result.accepted).toBe(false);
+      if (!result.accepted) expect(result.reason).toBe("document:invalid-props");
+    }
+  });
+
+  it("serves a valid multilingual Markdown field byte-exactly, in both the plain and the Markdown form", () => {
+    // Plain form: one inert paragraph carrying the authored characters untouched.
+    const plain = render(accept(page("content.prose", { text: multilingual })));
+    expect(plain).toContain("\u{1F600}");
+    expect(plain).toContain("e\u0301");
+    expect(plain).toContain("नमस्ते");
+    expect(plain).not.toContain("\uFFFD");
+
+    // Markdown form: the shared renderer draws the same characters inside an accepted paragraph.
+    const markdown = render(accept(page("content.prose", { text: multilingual, markdown: true })));
+    expect(markdown).toContain("\u{1F600}");
+    expect(markdown).toContain("e\u0301");
+    expect(markdown).not.toContain("\uFFFD");
+
+    // The four credited rich families keep their multilingual text too.
+    for (const fixture of [
+      page("content.hero", { lede: multilingual, markdown: true }),
+      page("content.stats", { items: [{ value: "\u{1F600}", label: "L", detail: multilingual }], markdown: true }),
+      page("content.timeline", { items: [{ title: "T", description: multilingual }], markdown: true }),
+    ]) {
+      const html = render(accept(fixture));
+      expect(html).toContain("\u{1F600}");
+      expect(html).not.toContain("\uFFFD");
+    }
+  });
+});
+
