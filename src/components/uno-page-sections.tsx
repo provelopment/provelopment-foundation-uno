@@ -180,7 +180,7 @@ function SectionNode({
     case "layout.stack": {
       const gap = node.props.gap ?? "normal";
       return (
-        <div className="uno-json-stack" data-uno-gap={gap} id={node.id}>
+        <div className="uno-json-stack" data-uno-gap={gap} data-uno-surface={node.props.surface} id={node.id}>
           {node.children.map((child) => (
             <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} />
           ))}

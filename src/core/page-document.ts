@@ -143,9 +143,14 @@ export type UnoStackGap = "tight" | "normal" | "wide";
 /** The two closed grid item semantics; `article` is a semantic wrapper, never a hidden module. */
 export type UnoGridItemSemantics = "plain" | "article";
 
-/** `layout.stack` props: one closed optional gap and typed children. */
+/** `layout.stack` props: one closed optional gap, one closed optional surface and typed children. */
 export interface UnoLayoutStackProps {
   readonly gap?: UnoStackGap;
+  /**
+   * `UNO-WO-119 / R01`: the adopted closed section surface, so a family that composes its heading, lede and body into one
+   * stack can carry an authored surface **around the whole section** rather than only around its inner grid.
+   */
+  readonly surface?: UnoSectionSurface;
 }
 
 /** The grid-only third item semantic: one native list with one `<li>` per authored child, in source order. */
@@ -1241,9 +1246,12 @@ function readContentActions(value: unknown, state: WalkState): UnoContentActionE
 
 
 /** The three optional-value helpers that keep `exactOptionalPropertyTypes` honest. */
-function optionalStackProps(gap: unknown): UnoLayoutStackProps {
-  if (gap === undefined) return {};
-  if (gap === "tight" || gap === "normal" || gap === "wide") return { gap };
+function optionalStackProps(gap: unknown, surface: unknown): UnoLayoutStackProps {
+  const resolvedSurface = optionalProseSurface(surface);
+  if (gap === undefined) return resolvedSurface === undefined ? {} : { surface: resolvedSurface };
+  if (gap === "tight" || gap === "normal" || gap === "wide") {
+    return resolvedSurface === undefined ? { gap } : { gap, surface: resolvedSurface };
+  }
   throw new RefusedDocument("document:invalid-props");
 }
 
@@ -2123,8 +2131,8 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   if (props === null) throw new RefusedDocument("document:invalid-props");
 
   if (moduleName === "layout.stack") {
-    if (!hasExactlyKeys(props, [], ["gap"])) throw new RefusedDocument("document:invalid-props");
-    const stackProps = optionalStackProps(props["gap"]);
+    if (!hasExactlyKeys(props, [], ["gap", "surface"])) throw new RefusedDocument("document:invalid-props");
+    const stackProps = optionalStackProps(props["gap"], props["surface"]);
     const children = readChildren(record["children"], depth + 1, state, seen);
     return { id, module: "layout.stack", props: stackProps, children };
   }

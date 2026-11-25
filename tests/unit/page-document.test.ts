@@ -229,6 +229,77 @@ describe("readUnoPageDocument — accepted documents", () => {
       expect(result.accepted).toBe(true);
     }
   });
+
+  it("accepts the closed stack surface and refuses every non-closed value", () => {
+    // `UNO-WO-119 / R01`: the section stack carries the adopted closed surface so a family can surface heading, lede and body
+    // together. Absent and `plain` stay the ordinary stack; the two emphasised values are the only additions.
+    for (const surface of ["plain", "muted", "bordered"]) {
+      const result = readUnoPageDocument({
+        version: 1,
+        title: "Stack surface",
+        sections: [
+          {
+            id: "stack",
+            module: "layout.stack",
+            props: { surface },
+            children: [{ id: "body", module: "content.prose", props: { text: "Body." } }],
+          },
+        ],
+      });
+      expect(result.accepted).toBe(true);
+      if (result.accepted) {
+        const node = result.document.sections[0];
+        expect(node?.module).toBe("layout.stack");
+        if (node?.module === "layout.stack") expect(node.props.surface).toBe(surface);
+      }
+    }
+    // A gap and a surface coexist, and both are closed.
+    const both = readUnoPageDocument({
+      version: 1,
+      title: "Stack surface and gap",
+      sections: [
+        {
+          id: "stack",
+          module: "layout.stack",
+          props: { gap: "tight", surface: "muted" },
+          children: [{ id: "body", module: "content.prose", props: { text: "Body." } }],
+        },
+      ],
+    });
+    expect(both.accepted).toBe(true);
+    if (both.accepted) {
+      const node = both.document.sections[0];
+      if (node?.module === "layout.stack") expect(node.props).toEqual({ gap: "tight", surface: "muted" });
+    }
+    expectRefusal(
+      {
+        ...minimal(),
+        sections: [section("stack", "layout.stack", { surface: "raised" }, {
+          children: [{ id: "body", module: "content.prose", props: { text: "Body." } }],
+        })],
+      },
+      "document:invalid-props",
+    );
+    expectRefusal(
+      {
+        ...minimal(),
+        sections: [section("stack", "layout.stack", { surface: true }, {
+          children: [{ id: "body", module: "content.prose", props: { text: "Body." } }],
+        })],
+      },
+      "document:invalid-props",
+    );
+    // An unknown stack prop stays unknown; the surface does not open the stack to extra keys.
+    expectRefusal(
+      {
+        ...minimal(),
+        sections: [section("stack", "layout.stack", { surface: "plain", align: "center" }, {
+          children: [{ id: "body", module: "content.prose", props: { text: "Body." } }],
+        })],
+      },
+      "document:invalid-props",
+    );
+  });
 });
 
 /** One top-level section wrapper. */

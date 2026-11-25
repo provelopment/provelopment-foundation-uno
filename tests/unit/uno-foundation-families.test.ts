@@ -10,7 +10,7 @@ import {
   UNO_FOUNDATION_SUBSET_FAMILIES,
   composeUnoFoundationSubset,
 } from "../../src/application/compose-uno-foundation-families";
-import { UNO_RENDERABLE_MODULES, readUnoPageDocument, type UnoPageDocument } from "../../src/core/page-document";
+import { UNO_RENDERABLE_MODULES, readUnoPageDocument, type UnoPageDocument, type UnoSectionNode } from "../../src/core/page-document";
 import type { UnoPageMedia } from "../../src/core/assets/uno-owned-media";
 import { UnoPageSections } from "../../src/components/uno-page-sections";
 
@@ -1427,17 +1427,9 @@ describe("composeUnoFoundationSubset — faq parity, Markdown and the donor item
   });
 });
 
-  it("refuses columns fields, body/list conflicts and Markdown outside the bounded subset", () => {
+  it("refuses crossed column shapes and unsupported column fields", () => {
     expectRefusal(envelope({ type: "columns", items: "A" }), "family:unsupported-feature");
-    expectRefusal(
-      envelope({ type: "columns", heading: "H", items: [{ title: "A", body: "B" }, { title: "C", body: "D" }] }),
-      "family:unsupported-feature",
-    );
-    expectRefusal(
-      envelope({ type: "columns", surface: "plain", items: [{ title: "A", body: "B" }, { title: "C", body: "D" }] }),
-      "family:unsupported-feature",
-    );
-    for (const extra of ["href", "icon", "style"]) {
+    for (const extra of ["href", "icon", "style", "align"]) {
       expectRefusal(
         envelope({
           type: "columns",
@@ -1446,6 +1438,7 @@ describe("composeUnoFoundationSubset — faq parity, Markdown and the donor item
         "family:unsupported-feature",
       );
     }
+    // A column is a body OR a list: both, or neither, is a crossed shape.
     expectRefusal(
       envelope({
         type: "columns",
@@ -1457,12 +1450,10 @@ describe("composeUnoFoundationSubset — faq parity, Markdown and the donor item
       envelope({ type: "columns", items: [{ title: "A" }, { title: "C", body: "D" }] }),
       "family:unsupported-feature",
     );
+    // `UNO-WO-119 / R01`: Markdown in a column *title* and in a *label* stays outside the subset; only the body and the lede
+    // are Markdown-capable in the donor.
     expectRefusal(
       envelope({ type: "columns", items: [{ title: "**A**", body: "B" }, { title: "C", body: "D" }] }),
-      "family:unsupported-feature",
-    );
-    expectRefusal(
-      envelope({ type: "columns", items: [{ title: "A", body: "*B*" }, { title: "C", body: "D" }] }),
       "family:unsupported-feature",
     );
     expectRefusal(
@@ -1473,17 +1464,195 @@ describe("composeUnoFoundationSubset — faq parity, Markdown and the donor item
       envelope({ type: "columns", items: [{ title: "A", items: [1] }, { title: "C", body: "D" }] }),
       "family:unsupported-feature",
     );
-    // Three columns plus an authored ratio is unsupported, not silently discarded.
+    // Nested donor sections and an invented column count stay unsupported rather than reinterpreted.
     expectRefusal(
-      envelope({
-        type: "columns",
-        ratio: "equal",
-        items: [{ title: "A", body: "B" }, { title: "C", body: "D" }, { title: "E", body: "F" }],
-      }),
+      envelope({ type: "columns", items: [{ title: "A", body: "B", sections: [] }, { title: "C", body: "D" }] }),
       "family:unsupported-feature",
     );
   });
 });
+
+/**
+ * `UNO-WO-119 / R01`: the donor Columns family in full — optional plain `heading`, **Markdown** `lede`, closed `surface` and
+ * closed `ratio`, two or three ordered columns, each a plain title with one Markdown body or one list of up to twenty-four
+ * plain labels. The legacy two-column, body-plus-list shape composes byte-identically; the richer donor fields add the
+ * documented wrapper rather than changing any existing node.
+ */
+describe("composeUnoFoundationSubset — columns parity, Markdown, ratios and the donor label ceiling", () => {
+  // A columns family only forms a legal outline with an authored h2 before it (its titles are h3 by the donor's own outline),
+  // so every positive case here composes one — the same shape the served fixture uses.
+  const columnsPage = (section: unknown) => composed(titledEnvelope(section));
+  const columnsNode = (section: unknown) => columnsPage(section).sections[1];
+  const pair = (left: Record<string, unknown>, right: Record<string, unknown>) => [left, right];
+  const labels = (count: number) => Array.from({ length: count }, (_, index) => `Label ${index + 1}`);
+  /** The child sections of a node that carries them, or an empty list for a leaf. */
+  const childrenOf = (node: unknown) =>
+    node !== null && typeof node === "object" && "children" in node
+      ? ((node as { children: readonly UnoSectionNode[] }).children)
+      : [];
+
+  it("keeps the legacy plain two-column grid byte-identical, including its authored ratio", () => {
+    const node = columnsNode(
+      {
+        type: "columns",
+        ratio: "start-wide",
+        items: pair({ title: "Left", body: "The left text." }, { title: "Right", items: ["One", "Two"] }),
+      },
+    );
+    expect(node?.module).toBe("layout.grid");
+    expect(node?.id).toBe("family-1-columns");
+    if (node?.module !== "layout.grid") return;
+    expect(node.props).toEqual({ columns: 2, ratio: "start-wide" });
+    expect(node.children.map((child) => child.id)).toEqual(["family-1-columns-column-0", "family-1-columns-column-1"]);
+    expect(node.children[0]?.props).toEqual({ gap: "tight" });
+    expect(childrenOf(node.children[0]).map((child) => child.props)).toEqual([
+      { text: "Left", level: 3 },
+      { text: "The left text." },
+    ]);
+    expect(childrenOf(node.children[1])[1]?.props).toEqual({
+      variant: "list",
+      items: [{ label: "One" }, { label: "Two" }],
+    });
+  });
+
+  it("wraps heading, Markdown lede, surface and grid in one surfaced section stack", () => {
+    const items = pair(
+      { title: "Left", body: "Read [the notes](https://example.org/notes)." },
+      { title: "Right", items: ["One"] },
+    );
+    const node = columnsNode({
+      type: "columns",
+      heading: "Synthetic columns",
+      lede: "Two **authored** columns.",
+      surface: "muted",
+      ratio: "equal",
+      items,
+    });
+    expect(node?.module).toBe("layout.stack");
+    expect(node?.id).toBe("family-1-columns");
+    if (node?.module !== "layout.stack") return;
+    expect(node.props).toEqual({ surface: "muted" });
+    expect(node.children.map((child) => child.id)).toEqual([
+      "family-1-columns-heading",
+      "family-1-columns-lede",
+      "family-1-columns-grid",
+    ]);
+    expect(node.children[0]?.props).toEqual({ text: "Synthetic columns", level: 2 });
+    expect(node.children[1]?.props).toEqual({ text: "Two **authored** columns.", markdown: true });
+    const grid = node.children[2];
+    expect(grid?.module).toBe("layout.grid");
+    if (grid?.module !== "layout.grid") return;
+    expect(grid.props).toEqual({ columns: 2, ratio: "equal" });
+    // A Markdown body is one Markdown prose child; a plain body stays the byte-identical escaped paragraph.
+    expect(childrenOf(grid.children[0])[1]?.props).toEqual({
+      text: "Read [the notes](https://example.org/notes).",
+      markdown: true,
+    });
+    // The composed Page re-reads byte-identically through the strict reader, surface and all.
+    const reread = readUnoPageDocument(columnsPage({
+      type: "columns",
+      heading: "Synthetic columns",
+      lede: "Two **authored** columns.",
+      surface: "muted",
+      ratio: "equal",
+      items,
+    }));
+    expect(reread.accepted).toBe(true);
+  });
+
+  it("keeps up to twenty-four labels as consecutive native lists and refuses the twenty-fifth", () => {
+    // `UNO-WO-119 / R01`: the donor's 24-label ceiling exceeds the native 12-item list bound, so a longer list composes as
+    // consecutive native lists of at most twelve — same column, same order, plain list semantics, no global cap change.
+    for (const count of [1, 12, 13, 24]) {
+      const node = columnsNode({
+        type: "columns",
+        items: pair({ title: "A", body: "B" }, { title: "C", items: labels(count) }),
+      });
+      if (node?.module !== "layout.grid") throw new Error("expected the legacy grid");
+      const lists = childrenOf(node.children[1]).filter((child) => child.module === "content.prose");
+      expect(lists.length).toBe(count > 12 ? 2 : 1);
+      const flattened = lists.flatMap((list) =>
+        list.module === "content.prose" && list.props.variant === "list"
+          ? list.props.items.map((item: { label: string }) => item.label)
+          : [],
+      );
+      expect(flattened).toEqual(labels(count));
+      expect(lists[0]?.id).toBe("family-1-columns-column-1-body");
+      if (lists.length === 2) expect(lists[1]?.id).toBe("family-1-columns-column-1-body-2");
+    }
+    expectRefusal(
+      titledEnvelope({ type: "columns", items: pair({ title: "A", body: "B" }, { title: "C", items: labels(25) }) }),
+      "family:target-refused",
+    );
+    expectRefusal(
+      titledEnvelope({ type: "columns", items: pair({ title: "A", body: "B" }, { title: "C", items: [] }) }),
+      "family:target-refused",
+    );
+  });
+
+  it("validates the closed ratio for three columns and suppresses only its layout effect", () => {
+    const three = columnsNode({
+      type: "columns",
+      ratio: "start-wide",
+      items: [
+        { title: "A", body: "B" },
+        { title: "C", body: "D" },
+        { title: "E", body: "F" },
+      ],
+    });
+    expect(three?.module).toBe("layout.grid");
+    if (three?.module !== "layout.grid") return;
+    // Valid and validated, but deliberately without a layout effect: the donor lays three columns out equally.
+    expect(three.props).toEqual({ columns: 3 });
+    expect(Object.prototype.hasOwnProperty.call(three.props, "ratio")).toBe(false);
+    // The value itself is still closed: an out-of-set ratio refuses for two *and* three columns.
+    expectRefusal(
+      titledEnvelope({
+        type: "columns",
+        ratio: "wide",
+        items: [
+          { title: "A", body: "B" },
+          { title: "C", body: "D" },
+          { title: "E", body: "F" },
+        ],
+      }),
+      "family:target-refused",
+    );
+  });
+
+  it("renders the surfaced section, the Markdown body and both label lists as native markup", () => {
+    const html = render(
+      columnsPage({
+        type: "columns",
+        heading: "Synthetic columns",
+        lede: "Two **authored** columns.",
+        surface: "muted",
+        ratio: "end-wide",
+        items: pair(
+          { title: "Left", body: "Read [the notes](https://example.org/notes)." },
+          { title: "Right", items: labels(13) },
+        ),
+      }),
+    );
+    expect(html).toContain(
+      '<div class="uno-json-stack" data-uno-gap="normal" data-uno-surface="muted" id="family-1-columns">',
+    );
+    expect(html).toContain('<h2 class="uno-json-heading" id="family-1-columns-heading">Synthetic columns</h2>');
+    expect(html).toContain('<strong class="uno-family-md-strong">authored</strong>');
+    expect(html).toContain(
+      '<div class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="plain" data-uno-ratio="end-wide" id="family-1-columns-grid">',
+    );
+    expect(html).toContain(
+      '<a class="uno-family-md-link" href="https://example.org/notes" rel="noopener noreferrer">the notes</a>',
+    );
+    expect((html.match(/<ul class="uno-json-list"/gu) ?? []).length).toBe(2);
+    expect((html.match(/<li>/gu) ?? []).length).toBe(13);
+    expect(html.indexOf("Label 1<") < html.indexOf("Label 13<")).toBe(true);
+    expect((html.match(/<h3 class="uno-json-heading"/gu) ?? []).length).toBe(2);
+    expect(html).not.toContain("<button");
+  });
+});
+
 
 describe("composeUnoFoundationSubset — columns target bounds and hostile source", () => {
   it("refuses column counts and ratios outside the two-or-three subset", () => {
@@ -2691,11 +2860,11 @@ describe("composeUnoFoundationSubset — canonical donor inventory", () => {
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/FAMILY_PARITY=17\/17/u);
     expect(ledger).toContain("ADAPT (divider semantic parity candidate)");
-    expect(ledger).toContain("ten of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("eleven of seventeen fully parity-evidenced candidates");
     // `UNO-WO-071 / R01` normalizes the divider wording to its already independently accepted status.
     expect(ledger).toContain("independently accepted under `UNO-WO-069 / R01`");
     expect(ledger).not.toContain("awaiting independent Architect acceptance");
-    expect(ledger).toContain("seven still bounded");
+    expect(ledger).toContain("six still bounded");
     // `UNO-WO-070 / R01`: the two grid families gained a bounded authored-heading mode, which must never be recorded as
     // full parity, a second/third accepted family or a closed stage.
     expect(ledger).toContain("ADAPT (bounded grid plus authored section heading and plain-text lede)");
@@ -4418,7 +4587,7 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
     expect(ledger).toContain("lede-only");
     expect(ledger).toContain("no-lede");
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("ten of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("eleven of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/cards[^.\n]*full semantic parity/u);
@@ -4791,7 +4960,7 @@ describe("composeUnoFoundationSubset — stats and steps authored heading and le
     const ledger = readFileSync(".documents/Architecture/u04-family-parity.md", "utf8");
     expect(ledger.split("ADAPT (bounded authored plain-text heading/lede)").length - 1).toBe(0);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("ten of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("eleven of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("3/17");
     expect(ledger).not.toMatch(/stats[^.\n]*full semantic parity/u);
@@ -5212,22 +5381,25 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     expect(ledger.split("PARITY (UNO-WO-117 / R01)").length - 1).toBe(1);
     expect(ledger.split("PARITY (UNO-WO-118 / R01)").length - 1).toBe(1);
     expect(ledger).toContain("**UNIMPLEMENTED (0):** none.");
-    expect(ledger).toContain("ten of seventeen fully parity-evidenced candidates");
+    expect(ledger).toContain("eleven of seventeen fully parity-evidenced candidates");
     expect(ledger).not.toContain("sixteen still bounded");
-    expect(ledger).toContain("seven still bounded");
+    expect(ledger).toContain("six still bounded");
     expect(ledger).toContain("Seven of the seventeen remain bounded");
     expect(ledger).not.toContain("2/17");
     expect(ledger).not.toContain("16/17");
     // `UNO-WO-114 / R01`: the ledger records the delivered B1 row (`8/17` / `50/59`); `UNO-WO-117 / R01` records the
-    // checkpoint-free nine-family interim (`9/17` / `51/59`). What it must never claim is any later row, so those counts stay
-    // forbidden while every delivered count is pinned positively.
+    // checkpoint-free nine-family interim (`9/17` / `51/59`); `UNO-WO-119 / R01` records the earned B2 row (`11/17` / `53/59`).
+    // What it must never claim is any later row, so those counts stay forbidden while every delivered count is pinned positively.
     expect(ledger).toContain("6/17");
     expect(ledger).toContain("7/17");
     expect(ledger).toContain("8/17");
     expect(ledger).toContain("50/59");
     expect(ledger).toContain("9/17");
     expect(ledger).toContain("51/59");
-    expect(ledger).not.toContain("11/17");
+    expect(ledger).toContain("11/17");
+    expect(ledger).toContain("53/59");
+    expect(ledger).not.toContain("13/17");
+    expect(ledger).not.toContain("15/17");
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/prose[^.\n]*full semantic parity/u);
     expect(ledger).not.toMatch(/table[^.\n]*full semantic parity/u);

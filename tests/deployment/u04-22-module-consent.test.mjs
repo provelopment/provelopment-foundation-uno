@@ -378,7 +378,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   'localA2.table.browser = conjunction(tableBrowserCases);',
   "if (tableLightOk) tableBrowserCases.add(`light:${width}`);",
   "if (darkTableOk) tableBrowserCases.add(`dark:${width}`);",
-  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_EVIDENCE=49/49 (table, list, hero, stats, steps, quote and faq credited; P6 destination proof in the three-Site gate)",
+  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_EVIDENCE=56/56 (table, list, hero, stats, steps, quote, faq and columns credited; P6 destination proof in the three-Site gate)",
   "U04_CLOSURE_ORACLE the checkpoint-omitted oracle credits exactly prose, callout, table and divider",
   'JSON.stringify(closureFour.credited) === JSON.stringify(["prose", "callout", "table", "divider"])',
   "closureFour.parity === 4",
@@ -498,7 +498,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "const quoteFacts = quoteServed(quoteRegion);",
   "const quoteItems = quoteItemsOf(quoteRegion);",
   "JSON.stringify(familyAccepted.sections[12]?.props) === JSON.stringify(quoteNodeProps())",
-  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_EVIDENCE=49/49 (table, list, hero, stats, steps, quote and faq credited; P6 destination proof in the three-Site gate)",
+  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_EVIDENCE=56/56 (table, list, hero, stats, steps, quote, faq and columns credited; P6 destination proof in the three-Site gate)",
   "A2_LOCAL_BROWSER the rich quote family was observed at 390px and 1280px in light and dark/reduced motion with its parsed Markdown quotation",
   "A2_LOCAL_REFUSAL every malformed quote family refuses the whole source Page with the family's own reason",
   "A2_LOCAL_READER the quote quotation is Markdown-validated and Unicode-checked in both forms while a native role-only caption stays accepted",
@@ -533,7 +533,22 @@ const PHASE_C_REQUIRED = Object.freeze([
   "${width}px the FAQ disclosures open independently",
   "${width}px the second FAQ disclosure opens by keyboard without opening the first",
   "dark ${width}px the faq family keeps its Markdown lede, closed surface and owned Markdown answer",
-  "U04_CLOSURE_ORACLE the unchanged oracle credits exactly ten families at 10/17 and 52/59 without a checkpoint selector",
+  "U04_CLOSURE_ORACLE the declared B2 checkpoint is earned by the executed evidence at exactly 11/17 and 53/59",
+  "U04_CLOSURE_ORACLE the unchanged oracle credits exactly eleven families at 11/17 and 53/59 without a checkpoint selector",
+  // `UNO-WO-119 / R01` (§2): the seven Columns dimensions — composition, the legacy byte-identity, the label/ratio boundaries,
+  // the ten refusals, the served markup, the four geometries and the rights probe.
+  "FAMILY_COLUMNS_SOURCE the real adapter composes the rich section as one surfaced stack of authored heading, Markdown lede and a two-column grid",
+  "FAMILY_COLUMNS_LEGACY the served fixture keeps its byte-identical two-column grid with the authored ratio and the authored titles",
+  "FAMILY_COLUMNS_READER the composed Page round-trips, the 1/12/13/24 label boundary holds as consecutive native lists, twenty-five refuses, three columns drop an authored ratio and the native grid still refuses one",
+  "FAMILY_COLUMNS_REFUSAL every columns refusal probe refuses the whole Page with its closed reason and no partial document",
+  "FAMILY_COLUMNS_HTTP the served rich section is one surfaced stack of authored heading, Markdown lede and body, a two-column grid and two native label lists — and the three-column grid carries no ratio attribute",
+  "FAMILY_COLUMNS_BROWSER the four served column variants lay out as authored at 1280px, stack in reading order at 390px and present their surfaces distinctly",
+  "FAMILY_COLUMNS_RIGHTS the served columns region carries no donor identity, owned asset, foreign resource or provider",
+  "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_EVIDENCE=56/56 (table, list, hero, stats, steps, quote, faq and columns credited; P6 destination proof in the three-Site gate)",
+  "localA2.columns.browser = geometry.ok;",
+  "localA2.columns.renderer = rendererOk;",
+  "const geometry = columnsGeometryReport(wide, narrow);",
+  "COLUMNS_REFUSAL_CASES.map((probe) =>",
   // `UNO-WO-118 / R02` (§2): the executed stylesheet check, the computed-appearance proof of the closed surface, its long-FAQ
   // coverage and the temporary fixture restoration.
   "FAMILY_SURFACE_CSS the shipped stylesheet gives the closed surface one token-only treatment per emphasised value and none for plain",
@@ -798,6 +813,33 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
   // `UNO-WO-067 / R01` §5: five independent mutations over the appended families, each failing for its own token.
   // `UNO-WO-118 / R02`: the surface proof must be load-bearing in both directions — deleting a computed-appearance comparison
   // and neutering the long-FAQ coverage each have to fail the audit for their own token.
+  // `UNO-WO-119 / R01`: the Columns proof is load-bearing — neutering the geometry comparison, the label ceiling, the ratio
+  // suppression or the served-markup check each has to fail the audit for its own token.
+  it("the audit genuinely fails when the columns evidence is deleted or neutered", () => {
+    const shapes = [
+      [
+        "const geometry = columnsGeometryReport(wide, narrow);",
+        "const geometry = { ok: true, detail: \"\" };",
+        "columnsGeometryReport(wide, narrow)",
+      ],
+      [
+        "localA2.columns.renderer = rendererOk;",
+        "localA2.columns.renderer = true;",
+        "localA2.columns.renderer = rendererOk",
+      ],
+      [
+        "FAMILY_COLUMNS_BROWSER the four served column variants lay out as authored at 1280px, stack in reading order at 390px and present their surfaces distinctly",
+        "columns layout unverified",
+        "four served column variants",
+      ],
+    ];
+    for (const [from, to, contract] of shapes) {
+      const mutated = source.replace(from, to);
+      assert.notEqual(mutated, source, from);
+      assert.ok(audit(mutated).some((entry) => entry.includes(contract)), `${contract}: ${audit(mutated).join(",")}`);
+    }
+  });
+
   it("the audit genuinely fails when the faq surface presentation proof is deleted or neutered", () => {
     const shapes = [
       [
@@ -903,8 +945,9 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     );
     assert.notEqual(mutated, source);
     assert.ok(audit(mutated).some((entry) => entry.includes("FAMILY_FOUR_REFUSALS")), audit(mutated).join(","));
-    // A probe that no longer composes the adapter cannot refuse anything.
-    const unprobed = source.replace("composeUnoFoundationSubset(probeSource, familyBindings())", "({ status: \"refused\" })");
+    // A probe that no longer composes the adapter cannot refuse anything. `UNO-WO-119 / R01` added further probes that compose
+    // the same adapter, so the mutation replaces every call site rather than the first one.
+    const unprobed = source.split("composeUnoFoundationSubset(probeSource, familyBindings())").join("({ status: \"refused\" })");
     assert.notEqual(unprobed, source);
     assert.ok(
       audit(unprobed).some((entry) => entry.includes("composeUnoFoundationSubset(probeSource, familyBindings())")),
@@ -1309,10 +1352,10 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       assert.notEqual(mutated, source, token);
       assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
     }
-    // The declared checkpoints are exactly the earned rows — the A1 regression, the A2 delivery and now the B1 row this order
-    // delivered. A higher checkpoint would claim a row the Owner has not delivered, so it must never appear.
+    // The declared checkpoints are exactly the earned rows — the A1 regression, the A2 delivery, the B1 row and now the B2 row
+    // this order delivered. A higher checkpoint would claim a row the Owner has not delivered, so it must never appear.
     const declared = [...source.matchAll(/checkpoint:\s*"([A-Z0-9]+)",$/gmu)].map((match) => match[1]);
-    assert.deepEqual(declared, ["A1", "A2", "B1"]);
+    assert.deepEqual(declared, ["A1", "A2", "B1", "B2"]);
   });
 
   it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {

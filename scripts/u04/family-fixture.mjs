@@ -102,6 +102,81 @@ export const FAQ_LONG_SOURCE = Object.freeze({
 });
 
 /**
+ * `UNO-WO-119 / R01`: the donated Columns surface, exactly as authored for the served fixture — a plain two-column grid with the
+ * donor's own closed `ratio`, one column with a plain body and one with two plain labels. It is exported so the gate, the
+ * evidence module and the served Page all read one definition.
+ */
+export const COLUMNS_SOURCE = Object.freeze({
+  type: "columns",
+  ratio: "start-wide",
+  items: Object.freeze([
+    Object.freeze({ title: "Left column", body: "The left text." }),
+    Object.freeze({ title: "Right column", items: Object.freeze(["Check one", "Check two"]) }),
+  ]),
+});
+
+/** The donor's own label ceiling: twenty-four plain labels in one column. */
+export const COLUMNS_LABELS = Object.freeze(
+  Array.from({ length: 24 }, (_, index) => `Label ${String(index + 1).padStart(2, "0")}`),
+);
+
+/**
+ * `UNO-WO-119 / R01`: the rich Columns section — plain heading, Markdown lede, closed `surface`, closed `ratio`, one Markdown
+ * body with a safe link and one column at the donor's full twenty-four-label ceiling. It is served only through the gate's
+ * temporary fixture swap, so it never becomes a durable Page, and it is composed by the real adapter like every other input.
+ */
+export const COLUMNS_RICH_SOURCE = Object.freeze({
+  type: "columns",
+  heading: "Synthetic columns",
+  lede: "Two **authored** columns.",
+  surface: "muted",
+  ratio: "equal",
+  items: Object.freeze([
+    Object.freeze({
+      title: "Rich left",
+      body: "Read [the notes](https://example.org/columns).",
+    }),
+    Object.freeze({ title: "Rich right", items: COLUMNS_LABELS }),
+  ]),
+});
+
+/**
+ * The four layout variants the served-browser proof needs: equal, start-wide, end-wide and three equal columns. The third
+ * variant authors `plain` and the fourth authors a **valid ratio on three columns**, which the donor mapping validates and
+ * deliberately renders without a layout effect.
+ */
+export const COLUMNS_VARIANT_SOURCES = Object.freeze([
+  COLUMNS_RICH_SOURCE,
+  Object.freeze({
+    type: "columns",
+    surface: "bordered",
+    ratio: "start-wide",
+    items: Object.freeze([
+      Object.freeze({ title: "Start-wide left", body: "A wider left column." }),
+      Object.freeze({ title: "Start-wide right", body: "A narrower right column." }),
+    ]),
+  }),
+  Object.freeze({
+    type: "columns",
+    surface: "plain",
+    ratio: "end-wide",
+    items: Object.freeze([
+      Object.freeze({ title: "End-wide left", body: "A narrower left column." }),
+      Object.freeze({ title: "End-wide right", body: "A wider right column." }),
+    ]),
+  }),
+  Object.freeze({
+    type: "columns",
+    ratio: "start-wide",
+    items: Object.freeze([
+      Object.freeze({ title: "Three one", body: "First of three." }),
+      Object.freeze({ title: "Three two", body: "Second of three." }),
+      Object.freeze({ title: "Three three", body: "Third of three." }),
+    ]),
+  }),
+]);
+
+/**
  * `UNO-WO-117 / R01`: the donated Quote surface, exactly as authored — a Markdown-capable `body`, a plain `attribution`
  * beside a plain `role` (the donor draws a role only with an attribution), and the donor's closed `align`/`surface` pair.
  * The donor authors no heading or lede for this family, so neither is present.
@@ -255,11 +330,9 @@ export function familySource() {
       },
       {
         type: "columns",
-        ratio: "start-wide",
-        items: [
-          { title: "Left column", body: "The left text." },
-          { title: "Right column", items: ["Check one", "Check two"] },
-        ],
+        // `UNO-WO-119 / R01`: one definition for the served Columns section, read from the exported fixture.
+        ...COLUMNS_SOURCE,
+        items: COLUMNS_SOURCE.items.map((item) => ({ ...item })),
       },
       {
         type: "cards",

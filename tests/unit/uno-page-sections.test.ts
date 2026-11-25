@@ -984,6 +984,33 @@ describe("the eleven remaining module renderers", () => {
     expect(html).not.toContain("<button");
   });
 
+  // `UNO-WO-119 / R01`: the attribute alone is not a surface. The shipped stylesheet must define one token-only treatment per
+  // emphasised stack value and nothing for the ordinary stack or for the authorable `plain` value, so the Columns surface is
+  // presentation rather than an attribute.
+  it("styles the closed stack surface from the shared tokens and leaves the ordinary stack alone", () => {
+    const css = stylesheet();
+    const rule = (value: string): string | null => {
+      const pattern = new RegExp(`\\.uno-json-stack\\[data-uno-surface="${value}"\\]\\s*\\{([^}]*)\\}`, "u");
+      const match = pattern.exec(css);
+      return match === null ? null : (match[1] ?? null);
+    };
+    const muted = rule("muted");
+    const bordered = rule("bordered");
+    expect(muted).not.toBeNull();
+    expect(bordered).not.toBeNull();
+    expect(muted).toContain("background-color: var(--uno-surface)");
+    expect(muted).toContain("padding:");
+    expect(muted).toContain("border-radius: var(--uno-radius-lg)");
+    expect(bordered).toContain("border: 1px solid var(--uno-border)");
+    expect(bordered).toContain("background-color: var(--uno-background)");
+    expect(rule("plain")).toBeNull();
+    const base = /\.uno-json-stack\s*\{([^}]*)\}/u.exec(css)?.[1] ?? "";
+    expect(base).toContain("display: flex");
+    expect(base).not.toContain("background");
+    expect(base).not.toContain("padding");
+    expect(base).not.toContain("border");
+  });
+
   // `UNO-WO-118 / R02`: the attribute alone is not a surface. The shipped stylesheet must define one treatment per emphasised
   // value from the shared tokens, and must define nothing for the ordinary accordion or for the authorable `plain` value.
   it("styles the closed accordion surface from the shared tokens and leaves the ordinary group alone", () => {

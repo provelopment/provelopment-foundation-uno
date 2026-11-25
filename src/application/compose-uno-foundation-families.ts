@@ -1099,15 +1099,20 @@ function composeSection(
       return wrapAuthoredText(record, id, composed, "accordion", { markdownLede: true, ledeReader: readFamilyLede });
     }
     case "columns": {
-      requireExactKeys(record, ["type", "items"], ["ratio"]);
+      // `UNO-WO-119 / R01`: the donor Columns family in full — an optional plain heading, Markdown lede, closed surface and
+      // closed ratio, two or three ordered columns, each one Markdown body or one list of up to twenty-four plain labels.
+      requireExactKeys(record, ["type", "items"], ["ratio", "heading", "lede", "surface"]);
       const items = record["items"];
       if (!Array.isArray(items)) refuseUnsupportedFeature();
       // The donor allows two or three columns; Uno's grid also allows one and four, which this subset never composes.
       if (items.length !== 2 && items.length !== 3) refuseTarget();
       const ratioAuthored = ownsKey(record, "ratio");
-      // A ratio only means something for two columns: three columns plus an authored ratio refuses instead of being
-      // silently discarded, because discarding it would change an authored layout decision.
-      if (ratioAuthored && items.length !== 2) refuseUnsupportedFeature();
+      if (ratioAuthored) {
+        // The closed ratio is validated for **every** authored column count, including three, where the donor then lays its
+        // columns out equally. An out-of-set value is a crossed shape and refuses; it is never repaired or ignored.
+        const ratio = record["ratio"];
+        if (ratio !== "equal" && ratio !== "start-wide" && ratio !== "end-wide") refuseTarget();
+      }
       const columns: CandidateSection[] = [];
       for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
         const raw = items[itemIndex];
@@ -1125,20 +1130,32 @@ function composeSection(
         if (codePointLength(title) > 160) refuseTarget();
 
         const columnId = `${id}-column-${itemIndex}`;
-        let content: CandidateSection;
+        const content: CandidateSection[] = [];
         if (hasBody) {
-          content = {
+          // The donor body is Markdown-capable, so the shared Markdown reader validates it and the one renderer draws it; a
+          // body without Markdown keeps the byte-identical escaped paragraph this family has always composed.
+          const body = readRichFamilyText(entry["body"], 4000);
+          content.push({
             id: `${columnId}-body`,
             module: "content.prose",
-            props: { text: readNewFamilyText(entry["body"]) },
-          };
+            props: hasFamilyMarkdown(body) ? { text: body, markdown: true } : { text: body },
+          });
         } else {
           const labels = entry["items"];
           if (!Array.isArray(labels)) refuseUnsupportedFeature();
-          if (labels.length < 1 || labels.length > 12) refuseTarget();
-          const list: Record<string, unknown>[] = [];
-          for (const label of labels) list.push({ label: readNewFamilyText(label) });
-          content = { id: `${columnId}-body`, module: "content.prose", props: { variant: "list", items: list } };
+          // The donor allows up to twenty-four labels per column while the native prose list is bounded at twelve. The column
+          // composes as **consecutive native lists** of at most twelve, in authored order, so every label keeps plain list
+          // semantics, source order and column ownership; no global cap moves and a twenty-fifth label refuses.
+          if (labels.length < 1 || labels.length > 24) refuseTarget();
+          for (let offset = 0; offset < labels.length; offset += 12) {
+            const chunk: Record<string, unknown>[] = [];
+            for (const label of labels.slice(offset, offset + 12)) chunk.push({ label: readNewFamilyText(label) });
+            content.push({
+              id: offset === 0 ? `${columnId}-body` : `${columnId}-body-${offset / 12 + 1}`,
+              module: "content.prose",
+              props: { variant: "list", items: chunk },
+            });
+          }
         }
 
         columns.push({
@@ -1148,14 +1165,47 @@ function composeSection(
           children: [
             // `UNO-WO-080 / R01`: the donor's column titles are level-3 headings beneath the section, not peer headings.
             { id: `${columnId}-title`, module: "content.heading", props: { text: title, level: 3 } },
-            content,
+            ...content,
           ],
         });
       }
-      const props: Record<string, unknown> = { columns: columns.length };
-      // An absent ratio stays absent; an authored one is copied as a closed literal the Uno reader validates.
-      if (ratioAuthored) props["ratio"] = record["ratio"];
-      return { id, module: "layout.grid", props, children: columns };
+      const gridProps: Record<string, unknown> = { columns: columns.length };
+      // An absent ratio stays absent. An authored ratio reaches the native grid only where the native grid can express it —
+      // two columns — which is also the only place the reader accepts one. With three columns the donor's own rule applies:
+      // its columns are equal, so a valid authored ratio is validated but has no layout effect. Nothing is discarded
+      // silently: the suppression is this donor mapping's documented adaptation, and the native reader still refuses a ratio
+      // on any non-two-column grid.
+      if (ratioAuthored && items.length === 2) gridProps["ratio"] = record["ratio"];
+      const grid: CandidateSection = { id: `${id}-grid`, module: "layout.grid", props: gridProps, children: columns };
+
+      const headingAuthored = ownsKey(record, "heading");
+      const ledeAuthored = ownsKey(record, "lede");
+      const surfaceAuthored = ownsKey(record, "surface");
+      if (!headingAuthored && !ledeAuthored && !surfaceAuthored) {
+        // Byte-compatible legacy output: the original grid root with its original id, no wrapper and no extra props.
+        return { id, module: "layout.grid", props: gridProps, children: columns };
+      }
+      const wrapped: CandidateSection[] = [];
+      if (headingAuthored) {
+        wrapped.push({
+          id: `${id}-heading`,
+          module: "content.heading",
+          props: { text: readSectionHeading(record["heading"]), level: 2 },
+        });
+      }
+      if (ledeAuthored) {
+        const lede = readRichFamilyText(record["lede"], 4000);
+        wrapped.push({
+          id: `${id}-lede`,
+          module: "content.prose",
+          props: hasFamilyMarkdown(lede) ? { text: lede, markdown: true } : { text: lede },
+        });
+      }
+      wrapped.push(grid);
+      // The closed surface sits on the section wrapper, so it covers the authored heading, lede **and** the column grid.
+      const props: Record<string, unknown> = {};
+      if (surfaceAuthored) props["surface"] = record["surface"];
+      return { id, module: "layout.stack", props, children: wrapped };
     }
     case "cards":
     case "features": {

@@ -587,6 +587,26 @@ main {
   gap: 2rem;
 }
 
+/*
+ * `UNO-WO-119 / R01`: the adopted closed section surface, for a family that composes its heading, lede and body into one stack
+ * (currently Columns). `plain` keeps the ordinary stack — the convention every other Uno surface module follows — so only the
+ * two emphasised values add a treatment, from the shared tokens, and a stack without a surface is byte- and pixel-identical.
+ * `muted` tints the whole section against the page; `bordered` keeps the page background and draws one rule around it, so the
+ * two are distinguishable in either colour scheme.
+ */
+.uno-json-stack[data-uno-surface="muted"] {
+  padding: 1rem 1.25rem;
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-surface);
+}
+
+.uno-json-stack[data-uno-surface="bordered"] {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-background);
+}
+
 .uno-json-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

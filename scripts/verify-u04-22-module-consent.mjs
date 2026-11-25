@@ -34,11 +34,31 @@ import {
   FAMILY_IDS,
   FAMILY_PLATE,
   FAMILY_ROUTE,
+  COLUMNS_LABELS,
+  COLUMNS_RICH_SOURCE,
+  COLUMNS_SOURCE,
+  COLUMNS_VARIANT_SOURCES,
   FAQ_LONG_SOURCE,
   composeFamilyFixture,
   familyBindings,
   familySource,
 } from "./u04/family-fixture.mjs";
+import {
+  COLUMNS_BODY_ID,
+  COLUMNS_EXPECTED,
+  COLUMNS_GRID_ID,
+  COLUMNS_HEADING_ID,
+  COLUMNS_ID,
+  COLUMNS_LEDE_ID,
+  COLUMNS_REFUSAL_CASES,
+  COLUMNS_RICH,
+  COLUMNS_TITLE_ID,
+  COLUMNS_VARIANTS,
+  columnsGeometryReport,
+  columnsGridOf,
+  columnsLabelsOf,
+  columnsRegionOf,
+} from "./u04/columns-evidence.mjs";
 import { conjunction, conjunctionDetail, createFamilyEvidence, isCreditable } from "./u04/family-evidence.mjs";
 import { HERO_EXPECTED, HERO_REFUSAL_CASES, heroActionsOf, heroRegionOf, heroServed } from "./u04/hero-evidence.mjs";
 import {
@@ -190,6 +210,8 @@ const localA2 = {
   steps: createFamilyEvidence(),
   quote: createFamilyEvidence(),
   faq: createFamilyEvidence(),
+  // `UNO-WO-119 / R01`: the eleventh credited family's own seven-dimension record.
+  columns: createFamilyEvidence(),
 };
 // Diagnostics only: the executed refusal codes, so a red `refusal` dimension names its own reason.
 let refusalReasons = "";
@@ -1924,7 +1946,13 @@ async function main() {
             new RegExp(`\\.uno-json-accordion\\[data-uno-surface="${value}"\\]\\s*\\{([^}]*)\\}`, "u").exec(stylesheet)?.[1] ?? "";
           const mutedRule = ruleOf("muted");
           const borderedRule = ruleOf("bordered");
-          const surfaceCssOk = mutedRule.includes("background-color: var(--uno-surface-strong);")
+          // `UNO-WO-119 / R01`: the same closed surface on the section wrapper, so a family that composes its heading, lede and
+          // body into one stack can surface all of it. `plain` again carries no rule.
+          const stackMuted = stylesheet.includes('.uno-json-stack[data-uno-surface="muted"]');
+          const stackBordered = stylesheet.includes('.uno-json-stack[data-uno-surface="bordered"]');
+          const surfaceCssOk = stackMuted && stackBordered
+            && !stylesheet.includes('.uno-json-stack[data-uno-surface="plain"]')
+            && mutedRule.includes("background-color: var(--uno-surface-strong);")
             && mutedRule.includes("padding: 0.75rem;")
             && mutedRule.includes("border-radius: var(--uno-radius-lg);")
             && borderedRule.includes("border: 1px solid var(--uno-border);")
@@ -2001,16 +2029,67 @@ async function main() {
               ninePanels: ninePanels.accepted === true ? "accepted" : ninePanels.reason,
             }),
           );
+        // `UNO-WO-119 / R01` — the Columns family. Source and reader execute here on the real adapter and the strict reader;
+        // renderer, HTTP, browser and rights on the served swap page; refusal on the ten closed probes below.
+        {
+          const richSource = familySource();
+          richSource.sections[14] = {
+            ...COLUMNS_RICH_SOURCE,
+            items: COLUMNS_RICH_SOURCE.items.map((item) => ({ ...item })),
+          };
+          const richOutcome = composeUnoFoundationSubset(richSource, familyBindings());
+          const richSection = richOutcome.status === "composed" ? richOutcome.document.sections[14] : undefined;
+          const richGrid = columnsGridOf(richSection);
+          localA2.columns.source = richOutcome.status === "composed"
+            && richSection?.module === "layout.stack"
+            && richSection.id === COLUMNS_ID
+            && JSON.stringify(richSection.props) === JSON.stringify({ surface: COLUMNS_RICH.surface })
+            && richSection.children.map((child) => child.id).join(",")
+              === [COLUMNS_HEADING_ID, COLUMNS_LEDE_ID, COLUMNS_GRID_ID].join(",")
+            && richSection.children[0]?.props.text === COLUMNS_RICH.heading
+            && richSection.children[1]?.props.markdown === true
+            && richGrid?.props.columns === COLUMNS_RICH.columns
+            && richGrid.props.ratio === COLUMNS_RICH.ratio
+            && richGrid.children.map((child) => child.id).join(",")
+              === [COLUMNS_ID + "-column-0", COLUMNS_ID + "-column-1"].join(",")
+            && richGrid.children.every((child) => child.module === "layout.stack" && child.props.gap === "tight");
+          check(
+            "FAMILY_COLUMNS_SOURCE the real adapter composes the rich section as one surfaced stack of authored heading, Markdown lede and a two-column grid",
+            localA2.columns.source === true,
+            richOutcome.status === "composed" ? JSON.stringify(richSection?.props ?? null) : String(richOutcome.reason),
+          );
+          // The served fixture's own section keeps its byte-identical legacy output: a bare grid at the family anchor, its
+          // authored ratio, two tight column stacks and the authored titles — nothing wrapped, nothing added.
+          const servedGrid = columnsGridOf(familyAccepted.sections[14]);
+          const servedOk = servedGrid !== null
+            && servedGrid.id === COLUMNS_ID
+            && servedGrid.props.columns === COLUMNS_EXPECTED.columns
+            && servedGrid.props.ratio === COLUMNS_EXPECTED.ratio
+            && Object.keys(servedGrid.props).length === 2
+            && servedGrid.children.map((child) => child.id).join(",")
+              === [0, 1].map((index) => `${COLUMNS_ID}-column-${index}`).join(",")
+            && servedGrid.children.every((child) => child.props.gap === "tight")
+            && servedGrid.children.every((child, index) => child.children?.[0]?.id === COLUMNS_TITLE_ID(index))
+            && COLUMNS_SOURCE.items.length === COLUMNS_EXPECTED.columns;
+          check(
+            "FAMILY_COLUMNS_LEGACY the served fixture keeps its byte-identical two-column grid with the authored ratio and the authored titles",
+            servedOk && familyAccepted.sections[14]?.module === "layout.grid",
+            JSON.stringify(servedGrid?.props ?? null),
+          );
+        }
+
         }
         {
           const quoteDocument = (props) => ({
             version: 1,
             title: "Quote direct document",
+
             sections: [{ id: "quote", module: "content.testimonials", props }],
           });
           const declaredInvalid = ["A **unclosed quotation", "A ![alt](https://example.invalid/i.png)"].map((body) =>
             readUnoPageDocument(quoteDocument({ items: [{ quote: body }], markdown: true })));
           const unicodeBothForms = ["A \uD800 tail", "A \uDC00 tail"].map((body) =>
+
             readUnoPageDocument(quoteDocument({ items: [{ quote: body }] })));
           const unicodeFlagged = readUnoPageDocument(
             quoteDocument({ items: [{ quote: "A \uD800 tail" }], markdown: true }),
@@ -2037,6 +2116,128 @@ async function main() {
             }),
           );
         }
+        {
+          // The donor's one-body-or-one-list rule at the 1/12/13/24 label boundary, the closed ratio on three columns, and both
+          // shared readers: the composed Page round-trips, the native grid still refuses a non-two-column ratio, the native
+          // stack accepts the closed surface, and a twenty-fifth label refuses the whole Page.
+          const boundary = [1, 12, 13, 24].map((count) => {
+            const probeSource = familySource();
+            probeSource.sections[14] = {
+              type: "columns",
+              items: [
+                { title: "Body column", body: "A plain body." },
+                { title: "Label column", items: COLUMNS_LABELS.slice(0, count) },
+              ],
+            };
+            const outcome = composeUnoFoundationSubset(probeSource, familyBindings());
+            const grid = columnsGridOf(outcome.status === "composed" ? outcome.document.sections[14] : undefined);
+            const lists = (grid?.children[1]?.children ?? []).filter((child) => child.module === "content.prose");
+            const flattened = lists.flatMap((list) =>
+              list.module === "content.prose" && list.props.variant === "list"
+                ? list.props.items.map((item) => item.label)
+                : [],
+            );
+            return outcome.status === "composed"
+              && lists.length === (count > 12 ? 2 : 1)
+              && JSON.stringify(flattened) === JSON.stringify(COLUMNS_LABELS.slice(0, count))
+              && lists[0]?.id === COLUMNS_BODY_ID(1)
+              && (count > 12 ? lists[1]?.id === COLUMNS_BODY_ID(1, 2) : true);
+          });
+          const twentyFive = (() => {
+            const probeSource = familySource();
+            probeSource.sections[14] = {
+              type: "columns",
+              items: [{ title: "A", body: "B" }, { title: "C", items: [...COLUMNS_LABELS, "Label 25"] }],
+            };
+            const outcome = composeUnoFoundationSubset(probeSource, familyBindings());
+            return String(outcome.status === "refused" ? outcome.reason : outcome.status);
+          })();
+          const threeColumns = (() => {
+            const probeSource = familySource();
+            probeSource.sections[14] = {
+              type: "columns",
+              ratio: "start-wide",
+              items: [{ title: "A", body: "B" }, { title: "C", body: "D" }, { title: "E", body: "F" }],
+            };
+            const outcome = composeUnoFoundationSubset(probeSource, familyBindings());
+            const grid = columnsGridOf(outcome.status === "composed" ? outcome.document.sections[14] : undefined);
+            return { status: outcome.status, props: grid?.props ?? null };
+          })();
+          const nativeGridRatio = readUnoPageDocument({
+            version: 1,
+            title: "Native ratio",
+            sections: [{ id: "g", module: "layout.grid", props: { columns: 3, ratio: "equal" }, children: [] }],
+          });
+          const nativeStackSurface = readUnoPageDocument({
+            version: 1,
+            title: "Native stack surface",
+            sections: [
+              {
+                id: "s",
+                module: "layout.stack",
+                props: { surface: "bordered" },
+                children: [{ id: "p", module: "content.prose", props: { text: "Body." } }],
+              },
+            ],
+          });
+          const richSourceAgain = familySource();
+          richSourceAgain.sections[14] = {
+            ...COLUMNS_RICH_SOURCE,
+            items: COLUMNS_RICH_SOURCE.items.map((item) => ({ ...item })),
+          };
+          const richAgain = composeUnoFoundationSubset(richSourceAgain, familyBindings());
+          const reread = richAgain.status === "composed" ? readUnoPageDocument(richAgain.document) : null;
+          localA2.columns.reader = richAgain.status === "composed"
+            && reread?.accepted === true
+            && JSON.stringify(reread.document) === JSON.stringify(richAgain.document)
+            && boundary.every(Boolean)
+            && twentyFive === "family:target-refused"
+            && threeColumns.status === "composed"
+            && JSON.stringify(threeColumns.props) === JSON.stringify({ columns: 3 })
+            && nativeGridRatio.accepted === false
+            && nativeGridRatio.reason === "document:invalid-props"
+            && nativeStackSurface.accepted === true;
+          check(
+            "FAMILY_COLUMNS_READER the composed Page round-trips, the 1/12/13/24 label boundary holds as consecutive native lists, twenty-five refuses, three columns drop an authored ratio and the native grid still refuses one",
+            localA2.columns.reader === true,
+            JSON.stringify({
+              boundary,
+              twentyFive,
+              three: threeColumns.props,
+              nativeRatio: nativeGridRatio.accepted ? "accepted" : nativeGridRatio.reason,
+            }),
+          );
+        }
+        {
+          // `UNO-WO-119 / R01`: ten closed refusal probes over the rich section — the donor's two hard bounds, the closed ratio
+          // and surface, nested sections, an unsafe destination, malformed Markdown and ill-formed Unicode.
+          const columnsRefusals = COLUMNS_REFUSAL_CASES.map((probe) => {
+            const probeSource = familySource();
+            const section = {
+              ...COLUMNS_RICH_SOURCE,
+              items: COLUMNS_RICH_SOURCE.items.map((item) => ({
+                ...item,
+                ...(item.items === undefined ? {} : { items: [...item.items] }),
+              })),
+            };
+            probe.mutate(section);
+            probeSource.sections[14] = section;
+            const outcome = composeUnoFoundationSubset(probeSource, familyBindings());
+            return {
+              label: probe.label,
+              expected: probe.expected,
+              actual: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+              partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+            };
+          });
+          localA2.columns.refusal = columnsRefusals.every((probe) => probe.actual === probe.expected && probe.partial === false);
+          check(
+            "FAMILY_COLUMNS_REFUSAL every columns refusal probe refuses the whole Page with its closed reason and no partial document",
+            localA2.columns.refusal === true,
+            JSON.stringify(columnsRefusals),
+          );
+        }
+
         // `UNO-WO-116 / R01`: the malformed-Unicode probes are part of every Markdown-capable family matrix, and no earlier
         // refusal case was dropped to make room for them. One extracted case list, one presence rule, no per-family patch.
         const unicodeProbes = {
@@ -4886,6 +5087,128 @@ async function consentPhase(base) {
       outlineBrowserOk && outlineBrowserChecks === 12,
       `checks=${outlineBrowserChecks} ok=${outlineBrowserOk}`,
     );
+    // `UNO-WO-119 / R01` (§2 `renderer`/`http`/`browser`/`rights`): the Columns family served for real. The fixture's own
+    // Columns section is temporarily replaced by the rich one and three further variants are appended, so one production visit
+    // proves the served markup, the four geometries, the computed surface and mobile stacking. The original bytes are written
+    // back in `finally` and the restoration is checked by digest.
+    {
+      const familyPath = resolve(ROOT, SOURCES[4]);
+      const original = readFileSync(familyPath);
+      const originalDigest = sha256Of(SOURCES[4]);
+      let rendered = "";
+      const wide = [];
+      const narrow = [];
+      try {
+        const adapterSpecifier = "../src/application/compose-uno-foundation-families.ts";
+        const { composeUnoFoundationSubset: composeColumns } = await import(adapterSpecifier);
+        const swapSource = familySource();
+        COLUMNS_VARIANT_SOURCES.forEach((variant, index) => {
+          const section = {
+            ...variant,
+            items: variant.items.map((item) => ({
+              ...item,
+              ...(item.items === undefined ? {} : { items: [...item.items] }),
+            })),
+          };
+          if (index === 0) swapSource.sections[14] = section;
+          else swapSource.sections[17 + (index - 1)] = section;
+        });
+        const swapOutcome = composeColumns(swapSource, familyBindings());
+        if (swapOutcome.status !== "composed") throw new Error(String(swapOutcome.reason));
+        writeFileSync(familyPath, `${JSON.stringify(swapOutcome.document, null, 2)}\n`, "utf8");
+        const swapped = await fetch(`${FAMILY_URL}?wo119r01=columns`, { redirect: "manual" });
+        rendered = swapped.status === 200 ? await swapped.text() : "";
+        const readVariants = (ids) => {
+          const readings = ids.map((id) => {
+            const root = document.getElementById(id);
+            if (root === null) return null;
+            const grid = root.matches(".uno-json-grid") ? root : root.querySelector(".uno-json-grid");
+            const cells = [...(grid?.querySelectorAll(":scope > .uno-json-cell") ?? [])];
+            const rects = cells.map((cell) => cell.getBoundingClientRect());
+            const style = getComputedStyle(root);
+            return {
+              id,
+              columns: cells.length,
+              widths: rects.map((rect) => Math.round(rect.width)),
+              tops: rects.map((rect) => Math.round(rect.top)),
+              backgroundColor: style.backgroundColor,
+              borderWidth: `${Number.parseFloat(style.borderTopWidth) || 0}px`,
+              ratioAttribute: grid?.getAttribute("data-uno-ratio") ?? null,
+              overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+            };
+          });
+          return readings.filter((reading) => reading !== null);
+        };
+        const variantIds = COLUMNS_VARIANTS.map((variant) => variant.id);
+        await tab.setViewportSize({ width: 1280, height: 900 });
+        await tab.goto(`${FAMILY_URL}?wo119r01=columns`, { waitUntil: "networkidle" });
+        wide.push(...(await tab.evaluate(readVariants, variantIds)));
+        await tab.setViewportSize({ width: 390, height: 900 });
+        await tab.goto(`${FAMILY_URL}?wo119r01=columns-narrow`, { waitUntil: "networkidle" });
+        narrow.push(...(await tab.evaluate(readVariants, variantIds)));
+      } finally {
+        writeFileSync(familyPath, original);
+      }
+      const geometry = columnsGeometryReport(wide, narrow);
+      check(
+        "FAMILY_COLUMNS_BROWSER the four served column variants lay out as authored at 1280px, stack in reading order at 390px and present their surfaces distinctly",
+        geometry.ok && sha256Of(SOURCES[4]) === originalDigest,
+        geometry.detail,
+      );
+      localA2.columns.browser = geometry.ok;
+      // Renderer and HTTP: the served markup of the rich section and the three further variants, parsed from the real response.
+      {
+        const region = columnsRegionOf(rendered);
+        const labels = columnsLabelsOf(region);
+        const listCount = (region.match(/<ul class="uno-json-list"/gu) ?? []).length;
+        const threeRegion = rendered.slice(
+          rendered.indexOf(`id="${COLUMNS_VARIANTS[3].id}"`) - 200,
+          rendered.indexOf(`id="${COLUMNS_VARIANTS[3].id}"`) + 400,
+        );
+        const rendererOk = region.length > 0
+          && region.includes(
+            `<div class="uno-json-stack" data-uno-gap="normal" data-uno-surface="${COLUMNS_RICH.surface}" id="${COLUMNS_ID}">`,
+          )
+          && region.includes(`<h2 class="uno-json-heading" id="${COLUMNS_HEADING_ID}">${COLUMNS_RICH.heading}</h2>`)
+          && region.includes(`<section class="uno-json-prose" id="${COLUMNS_LEDE_ID}">`)
+          && /<strong class="uno-family-md-strong">authored<\/strong>/u.test(region)
+          && region.includes(
+            `<div class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="plain" data-uno-ratio="${COLUMNS_RICH.ratio}" id="${COLUMNS_GRID_ID}">`,
+          )
+          && region.includes(
+            `<a class="uno-family-md-link" href="${COLUMNS_RICH.bodyLink}" rel="noopener noreferrer">the notes</a>`,
+          )
+          && (region.match(/<div class="uno-json-cell"/gu) ?? []).length === 2
+          && listCount === COLUMNS_RICH.listChunks.length
+          && JSON.stringify(labels) === JSON.stringify(COLUMNS_RICH.labels)
+          && (region.match(/<h3 class="uno-json-heading"/gu) ?? []).length === 2
+          && !/<button\b|<img\b|<script\b|<form\b|<input\b/iu.test(region);
+        localA2.columns.renderer = rendererOk;
+        localA2.columns.http = rendered.length > 0
+          && rendered.includes(`id="${COLUMNS_ID}"`)
+          && rendered.includes(`id="${COLUMNS_VARIANTS[3].id}"`)
+          // The authored ratio on three columns is validated and has no layout effect: no ratio attribute reaches the grid.
+          && !/data-uno-ratio/iu.test(threeRegion.slice(threeRegion.indexOf(`id="${COLUMNS_VARIANTS[3].id}"`) - 200));
+        check(
+          "FAMILY_COLUMNS_HTTP the served rich section is one surfaced stack of authored heading, Markdown lede and body, a two-column grid and two native label lists — and the three-column grid carries no ratio attribute",
+          rendererOk && localA2.columns.http === true,
+          `${region.slice(0, 200)} lists=${listCount} labels=${labels.length}`,
+        );
+        // Rights: nothing of the donor's identity, no owned asset, no foreign resource and no new provider reaches the region.
+        const foreign = [...region.matchAll(/(?:href|src)="([^"]*)"/gu)]
+          .map((match) => match[1])
+          .filter((value) => !value.startsWith("#") && !value.startsWith("https://example.org/") && !value.startsWith("mailto:"));
+        localA2.columns.rights = !region.includes(FAMILY_DONOR_SOURCE)
+          && !region.includes("wo066")
+          && !/url\(|@font-face|<iframe/iu.test(region)
+          && foreign.length === 0;
+        check(
+          "FAMILY_COLUMNS_RIGHTS the served columns region carries no donor identity, owned asset, foreign resource or provider",
+          localA2.columns.rights === true,
+          JSON.stringify({ foreign }),
+        );
+      }
+    }
     // `UNO-WO-118 / R02` (§2 `browser`, long FAQ): the surface must hold on **every** group, so the served Page is temporarily
     // replaced by the same fixture with its FAQ section swapped for the donor's full twenty-four items. Nothing durable
     // changes: the original bytes are written back in `finally` and the restoration is checked by digest.
@@ -4992,12 +5315,13 @@ async function consentPhase(base) {
         steps: localA2.steps,
         quote: localA2.quote,
         faq: localA2.faq,
+        columns: localA2.columns,
       };
       const dimensions = Object.values(records).reduce((total, record) => total + Object.keys(record).length, 0);
       check(
-        "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_EVIDENCE=49/49 (table, list, hero, stats, steps, quote and faq credited; P6 destination proof in the three-Site gate)",
-        records.list && records.table && records.hero && records.stats && records.steps && records.quote && records.faq
-          && dimensions === 49
+        "A2_LOCAL_TABLE_LIST_HERO_STATS_STEPS_QUOTE_FAQ_COLUMNS_EVIDENCE=56/56 (table, list, hero, stats, steps, quote, faq and columns credited; P6 destination proof in the three-Site gate)",
+        Object.values(records).every((record) => Object.keys(record).length > 0)
+          && dimensions === 56
           && Object.values(localA2).every((record) => isCreditable(record)),
         JSON.stringify({ ...records, refusalReasons }),
       );
@@ -5272,10 +5596,10 @@ async function consentPhase(base) {
         ? `${closureInterim.parity}/17 ${closureInterim.proxy}/59 ${closureInterim.credited.join(",")}`
         : String(closureInterim.reason),
     );
-    // `UNO-WO-118 / R01` (§3): the newly credited **FAQ** family, evaluated by the same unchanged oracle **without** a
-    // checkpoint selector, so the interim row is whatever the executed records earn — ten families, `10/17` and `52/59`.
-    // The B1 and nine-family rows above stay retained regressions, and the declared **B2** target is still not claimed:
-    // it also requires `columns`.
+    // `UNO-WO-118 / R01`, retained as a regression by `UNO-WO-119 / R01`: the **FAQ** credit evaluated by the same unchanged
+    // oracle **without** a checkpoint selector, with `columns` deliberately still absent from the record set, so the ten-family
+    // interim (`10/17`, `52/59`) stays exactly what the executed evidence earned at that order. The earned row is eleven
+    // families and the declared **B2** checkpoint below; this row is here so a regression cannot silently inflate it.
     const closureTen = evaluateU04FamilyClosure({
       families: {
         divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
@@ -5311,11 +5635,78 @@ async function consentPhase(base) {
         : String(closureTen.reason),
     );
     if (closureTen.ok) {
-      // Every printed label is re-derived from the ten-family result's own credit set, so a label cannot appear without its
+      // Every printed label is re-derived from the eleven-family result's own credit set, so a label cannot appear without its
       // reason and no earlier row can print a fuller one.
-      const creditedNames = new Set(closureTen.credited.map((family) => `PARITY_${family.toUpperCase()}`));
-      const pendingNames = new Set(closureTen.pending.map((family) => `PARITY_${family.toUpperCase()}`));
-      for (const label of closureTen.labels) {
+      const closureEleven = evaluateU04FamilyClosure({
+        families: {
+          divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
+          prose: a1Evidence.prose,
+          callout: a1Evidence.callout,
+          table: localA2.table,
+          list: localA2.list,
+          hero: localA2.hero,
+          stats: localA2.stats,
+          steps: localA2.steps,
+          quote: localA2.quote,
+          faq: localA2.faq,
+          columns: localA2.columns,
+        },
+        modules: UNO_RENDERABLE_MODULES.length,
+        zones: UNO_OWNED_MEDIA_ZONES.length,
+        browserMatrix: matrixCases.length,
+      });
+      // `UNO-WO-119 / R01` (§2): the declared **B2** checkpoint, evaluated by the unchanged oracle with its own selector. It can
+      // only pass when `quote`, `faq` **and** `columns` are all credited and the executed score is exactly 11/17 and 53/59.
+      const closureB2 = evaluateU04FamilyClosure({
+        families: {
+          divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
+          prose: a1Evidence.prose,
+          callout: a1Evidence.callout,
+          table: localA2.table,
+          list: localA2.list,
+          hero: localA2.hero,
+          stats: localA2.stats,
+          steps: localA2.steps,
+          quote: localA2.quote,
+          faq: localA2.faq,
+          columns: localA2.columns,
+        },
+        modules: UNO_RENDERABLE_MODULES.length,
+        zones: UNO_OWNED_MEDIA_ZONES.length,
+        browserMatrix: matrixCases.length,
+        checkpoint: "B2",
+      });
+      check(
+        "U04_CLOSURE_ORACLE the unchanged oracle credits exactly eleven families at 11/17 and 53/59 without a checkpoint selector",
+        closureEleven.ok === true
+          && JSON.stringify(closureEleven.credited)
+            === JSON.stringify([
+              "prose", "callout", "table", "list", "hero", "stats", "steps", "quote", "faq", "columns", "divider",
+            ])
+          && closureEleven.parity === 11
+          && closureEleven.proxy === 53
+          && closureEleven.labels.includes("PARITY_COLUMNS=PASS")
+          && closureEleven.labels.includes("U04_PARITY=11/17")
+          && closureEleven.labels.includes("U04_PROXY=53/59")
+          && closureEleven.labels.includes("PARITY_CARDS=PENDING")
+          && familyOk
+          && dividerOk,
+        closureEleven.ok
+          ? `${closureEleven.parity}/17 ${closureEleven.proxy}/59 ${closureEleven.credited.join(",")}`
+          : String(closureEleven.reason),
+      );
+      check(
+        "U04_CLOSURE_ORACLE the declared B2 checkpoint is earned by the executed evidence at exactly 11/17 and 53/59",
+        closureB2.ok === true
+          && closureB2.parity === 11
+          && closureB2.proxy === 53
+          && ["quote", "faq", "columns"].every((family) => closureB2.credited.includes(family))
+          && closureB2.labels.includes("PARITY_COLUMNS=PASS"),
+        closureB2.ok ? `${closureB2.parity}/17 ${closureB2.proxy}/59` : String(closureB2.reason),
+      );
+      const creditedNames = new Set(closureEleven.credited.map((family) => `PARITY_${family.toUpperCase()}`));
+      const pendingNames = new Set(closureEleven.pending.map((family) => `PARITY_${family.toUpperCase()}`));
+      for (const label of closureEleven.labels) {
         const equals = label.lastIndexOf("=");
         const name = label.slice(0, equals);
         const value = label.slice(equals + 1);
@@ -5324,9 +5715,9 @@ async function consentPhase(base) {
           : pendingNames.has(name)
             ? value === "PENDING"
             : name === "U04_PARITY"
-              ? value === `${closureTen.parity}/17`
+              ? value === `${closureEleven.parity}/17`
               : name === "U04_PROXY"
-                ? value === `${closureTen.proxy}/59`
+                ? value === `${closureEleven.proxy}/59`
                 : value === `${UNO_RENDERABLE_MODULES.length}/${UNO_RENDERABLE_MODULES.length}`
                   || value === `${UNO_OWNED_MEDIA_ZONES.length}/${UNO_OWNED_MEDIA_ZONES.length}`
                   || value === `${matrixCases.length}/${matrixCases.length}`;

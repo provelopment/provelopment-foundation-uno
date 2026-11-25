@@ -53,6 +53,15 @@ import {
   stepsRegionOf,
   stepsServed,
 } from "../../scripts/u04/steps-evidence.mjs";
+// `UNO-WO-119 / R01`: the Columns evidence module, exercised on its own below.
+import {
+  COLUMNS_EXPECTED,
+  COLUMNS_REFUSAL_CASES,
+  COLUMNS_RICH,
+  COLUMNS_VARIANTS,
+  columnsGeometryReport,
+  columnsLabelsOf,
+} from "../../scripts/u04/columns-evidence.mjs";
 import { freeLoopbackPort, killChild, nextBinPath, runChild, waitForServer } from "../../scripts/u04/serving-harness.mjs";
 
 const ROOT = process.cwd();
@@ -428,4 +437,100 @@ describe("u04 family evidence — shared Unicode well-formedness probes", () => 
 });
 
 });
+
+// `UNO-WO-119 / R01`: the Columns evidence module on its own — the four served variants, the shared label parser and the one
+// geometry comparison, exercised without a browser so a regression names its own reason.
+describe("the extracted Columns evidence module", () => {
+  it("derives the four served variants from the one fixture definition", () => {
+    expect(COLUMNS_VARIANTS.map((variant) => variant.id)).toEqual([
+      "family-14-columns",
+      "family-17-columns",
+      "family-18-columns",
+      "family-19-columns",
+    ]);
+    expect(COLUMNS_VARIANTS.map((variant) => variant.columns)).toEqual([2, 2, 2, 3]);
+    expect(COLUMNS_VARIANTS.map((variant) => variant.ratio)).toEqual(["equal", "start-wide", "end-wide", "start-wide"]);
+    expect(COLUMNS_VARIANTS.map((variant) => variant.surface)).toEqual(["muted", "bordered", "plain", null]);
+    expect(COLUMNS_RICH.labels).toHaveLength(24);
+    expect(COLUMNS_RICH.listChunks).toEqual([12, 12]);
+    expect(COLUMNS_EXPECTED.titles).toEqual(["Left column", "Right column"]);
+  });
+
+  it("parses the plain labels of a served region in document order", () => {
+    const region = [
+      '<ul class="uno-json-list"><li><span>One</span></li><li><span>Two</span></li></ul>',
+      '<ul class="uno-json-list"><li><span>Three</span></li></ul>',
+    ].join("");
+    expect(columnsLabelsOf(region)).toEqual(["One", "Two", "Three"]);
+    expect(columnsLabelsOf('<ul class="uno-json-list"></ul>')).toEqual([]);
+  });
+
+  it("accepts the authored geometry and rejects each weakening of it", () => {
+    const reading = (id, widths, backgroundColor, borderWidth, tops, ratioAttribute = null) => ({
+      id,
+      columns: widths.length,
+      widths,
+      tops: tops ?? widths.map(() => 10),
+      backgroundColor,
+      borderWidth,
+      ratioAttribute,
+      overflow: 0,
+    });
+    const wide = [
+      reading("family-14-columns", [420, 420], "rgb(245, 247, 251)", "0px"),
+      reading("family-17-columns", [560, 280], "rgb(255, 255, 255)", "1px", undefined, "start-wide"),
+      reading("family-18-columns", [280, 560], "rgba(0, 0, 0, 0)", "0px", undefined, "end-wide"),
+      reading("family-19-columns", [280, 280, 280], "rgba(0, 0, 0, 0)", "0px", undefined, null),
+    ];
+    const narrow = [
+      reading("family-14-columns", [350], "rgb(245, 247, 251)", "0px", [10]),
+      reading("family-17-columns", [350], "rgb(255, 255, 255)", "1px", [10]),
+      reading("family-18-columns", [350], "rgba(0, 0, 0, 0)", "0px", [10]),
+      reading("family-19-columns", [350], "rgba(0, 0, 0, 0)", "0px", [10]),
+    ];
+    expect(columnsGeometryReport(wide, narrow).ok).toBe(true);
+    // Two equal columns that are not equal refuse.
+    const unequal = wide.map((row) => (row.id === "family-14-columns" ? { ...row, widths: [420, 380] } : row));
+    expect(columnsGeometryReport(unequal, narrow).ok).toBe(false);
+    // `start-wide` with the wider column second refuses, and so does `end-wide` with the wider column first.
+    const swapped = wide.map((row) => (row.id === "family-17-columns" ? { ...row, widths: [280, 560] } : row));
+    expect(columnsGeometryReport(swapped, narrow).ok).toBe(false);
+    const endSwapped = wide.map((row) => (row.id === "family-18-columns" ? { ...row, widths: [560, 280] } : row));
+    expect(columnsGeometryReport(endSwapped, narrow).ok).toBe(false);
+    // A three-column grid that kept its authored ratio attribute fails, as does a narrower third column.
+    const keptRatio = wide.map((row) => (row.id === "family-19-columns" ? { ...row, ratioAttribute: "start-wide" } : row));
+    expect(columnsGeometryReport(keptRatio, narrow).ok).toBe(false);
+    const ragged = wide.map((row) => (row.id === "family-19-columns" ? { ...row, widths: [280, 280, 240] } : row));
+    expect(columnsGeometryReport(ragged, narrow).ok).toBe(false);
+    // `plain` must present exactly like no surface at all; a muted column that lost its fill refuses.
+    const collapsed = wide.map((row) => (row.id === "family-14-columns" ? { ...row, backgroundColor: "rgba(0, 0, 0, 0)" } : row));
+    expect(columnsGeometryReport(collapsed, narrow).ok).toBe(false);
+    // Narrow must stack: equal widths in authored top order, never side by side.
+    const sideBySide = narrow.map((row) => (row.id === "family-19-columns" ? { ...row, tops: [10, 10, 10] } : row));
+    expect(columnsGeometryReport(wide, sideBySide).ok).toBe(false);
+    // Any overflow refuses.
+    const overflowing = wide.map((row) => (row.id === "family-17-columns" ? { ...row, overflow: 12 } : row));
+    expect(columnsGeometryReport(overflowing, narrow).ok).toBe(false);
+  });
+
+  it("publishes the ten closed refusal probes with their own literal reasons", () => {
+    expect(COLUMNS_REFUSAL_CASES).toHaveLength(10);
+    expect(COLUMNS_REFUSAL_CASES.every((probe) => probe.expected.startsWith("family:"))).toBe(true);
+    const section = {
+      type: "columns",
+      lede: "A **lede**.",
+      surface: "muted",
+      ratio: "equal",
+      items: [{ title: "A", body: "B" }, { title: "C", items: ["One"] }],
+    };
+    for (const probe of COLUMNS_REFUSAL_CASES) {
+      const copy = { ...section, items: section.items.map((item) => ({ ...item, ...(item.items === undefined ? {} : { items: [...item.items] }) })) };
+      probe.mutate(copy);
+      const outcome = composeUnoFoundationSubset({ version: 1, title: "Columns refusal", sections: [copy] }, undefined);
+      expect(outcome.status).toBe("refused");
+      if (outcome.status === "refused") expect(outcome.reason).toBe(probe.expected);
+    }
+  });
+});
+
 
