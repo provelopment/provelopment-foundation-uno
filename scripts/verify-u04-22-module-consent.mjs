@@ -6547,6 +6547,7 @@ async function consentPhase(base) {
         });
         // Two genuinely distinguishable owned identities: different paths, different bytes, different dimensions.
         const servedPaths = new Set(servedBytes.map((entry) => entry.occurrence.ref.path));
+        const perPlate = Object.fromEntries([...servedPaths].map((path) => [path, servedBytes.filter((entry) => entry.occurrence.ref.path === path).length]));
         const twoPlates = servedPaths.size === 2
           && !plateBytes.equals(altPlateBytes)
           && servedBytes.some((entry) => entry.occurrence.ref.path === FAMILY_PLATE_ALT);
@@ -6554,7 +6555,7 @@ async function consentPhase(base) {
         check(
           "FAMILY_GALLERY_HTTP the served Gallery is one ordered list per section with the authored heading, Markdown lede, caption and all three surfaces, and every one of its occurrences serves the locator, bytes, MIME and intrinsic size of the plate its own binding names",
           localA2.gallery.http === true,
-          `${galleryOccurrences.length}/${expectedTotal} occurrences ${servedBytes[0]?.status ?? "none"} ${servedBytes[0]?.type ?? "none"} ${JSON.stringify({ ...richMarkup, ...otherMarkup, bindingOk, locatorOk, bytesOk, twoPlates })}`,
+          `${galleryOccurrences.length}/${expectedTotal} occurrences ${servedBytes[0]?.status ?? "none"} ${servedBytes[0]?.type ?? "none"} ${JSON.stringify({ ...richMarkup, ...otherMarkup, bindingOk, locatorOk, bytesOk, twoPlates, perPlate })}`,
         );
         const foreignInPage = [...servedHtml.matchAll(/(?:href|src)="([^"]*)"/gu)]
           .map((match) => match[1])
