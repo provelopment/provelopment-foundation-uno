@@ -81,6 +81,10 @@ force from `2d0428a`, tree clean.
 | `Uno Bootstrap Verify` | `45777460173` | **success** | **success** |
 | `Verify U01 baseline` | `45777460251` | **failure — `Lint`** | **failure — `Lint`** |
 
+Report head **`b7c90eedf0413ccfccbbc26bcf4d590bbb24ac34`** reproduces the same shape exactly — `Uno Bootstrap Verify` success on both
+systems; `Verify U01 baseline` green through `Architecture boundaries` and failing only at `Lint` on both — which confirms the
+blocker is the two R05 lint lines and not the R06 change.
+
 `Architecture boundaries` — the R05 blocker — **passes on both systems**. The run then stops at `Lint`, and every later step
 (typecheck, unit, the U04 slice and gate, the HTTP and browser proofs, deployment readiness) is skipped on this head.
 
