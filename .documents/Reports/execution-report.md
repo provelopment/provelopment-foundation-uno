@@ -1,11 +1,11 @@
 # Execution Report — UNO-WO-122 / R06
 
-**Outcome: COMPLETE for the R06 scope.** The delivered native Cards representation is preserved unchanged, the authorized
-architecture inventory now admits its focused runner with its strictness and product-layer prohibition intact, every mandatory local
-gate is green including the architecture gate, the focused production proof and the default U04 gate, and both hosted workflows are
-verified on the evidence head and on this report's own head. Cards remains **PENDING** and no credit is claimed:
-`PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`; C1 remains earned, C2 and U04 remain OPEN. No stage closure, release or
-deployment.
+**Outcome: the authorized objective is achieved; the delivery is NOT green, and this report is a STOP.** The delivered native Cards
+representation is preserved unchanged, the authorized architecture inventory now admits its focused runner with its strictness and
+product-layer prohibition intact, and every local gate is green. Hosted `Verify U01 baseline` now passes `Architecture boundaries` on
+both operating systems and then fails **`Lint`** on two one-line defects that R05 introduced in files R06's ledger forbids changing —
+see §5 and §6. Cards remains **PENDING** and no credit is claimed: `PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`;
+C1 remains earned, C2 and U04 remain OPEN. No stage closure, release or deployment.
 
 | | |
 | --- | --- |
@@ -71,13 +71,55 @@ gate's own removal check confirmed the tree afterwards.
 - **Untouched and unclaimed:** the ordinary `layout.grid` children/props/markup, the composer, the family fixtures, the planner, the
   oracle and the frozen governance documents are unchanged, and `scripts/verify-governance-docs.mjs` was re-run green.
 
-## 5. Hosted verification
+## 5. Hosted verification — actual results
 
-Recorded in §6 once observed, on both `Verify U01 baseline` and `Uno Bootstrap Verify`, for `ubuntu-24.04` and `windows-2025`, for
-the evidence head and for this report's head.
+Evidence head **`9d7f81de949fbfb79bbc9930a95548974057be3b`** (`fix(arch): admit the focused native Cards runner …`), pushed without
+force from `2d0428a`, tree clean.
 
-## 6. Disposition
+| Workflow | Run | ubuntu-24.04 | windows-2025 |
+| --- | --- | --- | --- |
+| `Uno Bootstrap Verify` | `45777460173` | **success** | **success** |
+| `Verify U01 baseline` | `45777460251` | **failure — `Lint`** | **failure — `Lint`** |
 
-Committed and pushed without force as one exact head after the local gates above were green, then amended only with the hosted
-results this section records. The report is a **STOP for independent Architect review**; nothing further is written, reverted or
-force-pushed until that review returns.
+`Architecture boundaries` — the R05 blocker — **passes on both systems**. The run then stops at `Lint`, and every later step
+(typecheck, unit, the U04 slice and gate, the HTTP and browser proofs, deployment readiness) is skipped on this head.
+
+`npm run lint` reproduces it locally as **exactly two errors, 0 warnings**:
+
+```
+  657:11  error  'originalHtml' is assigned a value but never used                       @typescript-eslint/no-unused-vars
+   16:3  error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do
+                nothing if the following line is error-free                            @typescript-eslint/ban-ts-comment
+```
+
+Both are R05 artefacts left by that round's own late edits, and neither changes behaviour:
+
+1. `scripts/u04/cards-native-evidence.mjs:657` — `originalHtml` became unused when R05 replaced literal HTML equality with the
+   marker-plus-digest restoration proof. The fix is deleting that one assignment; `originalResponse` stays, because its status and
+   the original fetch are still part of the proof.
+2. `tests/unit/page-document.test.ts:16` — the declaration suppression must read `@ts-expect-error` rather than `@ts-ignore`; the
+   diagnostic really is there (TS7016, no declaration for the plain-ESM evidence module), so `@ts-expect-error` is satisfied rather
+   than unused. The directive must stay on the line immediately above the module specifier, which is the line TypeScript reports.
+
+## 6. STOP — the fix lies outside this ledger
+
+R06 authorizes exactly three files: the architecture inventory, the architecture record and this report. The two defects above sit in
+`scripts/u04/cards-native-evidence.mjs` and `tests/unit/page-document.test.ts`, which the same order names only as things to
+*preserve* and explicitly forbids changing ("No product, other test, runner … change"). Hosted `Lint` cannot pass without them, so two
+clauses of the controlling instruction conflict, and the SOP's rule for a conflict — and R06's own clause, "If another out-of-ledger
+blocker arises, STOP and preserve" — governs: **the files are untouched and the red check is preserved as evidence.**
+
+**Requested decision (one line of authority clears it).** Authorize, in a follow-on order, these two non-behavioural edits:
+
+```
+scripts/u04/cards-native-evidence.mjs:657   - const originalHtml = originalResponse.status === 200 ? await originalResponse.text() : "";
+tests/unit/page-document.test.ts:16         -   // @ts-ignore - no declaration file is shipped for the plain-ESM runner asset
+                                            +   // @ts-expect-error - no declaration file is shipped for the plain-ESM runner asset
+```
+
+Everything else is already in place: with those two lines corrected, `npm run lint` returns 0 problems, and every downstream step is
+the same locally green chain recorded in §2 — the hosted runner simply has never been allowed past `Lint` on this branch since the
+R05 push, because `Architecture boundaries` failed first then and `Lint` fails first now.
+
+Until that decision arrives, this delivery is **not** releasable and the capability remains uncredited. Nothing further is written,
+reverted or force-pushed; this report is the STOP for independent Architect review.
