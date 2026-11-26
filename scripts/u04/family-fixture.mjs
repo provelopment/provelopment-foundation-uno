@@ -465,3 +465,73 @@ export function composeFamilyFixture(compose) {
   return compose(familySource(), familyBindings());
 }
 
+/**
+ * `UNO-WO-124 / R05`: the bounded **composed** Cards source and its migration binding.
+ *
+ * Additive only — the seventeen-family baseline fixture above is untouched and keeps its own source, bindings and assertions. This
+ * is one donor-shaped Cards section, composed by the real adapter, whose two donor image identities are bound to the two distinct
+ * synthetic Page plates the mandatory gate already installs and removes. Nothing here is publication, asset-servability or delivery
+ * authority, and nothing is durable.
+ */
+export const COMPOSED_CARDS_SOURCES = Object.freeze({
+  first: "/assets/wo124-composed-plate.png",
+  second: "/assets/wo124-composed-alt-plate.png",
+});
+
+export const COMPOSED_CARDS_ALT = Object.freeze({
+  described: "A composed plate",
+  second: "A second composed plate",
+});
+
+/** The composed section's authored facts, in card order, as the served document must show them. */
+export const COMPOSED_CARDS_CARDS = Object.freeze([
+  Object.freeze({ title: "Composed ownership", meta: "Card one", image: "first", alt: "described" }),
+  Object.freeze({ title: "Composed omission", meta: null, image: null, alt: null }),
+  Object.freeze({ title: "Composed repetition", meta: null, image: "first", alt: "" }),
+  Object.freeze({ title: "Composed second plate", meta: null, image: "second", alt: "second" }),
+]);
+
+export function composedCardsSource() {
+  return {
+    version: 1,
+    title: "Composed cards",
+    sections: [
+      {
+        type: "cards",
+        heading: "Composed cards",
+        // The donor lede is Markdown-capable by contract, and the allow-list carries no separate flag for it.
+        lede: "A **composed** lede.",
+        columns: 2,
+        surface: "muted",
+        // The donor Cards shape is `{type, items, columns?, heading?, lede?, surface?}` — `items`, never `cards`.
+        items: COMPOSED_CARDS_CARDS.map((card) => ({
+          title: card.title,
+          ...(card.meta === null ? {} : { meta: card.meta }),
+          ...(card.image === "first"
+            ? { image: card.alt === "" ? { src: COMPOSED_CARDS_SOURCES.first, decorative: true } : { src: COMPOSED_CARDS_SOURCES.first, alt: COMPOSED_CARDS_ALT.described } }
+            : card.image === "second"
+              ? { image: { src: COMPOSED_CARDS_SOURCES.second, alt: COMPOSED_CARDS_ALT.second } }
+              : {}),
+        })),
+      },
+    ],
+  };
+}
+
+/** The exact migration binding the composed section consumes: one owned Page plate per donor image identity, and nothing else. */
+export function composedCardsBindings() {
+  return {
+    images: [
+      { source: COMPOSED_CARDS_SOURCES.first, owned: { zone: "page", path: FAMILY_PLATE } },
+      { source: COMPOSED_CARDS_SOURCES.second, owned: { zone: "page", path: FAMILY_PLATE_ALT } },
+    ],
+  };
+}
+
+/** The binding a Page composes with when one identity is left unowned — the refusal case, never a served document. */
+export function composedCardsUnboundBindings() {
+  return {
+    images: [{ source: COMPOSED_CARDS_SOURCES.first, owned: { zone: "page", path: FAMILY_PLATE } }],
+  };
+}
+

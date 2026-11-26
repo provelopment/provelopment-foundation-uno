@@ -553,14 +553,24 @@ const CARD_PLATES = Object.freeze([
  */
 export function installCardPlates(mediaRoot) {
   const directory = resolve(mediaRoot, "cards");
+  // Fail closed: a directory that already exists is never reused, never written into and never removed.
   if (existsSync(directory)) return { absent: false, directory, installed: [] };
   mkdirSync(directory);
-  const installed = CARD_PLATES.map((plate) => {
-    const path = resolve(directory, plate.name);
-    const bytes = pngBytes(plate.size.width, plate.size.height, plate.color);
-    writeFileSync(path, bytes, { flag: "wx" });
-    return { key: plate.key, name: plate.name, path, size: plate.size, byteLength: bytes.length };
-  });
+  const installed = [];
+  try {
+    for (const plate of CARD_PLATES) {
+      const path = resolve(directory, plate.name);
+      const bytes = pngBytes(plate.size.width, plate.size.height, plate.color);
+      writeFileSync(path, bytes, { flag: "wx" });
+      installed.push({ key: plate.key, name: plate.name, path, size: plate.size, byteLength: bytes.length });
+    }
+  } catch (error) {
+    // Exception-safe from the first successful write: a partial install removes exactly what it created, so a failed run can never
+    // leave a plate or its directory behind for the next one to trip over.
+    for (const plate of installed) rmSync(plate.path, { force: true });
+    if (existsSync(directory)) rmdirSync(directory);
+    throw error;
+  }
   return { absent: true, directory, installed };
 }
 
@@ -908,15 +918,16 @@ export async function runNativeCardsTransaction({
         .map((plate) => `${plate.name}:${plate.size.width}x${plate.size.height}:${plate.byteLength}`)
         .join(",")}`,
     );
+    // `UNO-WO-124 / R05`: the original response is captured **before** the swap, so restoration is compared with the state the run
+    // actually found rather than with a response taken after this run had already written its own document.
+    const originalResponse = await fetch(`${familyUrl}?wo122r05=original`, { redirect: "manual" });
     // The authored JSON goes into the fixture zone exactly as an author would commit it: pretty-printed and deterministic.
     writeFileSync(fixturePath, `${JSON.stringify(NATIVE_CARDS_DOCUMENT, null, 2)}\n`, "utf8");
     const { readUnoPageDocument } = await import("../../src/core/page-document.ts");
 
     // (a) Production HTTP: four native sections, one list each, the authored column intents and surfaces, and no deferred
-    // image or action markup anywhere. The response served *before* the swap is captured first, so the restoration in (f) can
-    // prove the served status is unchanged and the fixture digest returns to the authored bytes (R06 dropped the literal
-    // HTML comparison in favour of the marker-plus-digest restore proof, which leaves the captured body unused).
-    const originalResponse = await fetch(`${familyUrl}?wo122r05=original`, { redirect: "manual" });
+    // action markup anywhere. The response served *before* the swap was captured above, so the restoration in (f) can prove the
+    // served status is unchanged and the fixture digest returns to the authored bytes.
     const response = await fetch(`${familyUrl}?wo122r05=native`, { redirect: "manual" });
     const html = response.status === 200 ? await response.text() : "";
     const facts = NATIVE_CARDS_IDS.map((id) => nativeCardsListOf(nativeCardsRegionOf(html, id)));
@@ -993,6 +1004,7 @@ export async function runNativeCardsTransaction({
         src,
         status: asset.status,
         type: asset.headers.get("content-type") ?? "",
+        bytes,
         byteLength: bytes.length,
         width: bytes.length > 24 ? bytes.readUInt32BE(16) : 0,
         height: bytes.length > 24 ? bytes.readUInt32BE(20) : 0,
@@ -1005,8 +1017,9 @@ export async function runNativeCardsTransaction({
         && installed !== undefined
         && got.status === 200
         && got.type.toLowerCase().startsWith("image/png")
-        && got.byteLength === installed.byteLength
-        && got.byteLength > PNG_SIGNATURE.length
+        // `UNO-WO-124 / R05`: actual byte equality against the installed file, never a length-only comparison.
+        && got.bytes.equals(readFileSync(installed.path))
+        && got.bytes.length > PNG_SIGNATURE.length
         && got.width === installed.size.width
         && got.height === installed.size.height;
     };
@@ -1027,6 +1040,14 @@ export async function runNativeCardsTransaction({
     assert(
       `${prefix}_IMAGES both owned plates are delivered: exact per-card locator, authored and exactly-empty alternatives, image-first order, none on the omitted card, the same fixture delivered twice for the repeated occurrence, and HTTP 200 image/png with the exact fixture bytes and intrinsic dimensions`,
       shapeOk
+        // `UNO-WO-124 / R05`: only an authoritative locator on the Page's own origin may be fetched, and the media route must hand
+        // each occurrence its own locator — proven here rather than assumed, before any bytes are requested.
+        && [primarySource, repeatSource, secondSource].every(
+          (src) => typeof src === "string" && src.length > 0 && new URL(src, familyUrl).origin === new URL(familyUrl).origin,
+        )
+        && primarySource !== repeatSource
+        && primarySource !== secondSource
+        && repeatSource !== secondSource
         && servedOk(primarySource, "plate")
         && servedOk(repeatSource, "plate")
         && servedOk(secondSource, "altPlate")

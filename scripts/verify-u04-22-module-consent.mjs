@@ -27,6 +27,7 @@ import { deflateSync } from "node:zlib";
 
 import { prepareUnoU03FixtureTransaction } from "./uno-u03-fixture-transaction.mjs";
 import { runNativeCardsTransaction } from "./u04/cards-native-evidence.mjs";
+import { runComposedCardsTransaction } from "./u04/cards-composed-evidence.mjs";
 import { evaluateU04FamilyClosure } from "./verify-u04-family-closure.mjs";
 // `UNO-WO-112 / R01`: the cohesive verification modules this entrypoint orchestrates. The fixture, the Hero expectations,
 // the seven-dimension record and the process harness each live in one testable file under `scripts/u04/`.
@@ -2932,6 +2933,24 @@ async function main() {
       originalMarker: null,
     });
     if (!check("U04_NATIVE_CARDS the mandatory native Cards transaction ran and every required check passed", cardsOutcome.failed === 0 && cardsOutcome.passed > 0, `${cardsOutcome.passed} passed, ${cardsOutcome.failed} failed`)) return 1;
+  }
+
+  // `UNO-WO-124 / R05`: the **composed** Cards transaction is mandatory in the default run as well — the real adapter composes the
+  // bounded donor section with explicit migration bindings, the serialized composition is served over this server's real HTTP and
+  // Chromium, and the fixture bytes are restored. It reuses the gate's own installed plates and creates or removes no asset.
+  {
+    const composedFixture = resolve(ROOT, SOURCES[4]);
+    const composedDigest = () => createHash("sha256").update(readFileSync(composedFixture)).digest("hex");
+    const composedOutcome = await runComposedCardsTransaction({
+      familyUrl: `${base}/en-001/${FAMILY_ROUTE.join("/")}`,
+      fixturePath: composedFixture,
+      mediaRoot: resolve(ROOT, CAPSULE_DIR),
+      digestOf: composedDigest,
+      check,
+      prefix: "U04_COMPOSED_CARDS",
+      originalMarker: null,
+    });
+    if (!check("U04_COMPOSED_CARDS the mandatory composed Cards transaction ran and every required check passed", composedOutcome.failed === 0 && composedOutcome.passed > 0, `${composedOutcome.passed} passed, ${composedOutcome.failed} failed`)) return 1;
   }
 
   const pageResponse = await fetch(`${base}/en-001/wo044-all-modules`);
