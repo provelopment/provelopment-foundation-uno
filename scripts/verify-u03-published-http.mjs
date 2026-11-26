@@ -942,7 +942,40 @@ async function durableFamilySourcePhase() {
         const differing = committed
           .filter((node, index) => JSON.stringify(node) !== JSON.stringify(recomposed[index]))
           .map((node) => node.id);
-        return JSON.stringify(differing) === JSON.stringify([GALLERY_SECTION_ID]);
+        // `UNO-WO-123 / R06`: the durable Page is still not rewritten, so Cards differs for the same reason Gallery does —
+        // the committed bytes keep the superseded wrapper while the composer emits the accepted native node.
+        return JSON.stringify(differing) === JSON.stringify([GALLERY_SECTION_ID, "family-15-cards"]);
+      })(),
+    );
+    // `UNO-WO-123 / R06`: the durable Cards difference is proved **semantically**, never exempted — same anchor, authored
+    // heading and its level, authored lede, authored column intent, and the same ordered card titles and bodies, with no
+    // invented meta, image or action.
+    const committedCards = parsed.document.sections.find((node) => node.id === "family-15-cards");
+    const composedCards = composed.document.sections.find((node) => node.id === "family-15-cards");
+    check(
+      "DURABLE_FAMILY_SOURCE the committed Cards section and the composed native Cards node agree on every authored field",
+      (() => {
+        if (committedCards === undefined || composedCards === undefined) return false;
+        if (composedCards.module !== "layout.grid" || composedCards.id !== committedCards.id) return false;
+        const stack = committedCards.module === "layout.stack" ? committedCards.children ?? [] : [];
+        const heading = stack.find((child) => child.module === "content.heading");
+        const lede = stack.find((child) => child.module === "content.prose");
+        const grid = stack.find((child) => child.module === "layout.grid");
+        const props = composedCards.props ?? {};
+        return heading?.props?.text === props.heading
+          && heading?.props?.level === 2
+          && props.level === 2
+          && lede?.props?.text === props.lede
+          && props.ledeMarkdown === undefined
+          && grid?.props?.columns === props.columns
+          && Array.isArray(props.cards)
+          && props.cards.length === (grid?.children?.length ?? -1)
+          && props.cards.every((card, index) => {
+            const item = grid?.children?.[index];
+            const title = item?.children?.[0]?.props?.text;
+            const body = (item?.children ?? []).find((child) => child.module === "content.prose")?.props?.text;
+            return card.title === title && card.body === body && card.meta === undefined;
+          });
       })(),
     );
     // The Gallery itself is compared **semantically**, never exempted: anchor, authored columns, item count and order, each
