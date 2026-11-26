@@ -1,78 +1,76 @@
-# Execution Report — UNO-WO-122 / R01
+# Execution Report — UNO-WO-122 / R02
 
-**Outcome: NOT EXECUTED — the order's required outcome was not reached, no parity credit is claimed, and nothing was landed.
-The repository is at the reviewed state `4f37a61573254697d954efe2951890137586bd07` with every gate green. U04 and C2 remain OPEN.
-This report is a STOP for independent Architect review, not a completion.**
+**Outcome: NOT DELIVERED — the bounded text-only Cards slice was built, unit-proven and then reverted, because the order's
+mandatory production HTTP and Chromium evidence for the new representation could not be completed in this round. Nothing is
+landed, no credit is claimed, and the repository is back at the reviewed state
+`6c7c988f77bdfbef056e557e8e53f596d684209d` with every gate green. U04 and C2 remain OPEN. This report is a STOP for independent
+Architect review, not a completion.**
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-122 / R01`, `FINAL — EXECUTE` |
-| ACTIVE | **6,560 bytes**, SHA-256 `883acfc34dfde0beab3cbb88f06bc314619e1b2da172c73de7a9d4878ee0ef11` — matched the activation exactly; private, ignored, untracked |
-| Start SHA | `4f37a61573254697d954efe2951890137586bd07` (`HEAD` = `main` = `origin/main` = `ls-remote`; one worktree; one Uno `origin`; clean tree) |
-| Required outcome | `PARITY_CARDS=PASS`, `U04_PARITY=14/17`, `U04_PROXY=56/59` — **not met** |
-| Actual outcome | `PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`, all thirteen prior credits and unchanged **C1** exactly as before |
-| Landed | **nothing** in `src/`, `scripts/` or `tests/`; the only committed change is this report |
+| Order | `UNO-WO-122 / R02`, `FINAL — EXECUTE` (supersedes R01) |
+| ACTIVE | **4,928 bytes**, SHA-256 `d01f16ed03746524ff3a67953cbdf0edaa8c1a8a528390fec3d152eda95be9c3` — matched exactly; private, ignored, untracked |
+| Start SHA | `6c7c988f77bdfbef056e557e8e53f596d684209d` (`HEAD` = `main` = `origin/main` = `ls-remote`; one worktree; one Uno `origin`; clean tree) |
+| Required outcome | functioning, independently evidenced Cards text/presentation, durable compatibility, prior credits preserved, all local and exact-head hosted gates green — **not delivered** |
+| Actual outcome | `PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59` (unchanged); C1 unchanged; nothing landed except this report |
 
-## 1. Why the order was not completed
+## 1. What was built
 
-The order requires Cards to be earned, not merely implemented: seven executed evidence dimensions (with the `0/1/8/9/12/13/24/25`
-item points, the 120/121, 160/161 and 4,000/4,001 boundaries, malformed-Unicode and supplementary-plane text, every decorative and
-alternative form, crossed and unsafe actions, and unbound/extra/duplicate/cross-Site bindings), a real production HTTP and planner
-agreement per card image, six browser cases with per-card content, ownership, geometry, surface and keyboard proof, the durable
-Cards comparison, the A2 credit table, the published-Pages gate, an unchanged-oracle `14/17` / `56/59`, then exact-head hosted
-runs. That is the substance of the order, and it cannot be produced, executed and recorded truthfully inside this session.
+The approved closed, props-only, **childless** Cards alternative of `layout.grid` was implemented exactly as the order scopes it:
 
-Implementing the representation alone would have been worse than not starting it. Three concrete reasons:
+- `src/core/page-document.ts`: `UnoLayoutCard` (`title`, optional `meta`, optional Markdown-capable `body` + `bodyMarkdown`),
+  `UnoLayoutGridCardsProps` (`cards[1..24]`, optional `columns` 2/3/4, `heading`/`level`, `lede`/`ledeMarkdown`, closed `surface`),
+  the `UnoLayoutGridAlternative` union with `isUnoLayoutGridCards`, the childless grid node variant, limits `cardItems: 24`,
+  `cardTitleCodePoints: 160`, `cardMetaCodePoints: 120`, `cardTextCodePoints: 4000`, and a validator branch that refuses a node
+  declaring `cards` **and** `children` — including an explicitly empty `children` array — while ordinary grids keep their
+  required children, props and 1–8 bound untouched.
+- `src/application/compose-uno-foundation-families.ts`: the Cards arm now adopts the donor's text surface (plain heading,
+  Markdown lede, 2/3/4 or absent columns, closed surface, 1–24 items with title/meta/Markdown body) and refuses card `image` and
+  `action` as `family:unsupported-feature` rather than dropping them. Features, standalone Actions, asset bindings and media
+  planning are untouched.
+- `src/components/uno-page-sections.tsx`: one native `<ul>` with one direct `<li class="uno-json-card">` per item, emitting the
+  authored meta, title and body in donor order; heading-less item titles are level 2 and headed ones level 3; no invented field
+  and no deferred image/action element exists.
+- `src/app/globals.css`: the cards wrapper/list/card/meta/body rules, the shared closed surfaces, and the one/two/authored-or-three
+  responsive default — an unauthored intent gets no attribute, so the default lives in the stylesheet.
+- Tests: the five obsolete `cards`/`features` unit describes were replaced with tests for the **actual** representation (props
+  shape and childlessness, markup and authored order, escaping, 160/120/4,000 exact bounds with astral code points, 0/1/24/25
+  items, deferred-field refusal, unsafe Markdown, hostile accessor, freezing), and the durable Page test gained the strict
+  semantic comparison the order asks for: same anchor, authored heading/lede/columns, every ordered title with its own body
 
-1. **The acceptance chain would be inconsistent.** `verify-u04-22-module-consent.mjs` still asserts the *legacy* durability of
-   `family-15-cards-grid` (`layout.grid` + `itemSemantics:"list"` + one stack per card), and the durable committed Components Page
-   is not authorized to be rewritten. A richer Cards representation requires the strict semantic comparison for that one section
-   that the order describes; without it the gate either fails or — far worse — has to be weakened.
-2. **Cards would become reachable in production with zero executed parity evidence.** A Page authoring `cards` would receive a
-   materially different document, stylesheet, renderer and asset plan while `PARITY_CARDS` still read `PENDING`. That is precisely
-   the "no unexecuted credit" failure the SOP forbids, and it would put an unevidenced representation in front of Visitors.
-3. **A half-migrated family is not a green tree.** Local gates would be red for reasons that document the attempt rather than the
-   product, and the next round would first have to unpick it.
+## 2. Why it was reverted
 
-## 2. What was built, and why it was reverted
+The order requires the whole **gate** surface to be re-proven for the new representation, not only the composer and reader. The
+source-level assertions were updated (item outline, lede, refusal probes, and the served `FAMILY_CARDS_HTTP` markup check, which
+is real production HTTP), but the remaining gate blocks still encode the legacy Cards markup and fail against it:
+`FAMILY_ITEM_OUTLINE_HTTP`, `FAMILY_LEDE_HTTP`, `FAMILY_TEXT_FIVE_HTTP`, plus six `FAMILY_BROWSER`/`FAMILY_LEDE_BROWSER` clauses
+that read `#family-15-cards` as a stack whose `<ul class="uno-json-grid">` holds `uno-json-cell` stacks. Completing those
+readings, the dedicated `scripts/u04/cards-evidence.mjs` with its six Chromium cases and mutation-sensitive regressions, and the
+served 24-card variant is the substantive remainder of this order, and it did not fit in this session alongside the product slice.
 
-The donor was read at the pinned GEO-03 commit `c05c55ea61b5347cf5032211dd0bf37f2cc5083c` (read-only, no file copied): the strict
-`cardsSectionSchema`/`cardItemSchema` and the 160/120/4,000/24 bounds from `src/core/page-document.ts`
-(`a12d964c43626c6313a621bf628f5cc24b65d444`), the `CardsSection` renderer and `columnsClass` default from
-`media-sections.tsx` (`e3f3a12e5e26cb6af9133bef79f5fa2dc0680bb2`) and `section-support.tsx`
-(`19c9bee3b3b200af2455813e5f842c30b062a6ac`).
+Shipping the slice with those gates red would have left the acceptance chain internally inconsistent; weakening or deleting the
+checks is forbidden by the order ("update obsolete fixture assertions to the actual new representation, not weakened checks").
+So the only coherent hand-back was the reviewed state, which was verified: `git status` clean, `HEAD` still `6c7c988`,
+`pnpm typecheck` exit 0, `pnpm test` green, `node --test tests/deployment` **346/0**, the governance byte check **PASS**, and
+`verify-u04-22-module-consent` **943/0** reporting `PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`.
 
-Against that contract a complete-looking seam was drafted and typechecked: a closed opt-in `cards` representation on
-`layout.grid` (`cards[1..24]`, optional `columns`, `heading`/`level`, Markdown lede, closed `surface`); a validator branch that
-refuses a node declaring both `cards` and `children`; per-card `title`/`meta`/`body`(+`bodyMarkdown`)/owned `media`(+ required
-`alt`, decorative normalization)/one `action` in the unchanged safe destination shape plus its closed variant; the renderer
-emitting one `<ul>` with one `<li>` per card in the donor's authored order (image, meta, title, body, action); the stylesheet's
-one/two/authored-or-three default with the shared closed surfaces; per-card occurrence planning; and the composer arm with the
-aggregate ceiling widened only for a Page that composed Cards. It compiled cleanly — and it was still not evidence, so it was
-removed rather than landed.
+## 3. What the next round needs
 
-**The tree was restored with `git checkout --` on exactly those files and verified:** `git status` clean, `HEAD` unchanged at
-`4f37a61`, `pnpm typecheck` exit 0, `pnpm test` **1,410/1,410**, `node --test tests/deployment` **346/0**, the governance byte
-check **PASS**, and `verify-u04-22-module-consent` **943/0** reporting `PARITY_CARDS=PENDING`, `U04_PARITY=13/17`,
-`U04_PROXY=55/59`.
-
-## 3. What a future round needs, in order
-
-1. **Settle the representation with the Architect before writing it** — whether the donor card is expressed as a props-only
-   cards alternative on `layout.grid` (no children, exact intra-card order, one `<li>` per card), or through a different existing
-   module — and confirm that a cards grid may be childless, since that is the one shape decision the current node type does not
-   carry.
-2. **Land the durable comparison in the same round as the representation**, so the gate never has a window in which Cards is
-   composed but the committed Components Page comparison is stale: strict semantic equality for that one section only (all
-   authored fields and order, no invented fields), with the existing Gallery comparison and byte-exact other sections retained.
-3. **Then** the seven evidence dimensions, the HTTP/planner per-card image proof, the six browser cases and the unchanged-oracle
-   `14/17` / `56/59` — all inside one order, because none of them credits anything on its own.
+1. Land the product slice **and** the gate's served-HTTP/browser readings in one change, as a single unit: the cards region
+   reader (`<div class="uno-json-cards-section">` → `<ul class="uno-json-cards">` → one `<li class="uno-json-card">`), the two
+   outline/lede HTTP clauses, the five-family stack count, and the six `FAMILY_BROWSER`/`FAMILY_LEDE_BROWSER` clauses that still
+   assume the stack-with-grid shape.
+2. Add `scripts/u04/cards-evidence.mjs` with the six variants (rich default, 2/3/4 explicit, heading-less, 24-card), the exact
+   per-item expected texts and surfaces, the refusal probes and the case verdict — appended to the temporary fixture Page the way
+   the Gallery variants already are, with its own HTTP and six-case Chromium proof.
+3. Only then update `.documents/Architecture/u04-family-parity.md` to record the capability as bounded and **uncredited**, with
+   `PARITY_CARDS` still `PENDING` and no `C2` claim.
 
 ## 4. State handed back
 
-`PARITY_CARDS` remains `PENDING`; `U04_PARITY=13/17` and `U04_PROXY=55/59` are unchanged; **C1** stays earned and unchanged,
-**B2** stays exactly `11/17` / `53/59`, and `A2` stays `63/63`, `U04_MODULE_IDS=22/22`, `U04_ASSET_ZONES=4/4`,
-`U04_BROWSER_MATRIX=16/16`. No product source, stylesheet, published-Pages comparison, durable Page, asset policy, dependency,
-workflow, oracle or frozen governance document was changed. The ACTIVE order is untouched, private and untracked. Nothing is
-claimed beyond what the previous independent review already accepted, and the next round starts from a green, reviewed tree.
+`PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`, C1 earned and unchanged, B2 `11/17` / `53/59`, `A2` `63/63`,
+`U04_MODULE_IDS=22/22`, `U04_ASSET_ZONES=4/4`, `U04_BROWSER_MATRIX=16/16`. No product source, stylesheet, planner, asset policy,
+durable Page, dependency, workflow, oracle or frozen governance document is changed. The ACTIVE order is untouched, private and
+untracked, and the next round starts from a green, reviewed tree.
 
+  presence and text, and no key beyond `title`/`meta`/`body`/`bodyMarkdown`. `src/` typechecked clean and that suite passed.
