@@ -87,10 +87,50 @@ unchanged; no overflow, no console error, no foreign request.
 - **Hosted workflows are verified after this report**, on the exact head it accompanies; the report states their outcome in the
   disposition below only once observed.
 
-## 5. Disposition
+## 6. STOP — an out-of-ledger change is required, and it is not taken
 
-Verified work — three source files, two runner files, the gate integration, two test files and this report — is committed and
+The exact head `ab43ae316bf0e230a3092d7ed9b5a1b9fb6e9aad` is **red on one hosted step**: `Architecture boundaries` fails in both
+`verify (ubuntu-24.04)` and `verify (windows-2025)` of `Verify U01 baseline` (`45772393015`), and every later step is skipped. The
+other workflow, `Uno Bootstrap Verify` (`45772393047`), is green.
+
+**Cause, precisely.** `tests/architecture/u01-boundaries.test.mjs` asserts a strict deep-equality on the exact list of scripts under
+`scripts/`, and the new authorized runner appears in the actual list but not in the pinned expectation:
+
+```
+actual:   [ … "scripts/verify-u04-22-module-consent.mjs", "scripts/verify-u04-cards-native.mjs", … ]
+expected: [ … "scripts/verify-u04-22-module-consent.mjs", "scripts/verify-u04-json-slice.mjs", … ]
+```
+
+**Why this is a stop and not a fix.** The file that must change to make the check pass is
+`tests/architecture/u01-boundaries.test.mjs`, and the R05 authorized ledger does not include it: it names only
+`tests/unit/page-document.test.ts`, `tests/unit/uno-page-sections.test.ts`, `tests/unit/u04-verification-modules.test.mjs` and
+`tests/deployment/u04-22-module-consent.test.mjs`. Editing the pin to admit the new runner would be the agent extending its own
+authority over an architecture boundary — exactly what the ledger forbids — so the pin is untouched and the failure is preserved as
+evidence, not hidden.
+
+**What is otherwise true of this head.** Every local gate listed in §3 was green *before* the commit, including the U04 gate with the
+mandatory native Cards transaction and its own fixture-removal check. The hosted failure is a boundary inventory, not a behavioural
+one: no product, evidence, gate or fixture behaviour regressed.
+
+**What the Owner must decide (one of).**
+
+1. **Authorize the pin.** Add `tests/architecture/u01-boundaries.test.mjs` to the ledger with the single-line addition of
+   `scripts/verify-u04-cards-native.mjs` to the expected inventory — the honest, smallest change, and the one consistent with the
+   order's own requirement that a focused entrypoint exist and be runnable.
+2. **Relocate the focused entrypoint** so no new top-level `scripts/verify-*.mjs` exists — for example `scripts/u04/cards-native.mjs`
+   as the runnable and `cards-native-evidence.mjs` as its shapes, if the pin only enumerates the top level. This changes the ledger's
+   named path and should therefore be spelled out in a new order rather than assumed.
+3. **Withdraw the focused entrypoint** and keep only the mandatory in-gate transaction, accepting that a standalone runnable proof
+   no longer exists.
+
+Until one is authorized, this delivery is **not** releasable and the capability remains uncredited: `PARITY_CARDS=PENDING`,
+`U04_PARITY=13/17`, `U04_PROXY=55/59`. Nothing further is written, reverted or force-pushed; this report is the STOP.
+
+
+### Disposition of the work itself
+
+Verified work — three source files, two runner files, the gate integration, two test files and this report — was committed and
 pushed without force as one exact head after the local gates above were green. The test-owned declaration, fixture source and server
 are gone: the gate's own removal check passed, the committed manifest is byte-identical, and no durable Page, composer, family
-fixture, planner, oracle or governance file was touched. This report is a **STOP for independent Architect review**.
+fixture, planner, oracle or governance file was touched. Section 6 records the hosted STOP that keeps this delivery short of release.
 
