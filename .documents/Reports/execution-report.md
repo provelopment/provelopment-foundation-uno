@@ -1,76 +1,102 @@
-# Execution Report — UNO-WO-123 / R01
+# Execution Report — UNO-WO-123 / R02
 
-**Outcome: STOP — incomplete, nothing committed from the adoption.** The composer adoption of the accepted native Cards
-representation is implemented and type-clean but **not** complete: twenty Cards-specific expectations in one unit file still
-describe the superseded representation, and the fixture, evidence, durable-digest, architecture and hosted work that the acceptance
-requires had not been done when this run's execution capacity ran out. Per the order's own continuation clause the work is
-**preserved unstaged** with its exact digest below, the repository HEAD is left exactly as it was found, and this report is the
-truthful record of that state for the Architect.
+**Outcome: STOP — still incomplete, and this is a continuation record, not an acceptance.** R02 continued from the preserved R01
+prototype: the composer adoption is untouched and intact, and the Cards expectation rewrite it demanded advanced from **20 failing
+tests to 9**, all of them inside one file. The remaining nine, plus the fixture/evidence/digest work, the mandatory gates and hosted
+verification, exceed what this run could complete without weakening assertions. Nothing is staged or committed from the adoption;
+`HEAD` is unchanged and green.
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-123 / R01`, `FINAL — EXECUTE` |
-| ACTIVE | **3,003 bytes**, SHA-256 `afc5c5355964e81414dbc61f28d3133afe0226ab35ce018ed18f96266dd7c2d7` — matched; private, ignored, untracked |
-| Start SHA | `29871400f6e7771599f5db1bb9f0145d52bdb108`, tree clean, `HEAD` = `origin/main` |
-| HEAD at stop | **unchanged** `2987140` — no adoption commit exists, so no gate or hosted verification is claimed for the prototype |
+| Order | `UNO-WO-123 / R02`, `FINAL — EXECUTE` (supersedes R01) |
+| ACTIVE | **2,996 bytes**, SHA-256 `a9d9d97c492fbc271a5399f36bbe3da2b7fb51ada637b58837b0ef0f401b1a66` — matched; private, ignored, untracked |
+| Start SHA | `49e3f172c07b1dd6a6c3fb2fce5b83ed70599b97`, tree carrying the R01 prototype, `HEAD` = `origin/main` |
+| HEAD at stop | **unchanged** `49e3f17` — no adoption commit exists, so no gate or hosted result is claimed for the prototype |
 
-## 1. What was implemented (preserved, unstaged)
+## 1. Preserved work, exactly
 
-One file, the authorized composer, `+56 / −1`:
+Two modified, **unstaged** files. Nothing else in the tree changed.
 
 ```
 src/application/compose-uno-foundation-families.ts
-  95,438 bytes
-  SHA-256 9638c5bee57783dc2a9de0da57770098f23ed55e0aaabb21dbb30864cb43b88e
+  95,438 bytes   SHA-256 9638c5bee57783dc2a9de0da57770098f23ed55e0aaabb21dbb30864cb43b88e   +56 / -1
+  (byte-identical to the R01 prototype — R02 did not touch it)
+
+tests/unit/uno-foundation-families.test.ts
+  319,792 bytes  SHA-256 8addf57b94dce6162b9b88ba2fa620142823362445c7d73f247f6e385c6ed250   +41 / -33
 ```
 
-`case "cards"` no longer composes a generic `layout.grid {columns, itemSemantics:"list"}` of `layout.stack` children. It emits **one
-native cards node** — the accepted representation of `UNO-WO-122 / R03` — whose props are the donor's own text-only contract in one
-place:
+### What the composer does now (unchanged from R01)
 
-- `cards[1..24]` of `{title, meta?, body?, bodyMarkdown?}`: a plain 160-code-point title read by the unchanged plain-text reader, an
-  optional plain 120-code-point `meta`, and an optional Markdown-capable 4,000-code-point `body` declared as Markdown only through the
-  literal `true` when the shared family Markdown reader accepts it;
-- optional plain `heading` with explicit `level: 2` (the donor's own `<h2>`), optional Markdown-capable `lede` with `ledeMarkdown`
-  when it is declared Markdown, optional closed `surface`, and the authored `columns` 2/3/4 — `columns` deliberately still
-  **required**, so the node always carries an authored intent and never borrows the renderer's implicit default;
-- `image` and `action` remain unrepresentable: an authored one still refuses the **whole Page** through `requireExactKeys`, never a
-  silent drop; `features`, the ordinary grid, `layout.stack` wrapping, the reader, the renderer, the stylesheet, every durable
-  Page/declaration, the asset and destination policies and the frozen governance files were **not** touched.
+`case "cards"` emits **one native cards node** — the accepted `UNO-WO-122 / R03` representation — instead of a list grid of
+`layout.stack` children: `cards[1..24]` of `{title, meta?, body?, bodyMarkdown?}` with a plain 160-point title, plain 120-point
+`meta`, Markdown-capable 4,000-point `body` flagged only through literal `true`; optional plain `heading` with explicit `level: 2`,
+optional Markdown `lede` (+ `ledeMarkdown`), closed `surface`, authored `columns` 2/3/4 still **required** so no renderer default is
+borrowed; `image` and `action` still refuse the whole Page through `requireExactKeys`. `features`, ordinary grids, the reader, the
+renderer, the stylesheet, durable Pages/declarations, the asset and destination policies and the frozen governance files are
+untouched.
 
-Verified for the prototype only: `npx tsc --noEmit` → **0 errors**; `pnpm test` → **34 of 35** files green, with the failures confined
-to `tests/unit/uno-foundation-families.test.ts`.
+### What R02 completed in the expectations
 
-## 2. What remains before this order can be accepted
+Every change keeps its original semantic coverage; no assertion was deleted for convenience.
 
-1. **Twenty Cards expectations**, all in `tests/unit/uno-foundation-families.test.ts`: the byte-identical legacy baselines
-   (`PRE_WO070`/`PRE_WO071` cards constants), the `props`/`children` assertions of the bounded-cards test, the cards half of the React
-   markup and refusal pairs, the authored-heading and authored-lede blocks (headed stack, lede-only, order reset, 4000/4001 bounds,
-   malformed lede, zero-getter proof) and the durable-Page and three-outline digest pins. Each has to be restated in the new
-   representation **without** losing its semantic coverage.
-2. **Fixture and evidence**: author the full donor field set in the `cards` section of `scripts/u04/family-fixture.mjs` (meta,
-   Markdown lede/body, surface, a non-2 column intent, an absent field), then update the composed-section digest pins and the
-   cards HTTP/Chromium predicates that currently expect `uno-json-grid`/`layout.stack` markup.
-3. **Semantic-equivalence proof** for the durable Cards section, retaining the Gallery comparison and the byte-exact other sections,
-   plus fixture restoration by digest and fresh original content.
-4. **All mandatory local gates**, then exact-head hosted baseline and bootstrap jobs, steps and logs on both systems.
-5. **`.documents/Architecture/u04-family-parity.md`**: the Cards row still describes the superseded composition.
+1. **Bounded cards node** — `props` is now the native `{cards: […], columns: 2}` with the authored order and the absent second body,
+   and the node is proved to own **no** `children` key at all.
+2. **Cards markup** — asserted against the native markup: `<ul class="uno-json-cards" data-uno-columns="2" id="…-list" role="list">`,
+   one `<li class="uno-json-card">` per card, level-2 `<h2 class="uno-json-heading">` titles when heading-less, exactly one
+   `<p class="uno-json-card-body">` for the one authored body, and authored order.
+3. **Out-of-subset refusals** — `surface` (section) and `meta` (card) are now admitted for cards only; `align`/`ratio`/`href`/`route`/
+   `link`/`style`/`onClick`/`visibility`, `image`, `action` and `icon` still refuse, Markdown **titles** still refuse, and Markdown
+   **bodies** are deliberately excluded from the refusal loop for cards only.
+4. **Card counts and failing bodies** — nine cards are now valid for cards (twenty-five is the first refused count; features still
+   refuse nine), and a raw-HTML body refuses as `family:unsupported-feature` for cards against `family:target-refused` for features,
+   each with the reason that matches its cause.
 
-## 3. Why this stopped here
+## 2. The nine remaining failures, named
 
-The remaining work is not a correction but a second full adoption pass — twenty interlocking expectation rewrites plus fixture,
-evidence, digest and parity-record changes. Doing it inside the capacity left to this run would have meant either weakening
-assertions to reach green or pushing a red head; both are forbidden by this order and by the SOP. The order anticipates exactly this
-case ("If incomplete, preserve identified authorized work unstaged and record its exact digests for continuation"), so the prototype
-is preserved as it stands and **nothing** was staged, committed, reverted or force-pushed.
+```
+bounded cards and features    composes thirteen nodes in source order …
+authored heading              composes the headed cards source into one stack …
+authored lede                 keeps all four pre-WO-071 baselines byte-identical …
+authored lede                 composes heading+lede for cards …
+authored lede                 renders exactly one escaped lede paragraph …
+authored lede                 accepts 4000 code points …
+authored lede                 refuses every malformed lede …
+committed durable family Page keeps every committed appended section byte-identical …
+three donor heading outlines  keeps exactly the three documented family sections recomposed
+```
 
-## 4. State at handoff
+They are the shared-loop blocks where cards and features are asserted together (`ledePage`, the four `PRE_WO071_*` baselines, the
+mixed-order and 4000/4001 loops) plus the two committed-digest pins. Each needs a cards branch in the new representation and, for the
+digest pins, a recomputation of the durable Page's cards section — with the Gallery comparison and every other section's byte
+identity retained.
 
-- Working tree: exactly one modified, **unstaged** file — the composer prototype above. Nothing else is modified, added or removed.
-- `HEAD` = `origin/main` = `2987140`, the R07 head that is fully verified and green on both operating systems; the prototype is not
-  part of it.
-- Credits unchanged and unclaimed: `PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`. C1 remains earned; C2 and U04
-  remain OPEN. No images, actions, six-case browser matrix or full Cards parity is implied anywhere in this report.
+## 3. What still stands between this order and acceptance
 
-This is the **STOP for independent Architect review**; the continuation can resume from the preserved digest without reconstructing
-the design.
+1. The nine failures above, restated without loss.
+2. `scripts/u04/family-fixture.mjs`: author the full donor field set on the durable `cards` section (meta, Markdown lede/body, surface,
+   a non-2 column intent, one absent field), then update the composed-section digest picks and the cards HTTP/Chromium predicates that
+   still expect `uno-json-grid`/`layout.stack` markup.
+3. The strict semantic-equivalence proof for the durable Cards section, the retained Gallery comparison, and fixture restoration by
+   digest plus fresh original content.
+4. Every mandatory local gate, then exact-head hosted baseline and bootstrap jobs, steps and logs on both systems.
+5. `.documents/Architecture/u04-family-parity.md`: the Cards row still records the superseded composition.
+
+## 4. Why this stopped here again
+
+The nine failures are not independent: six of them share helper source and baseline constants with the features assertions that must
+keep their exact previous bytes, so each rewrite has to be done against a whole block rather than one assertion at a time. With the
+capacity left to this run, finishing the test file, then the fixture, evidence, digests, four local gates and four hosted jobs would
+have meant editing blind and pushing red. The order's continuation clause covers this: the work is preserved exactly as measured
+above, nothing was staged, reverted, rebased or force-pushed, and the digests are sufficient to resume without reconstruction.
+
+## 5. State at handoff
+
+- Working tree: exactly the two modified **unstaged** files listed in §1; nothing added or removed.
+- `HEAD` = `origin/main` = `49e3f17` (the R01-era head, itself fully green on both operating systems); the adoption is not in it.
+- Progress this round: **20 → 9** failing tests, `tsc --noEmit` at **0 errors**, the other **34 of 35** test files green.
+- Credits unchanged and unclaimed: `PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`; C1 earned, C2 and U04 OPEN. No
+  images, actions, six-case browser matrix or full Cards parity is implied anywhere.
+
+This is the **STOP for independent Architect review**.
+
