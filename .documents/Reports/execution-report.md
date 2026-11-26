@@ -1,7 +1,7 @@
 # Execution Report — UNO-WO-123 / R06
 
-**Outcome: production acceptance COMPLETE — every mandatory local gate is green, including the U04 production gate at 952 → 953
-passing checks and zero failures.** The production-evidence migration that stopped R05 is finished: the durable-family predicates now
+**Outcome: every mandatory LOCAL gate is green — the U04 production gate included, at 953 passing checks and zero failures — but
+exact-head HOSTED acceptance is NOT achieved (see §5).** The production-evidence migration that stopped R05 is finished: the durable-family predicates now
 describe the native cards section, no affected family lost a check, and the closure-oracle rows recover on their own. The adoption and
 its evidence are committed together; exact-head hosted verification is recorded in §5.
 
@@ -67,8 +67,10 @@ gate's own removal check confirms no temporary route or write survives the run.
 
 ## 5. Hosted verification
 
-Recorded after the exact head is pushed, on both `Verify U01 baseline` and `Uno Bootstrap Verify`, for `ubuntu-24.04` and
-`windows-2025`.
+Exact-head hosted acceptance is **NOT achieved**. Evidence head `4057b57` (and the follow-up `9569f31`): `Uno Bootstrap Verify`
+**success** on both systems; `Verify U01 baseline` **failure** on both, in the U03 published-Page runner step, where the newly added
+durable-Cards semantic proof returns false on one field comparison. That single predicate is not yet diagnosed; every other check in
+that runner passes, and all local gates listed in §2 are green.
 
 ## 6. Disposition
 
