@@ -1712,3 +1712,56 @@ describe("the hosted durable-family labels are connected to real predicates", ()
     }
   });
 });
+
+/**
+ * `UNO-WO-122 / R05`: the native Cards proof is mandatory in the default run and shares one implementation with the focused
+ * entrypoint. The audit reads both runners and fails if the invocation is conditional, duplicated, missing, or replaced by a
+ * second implementation — and it proves its own sensitivity by mutating the runner text.
+ */
+function nativeCardsWiring(source) {
+  const problems = [];
+  const imports = source.match(/import \{ runNativeCardsTransaction \} from "\.\/u04\/cards-native-evidence\.mjs";/gu) ?? [];
+  if (imports.length !== 1) problems.push(`import:${imports.length}`);
+  const calls = source.match(/await runNativeCardsTransaction\(/gu) ?? [];
+  if (calls.length !== 1) problems.push(`calls:${calls.length}`);
+  const guarded = /if \([^)]*\) \{\s*await runNativeCardsTransaction\(/u.test(source);
+  if (guarded) problems.push("conditional");
+  if (!/cardsOutcome\.failed === 0 && cardsOutcome\.passed > 0/u.test(source)) problems.push("no-fail-clause");
+  if (!/prefix: "U04_NATIVE_CARDS"/u.test(source)) problems.push("no-prefix");
+  return problems;
+}
+
+describe("native Cards mandatory wiring (UNO-WO-122 / R05)", () => {
+  const runner = readFileSync(resolve(process.cwd(), "scripts/verify-u04-22-module-consent.mjs"), "utf8");
+
+  it("invokes the one shared native Cards transaction exactly once, unconditionally, and fails the run on any failed check", () => {
+    assert.deepEqual(nativeCardsWiring(runner), []);
+  });
+
+  it("shares that transaction with the focused entrypoint instead of reimplementing it", () => {
+    const focused = readFileSync(resolve(process.cwd(), "scripts/verify-u04-cards-native.mjs"), "utf8");
+    assert.match(focused, /import \{[\s\S]*?runNativeCardsTransaction,[\s\S]*?\} from "\.\/u04\/cards-native-evidence\.mjs";/u);
+    assert.equal((focused.match(/await runNativeCardsTransaction\(/gu) ?? []).length, 1);
+    // The focused entrypoint must never present itself as the gate or claim credit.
+    assert.match(focused, /not the U04 gate/u);
+    assert.match(focused, /PARITY_CARDS=PENDING/u);
+  });
+
+  it("fails the audit when the mandatory invocation is deleted or made conditional", () => {
+    const deleted = runner.replace(/\s*const cardsOutcome = await runNativeCardsTransaction\(/u, "\n    const cardsOutcome = undefined; void (");
+    assert.notDeepEqual(nativeCardsWiring(deleted), []);
+    // A conditional invocation — the shape that would let the default run skip the proof — must be rejected outright.
+    const guarded = [
+      'import { runNativeCardsTransaction } from "./u04/cards-native-evidence.mjs";',
+      'if (process.env.SKIP_NATIVE_CARDS !== "1") {',
+      "  await runNativeCardsTransaction({});",
+      "}",
+      "cardsOutcome.failed === 0 && cardsOutcome.passed > 0",
+      'prefix: "U04_NATIVE_CARDS"',
+    ].join("\n");
+    assert.ok(nativeCardsWiring(guarded).includes("conditional"));
+    // A duplicated second implementation must be rejected as well.
+    const duplicated = `${runner}\nawait runNativeCardsTransaction({});\n`;
+    assert.ok(nativeCardsWiring(duplicated).some((problem) => problem.startsWith("calls:")));
+  });
+});

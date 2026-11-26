@@ -28,7 +28,7 @@
 import Image from "next/image";
 
 import type { UnoPageMedia, UnoResolvedImage, UnoSectionMedia } from "../core/assets/uno-owned-media";
-import { readUnoFamilyMarkdown, readUnoPageDocument, isUnoExternalVideoProps, type UnoContentProseBody, type UnoPageDocument, type UnoSectionNode } from "../core/page-document";
+import { readUnoFamilyMarkdown, readUnoPageDocument, isUnoExternalVideoProps, isUnoLayoutGridCards, type UnoContentProseBody, type UnoPageDocument, type UnoSectionNode } from "../core/page-document";
 import { readUnoVideoEmbed } from "../core/video/uno-video-embeds";
 import { UnoFamilyMarkdown } from "./uno-family-markdown";
 import { UnoCarouselIsland, UnoExternalVideoIsland, UnoModalIsland, UnoTabsIsland } from "./uno-interaction-island";
@@ -224,6 +224,55 @@ function SectionNode({
       );
     }
     case "layout.grid": {
+      // `UNO-WO-122 / R04`: the native closed opt-in **text-only** cards grid. One native `<ul>` whose every direct `<li>` is one
+      // card in the donor's own shipped treatment (`.uno-json-card`: bordered, padded, rounded), carrying its own meta line,
+      // title and body in the authored order, beneath only the authored heading and lede. Nothing is manufactured: an absent
+      // field emits no element, and the deferred image/action capabilities have no key, so nothing can be drawn that the
+      // document did not author.
+      if (isUnoLayoutGridCards(node.props)) {
+        const { cards, columns, heading, level, lede, ledeMarkdown, surface } = node.props;
+        const Tag = level === undefined ? null : HEADING_TAGS[level];
+        // The donor item title is level 3 beneath an authored section heading and level 2 without one — the accepted outline
+        // adaptation for a heading-less cards section.
+        const ItemTag = HEADING_TAGS[(level === undefined ? 2 : Math.min(6, level + 1)) as 2 | 3 | 4 | 5 | 6];
+        const ledeParsed = ledeMarkdown === true ? parseFamilyMarkdown(lede) : null;
+        return (
+          <div className="uno-json-cards-section" data-uno-surface={surface} id={node.id}>
+            {Tag === null || heading === undefined ? null : (
+              <Tag className="uno-json-heading" id={`${node.id}-heading`}>
+                {heading}
+              </Tag>
+            )}
+            {lede === undefined ? null : ledeParsed !== null ? (
+              <section className="uno-json-prose" id={`${node.id}-lede`}>
+                <UnoFamilyMarkdown blocks={ledeParsed} className="uno-json-cards-lede" />
+              </section>
+            ) : (
+              <p className="uno-json-prose" id={`${node.id}-lede`}>
+                {lede}
+              </p>
+            )}
+            <ul className="uno-json-cards" data-uno-columns={columns} id={`${node.id}-list`} role="list">
+              {cards.map((card, index) => {
+                const bodyParsed = card.bodyMarkdown === true ? parseFamilyMarkdown(card.body) : null;
+                return (
+                  <li className="uno-json-card" key={`${card.title}:${index}`}>
+                    {card.meta === undefined ? null : <p className="uno-json-card-meta">{card.meta}</p>}
+                    <ItemTag className="uno-json-heading">{card.title}</ItemTag>
+                    {card.body === undefined ? null : bodyParsed !== null ? (
+                      <UnoFamilyMarkdown blocks={bodyParsed} className="uno-json-card-body" />
+                    ) : (
+                      <p className="uno-json-card-body">{card.body}</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      }
+      // The ordinary native grid is the child-bearing shape; a cards grid returned above and never reaches this line.
+      if (!("children" in node)) return null;
       const semantics = node.props.itemSemantics ?? "plain";
       // `list` is a genuine native list: one `<ul>` root and one direct `<li>` per authored child, in source order.
       if (semantics === "list") {

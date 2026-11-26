@@ -26,6 +26,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { deflateSync } from "node:zlib";
 
 import { prepareUnoU03FixtureTransaction } from "./uno-u03-fixture-transaction.mjs";
+import { runNativeCardsTransaction } from "./u04/cards-native-evidence.mjs";
 import { evaluateU04FamilyClosure } from "./verify-u04-family-closure.mjs";
 // `UNO-WO-112 / R01`: the cohesive verification modules this entrypoint orchestrates. The fixture, the Hero expectations,
 // the seven-dimension record and the process harness each live in one testable file under `scripts/u04/`.
@@ -2862,6 +2863,26 @@ async function main() {
   child.stdout.on("data", () => {});
   child.stderr.on("data", () => {});
   if (!check("the production server answers on loopback", await waitForServer({ base, child, readyPath: "/en-001/wo044-all-modules" }))) return 1;
+
+  // `UNO-WO-122 / R05`: the focused native Cards proof is a **mandatory** part of the default run, executed exactly once through
+  // the same single transaction the focused entrypoint uses. It swaps the test-owned family fixture for the authored native
+  // document, proves it over this server's real HTTP and Chromium, and restores the fixture bytes in `finally`; a missing or
+  // failed check below fails the run, and skipping it is not possible without deleting this call and its deployment audit.
+  {
+    const cardsFixture = resolve(ROOT, SOURCES[4]);
+    const cardsDigest = () => createHash("sha256").update(readFileSync(cardsFixture)).digest("hex");
+    const cardsOutcome = await runNativeCardsTransaction({
+      familyUrl: `${base}/en-001/${FAMILY_ROUTE.join("/")}`,
+      fixturePath: cardsFixture,
+      digestOf: cardsDigest,
+      check,
+      prefix: "U04_NATIVE_CARDS",
+      // The gate's family fixture is the composer's own document, whose content is not asserted by this transaction, so the
+      // restoration proof is the byte digest plus the absence of every temporary anchor.
+      originalMarker: null,
+    });
+    if (!check("U04_NATIVE_CARDS the mandatory native Cards transaction ran and every required check passed", cardsOutcome.failed === 0 && cardsOutcome.passed > 0, `${cardsOutcome.passed} passed, ${cardsOutcome.failed} failed`)) return 1;
+  }
 
   const pageResponse = await fetch(`${base}/en-001/wo044-all-modules`);
   const html = await pageResponse.text();

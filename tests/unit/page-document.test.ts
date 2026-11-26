@@ -7,6 +7,16 @@ import {
   readUnoPageDocument,
   type UnoPageDocumentResult,
 } from "../../src/core/page-document";
+// The evidence module is a plain ESM runner asset without a TypeScript declaration; its shapes are asserted by the tests below.
+import {
+  NATIVE_CARDS_ACCEPTED,
+  NATIVE_CARDS_DOCUMENT,
+  NATIVE_CARDS_IDS,
+  NATIVE_CARDS_REFUSALS,
+  // @ts-ignore - no declaration file is shipped for the plain-ESM runner asset
+} from "../../scripts/u04/cards-native-evidence.mjs";
+
+
 
 /** A minimal valid document: one prose section. */
 function minimal(): Record<string, unknown> {
@@ -3093,3 +3103,61 @@ describe("readUnoPageDocument — content.testimonials declared Markdown", () =>
   });
 });
 
+
+// `UNO-WO-122 / R05`: the native Cards alternative of `layout.grid`. These assertions run the *same* authored shapes the
+// production proof ships, so a reader regression fails here before it can reach a served Page.
+describe("native cards (UNO-WO-122)", () => {
+  it("accepts the authored native cards document and keeps every card in authored order", () => {
+    const result = readUnoPageDocument(JSON.stringify(NATIVE_CARDS_DOCUMENT));
+    expect(result.accepted).toBe(true);
+    if (!result.accepted) return;
+    const nodes = result.document.sections;
+    expect(nodes.map((node) => node.id)).toEqual([...NATIVE_CARDS_IDS]);
+    const rich = nodes[0];
+    expect(rich?.module).toBe("layout.grid");
+    if (rich === undefined || !("cards" in rich.props)) throw new Error("expected a cards grid");
+    expect(rich.props.cards.map((card) => card.title)).toEqual(["Ownership", "Presence", "Omission"]);
+    expect(rich.props.heading).toBe("Native cards");
+    expect(rich.props.level).toBe(2);
+    expect(rich.props.surface).toBe("muted");
+    // Authored childlessness is preserved: the node carries no children of its own, only the empty list the grid contract reads.
+    const childless = rich as unknown as { readonly children?: readonly unknown[] };
+    expect(childless.children).toEqual([]);
+    expect(Object.keys(childless)).not.toContain("children");
+  });
+
+  it("serializes its accepted output and revalidates it unchanged, without relaxing authored childlessness", () => {
+    const first = readUnoPageDocument(JSON.stringify(NATIVE_CARDS_DOCUMENT));
+    expect(first.accepted).toBe(true);
+    if (!first.accepted) return;
+    const serialized = JSON.stringify(first.document);
+    const second = readUnoPageDocument(serialized);
+    expect(second.accepted).toBe(true);
+    if (!second.accepted) return;
+    expect(JSON.stringify(second.document)).toBe(serialized);
+    // A document that *declares* children beside cards is still refused, before and after the round trip.
+    const declared = JSON.parse(JSON.stringify(NATIVE_CARDS_DOCUMENT)) as { sections: Record<string, unknown>[] };
+    declared.sections[0]!.children = [];
+    const refused = readUnoPageDocument(JSON.stringify(declared));
+    expect(refused.accepted).toBe(false);
+    if (!refused.accepted) expect(refused.reason).toBe("document:invalid-section");
+  });
+
+  it("refuses every closed native Cards probe with the reason its own shape earns", () => {
+    for (const probe of NATIVE_CARDS_REFUSALS) {
+      const outcome = readUnoPageDocument(JSON.stringify(probe.mutate()));
+      expect(outcome.accepted, probe.label).toBe(false);
+      if (!outcome.accepted) expect(outcome.reason, probe.label).toBe(probe.expected);
+    }
+    expect(NATIVE_CARDS_REFUSALS.length).toBe(19);
+  });
+
+  it("accepts the donor's exact bounds and every accepted card count, and refuses one beyond them", () => {
+    for (const probe of NATIVE_CARDS_ACCEPTED) {
+      expect(readUnoPageDocument(JSON.stringify(probe.document())).accepted, probe.label).toBe(true);
+    }
+    const over = JSON.parse(JSON.stringify(NATIVE_CARDS_DOCUMENT)) as { sections: { props: { cards: { title: string }[] } }[] };
+    over.sections[1]!.props.cards = Array.from({ length: 25 }, (_unused, index) => ({ title: `Plate ${index}` }));
+    expect(readUnoPageDocument(JSON.stringify(over)).accepted).toBe(false);
+  });
+});

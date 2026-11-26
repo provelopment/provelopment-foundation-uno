@@ -131,6 +131,16 @@ export const UNO_PAGE_DOCUMENT_LIMITS = Object.freeze({
    * ordinary `media.carousel` keeps its 2–8 bound.
    */
   galleryListItems: 24,
+  /**
+   * `UNO-WO-122 / R03`: the donor Cards family's own bounds, adopted **only** by the native, closed opt-in text-only cards
+   * representation of `layout.grid`. The donor allows 1–24 cards, a 160-code-point title, a 120-code-point meta line and a
+   * 4,000-code-point Markdown body and lede. The ordinary `layout.grid` keeps its 1–8 child bound, and no other module's bound
+   * moves.
+   */
+  cardItems: 24,
+  cardTitleCodePoints: 160,
+  cardMetaCodePoints: 120,
+  cardTextCodePoints: 4000,
   mediaAltCodePoints: 320,
   mediaCaptionCodePoints: 320,
   /**
@@ -193,6 +203,59 @@ export interface UnoLayoutGridProps {
   readonly columns: 1 | 2 | 3 | 4;
   readonly itemSemantics?: UnoGridItemSemantics | UnoGridListSemantics;
   readonly ratio?: UnoGridRatio;
+}
+
+/**
+ * One card of the native, closed opt-in **text-only** cards grid (`UNO-WO-122 / R03`).
+ *
+ * A card is the donor's own text unit: a required plain title, an optional plain meta line and an optional Markdown-capable
+ * body. Nothing is manufactured — an absent field stays absent, and the renderer emits the authored fields in the donor's own
+ * order (meta, title, body).
+ *
+ * The donor card also carries an image and one action. Those two capabilities are deliberately deferred, so this representation
+ * has no key for either: a document that authors `image` or `action` on a card is refused rather than having the field silently
+ * discarded.
+ */
+export interface UnoLayoutCard {
+  readonly title: string;
+  readonly meta?: string;
+  readonly body?: string;
+  /** Only ever the literal `true`, for a body that has been read by the shared Markdown reader. */
+  readonly bodyMarkdown?: true;
+}
+
+/**
+ * `layout.grid` in its native, closed opt-in **text-only** cards representation (`UNO-WO-122 / R03`).
+ *
+ * One native list of one to twenty-four bordered, padded cards beneath an optional authored heading and Markdown lede, inside
+ * a whole-section closed surface, with an optional column intent that otherwise resolves to three columns at a wide viewport,
+ * two at an intermediate one and one at a narrow one. The representation is opt-in through the presence of `cards`, so the
+ * ordinary native grid keeps its exact previous props, children, markup and acceptance.
+ *
+ * A cards grid carries **no children**: its content is its own closed item shape, and the reader refuses a node that declares
+ * both — including an explicitly empty `children` array, which is a crossed shape and never an ordinary grid.
+ */
+export interface UnoLayoutGridCardsProps {
+  readonly cards: readonly UnoLayoutCard[];
+  readonly columns?: 2 | 3 | 4;
+  readonly heading?: string;
+  readonly level?: 2 | 3 | 4 | 5 | 6;
+  readonly lede?: string;
+  readonly ledeMarkdown?: true;
+  readonly surface?: UnoSectionSurface;
+}
+
+/** `layout.grid` props: the ordinary native grid, or the native closed opt-in text-only cards representation. */
+export type UnoLayoutGridAlternative = UnoLayoutGridProps | UnoLayoutGridCardsProps;
+
+/**
+ * Narrow a validated `layout.grid` to its native cards representation.
+ *
+ * Cards mode is identified by the presence of the own `cards` key, which the ordinary grid never carries and the validator
+ * accepts only as a read card array. Callers therefore narrow on structure, never on a value they would have to trust.
+ */
+export function isUnoLayoutGridCards(props: UnoLayoutGridAlternative): props is UnoLayoutGridCardsProps {
+  return Object.prototype.hasOwnProperty.call(props, "cards");
 }
 
 /** `content.heading` props: text plus an explicit level that can never be the Page `h1`. */
@@ -681,6 +744,22 @@ export type UnoSectionNode =
       readonly module: "layout.grid";
       readonly props: UnoLayoutGridProps;
       readonly children: readonly UnoSectionNode[];
+    }
+  | {
+      /**
+       * `UNO-WO-122 / R03`: the native closed opt-in text-only cards grid. It owns its content in `props.cards` and therefore has
+       * **no** `children` key at all — the validator never reads one for this shape and refuses a node that declares one, even
+       * an explicitly empty array.
+       */
+      readonly id: string;
+      readonly module: "layout.grid";
+      readonly props: UnoLayoutGridCardsProps;
+      /**
+       * Always empty, and never authored: the reader refuses a document that declares `children` beside `cards`, and the
+       * renderer returns before reading this list. It exists so the validated node stays compatible with the existing grid
+       * contract, whose consumers read `children` directly.
+       */
+      readonly children: readonly [];
     }
   | {
       readonly id: string;
@@ -2269,6 +2348,68 @@ function optionalMotionSpeed(value: unknown): UnoMotionSpeed | undefined {
  * whatever else is wrong with the node, and the module literal is checked against the immutable registry
  * before `document:renderer-unavailable` can be claimed, so the two module refusals stay distinguishable.
  */
+/**
+ * Whether one node record declares the native closed opt-in text-only cards grid (`UNO-WO-122 / R03`).
+ *
+ * The check is purely structural — the module literal and a plain `props` object that owns `cards` — so it can never trust a
+ * value: every field it looks at is re-read by the validator immediately afterwards. It decides only which required-key set a
+ * grid node must satisfy, never whether a document is acceptable.
+ */
+function declaresCardsGrid(record: DataRecord): boolean {
+  if (record["module"] !== "layout.grid") return false;
+  const props = record["props"];
+  if (props === null || typeof props !== "object" || Array.isArray(props)) return false;
+  return Object.prototype.hasOwnProperty.call(props, "cards");
+}
+
+/**
+ * The bounded ordered card list of the native text-only cards grid (`UNO-WO-122 / R03`).
+ *
+ * Every card is a strict object: a required plain title at the donor's 160 points, an optional plain meta line at 120, and an
+ * optional Markdown-capable body at the donor's 4,000 points (declared as Markdown only through the literal `true`). Nothing the
+ * donor's *deferred* image and action capabilities would carry is representable here, so an `image`, `action` or any other
+ * undeclared key refuses the whole Page instead of being dropped.
+ */
+function readLayoutCards(value: unknown): UnoLayoutCard[] {
+  if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
+  if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.cardItems) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const cards: UnoLayoutCard[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) throw new RefusedDocument("document:invalid-props");
+    const item = readPlainData(value[index]);
+    if (item === null) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(item, ["title"], ["meta", "body", "bodyMarkdown"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    // A card title and meta line are literal well-formed plain text: an unpaired surrogate or a control character cannot be
+    // represented, so it refuses the whole Page rather than being replaced or normalised.
+    const title = readMarkdownCapableText(
+      item["title"],
+      UNO_PAGE_DOCUMENT_LIMITS.cardTitleCodePoints,
+      false,
+    );
+    const meta = item["meta"] === undefined
+      ? undefined
+      : readMarkdownCapableText(item["meta"], UNO_PAGE_DOCUMENT_LIMITS.cardMetaCodePoints, false);
+    const bodyMarkdown = optionalProseMarkdown(item["bodyMarkdown"]);
+    if (bodyMarkdown === true && item["body"] === undefined) throw new RefusedDocument("document:invalid-props");
+    const body = item["body"] === undefined
+      ? undefined
+      : bodyMarkdown === true
+        ? requireFamilyMarkdown(item["body"], UNO_PAGE_DOCUMENT_LIMITS.cardTextCodePoints)
+        : optionalMarkdownCapableText(item["body"], UNO_PAGE_DOCUMENT_LIMITS.cardTextCodePoints, true);
+    cards.push({
+      title,
+      ...(meta === undefined ? {} : { meta }),
+      ...(body === undefined ? {} : { body }),
+      ...(bodyMarkdown === undefined ? {} : { bodyMarkdown }),
+    });
+  }
+  return cards;
+}
+
 function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet<object>): UnoSectionNode {
   if (depth > UNO_PAGE_DOCUMENT_LIMITS.depth) throw new RefusedDocument("document:too-deep");
   if (typeof value === "object" && value !== null) {
@@ -2296,7 +2437,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
     throw new RefusedDocument("document:renderer-unavailable");
   }
 
-  const ownsChildren = CHILD_BEARING_MODULES.includes(moduleName);
+  const ownsChildren = CHILD_BEARING_MODULES.includes(moduleName) && !declaresCardsGrid(record);
   const requiredKeys = ownsChildren ? ["id", "module", "props", "children"] : ["id", "module", "props"];
   if (!hasExactlyKeys(record, requiredKeys, [])) {
     throw new RefusedDocument(ownsChildren ? "document:invalid-children" : "document:invalid-section");
@@ -2313,6 +2454,41 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "layout.grid") {
+    // `UNO-WO-122 / R03`: the native closed opt-in **text-only** cards representation is a separate, explicit shape. Its absence
+    // keeps the ordinary native grid byte-identical — required `columns`, optional item semantics and ratio, typed children.
+    if (props["cards"] !== undefined) {
+      if (!hasExactlyKeys(props, ["cards"], ["columns", "heading", "level", "lede", "ledeMarkdown", "surface"])) {
+        throw new RefusedDocument("document:invalid-props");
+      }
+      // A cards grid owns its content and never declares children; an explicitly empty array is the same crossed shape.
+      if (record["children"] !== undefined) throw new RefusedDocument("document:invalid-children");
+      const columns = optionalGalleryColumns(props["columns"]);
+      const { heading, level } = readOptionalHeading(props, state);
+      const ledeMarkdown = optionalProseMarkdown(props["ledeMarkdown"]);
+      if (ledeMarkdown === true && props["lede"] === undefined) throw new RefusedDocument("document:invalid-props");
+      const lede =
+        ledeMarkdown === true
+          ? requireFamilyMarkdown(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.cardTextCodePoints)
+          : optionalMarkdownCapableText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.cardTextCodePoints, true);
+      const surface = optionalSurface(props["surface"]);
+      const cards = readLayoutCards(props["cards"]);
+      // The validated cards node is childless. The empty `children` list is defined **non-enumerable**, so it exists for the
+      // existing grid contract's consumers (which read `node.children` directly) while the document's serialized form stays
+      // authentically childless: `JSON.stringify` omits it, and re-reading that output succeeds rather than being refused as
+      // authored `children`. Authored childlessness is never relaxed — a card document that *declares* `children` still refuses.
+      const cardsProps: UnoLayoutGridCardsProps = {
+        cards,
+        ...(columns === undefined ? {} : { columns }),
+        ...(heading === undefined ? {} : { heading }),
+        ...(level === undefined ? {} : { level }),
+        ...(lede === undefined ? {} : { lede }),
+        ...(ledeMarkdown === undefined ? {} : { ledeMarkdown }),
+        ...(surface === undefined ? {} : { surface }),
+      };
+      const node = { id, module: "layout.grid" as const, props: cardsProps };
+      Object.defineProperty(node, "children", { value: Object.freeze([]), enumerable: false, writable: false });
+      return node as typeof node & { readonly children: readonly [] };
+    }
     if (!hasExactlyKeys(props, ["columns"], ["itemSemantics", "ratio"])) {
       throw new RefusedDocument("document:invalid-props");
     }

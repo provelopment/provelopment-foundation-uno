@@ -1580,6 +1580,84 @@ main {
   }
 }
 
+/*
+ * `UNO-WO-122 / R04`: the native, closed opt-in text-only cards grid. The donor's shipped `.uno-json-card` treatment already
+ * defines the card's border, radius, padding and paint, so a native card is the *same* card the composed family draws — this
+ * block adds only what the native list itself needs: its own track rules, its meta line and its body, and the whole-section
+ * surfaces that `layout.grid` did not previously carry. Below `40rem` the list is one column, from `40rem` two, and from `64rem`
+ * the authored intent (`2`, `3` or `4`) or the donor's default of three. An unauthored intent therefore carries no attribute at
+ * all: the default lives here, in the stylesheet, not in the document.
+ */
+.uno-json-cards-section {
+  min-width: 0;
+}
+
+.uno-json-cards-section[data-uno-surface="muted"] {
+  padding: 1rem 1.25rem;
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-surface);
+}
+
+.uno-json-cards-section[data-uno-surface="bordered"] {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius-lg);
+  background-color: var(--uno-background);
+}
+
+.uno-json-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uno-json-card-meta {
+  margin: 0;
+  color: var(--uno-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.uno-json-card-body {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+@media (min-width: 640px) {
+  .uno-json-cards,
+  .uno-json-cards[data-uno-columns="2"],
+  .uno-json-cards[data-uno-columns="3"],
+  .uno-json-cards[data-uno-columns="4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .uno-json-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .uno-json-cards[data-uno-columns="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .uno-json-cards[data-uno-columns="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .uno-json-cards[data-uno-columns="4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 /* --- Watermark --------------------------------------------------------------- */
 .uno-json-watermark-wrap {
   position: relative;
