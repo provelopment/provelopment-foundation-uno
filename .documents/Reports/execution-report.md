@@ -99,7 +99,8 @@ failed `Lint` on the two lines R07 was authorized to fix. Nothing was force-push
 | `Uno Bootstrap Verify` | `45777460173` | **success** | **success** |
 | `Verify U01 baseline` | `45777460251` | **failure — `Lint`** | **failure — `Lint`** |
 
-Report head **`<report-head>`** is verified in §6 on the same four jobs.
+Report head **`70ce0f9172fcf40a3fa68b751356a33a676b442a`** is verified on the same four jobs — `Verify U01 baseline` success on
+`ubuntu-24.04` and `windows-2025`, `Uno Bootstrap Verify` success on both — with no step failing, cancelled or unresolved.
 
 ## 6. Disposition
 
