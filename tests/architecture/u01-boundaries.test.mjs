@@ -1476,8 +1476,9 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
     );
   }
 
-  // Exactly the two sanctioned importers, and no product layer. This checker file names the module only to police it,
-  // so it is excluded — it imports nothing from the helper.
+  // Exactly the sanctioned importers, and no product layer. This checker file names the module only to police it,
+  // so it is excluded — it imports nothing from the helper. `UNO-WO-122 / R06` admits the focused native Cards runner, which
+  // imports the transaction solely to declare, serve, prove and remove one test-owned route.
   const scanned = { ...readTree('src', 'src'), ...readTree('scripts', 'scripts'), ...readTree('tests', 'tests') };
   const CHECKER = 'tests/architecture/u01-boundaries.test.mjs';
   const importers = Object.entries(scanned)
@@ -1487,8 +1488,9 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
     .sort();
   assert.deepEqual(importers, [
     'scripts/verify-u03-multisite-http.mjs',
-  'scripts/verify-u03-published-http.mjs',
+    'scripts/verify-u03-published-http.mjs',
     'scripts/verify-u04-22-module-consent.mjs',
+    'scripts/verify-u04-cards-native.mjs',
     'scripts/verify-u04-json-slice.mjs',
     'tests/deployment/u03-fixture-transaction.test.mjs',
     'tests/deployment/u04-json-slice.test.mjs',
