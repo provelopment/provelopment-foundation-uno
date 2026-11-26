@@ -947,35 +947,51 @@ async function durableFamilySourcePhase() {
         return JSON.stringify(differing) === JSON.stringify([GALLERY_SECTION_ID, "family-15-cards"]);
       })(),
     );
-    // `UNO-WO-123 / R06`: the durable Cards difference is proved **semantically**, never exempted — same anchor, authored
-    // heading and its level, authored lede, authored column intent, and the same ordered card titles and bodies, with no
-    // invented meta, image or action.
+    // `UNO-WO-123 / R07`: the durable Cards difference is proved **semantically**, never exempted. The committed Page keeps the
+    // earlier outline — `layout.grid` with `itemSemantics: "list"` and per-card stacks whose titles are level-2 headings — while
+    // the composer emits the accepted native node, childless, with `cards[]` and the same authored column intent and level. The
+    // comparison therefore walks the committed outline against the composed `cards[]` and asserts **absence** on both sides:
+    // neither authors a section heading, lede or surface, and neither invents a meta, image, action or other field.
     const committedCards = parsed.document.sections.find((node) => node.id === "family-15-cards");
     const composedCards = composed.document.sections.find((node) => node.id === "family-15-cards");
     check(
-      "DURABLE_FAMILY_SOURCE the committed Cards section and the composed native Cards node agree on every authored field",
+      "DURABLE_FAMILY_SOURCE the committed Cards outline and the composed native Cards node agree on every authored field",
       (() => {
         if (committedCards === undefined || composedCards === undefined) return false;
-        if (composedCards.module !== "layout.grid" || composedCards.id !== committedCards.id) return false;
-        const stack = committedCards.module === "layout.stack" ? committedCards.children ?? [] : [];
-        const heading = stack.find((child) => child.module === "content.heading");
-        const lede = stack.find((child) => child.module === "content.prose");
-        const grid = stack.find((child) => child.module === "layout.grid");
-        const props = composedCards.props ?? {};
-        return heading?.props?.text === props.heading
-          && heading?.props?.level === 2
-          && props.level === 2
-          && lede?.props?.text === props.lede
-          && props.ledeMarkdown === undefined
-          && grid?.props?.columns === props.columns
-          && Array.isArray(props.cards)
-          && props.cards.length === (grid?.children?.length ?? -1)
-          && props.cards.every((card, index) => {
-            const item = grid?.children?.[index];
-            const title = item?.children?.[0]?.props?.text;
-            const body = (item?.children ?? []).find((child) => child.module === "content.prose")?.props?.text;
-            return card.title === title && card.body === body && card.meta === undefined;
-          });
+        if (committedCards.id !== composedCards.id) return false;
+        if (committedCards.module !== "layout.grid" || composedCards.module !== "layout.grid") return false;
+        const old = committedCards.props ?? {};
+        const next = composedCards.props ?? {};
+        // Neither representation may carry an authored section heading, lede, surface or Markdown mirror.
+        for (const props of [old, next]) {
+          if (props.heading !== undefined || props.lede !== undefined
+            || props.ledeMarkdown !== undefined || props.surface !== undefined) return false;
+        }
+        if (old.columns !== next.columns || typeof next.columns !== "number") return false;
+        // The committed outline states its item semantics and per-card stacks; the native node states the same level and is childless.
+        if (old.itemSemantics !== "list") return false;
+        if (!Array.isArray(composedCards.children) || composedCards.children.length !== 0) return false;
+        // The committed outline states level 2 on every card title and the native node carries no override, so both keep the
+        // accepted level-2 item contract proved in the served markup evidence.
+        if (next.level !== undefined) return false;
+        const stacks = Array.isArray(committedCards.children) ? committedCards.children : [];
+        if (!Array.isArray(next.cards) || next.cards.length !== stacks.length) return false;
+        const allowed = ["title", "meta", "body"];
+        return next.cards.every((card, index) => {
+          const stack = stacks[index];
+          if (stack === undefined || stack.module !== "layout.stack") return false;
+          const children = Array.isArray(stack.children) ? stack.children : [];
+          const title = children[0];
+          const body = children.find((child) => child.module === "content.prose");
+          return Object.keys(card).every((key) => allowed.includes(key))
+            && card.meta === undefined
+            && title?.module === "content.heading"
+            && title?.props?.level === 2
+            && card.title === title?.props?.text
+            && (body === undefined
+              ? card.body === undefined
+              : card.body !== undefined && card.body === body.props?.text);
+        });
       })(),
     );
     // The Gallery itself is compared **semantically**, never exempted: anchor, authored columns, item count and order, each
