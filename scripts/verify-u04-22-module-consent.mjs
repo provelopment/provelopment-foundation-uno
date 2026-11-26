@@ -340,14 +340,21 @@ async function walkToSafeLink(tab, expectedHref) {
     }, expectedHref);
     if (trace.length < 6) trace.push(atLink.at);
   }
-  const pageUrlAfter = tab.url();
   await tab.keyboard.press("Tab");
-  const leftAfterTab = await tab.evaluate((expected) => {
+  const departure = await tab.evaluate((expected) => {
     const active = document.activeElement;
     // Leaving means the focused element is no longer that link: focus is not trapped on a single anchor.
-    return !(active instanceof HTMLAnchorElement && active.getAttribute("href") === expected);
+    const left = !(active instanceof HTMLAnchorElement && active.getAttribute("href") === expected);
+    return { left, url: window.location.href };
   }, expectedHref);
-  return { ...atLink, leftAfterTab, presses, trace, pageUrlAfter };
+  return {
+    ...atLink,
+    leftAfterTab: departure.left,
+    tabsAfter: 1,
+    pageUrlAfter: departure.url,
+    presses,
+    trace,
+  };
 }
 
 /**
@@ -502,19 +509,36 @@ async function readGalleryCase(input) {
     probe.remove();
     return value;
   };
+  // A length token (`--uno-radius-lg`) resolves through its own property, so a `rem` value becomes the same computed pixels
+  // the section reports; the colour tokens keep the background probe above.
+  const resolveLength = (name) => {
+    const raw = String(getComputedStyle(document.documentElement).getPropertyValue(name)).trim();
+    const probe = document.createElement("div");
+    probe.style.borderRadius = raw;
+    document.body.appendChild(probe);
+    const value = getComputedStyle(probe).borderTopLeftRadius;
+    probe.remove();
+    return value;
+  };
   const readVariant = (id) => {
     const root = document.getElementById(id);
     if (root === null) return null;
     const lists = root.querySelectorAll("ul.uno-json-gallery-list");
     const list = lists.length === 1 ? lists[0] : null;
     const entries = list === null ? [] : [...list.children];
+    // `UNO-WO-121 / R03`: one **direct** figure and one direct image per list item, counted on the children themselves so a
+    // wrapper cannot hide a second figure and an image cannot be borrowed from a neighbour.
+    const directFigures = entries.map((entry) => entry.querySelectorAll(":scope > figure.uno-json-media-item").length);
+    const directImages = entries.map((entry) => entry.querySelectorAll(":scope > figure.uno-json-media-item > img").length);
     const figures = entries.map((entry) => entry.querySelector("figure.uno-json-media-item"));
     const images = figures.map((figure) => (figure === null ? null : figure.querySelector("img")));
     const captions = figures.map((figure) => (figure === null ? null : figure.querySelector("figcaption")));
     const style = list === null ? getComputedStyle(root) : getComputedStyle(list);
-    const tracks = list === null || style.gridTemplateColumns === "none"
-      ? 0
-      : style.gridTemplateColumns.split(" ").length;
+    // The resolved tracks themselves, not only their count: `grid-template-columns` computes to one pixel length per track.
+    const trackWidths = list === null || style.gridTemplateColumns === "none"
+      ? []
+      : style.gridTemplateColumns.split(" ").map((value) => Number.parseFloat(value)).filter((value) => Number.isFinite(value));
+    const tracks = trackWidths.length;
     const srcs = images.map((image) => (image === null ? "" : image.getAttribute("src") ?? ""));
     const occurrence = srcs.map((src) => Number.parseInt(src.slice(src.lastIndexOf("/") + 1), 10));
     const widths = entries.map((entry) => Math.round(entry.getBoundingClientRect().width));
@@ -531,7 +555,10 @@ async function readGalleryCase(input) {
       const newRow = index % columns !== 0 || index === 0 || tops[index] > tops[index - columns];
       return sameRow && increases && newRow;
     });
+    // Each caption's own list item, so a caption moved into a neighbour is visible as ownership, not just as text.
+    const captionOwners = captions.map((caption) => (caption === null ? null : entries.indexOf(caption.closest("li"))));
     const richFigure = captions[0] ?? null;
+    const richLink = richFigure === null ? null : richFigure.querySelector("a");
     const rootStyle = getComputedStyle(root);
     return {
       id,
@@ -539,8 +566,11 @@ async function readGalleryCase(input) {
       itemCount: entries.filter((entry) => entry.matches("li.uno-json-gallery-entry")).length,
       imageCount: images.filter((image) => image !== null).length,
       figuresPerItem: figures.filter((figure) => figure !== null).length,
+      directFigures,
+      directImages,
       intent: list === null ? null : list.getAttribute("data-uno-columns"),
       trackCount: tracks,
+      trackWidths,
       gridColumns: style.gridTemplateColumns,
       columnGap: Number.parseFloat(style.columnGap) || 0,
       widths,
@@ -554,16 +584,20 @@ async function readGalleryCase(input) {
       sizes: images.map((image) => (image === null ? [0, 0] : [image.naturalWidth, image.naturalHeight])),
       captionPresence: captions.map((caption) => caption !== null),
       captionTexts: captions.map((caption) => (caption === null ? null : caption.textContent)),
+      captionOwners,
       imagesLoaded: images.every((image) => image !== null && image.complete === true && image.naturalWidth > 0),
       heading: root.querySelector("h2.uno-json-heading, h3.uno-json-heading, h4.uno-json-heading")?.textContent ?? null,
       lede: root.querySelector("section.uno-json-prose, p.uno-json-prose")?.textContent ?? null,
       ledeStrong: root.querySelector("strong.uno-family-md-strong")?.textContent ?? null,
       captionEm: richFigure?.querySelector("em.uno-family-md-em")?.textContent ?? null,
-      captionLinkHref: richFigure?.querySelector("a")?.getAttribute("href") ?? null,
+      captionLinkHref: richLink?.getAttribute("href") ?? null,
+      captionLinkRel: richLink?.getAttribute("rel") ?? null,
       captionText: richFigure === null ? null : richFigure.textContent,
       surface: root.getAttribute("data-uno-surface"),
       backgroundColor: rootStyle.backgroundColor,
       borderWidth: `${Number.parseFloat(rootStyle.borderTopWidth) || 0}px`,
+      borderStyle: rootStyle.borderTopStyle,
+      borderColor: rootStyle.borderTopColor,
       borderRadius: rootStyle.borderTopLeftRadius,
       padding: [rootStyle.paddingTop, rootStyle.paddingRight, rootStyle.paddingBottom, rootStyle.paddingLeft].join(" "),
       hasControls: root.querySelector("button, form, input, iframe, script") !== null,
@@ -596,6 +630,7 @@ async function readGalleryCase(input) {
       surface: resolveToken("--uno-surface"),
       background: resolveToken("--uno-background"),
       border: resolveToken("--uno-border"),
+      emphasisRadius: resolveLength("--uno-radius-lg"),
     },
     variants: input.ids.map(readVariant).filter((variant) => variant !== null),
   };
@@ -6651,11 +6686,27 @@ async function consentPhase(base) {
         writeFileSync(familyPath, original);
         tab.off("request", onGalleryBrowserRequest);
       }
+      // `UNO-WO-121 / R03`: the restored bytes are not enough on their own — a fresh request must answer the committed Page
+      // again, exactly as the HTTP swap proves, with its own composed Gallery list and none of the six temporary anchors.
+      const freshResponse = await fetch(`${FAMILY_URL}?wo121r02=restored-browser`, { redirect: "manual" });
+      const freshHtml = freshResponse.status === 200 ? await freshResponse.text() : "";
+      const freshCommitted = galleryListOf(galleryRegionOf(freshHtml, "family-5-gallery"));
+      const freshRestored = sha256Of(SOURCES[4]) === originalDigest
+        && freshHtml.length > 0
+        && freshCommitted.listCount === 1
+        && freshCommitted.itemCount === 2
+        && GALLERY_IDS.every((id) => !freshHtml.includes(`id="${id}"`));
+      check(
+        "FAMILY_GALLERY_BROWSER_RESTORE after the browser swap restored in finally, a fresh response serves the committed Page's own Gallery list and no temporary anchor,",
+        freshRestored,
+        `digest=${sha256Of(SOURCES[4]) === originalDigest} committed=${freshCommitted.itemCount} fresh=${freshHtml.length}`,
+      );
       const geometry = galleryGeometryReport(readings);
       for (const reading of readings) {
         process.stdout.write(
           `  INFO  gallery ${reading.case} ${reading.width}px dark=${reading.dark} reduce=${reading.reduce} `
-          + `columns=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, variant.trackCount, variant.columns]))} `
+          + `columns=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, variant.trackCount, variant.intent, variant.trackWidths]))} `
+          + `captions=${JSON.stringify((reading.variants ?? []).map((variant) => variant.captionTexts))} `
           + `sizes=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, [...new Set(variant.sizes.map((size) => size.join("x")))]]))} `
           + `surfaces=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.surface, variant.backgroundColor, variant.borderWidth, variant.borderRadius, variant.padding]))} `
           + `rows=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.rowCount, variant.geometryOk]))} `
@@ -6667,6 +6718,7 @@ async function consentPhase(base) {
       localA2.gallery.browser = galleryCases.size === GALLERY_CASES.length
         && conjunction(galleryCases, GALLERY_REQUIRED_CASES)
         && geometry.ok
+        && freshRestored
         && sha256Of(SOURCES[4]) === originalDigest;
       check(
         "FAMILY_GALLERY_BROWSER the browser dimension is the conjunction of all six executed cases at 390, 768 and 1280px in light and dark/reduced motion, with the fixture restored byte-exactly",

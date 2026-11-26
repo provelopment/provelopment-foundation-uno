@@ -94,6 +94,8 @@ export const GALLERY_EXPECTED = Object.freeze({
   captionEm: "owned",
   captionLinkHref: "https://example.org/wo121-notes",
   captionLinkText: "the notes",
+  // `UNO-WO-121 / R03`: the served `<a>` of an `https` destination carries the renderer's own safe relation.
+  captionLinkRel: "noopener noreferrer",
   surface: "muted",
   intrinsicWidth: 64,
   intrinsicHeight: 64,
@@ -128,7 +130,9 @@ export const GALLERY_VARIANTS = Object.freeze([
     heading: "Two columns",
     columns: 2,
     surface: "plain",
-    items: Object.freeze([item(2), item(3), item(4)]),
+    // `UNO-WO-121 / R03`: a **second**, distinct authored caption on a different section and a different item position, so a
+    // caption that is swapped between figures, or between sections, changes the text the reader must find in that exact place.
+    items: Object.freeze([item(2), item(3, { caption: "A second plate's own caption." }), item(4)]),
   }),
   Object.freeze({
     type: "gallery",
@@ -152,6 +156,30 @@ export const GALLERY_VARIANTS = Object.freeze([
 
 /** The surface each variant authors, in variant order: `null` is the absent case that must have no effect. */
 export const GALLERY_SURFACES = Object.freeze(GALLERY_VARIANTS.map((variant) => variant.surface ?? null));
+
+/**
+ * The exact text every served caption must show, in variant and item order; `null` is an item that must own no caption.
+ *
+ * `UNO-WO-121 / R03`: the fixture holds two **distinct** captions at different positions and in different sections — a Markdown
+ * one in the rich section and a plain one in the two-column section — so a caption swapped between figures, or between sections,
+ * changes the text the reader must find in that exact place. An absent caption is an absence, never an empty element.
+ */
+export const GALLERY_RENDERED_CAPTIONS = Object.freeze([
+  Object.freeze(["An owned caption with the notes", null]),
+  Object.freeze([null, "A second plate's own caption.", null]),
+  Object.freeze([null, null, null]),
+  Object.freeze([null, null, null, null]),
+  Object.freeze([null]),
+  Object.freeze(Array.from({ length: 24 }, () => null)),
+]);
+
+/** The expected caption text of one variant, in item order. */
+export function galleryExpectedCaptionTexts(index) {
+  return GALLERY_RENDERED_CAPTIONS[index] ?? [];
+}
+
+/** The shipped emphasis padding of the two closed emphases (`1rem 1.25rem` at the fixture's 16px root). */
+export const GALLERY_EMPHASIS_PADDING = "16px 20px 16px 20px";
 
 /** The column counts each variant must actually lay out at 390, 768 and 1280. */
 export const GALLERY_COLUMNS = Object.freeze([
@@ -329,11 +357,6 @@ function expectedAlts(variant) {
   return variant.items.map((entry) => (entry.image.decorative === true ? "" : entry.image.alt));
 }
 
-/** Whether each item must own a caption at all — an absent caption is never invented. */
-function expectedCaptionPresence(variant) {
-  return variant.items.map((entry) => entry.caption !== undefined);
-}
-
 /** The intrinsic size each item must load, taken from the owned plate its own donor identity is bound to. */
 function expectedSizes(variant) {
   return variant.items.map((entry) => {
@@ -349,11 +372,28 @@ function expectedSizes(variant) {
  * distinct ascending owned locators, the loaded intrinsic size, the authored heading/lede/caption, the decorative empty
  * alternative, the computed surface, the absence of any control and any overflow, and a real keyboard traversal.
  */
+/**
+ * Judge one browser reading of all six served variants at one width and colour scheme.
+ *
+ * Every clause is measured and named. The reading must describe exactly the case it was requested for — key, viewport, colour
+ * scheme, motion preference and both real media queries — so a duplicate, missing or mislabelled observation cannot pass. Each
+ * list is then checked for one ordered `<ul>` with one *direct* figure and one direct image per item, the authored intent beside
+ * the resolved track count, resolved tracks that are finite, positive and equal within a rounding pixel, cells that occupy their
+ * own track, real row geometry, loaded intrinsic dimensions per item, the exact authored rendered caption in its own figure with
+ * an absence where nothing was authored, the exact alternative per item, distinct ascending same-Page locators, the authored
+ * surface for every section with the closed emphases measured against their live tokens and the inert cases required to compute
+ * nothing at all, no control, no overflow, and a real keyboard traversal.
+ */
 export function galleryCaseVerdict(reading, testCase) {
   const problems = [];
   const expect = (ok, label) => {
     if (!ok) problems.push(label);
   };
+  const tokens = reading.tokens ?? {};
+  const isTransparent = (value) => value === "rgba(0, 0, 0, 0)" || value === "transparent";
+  const isZeroPx = (value) => value === "0px";
+  const isZeroPadding = (value) => value === "0px 0px 0px 0px";
+  const within = (value, target) => Number.isFinite(value) && Number.isFinite(target) && Math.abs(value - target) <= 1;
 
   // The reading must be the case it claims to be: no duplicate, missing or mislabelled observation.
   expect(reading.case === testCase.key, `case:${reading.case}`);
@@ -373,46 +413,62 @@ export function galleryCaseVerdict(reading, testCase) {
     }
     const columns = expectedColumns(index, testCase.width);
     const authored = variant.columns === undefined ? null : String(variant.columns);
+    const captions = galleryExpectedCaptionTexts(index);
+    const onePerItem = variant.items.map(() => 1);
     expect(seen.id === GALLERY_IDS[index], `id:${index}`);
     expect(seen.listCount === 1, `list:${index}`);
     expect(seen.itemCount === variant.items.length, `items:${index}:${seen.itemCount}`);
     expect(seen.imageCount === variant.items.length, `images:${index}:${seen.imageCount}`);
     expect(seen.figuresPerItem === variant.items.length, `figures:${index}:${seen.figuresPerItem}`);
+    // Exactly one **direct** figure and one direct image per list item: no wrapper hiding a second figure, no borrowed image.
+    expect(JSON.stringify(seen.directFigures) === JSON.stringify(onePerItem), `direct-figures:${index}`);
+    expect(JSON.stringify(seen.directImages) === JSON.stringify(onePerItem), `direct-images:${index}`);
     // An unauthored intent has no attribute at all and the donor default applies; an authored one must be its own literal.
     expect(seen.intent === authored, `intent:${index}:${seen.intent}`);
     expect(seen.trackCount === columns, `tracks:${index}:${seen.trackCount}`);
+    // The resolved tracks must be real: the authored count, each finite and positive, all equal within a rounding pixel.
+    expect(Array.isArray(seen.trackWidths) && seen.trackWidths.length === columns, `track-count:${index}:${seen.trackWidths?.length}`);
+    expect((seen.trackWidths ?? []).every((width) => Number.isFinite(width) && width > 0), `track-positive:${index}`);
+    expect((seen.trackWidths ?? []).every((width) => within(width, seen.trackWidths[0])), `track-equal:${index}`);
+    // Each cell must occupy its own track: positive, and no wider or narrower than that track by more than a rounding pixel.
+    expect(seen.widths.length === variant.items.length, `cells:${index}:${seen.widths.length}`);
+    expect(seen.widths.every((width) => Number.isFinite(width) && width > 0), `cell-positive:${index}`);
+    expect(seen.widths.every((width, item) => within(width, seen.trackWidths?.[item % columns])), `cell-track:${index}`);
+    expect(seen.rowCount === Math.ceil(variant.items.length / columns), `rows:${index}:${seen.rowCount}`);
+    expect(seen.geometryOk === true, `geometry:${index}`);
     expect(seen.imagesLoaded === true, `loaded:${index}`);
     expect(seen.overflow === 0, `overflow:${index}`);
     expect(seen.hasControls === false, `controls:${index}`);
-    // Equal track widths and real row geometry: `columns` cells per row, rows descending, order kept within a row.
-    expect(
-      seen.widths.length === variant.items.length
-        && seen.widths.every((width) => Math.abs(width - seen.widths[0]) <= 1),
-      `widths:${index}`,
-    );
-    expect(seen.rowCount === Math.ceil(variant.items.length / columns), `rows:${index}:${seen.rowCount}`);
-    expect(seen.geometryOk === true, `geometry:${index}`);
     // Distinct, owned, ascending same-Page occurrence identity, in authored order.
     expect(new Set(seen.srcs).size === seen.srcs.length, `distinct:${index}`);
     expect(seen.srcs.every((src) => /^\/uno-media\//u.test(src)), `owned:${index}`);
     expect(seen.ascending === true, `order:${index}`);
-    // Per-item alternative and caption ownership, exactly as authored; no raw Markdown syntax reaches a caption.
-    expect(JSON.stringify(seen.alts) === JSON.stringify(expectedAlts(variant)), `alts:${index}`);
-    expect(JSON.stringify(seen.captionPresence) === JSON.stringify(expectedCaptionPresence(variant)), `captions:${index}`);
+    // The exact authored rendered caption, inside its own figure, and a real absence where nothing was authored.
+    expect(JSON.stringify(seen.captionTexts) === JSON.stringify(captions), `captions:${index}`);
     expect(
-      seen.captionTexts.every((caption) => caption === null || !/(\*\*|\[[^\]]*\]\()/u.test(caption)),
-      `caption-syntax:${index}`,
+      JSON.stringify(seen.captionPresence) === JSON.stringify(captions.map((text) => text !== null)),
+      `caption-presence:${index}`,
     );
+    expect(
+      JSON.stringify(seen.captionOwners) === JSON.stringify(captions.map((text, item) => (text === null ? null : item))),
+      `caption-owner:${index}`,
+    );
+    // Each item is announced by its own alternative, or by the empty alternative when it is explicitly decorative.
+    expect(JSON.stringify(seen.alts) === JSON.stringify(expectedAlts(variant)), `alts:${index}`);
     // Each item loads its own bound plate, at that plate's own intrinsic size.
     expect(JSON.stringify(seen.sizes) === JSON.stringify(expectedSizes(variant)), `sizes:${index}`);
+    // The authored surface, or its absence, is exactly what this section carries.
+    expect(seen.surface === GALLERY_SURFACES[index], `surface-attr:${index}:${seen.surface}`);
   });
 
   const rich = variants[0];
   if (rich !== undefined) {
     expect(rich.heading === GALLERY_EXPECTED.heading, "heading");
     expect(rich.ledeStrong === GALLERY_EXPECTED.ledeStrong, "lede");
-    expect(rich.captionEm === GALLERY_EXPECTED.captionEm, "caption");
+    expect(rich.captionEm === GALLERY_EXPECTED.captionEm, "caption-em");
     expect(rich.captionLinkHref === GALLERY_EXPECTED.captionLinkHref, "caption-link");
+    // The renderer's own safe relation for an `https` destination, measured on the served anchor.
+    expect(rich.captionLinkRel === GALLERY_EXPECTED.captionLinkRel, `caption-link-rel:${rich.captionLinkRel}`);
   }
   for (const index of [1, 2, 3]) {
     const seen = variants[index];
@@ -427,52 +483,48 @@ export function galleryCaseVerdict(reading, testCase) {
     expect(bare.surface === null, "bare-surface");
   }
 
-  // --- the closed surface, measured against its own tokens -----------------------------------------------------
-  const plainIndex = GALLERY_SURFACES.indexOf("plain");
-  const borderedIndex = GALLERY_SURFACES.indexOf("bordered");
-  const mutedIndex = GALLERY_SURFACES.indexOf("muted");
-  const absentIndex = GALLERY_SURFACES.indexOf(null);
-  const plain = variants[plainIndex];
-  const bordered = variants[borderedIndex];
-  const muted = variants[mutedIndex];
-  const absent = variants[absentIndex];
-  const tokens = reading.tokens ?? {};
+  // --- the closed surface, measured against its own tokens ---------------------------------------------------------
+  const plain = variants[GALLERY_SURFACES.indexOf("plain")];
+  const bordered = variants[GALLERY_SURFACES.indexOf("bordered")];
+  const muted = variants[GALLERY_SURFACES.indexOf("muted")];
+  const absent = variants[GALLERY_SURFACES.indexOf(null)];
   if (plain !== undefined && bordered !== undefined && muted !== undefined && absent !== undefined) {
-    expect(plain.surface === "plain", "plain-attr");
-    expect(bordered.surface === "bordered", "bordered-attr");
-    expect(muted.surface === "muted", "muted-attr");
-    expect(absent.surface === null, "absent-attr");
-    // An authored `plain` is the absence of emphasis: it computes exactly like the section that authors nothing.
-    expect(
-      plain.backgroundColor === absent.backgroundColor
-        && plain.borderWidth === absent.borderWidth
-        && plain.padding === absent.padding
-        && plain.borderRadius === absent.borderRadius,
-      `plain-inert:${plain.backgroundColor}/${plain.borderWidth}/${plain.padding}`,
-    );
-    // `muted` paints the surface token and pads; it never draws a border.
+    // An authored `plain`, and no surface at all, are both **inert**: transparent, no border, no padding, no radius — asserted
+    // absolutely, not merely as equality with each other.
+    for (const [label, seen] of [["plain", plain], ["absent", absent]]) {
+      expect(isTransparent(seen.backgroundColor), `${label}-transparent:${seen.backgroundColor}`);
+      expect(isZeroPx(seen.borderWidth), `${label}-border-width:${seen.borderWidth}`);
+      expect(seen.borderStyle === "none", `${label}-border-style:${seen.borderStyle}`);
+      expect(isZeroPadding(seen.padding), `${label}-padding:${seen.padding}`);
+      expect(isZeroPx(seen.borderRadius), `${label}-radius:${seen.borderRadius}`);
+    }
+    // `muted` paints the surface token and takes the emphasis padding and radius, and never draws a border.
     expect(muted.backgroundColor === tokens.surface, `muted-token:${muted.backgroundColor}/${tokens.surface}`);
-    expect(muted.borderWidth === "0px", `muted-border:${muted.borderWidth}`);
-    expect(muted.padding !== plain.padding, `muted-padding:${muted.padding}`);
-    expect(muted.borderRadius !== plain.borderRadius, `muted-radius:${muted.borderRadius}`);
-    // `bordered` paints the background token and draws the border token, with the same padding and radius as `muted`.
-    expect(bordered.backgroundColor === tokens.background, `bordered-token:${bordered.backgroundColor}`);
-    expect(bordered.borderWidth === "1px", `bordered-border:${bordered.borderWidth}`);
-    expect(bordered.padding === muted.padding, `bordered-padding:${bordered.padding}`);
-    expect(bordered.borderRadius === muted.borderRadius, `bordered-radius:${bordered.borderRadius}`);
-    // The three emphases are genuinely distinct from one another and from the absent case.
+    expect(isZeroPx(muted.borderWidth) && muted.borderStyle === "none", `muted-border:${muted.borderWidth}/${muted.borderStyle}`);
+    expect(muted.padding === GALLERY_EMPHASIS_PADDING, `muted-padding:${muted.padding}`);
+    expect(muted.borderRadius === tokens.emphasisRadius, `muted-radius:${muted.borderRadius}/${tokens.emphasisRadius}`);
+    // `bordered` paints the background token and draws the border token at 1px solid, with the same emphasis geometry.
+    expect(bordered.backgroundColor === tokens.background, `bordered-token:${bordered.backgroundColor}/${tokens.background}`);
+    expect(bordered.borderWidth === "1px", `bordered-border-width:${bordered.borderWidth}`);
+    expect(bordered.borderStyle === "solid", `bordered-border-style:${bordered.borderStyle}`);
+    expect(bordered.borderColor === tokens.border, `bordered-border-token:${bordered.borderColor}/${tokens.border}`);
+    expect(bordered.padding === GALLERY_EMPHASIS_PADDING, `bordered-padding:${bordered.padding}`);
+    expect(bordered.borderRadius === tokens.emphasisRadius, `bordered-radius:${bordered.borderRadius}/${tokens.emphasisRadius}`);
+    // The two emphases stay distinct from the inert cases and from each other.
     expect(
       new Set([plain.backgroundColor, muted.backgroundColor, bordered.backgroundColor]).size === 3,
       "surfaces-distinct",
     );
+    expect(bordered.borderWidth !== muted.borderWidth, `surfaces-border-distinct:${bordered.borderWidth}/${muted.borderWidth}`);
   }
 
   expect(reading.keyboard?.reached === true, "keyboard");
   expect(reading.keyboard?.leftAfterTab === true, "keyboard-leave");
+  expect(reading.keyboard?.tabsAfter === 1, `keyboard-departure:${reading.keyboard?.tabsAfter}`);
   expect(reading.keyboard?.pageUrlBefore === reading.keyboard?.pageUrlAfter, "keyboard-nav");
   expect(reading.errors === 0, `errors=${reading.errors}`);
   expect(reading.foreignRequests === 0, `foreign=${reading.foreignRequests}`);
-  return Object.freeze({ ok: problems.length === 0, detail: problems.slice(0, 10).join(",") });
+  return Object.freeze({ ok: problems.length === 0, detail: problems.slice(0, 12).join(",") });
 }
 
 /**
@@ -487,6 +539,7 @@ export function galleryGeometryReport(readings) {
       expectedColumns(index, reading.width),
       variant.trackCount,
       variant.intent,
+      variant.trackWidths,
       variant.surface,
       variant.padding,
     ]);

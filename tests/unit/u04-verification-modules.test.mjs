@@ -27,11 +27,13 @@ import {
   GALLERY_EXPECTED,
   GALLERY_IDS,
   GALLERY_BINDINGS,
+  GALLERY_EMPHASIS_PADDING,
   GALLERY_REFUSAL_CASES,
   GALLERY_SURFACES,
   GALLERY_SOURCES,
   GALLERY_VARIANTS,
   galleryCaseVerdict,
+  galleryExpectedCaptionTexts,
   galleryExpectedSizeFor,
   galleryGeometryReport,
   galleryListOf,
@@ -1041,21 +1043,41 @@ describe("gallery evidence module (UNO-WO-121)", () => {
     surface: "rgb(245, 247, 251)",
     background: "rgb(255, 255, 255)",
     border: "rgb(214, 219, 226)",
+    emphasisRadius: "20px",
   });
-  const PLAIN_PAINT = "rgba(0, 0, 0, 0)";
-  const EMPHASIS = Object.freeze({ padding: "16px 20px 16px 20px", borderRadius: "12px" });
+  const INERT_PAINT = "rgba(0, 0, 0, 0)";
+  const EMPHASIS = Object.freeze({ padding: GALLERY_EMPHASIS_PADDING, borderRadius: SURFACE_TOKENS.emphasisRadius });
 
   /** The computed surface one variant must present, mirroring the shipped stylesheet's closed treatment. */
   const surfaceOf = (index) => {
     const authored = GALLERY_SURFACES[index];
     if (authored === "muted") {
-      return { backgroundColor: SURFACE_TOKENS.surface, borderWidth: "0px", ...EMPHASIS };
+      return {
+        backgroundColor: SURFACE_TOKENS.surface,
+        borderWidth: "0px",
+        borderStyle: "none",
+        borderColor: SURFACE_TOKENS.border,
+        ...EMPHASIS,
+      };
     }
     if (authored === "bordered") {
-      return { backgroundColor: SURFACE_TOKENS.background, borderWidth: "1px", ...EMPHASIS };
+      return {
+        backgroundColor: SURFACE_TOKENS.background,
+        borderWidth: "1px",
+        borderStyle: "solid",
+        borderColor: SURFACE_TOKENS.border,
+        ...EMPHASIS,
+      };
     }
-    // An authored `plain` and an absent surface are the same absence of emphasis.
-    return { backgroundColor: PLAIN_PAINT, borderWidth: "0px", padding: "0px 0px 0px 0px", borderRadius: "0px" };
+    // An authored `plain` and an absent surface are inert: no paint, no border, no padding, no radius.
+    return {
+      backgroundColor: INERT_PAINT,
+      borderWidth: "0px",
+      borderStyle: "none",
+      borderColor: SURFACE_TOKENS.border,
+      padding: "0px 0px 0px 0px",
+      borderRadius: "0px",
+    };
   };
 
   /** One correct served reading of one variant at one width, derived from the donor shape itself. */
@@ -1064,17 +1086,21 @@ describe("gallery evidence module (UNO-WO-121)", () => {
     const shape = GALLERY_COLUMNS[index];
     const columns = width >= 1024 ? shape.at1280 : width >= 640 ? shape.at768 : shape.at390;
     const count = variant.items.length;
+    const captions = galleryExpectedCaptionTexts(index);
     return {
       id: GALLERY_IDS[index],
       listCount: 1,
       itemCount: count,
       imageCount: count,
       figuresPerItem: count,
+      directFigures: variant.items.map(() => 1),
+      directImages: variant.items.map(() => 1),
       intent: variant.columns === undefined ? null : String(variant.columns),
       trackCount: columns,
+      trackWidths: Array.from({ length: columns }, () => 208),
       gridColumns: "",
       columnGap: 12,
-      widths: Array.from({ length: count }, () => 200),
+      widths: Array.from({ length: count }, () => 208),
       tops: Array.from({ length: count }, (_unused, item) => Math.floor(item / columns) * 260),
       lefts: Array.from({ length: count }, (_unused, item) => (item % columns) * 210),
       rowCount: Math.ceil(count / columns),
@@ -1086,15 +1112,16 @@ describe("gallery evidence module (UNO-WO-121)", () => {
         const size = galleryExpectedSizeFor(item.image.src);
         return size === null ? [0, 0] : [size.width, size.height];
       }),
-      captionPresence: variant.items.map((item) => item.caption !== undefined),
-      captionTexts: variant.items.map((item) =>
-        (item.caption === undefined ? null : item.caption.replaceAll("*", "").replaceAll("[", "").replaceAll("]", ""))),
+      captionPresence: captions.map((text) => text !== null),
+      captionTexts: captions,
+      captionOwners: captions.map((text, item) => (text === null ? null : item)),
       imagesLoaded: true,
       heading: variant.heading ?? null,
       lede: variant.lede ?? null,
       ledeStrong: variant.lede === undefined ? null : GALLERY_EXPECTED.ledeStrong,
       captionEm: index === 0 ? GALLERY_EXPECTED.captionEm : null,
       captionLinkHref: index === 0 ? GALLERY_EXPECTED.captionLinkHref : null,
+      captionLinkRel: index === 0 ? GALLERY_EXPECTED.captionLinkRel : null,
       captionText: null,
       surface: GALLERY_SURFACES[index],
       ...surfaceOf(index),
@@ -1112,10 +1139,11 @@ describe("gallery evidence module (UNO-WO-121)", () => {
     media: { wide640: testCase.width >= 640, wide1024: testCase.width >= 1024 },
     tokens: SURFACE_TOKENS,
     variants: GALLERY_VARIANTS.map((_unused, index) => served(index, testCase.width)),
-    keyboard: { reached: true, leftAfterTab: true, pageUrlBefore: "u", pageUrlAfter: "u" },
+    keyboard: { reached: true, leftAfterTab: true, tabsAfter: 1, pageUrlBefore: "u", pageUrlAfter: "u" },
     errors: 0,
     foreignRequests: 0,
   });
+
 
   const caseOf = (key) => GALLERY_CASES.find((entry) => entry.key === key);
 
@@ -1125,29 +1153,53 @@ describe("gallery evidence module (UNO-WO-121)", () => {
       expect(verdict.ok, `${testCase.key}:${verdict.detail}`).toBe(true);
     }
     const wide = caseOf("light:1280");
+    // `UNO-WO-121 / R03`: every clause is load-bearing, including the ones this order added — real positive equal tracks and
+    // cells that occupy them, exact per-item caption text and figure ownership, the inert and emphasised surface effects with
+    // their own tokens, the served link's safe relation, and the keyboard departure itself.
     const mutants = [
       ["tracks", (value) => { value.variants[0].trackCount = 2; }],
+      ["track-count", (value) => { value.variants[0].trackWidths = [208]; }],
+      ["track-positive", (value) => { value.variants[0].trackWidths = [0, 0, 0]; }],
+      ["track-equal", (value) => { value.variants[0].trackWidths = [208, 260, 208]; }],
+      ["cell-positive", (value) => { value.variants[0].widths[0] = 0; }],
+      ["cell-track", (value) => { value.variants[0].widths[1] = 10; }],
+      ["cells", (value) => { value.variants[0].widths = []; }],
       ["items", (value) => { value.variants[0].itemCount = 1; }],
       ["figures", (value) => { value.variants[0].figuresPerItem = 1; }],
+      ["direct-figures", (value) => { value.variants[0].directFigures[0] = 2; }],
+      ["direct-images", (value) => { value.variants[0].directImages[0] = 0; }],
       ["images", (value) => { value.variants[0].imageCount = 0; }],
       ["intent", (value) => { value.variants[0].intent = "4"; }],
-      ["widths", (value) => { value.variants[0].widths[1] = 10; }],
       ["rows", (value) => { value.variants[5].rowCount = 1; }],
       ["geometry", (value) => { value.variants[0].geometryOk = false; }],
       ["order", (value) => { value.variants[0].ascending = false; }],
       ["owned", (value) => { value.variants[0].srcs = ["/assets/wo121-plate-0.png"]; }],
       ["alts", (value) => { value.variants[0].alts = ["Described", "Described"]; }],
-      ["captions", (value) => { value.variants[1].captionPresence = [true, true, true]; }],
-      ["caption-syntax", (value) => { value.variants[0].captionTexts = ["An **owned** caption with [the notes](https://example.org/x)"]; }],
+      // A swapped caption — between items of one section, and between two sections — must fail on the text itself.
+      ["captions", (value) => { value.variants[0].captionTexts = ["A second plate's own caption.", null]; }],
+      ["captions", (value) => { value.variants[1].captionTexts = [null, null, "A second plate's own caption."]; }],
+      ["caption-owner", (value) => { value.variants[0].captionOwners = [1, null]; }],
+      ["caption-presence", (value) => { value.variants[1].captionPresence = [true, true, true]; }],
+      ["caption-link-rel", (value) => { value.variants[0].captionLinkRel = null; }],
       ["sizes", (value) => { value.variants[5].sizes[22] = [64, 64]; }],
       ["controls", (value) => { value.variants[0].hasControls = true; }],
       ["overflow", (value) => { value.variants[0].overflow = 8; }],
-      ["plain-inert", (value) => { value.variants[1].padding = "16px 20px 16px 20px"; }],
+      // The inert cases must compute nothing at all, and the emphases must match their own tokens.
+      ["plain-transparent", (value) => { value.variants[1].backgroundColor = SURFACE_TOKENS.surface; }],
+      ["plain-border-width", (value) => { value.variants[1].borderWidth = "1px"; }],
+      ["plain-padding", (value) => { value.variants[1].padding = GALLERY_EMPHASIS_PADDING; }],
+      ["absent-radius", (value) => { value.variants[3].borderRadius = SURFACE_TOKENS.emphasisRadius; }],
+      ["absent-border-style", (value) => { value.variants[3].borderStyle = "solid"; }],
       ["muted-token", (value) => { value.variants[0].backgroundColor = "rgb(1, 2, 3)"; }],
-      ["bordered-border", (value) => { value.variants[2].borderWidth = "0px"; }],
+      ["muted-radius", (value) => { value.variants[0].borderRadius = "12px"; }],
+      ["muted-padding", (value) => { value.variants[0].padding = "0px 0px 0px 0px"; }],
+      ["bordered-border-token", (value) => { value.variants[2].borderColor = SURFACE_TOKENS.surface; }],
+      ["bordered-border-width", (value) => { value.variants[2].borderWidth = "0px"; }],
+      ["bordered-border-style", (value) => { value.variants[2].borderStyle = "dashed"; }],
       ["bordered-padding", (value) => { value.variants[2].padding = "0px"; }],
+      ["bordered-radius", (value) => { value.variants[2].borderRadius = "12px"; }],
       ["surfaces-distinct", (value) => { value.variants[2].backgroundColor = SURFACE_TOKENS.surface; }],
-      ["absent-attr", (value) => { value.variants[3].surface = "plain"; }],
+      ["surface-attr", (value) => { value.variants[3].surface = "plain"; }],
       ["case", (value) => { value.case = "light:390"; }],
       ["width", (value) => { value.width = 390; }],
       ["scheme", (value) => { value.dark = true; }],
@@ -1155,6 +1207,8 @@ describe("gallery evidence module (UNO-WO-121)", () => {
       ["mq640", (value) => { value.media.wide640 = false; }],
       ["mq1024", (value) => { value.media.wide1024 = false; }],
       ["keyboard", (value) => { value.keyboard.leftAfterTab = false; }],
+      ["keyboard-departure", (value) => { value.keyboard.tabsAfter = 2; }],
+      ["keyboard-nav", (value) => { value.keyboard.pageUrlAfter = "elsewhere"; }],
       ["errors", (value) => { value.errors = 1; }],
       ["foreign", (value) => { value.foreignRequests = 1; }],
     ];

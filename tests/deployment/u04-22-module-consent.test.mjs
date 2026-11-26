@@ -585,7 +585,19 @@ const PHASE_C_REQUIRED = Object.freeze([
   'data-uno-surface="plain"',
   "absentSurface:",
   "geometryOk,",
-  "FAMILY_GALLERY_BROWSER ${testCase.key} the six served lists lay out the authored column count, keep their owned locators in order, load their images, own their captions, present their surfaces and reach the caption link by keyboard",
+  // `UNO-WO-121 / R03`: real positive equal tracks, per-item caption ownership, the resolved emphasis radius token, the
+  // served link relation, and a fresh browser restoration.
+  "trackWidths,",
+  "directFigures,",
+  "directImages,",
+  "captionOwners,",
+  "captionLinkRel",
+  "borderStyle",
+  'emphasisRadius: resolveLength("--uno-radius-lg")' ,
+  "FAMILY_GALLERY_BROWSER_RESTORE after the browser swap restored in finally, a fresh response serves the committed Page's own Gallery list and no temporary anchor",
+  "&& freshRestored",
+  "conjunction(galleryCases, GALLERY_REQUIRED_CASES)",
+  "geometry.ok",  "FAMILY_GALLERY_BROWSER ${testCase.key} the six served lists lay out the authored column count, keep their owned locators in order, load their images, own their captions, present their surfaces and reach the caption link by keyboard",
   "FAMILY_GALLERY_BROWSER the browser dimension is the conjunction of all six executed cases at 390, 768 and 1280px in light and dark/reduced motion, with the fixture restored byte-exactly",
   "FAMILY_GALLERY_RIGHTS the served Gallery renders no donor identity, no remote source, no provider and no locator outside this Page's own owned route",
   "FAMILY_GALLERY_RESTORE both the abandoned write and the served swap were restored byte-exactly, and a fresh response serves the committed Page's own Gallery list with no temporary anchor",
@@ -1021,6 +1033,26 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
         "restoredInFinally = sha256Of(SOURCES[4]) === originalDigest;",
         "restoredInFinally = true;",
         "restoredInFinally = sha256Of(SOURCES[4]) === originalDigest;",
+      ],
+      [
+        "&& freshRestored",
+        "&& true",
+        "&& freshRestored",
+      ],
+      [
+        "geometry.ok",
+        "true",
+        "geometry.ok",
+      ],
+      [
+        "conjunction(galleryCases, GALLERY_REQUIRED_CASES)",
+        "true",
+        "conjunction(galleryCases, GALLERY_REQUIRED_CASES)",
+      ],
+      [
+        "captionOwners,",
+        "captionOwners: [],",
+        "captionOwners,",
       ],
       [
         "absentSurface:",
