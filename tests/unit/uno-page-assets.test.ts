@@ -163,4 +163,69 @@ describe("planUnoPageAssets", () => {
     expect(planned.plan.bySection.size).toBe(0);
   });
 
+  // `UNO-WO-121 / R02`: the opt-in list Gallery declares one occurrence per authored item, in document order, with its own
+  // locator; a repeated identity inside the list keeps its own occurrence, and the ordinary grid is planned identically.
+  it("plans one ordered locator per list-Gallery item beside an ordinary grid", () => {
+    const items = (count: number, path: string) =>
+      Array.from({ length: count }, (_unused, index) => ({ asset: { zone: "page", path }, alt: `Plate ${index}` }));
+    const document = {
+      version: 1,
+      title: "Galleries",
+      sections: [
+        { id: "grid", module: "media.gallery", props: { columns: 2, items: items(2, "grid.png") } },
+        { id: "list", module: "media.gallery", props: { list: true, items: items(24, "list.png") } },
+        {
+          id: "repeat",
+          module: "media.gallery",
+          props: { list: true, items: [{ asset: { zone: "page", path: "one.png" }, alt: "A" }, { asset: { zone: "page", path: "one.png" }, alt: "B" }] },
+        },
+      ],
+    };
+    const planned = planUnoPageAssets(page(document, "/en-001/galleries"));
+    expect(planned.status).toBe("planned");
+    if (planned.status !== "planned") return;
+    expect(planned.plan.occurrences).toHaveLength(2 + 24 + 2);
+    expect(planned.plan.occurrences.map((occurrence) => occurrence.occurrence)).toEqual(
+      Array.from({ length: 28 }, (_unused, index) => index),
+    );
+    expect(planned.plan.occurrences.map((occurrence) => occurrence.url)).toEqual(
+      Array.from({ length: 28 }, (_unused, index) => unoMediaLocatorPath("en-001/galleries", index)),
+    );
+    const listItems = planned.plan.bySection.get("list")?.items ?? [];
+    expect(listItems).toHaveLength(24);
+    expect(listItems[0]).toBe(unoMediaLocatorPath("en-001/galleries", 2));
+    expect(listItems[23]).toBe(unoMediaLocatorPath("en-001/galleries", 25));
+    // A repeated identity is two occurrences of the same ref, never one shared locator.
+    const repeated = planned.plan.occurrences.filter((occurrence) => occurrence.sectionId === "repeat");
+    expect(repeated).toHaveLength(2);
+    expect(repeated[0]?.ref).toEqual(repeated[1]?.ref);
+    expect(repeated[0]?.url).not.toBe(repeated[1]?.url);
+  });
+
+  // The unchanged occurrence guard: a Page whose declared media exceed 512 occurrences is refused by the planner.
+  it("refuses a Page whose declared occurrences exceed the 512 occurrence limit", () => {
+    const galleries = Array.from({ length: 22 }, (_unused, index) => ({
+      id: `g${index}`,
+      module: "media.gallery",
+      props: {
+        list: true,
+        items: Array.from({ length: 24 }, (_unusedItem, itemIndex) => ({
+          asset: { zone: "page", path: `plate-${itemIndex}.png` },
+          alt: `Plate ${itemIndex}`,
+        })),
+      },
+    }));
+    const document = { version: 1, title: "Too many", sections: galleries };
+    const parsed = readUnoPageDocument(document);
+    expect(parsed.accepted).toBe(true);
+    if (!parsed.accepted) return;
+    const planned = planUnoPageAssets(page(document, "/en-001/many"));
+    expect(planned.status).toBe("refused");
+    if (planned.status === "refused") expect(planned.reason).toBe("assets:too-many");
+    // One gallery fewer stays inside the guard, so the limit is exactly where it was.
+    const inside = planUnoPageAssets(page({ ...document, sections: galleries.slice(0, 21) }, "/en-001/many"));
+    expect(inside.status).toBe("planned");
+    if (inside.status === "planned") expect(inside.plan.occurrences).toHaveLength(21 * 24);
+  });
+
 });

@@ -26,10 +26,13 @@ import {
   GALLERY_COLUMNS,
   GALLERY_EXPECTED,
   GALLERY_IDS,
+  GALLERY_BINDINGS,
   GALLERY_REFUSAL_CASES,
+  GALLERY_SURFACES,
   GALLERY_SOURCES,
   GALLERY_VARIANTS,
   galleryCaseVerdict,
+  galleryExpectedSizeFor,
   galleryGeometryReport,
   galleryListOf,
   galleryRegionOf,
@@ -1029,76 +1032,146 @@ describe("the extracted Media evidence module", () => {
 
 
 
-// `UNO-WO-121 / R01`: the Gallery evidence module is a tested unit of the delivery, not a refactor of convenience. Its
-// region reader, list reader and case verdict are each executed directly, and each one is shown to fail on a mutant.
+// `UNO-WO-121 / R02`: the Gallery evidence module is a tested unit of the delivery, not a refactor of convenience. Its region
+// reader, list reader and case verdict are each executed directly, and each is shown to fail on a mutant — including every
+// clause this order added: the case's own metadata and real media queries, equal track widths and row geometry, and the closed
+// surface measured against its own tokens.
 describe("gallery evidence module (UNO-WO-121)", () => {
-  const served = (variant, index, overrides = {}) => {
-    const items = GALLERY_VARIANTS[index].items;
+  const SURFACE_TOKENS = Object.freeze({
+    surface: "rgb(245, 247, 251)",
+    background: "rgb(255, 255, 255)",
+    border: "rgb(214, 219, 226)",
+  });
+  const PLAIN_PAINT = "rgba(0, 0, 0, 0)";
+  const EMPHASIS = Object.freeze({ padding: "16px 20px 16px 20px", borderRadius: "12px" });
+
+  /** The computed surface one variant must present, mirroring the shipped stylesheet's closed treatment. */
+  const surfaceOf = (index) => {
+    const authored = GALLERY_SURFACES[index];
+    if (authored === "muted") {
+      return { backgroundColor: SURFACE_TOKENS.surface, borderWidth: "0px", ...EMPHASIS };
+    }
+    if (authored === "bordered") {
+      return { backgroundColor: SURFACE_TOKENS.background, borderWidth: "1px", ...EMPHASIS };
+    }
+    // An authored `plain` and an absent surface are the same absence of emphasis.
+    return { backgroundColor: PLAIN_PAINT, borderWidth: "0px", padding: "0px 0px 0px 0px", borderRadius: "0px" };
+  };
+
+  /** One correct served reading of one variant at one width, derived from the donor shape itself. */
+  const served = (index, width) => {
+    const variant = GALLERY_VARIANTS[index];
+    const shape = GALLERY_COLUMNS[index];
+    const columns = width >= 1024 ? shape.at1280 : width >= 640 ? shape.at768 : shape.at390;
+    const count = variant.items.length;
     return {
       id: GALLERY_IDS[index],
       listCount: 1,
-      itemCount: items.length,
-      imageCount: items.length,
-      columns: GALLERY_VARIANTS[index].columns === undefined ? null : String(GALLERY_VARIANTS[index].columns),
-      trackCount: GALLERY_COLUMNS[index]["at1280"],
+      itemCount: count,
+      imageCount: count,
+      figuresPerItem: count,
+      intent: variant.columns === undefined ? null : String(variant.columns),
+      trackCount: columns,
       gridColumns: "",
       columnGap: 12,
-      widths: [],
-      tops: items.map((_unused, itemIndex) => itemIndex * 10),
-      lefts: [],
-      topsAscending: true,
-      srcs: items.map((_unused, itemIndex) => `/uno-media/en-001/example/${index * 24 + itemIndex}`),
+      widths: Array.from({ length: count }, () => 200),
+      tops: Array.from({ length: count }, (_unused, item) => Math.floor(item / columns) * 260),
+      lefts: Array.from({ length: count }, (_unused, item) => (item % columns) * 210),
+      rowCount: Math.ceil(count / columns),
+      geometryOk: true,
+      srcs: variant.items.map((_unused, item) => `/uno-media/en-001/example/${index * 24 + item}`),
       ascending: true,
-      alts: items.map((item) => (item.image.decorative === true ? "" : "Described")),
-      naturalWidths: items.map(() => GALLERY_EXPECTED.intrinsicWidth),
-      naturalHeights: items.map(() => GALLERY_EXPECTED.intrinsicHeight),
+      alts: variant.items.map((item) => (item.image.decorative === true ? "" : item.image.alt)),
+      sizes: variant.items.map((item) => {
+        const size = galleryExpectedSizeFor(item.image.src);
+        return size === null ? [0, 0] : [size.width, size.height];
+      }),
+      captionPresence: variant.items.map((item) => item.caption !== undefined),
+      captionTexts: variant.items.map((item) =>
+        (item.caption === undefined ? null : item.caption.replaceAll("*", "").replaceAll("[", "").replaceAll("]", ""))),
       imagesLoaded: true,
-      heading: index === 0 ? GALLERY_EXPECTED.heading : (GALLERY_VARIANTS[index].heading ?? null),
-      lede: index === 0 ? "A bounded lede." : null,
-      ledeStrong: index === 0 ? GALLERY_EXPECTED.ledeStrong : null,
+      heading: variant.heading ?? null,
+      lede: variant.lede ?? null,
+      ledeStrong: variant.lede === undefined ? null : GALLERY_EXPECTED.ledeStrong,
       captionEm: index === 0 ? GALLERY_EXPECTED.captionEm : null,
       captionLinkHref: index === 0 ? GALLERY_EXPECTED.captionLinkHref : null,
       captionText: null,
-      surface: index === 0 ? GALLERY_EXPECTED.surface : null,
-      backgroundColor: index === 0 ? "rgb(245, 247, 251)" : "rgba(0, 0, 0, 0)",
-      borderWidth: "0px",
-      padding: "",
+      surface: GALLERY_SURFACES[index],
+      ...surfaceOf(index),
       hasControls: false,
       overflow: 0,
-      ...overrides,
     };
   };
-  const reading = (overrides = {}) => ({
-    case: "light:1280",
-    width: 1280,
-    dark: false,
-    reduce: false,
-    variants: GALLERY_VARIANTS.map((_unused, index) => served("", index, index === 0 ? overrides : {})),
+
+  /** One correct reading of all six variants for one declared case. */
+  const reading = (testCase) => ({
+    case: testCase.key,
+    width: testCase.width,
+    dark: testCase.scheme === "dark",
+    reduce: testCase.motion === "reduce",
+    media: { wide640: testCase.width >= 640, wide1024: testCase.width >= 1024 },
+    tokens: SURFACE_TOKENS,
+    variants: GALLERY_VARIANTS.map((_unused, index) => served(index, testCase.width)),
     keyboard: { reached: true, leftAfterTab: true, pageUrlBefore: "u", pageUrlAfter: "u" },
     errors: 0,
     foreignRequests: 0,
   });
-  const wide = GALLERY_CASES.find((entry) => entry.key === "light:1280");
 
-  it("judges a complete reading as executed, and refuses a mutated one", () => {
-    expect(galleryCaseVerdict(reading(), wide).ok).toBe(true);
-    const mutants = [
-      [{ trackCount: 2 }, "tracks"],
-      [{ itemCount: 1 }, "items"],
-      [{ imageCount: 0 }, "images"],
-      [{ ascending: false }, "order"],
-      [{ srcs: ["/assets/donor-plate.png"], ascending: true }, "owned"],
-      [{ hasControls: true }, "controls"],
-      [{ overflow: 8 }, "overflow"],
-      [{ backgroundColor: "rgb(0, 0, 0)" }, "surface-paint"],
-      [{ alts: ["Described", "Described"] }, "decorative-alt"],
-      [{ heading: "Invented" }, "heading"],
-    ];
-    for (const [mutant, label] of mutants) {
-      const verdict = galleryCaseVerdict(reading(mutant), wide);
-      expect(verdict.ok, label).toBe(false);
-      expect(verdict.detail).toContain(label);
+  const caseOf = (key) => GALLERY_CASES.find((entry) => entry.key === key);
+
+  it("accepts a complete reading for every declared case and refuses a mutated one", () => {
+    for (const testCase of GALLERY_CASES) {
+      const verdict = galleryCaseVerdict(reading(testCase), testCase);
+      expect(verdict.ok, `${testCase.key}:${verdict.detail}`).toBe(true);
     }
+    const wide = caseOf("light:1280");
+    const mutants = [
+      ["tracks", (value) => { value.variants[0].trackCount = 2; }],
+      ["items", (value) => { value.variants[0].itemCount = 1; }],
+      ["figures", (value) => { value.variants[0].figuresPerItem = 1; }],
+      ["images", (value) => { value.variants[0].imageCount = 0; }],
+      ["intent", (value) => { value.variants[0].intent = "4"; }],
+      ["widths", (value) => { value.variants[0].widths[1] = 10; }],
+      ["rows", (value) => { value.variants[5].rowCount = 1; }],
+      ["geometry", (value) => { value.variants[0].geometryOk = false; }],
+      ["order", (value) => { value.variants[0].ascending = false; }],
+      ["owned", (value) => { value.variants[0].srcs = ["/assets/wo121-plate-0.png"]; }],
+      ["alts", (value) => { value.variants[0].alts = ["Described", "Described"]; }],
+      ["captions", (value) => { value.variants[1].captionPresence = [true, true, true]; }],
+      ["caption-syntax", (value) => { value.variants[0].captionTexts = ["An **owned** caption with [the notes](https://example.org/x)"]; }],
+      ["sizes", (value) => { value.variants[5].sizes[22] = [64, 64]; }],
+      ["controls", (value) => { value.variants[0].hasControls = true; }],
+      ["overflow", (value) => { value.variants[0].overflow = 8; }],
+      ["plain-inert", (value) => { value.variants[1].padding = "16px 20px 16px 20px"; }],
+      ["muted-token", (value) => { value.variants[0].backgroundColor = "rgb(1, 2, 3)"; }],
+      ["bordered-border", (value) => { value.variants[2].borderWidth = "0px"; }],
+      ["bordered-padding", (value) => { value.variants[2].padding = "0px"; }],
+      ["surfaces-distinct", (value) => { value.variants[2].backgroundColor = SURFACE_TOKENS.surface; }],
+      ["absent-attr", (value) => { value.variants[3].surface = "plain"; }],
+      ["case", (value) => { value.case = "light:390"; }],
+      ["width", (value) => { value.width = 390; }],
+      ["scheme", (value) => { value.dark = true; }],
+      ["motion", (value) => { value.reduce = true; }],
+      ["mq640", (value) => { value.media.wide640 = false; }],
+      ["mq1024", (value) => { value.media.wide1024 = false; }],
+      ["keyboard", (value) => { value.keyboard.leftAfterTab = false; }],
+      ["errors", (value) => { value.errors = 1; }],
+      ["foreign", (value) => { value.foreignRequests = 1; }],
+    ];
+    for (const [label, mutate] of mutants) {
+      const value = reading(wide);
+      mutate(value);
+      expect(galleryCaseVerdict(value, wide).ok, label).toBe(false);
+      expect(galleryCaseVerdict(value, wide).detail, label).toContain(label);
+    }
+  });
+
+  it("refuses a reading set that is not exactly the six declared cases, once each", () => {
+    const complete = GALLERY_CASES.map((testCase) => reading(testCase));
+    expect(galleryGeometryReport(complete).ok).toBe(true);
+    expect(galleryGeometryReport(complete.slice(0, 5)).ok).toBe(false);
+    expect(galleryGeometryReport([...complete.slice(0, 5), complete[5], complete[5]]).ok).toBe(false);
+    expect(galleryGeometryReport(complete.map((value) => ({ ...value, case: "light:390" }))).ok).toBe(false);
   });
 
   it("reads one ordered list per region and never the page after it", () => {
@@ -1106,8 +1179,9 @@ describe("gallery evidence module (UNO-WO-121)", () => {
       '<div class="uno-json-gallery-section" id="g1"><h2 class="uno-json-heading">Field notes</h2>',
       '<section class="uno-json-prose">A lede.</section>',
       '<ul class="uno-json-gallery-list" data-uno-columns="2" role="list">',
-      '<li class="uno-json-gallery-entry"><figure class="uno-json-media-item"><img src="/uno-media/p/0" alt="A"/><figcaption class="uno-json-media-caption">One</figcaption></figure></li>',
-      '</ul></div>',
+      '<li class="uno-json-gallery-entry"><figure class="uno-json-media-item"><img src="/uno-media/p/0" alt="A"/>',
+      '<figcaption class="uno-json-media-caption">One</figcaption></figure></li>',
+      "</ul></div>",
       '<form><input name="q"/></form>',
     ].join("");
     const region = galleryRegionOf(html, "g1");
@@ -1123,10 +1197,15 @@ describe("gallery evidence module (UNO-WO-121)", () => {
     expect(galleryListOf(`${region}${region}`).listCount).toBe(2);
   });
 
-  it("declares the executed widths, the twenty-four identity ceiling and both closed refusal reasons", () => {
+  it("declares the executed widths, both plates, the twenty-four identity ceiling and both closed refusal reasons", () => {
     expect(GALLERY_CASES.map((entry) => entry.width)).toEqual([390, 768, 1280, 390, 768, 1280]);
+    expect(new Set(GALLERY_CASES.map((entry) => entry.key)).size).toBe(6);
     expect(new Set(GALLERY_SOURCES).size).toBe(24);
     expect(GALLERY_VARIANTS[5].items.length).toBe(24);
+    // `UNO-WO-121 / R02`: two owned identities carry distinguishable paths, bytes and sizes, and both appear in the ceiling list.
+    expect(new Set(GALLERY_BINDINGS.images.map((entry) => entry.owned.path)).size).toBe(2);
+    expect(galleryExpectedSizeFor(GALLERY_SOURCES[0])).not.toEqual(galleryExpectedSizeFor(GALLERY_SOURCES[23]));
+    expect(galleryExpectedSizeFor("/assets/not-bound.png")).toBeNull();
     const reasons = new Set(GALLERY_REFUSAL_CASES.map((probe) => probe.expected));
     expect([...reasons].sort()).toEqual(["family:target-refused", "family:unsupported-feature"]);
     expect(galleryGeometryReport([]).ok).toBe(false);

@@ -33,6 +33,9 @@ import {
   FAMILY_DONOR_SOURCE,
   FAMILY_IDS,
   FAMILY_PLATE,
+  FAMILY_PLATE_ALT,
+  FAMILY_PLATE_ALT_SIZE,
+  FAMILY_PLATE_SIZE,
   FAMILY_ROUTE,
   COLUMNS_LABELS,
   COLUMNS_RICH_SOURCE,
@@ -99,6 +102,7 @@ import {
   galleryCaseVerdict,
   galleryGeometryReport,
   galleryListOf,
+  galleryOwnedPathFor,
   galleryRegionOf,
 } from "./u04/gallery-evidence.mjs";
 import { conjunction, conjunctionDetail, createFamilyEvidence, isCreditable } from "./u04/family-evidence.mjs";
@@ -488,59 +492,85 @@ async function readGalleryCase(input) {
       setTimeout(done, 4000);
     });
   };
+  // The two closed surface tokens, resolved through a real element so the comparison is in the same computed form the
+  // sections themselves report — never a hand-written colour.
+  const resolveToken = (name) => {
+    const probe = document.createElement("div");
+    probe.style.backgroundColor = String(getComputedStyle(document.documentElement).getPropertyValue(name)).trim();
+    document.body.appendChild(probe);
+    const value = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return value;
+  };
   const readVariant = (id) => {
     const root = document.getElementById(id);
     if (root === null) return null;
     const lists = root.querySelectorAll("ul.uno-json-gallery-list");
     const list = lists.length === 1 ? lists[0] : null;
     const entries = list === null ? [] : [...list.children];
-    const images = entries.map((entry) => entry.querySelector("figure.uno-json-media-item img"));
+    const figures = entries.map((entry) => entry.querySelector("figure.uno-json-media-item"));
+    const images = figures.map((figure) => (figure === null ? null : figure.querySelector("img")));
+    const captions = figures.map((figure) => (figure === null ? null : figure.querySelector("figcaption")));
     const style = list === null ? getComputedStyle(root) : getComputedStyle(list);
     const tracks = list === null || style.gridTemplateColumns === "none"
       ? 0
       : style.gridTemplateColumns.split(" ").length;
-    const srcs = images.map((image) => image?.getAttribute("src") ?? "");
+    const srcs = images.map((image) => (image === null ? "" : image.getAttribute("src") ?? ""));
     const occurrence = srcs.map((src) => Number.parseInt(src.slice(src.lastIndexOf("/") + 1), 10));
-    const richCaption = entries[0]?.querySelector("figcaption") ?? null;
+    const widths = entries.map((entry) => Math.round(entry.getBoundingClientRect().width));
+    const tops = entries.map((entry) => Math.round(entry.getBoundingClientRect().top));
+    const lefts = entries.map((entry) => Math.round(entry.getBoundingClientRect().left));
+    const columns = tracks;
+    // Real row geometry: `columns` cells share a row, rows descend, and order is preserved left to right within a row.
+    const rowOf = (index) => Math.floor(index / columns);
+    const rowCount = entries.length === 0 ? 0 : rowOf(entries.length - 1) + 1;
+    const geometryOk = entries.length === 0 || entries.every((entry, index) => {
+      const rowStart = rowOf(index) * columns;
+      const sameRow = tops[index] === tops[rowStart];
+      const increases = index % columns === 0 ? true : lefts[index] > lefts[index - 1];
+      const newRow = index % columns !== 0 || index === 0 || tops[index] > tops[index - columns];
+      return sameRow && increases && newRow;
+    });
+    const richFigure = captions[0] ?? null;
+    const rootStyle = getComputedStyle(root);
     return {
       id,
       listCount: lists.length,
       itemCount: entries.filter((entry) => entry.matches("li.uno-json-gallery-entry")).length,
       imageCount: images.filter((image) => image !== null).length,
-      columns: list === null ? null : list.getAttribute("data-uno-columns"),
+      figuresPerItem: figures.filter((figure) => figure !== null).length,
+      intent: list === null ? null : list.getAttribute("data-uno-columns"),
       trackCount: tracks,
       gridColumns: style.gridTemplateColumns,
       columnGap: Number.parseFloat(style.columnGap) || 0,
-      widths: entries.map((entry) => Math.round(entry.getBoundingClientRect().width)),
-      tops: entries.map((entry) => Math.round(entry.getBoundingClientRect().top)),
-      lefts: entries.map((entry) => Math.round(entry.getBoundingClientRect().left)),
-      topsAscending: entries.every((entry, index) => index === 0
-        || Math.round(entry.getBoundingClientRect().top) >= Math.round(entries[index - 1].getBoundingClientRect().top)),
+      widths,
+      tops,
+      lefts,
+      rowCount,
+      geometryOk,
       srcs,
       ascending: occurrence.every((value, index) => index === 0 || value > occurrence[index - 1]),
       alts: images.map((image) => (image === null ? null : image.getAttribute("alt"))),
-      naturalWidths: images.map((image) => (image === null ? 0 : image.naturalWidth)),
-      naturalHeights: images.map((image) => (image === null ? 0 : image.naturalHeight)),
+      sizes: images.map((image) => (image === null ? [0, 0] : [image.naturalWidth, image.naturalHeight])),
+      captionPresence: captions.map((caption) => caption !== null),
+      captionTexts: captions.map((caption) => (caption === null ? null : caption.textContent)),
       imagesLoaded: images.every((image) => image !== null && image.complete === true && image.naturalWidth > 0),
       heading: root.querySelector("h2.uno-json-heading, h3.uno-json-heading, h4.uno-json-heading")?.textContent ?? null,
       lede: root.querySelector("section.uno-json-prose, p.uno-json-prose")?.textContent ?? null,
       ledeStrong: root.querySelector("strong.uno-family-md-strong")?.textContent ?? null,
-      captionEm: richCaption?.querySelector("em.uno-family-md-em")?.textContent ?? null,
-      captionLinkHref: richCaption?.querySelector("a")?.getAttribute("href") ?? null,
-      captionText: richCaption?.textContent ?? null,
+      captionEm: richFigure?.querySelector("em.uno-family-md-em")?.textContent ?? null,
+      captionLinkHref: richFigure?.querySelector("a")?.getAttribute("href") ?? null,
+      captionText: richFigure === null ? null : richFigure.textContent,
       surface: root.getAttribute("data-uno-surface"),
-      backgroundColor: getComputedStyle(root).backgroundColor,
-      borderWidth: `${Number.parseFloat(getComputedStyle(root).borderTopWidth) || 0}px`,
-      padding: [
-        getComputedStyle(root).paddingTop,
-        getComputedStyle(root).paddingRight,
-        getComputedStyle(root).paddingBottom,
-        getComputedStyle(root).paddingLeft,
-      ].join(" "),
+      backgroundColor: rootStyle.backgroundColor,
+      borderWidth: `${Number.parseFloat(rootStyle.borderTopWidth) || 0}px`,
+      borderRadius: rootStyle.borderTopLeftRadius,
+      padding: [rootStyle.paddingTop, rootStyle.paddingRight, rootStyle.paddingBottom, rootStyle.paddingLeft].join(" "),
       hasControls: root.querySelector("button, form, input, iframe, script") !== null,
       overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
     };
   };
+
   await (async () => {
     for (const id of input.ids) {
       const root = document.getElementById(id);
@@ -558,6 +588,15 @@ async function readGalleryCase(input) {
     width: window.innerWidth,
     dark: matchMedia("(prefers-color-scheme: dark)").matches,
     reduce: matchMedia("(prefers-reduced-motion: reduce)").matches,
+    media: {
+      wide640: matchMedia("(min-width: 640px)").matches,
+      wide1024: matchMedia("(min-width: 1024px)").matches,
+    },
+    tokens: {
+      surface: resolveToken("--uno-surface"),
+      background: resolveToken("--uno-background"),
+      border: resolveToken("--uno-border"),
+    },
     variants: input.ids.map(readVariant).filter((variant) => variant !== null),
   };
 }
@@ -585,6 +624,7 @@ const CAPSULE_FILES = Object.freeze([
   "wo044-carousel-a.png",
   "wo044-carousel-b.png",
   FAMILY_PLATE,
+  FAMILY_PLATE_ALT,
 ]);
 
 function crc32(buffer) {
@@ -1017,11 +1057,23 @@ async function main() {
   }
   mkdirSync(resolve(ROOT, CAPSULE_DIR), { recursive: true });
   for (const name of CAPSULE_FILES) {
-    writeFileSync(resolve(ROOT, CAPSULE_DIR, name), pngBytes(64, 64));
+    // `UNO-WO-121 / R02`: the second Gallery plate is created at its own intrinsic size, so two owned identities carry
+    // genuinely distinguishable bytes and dimensions.
+    const size = name === FAMILY_PLATE_ALT ? FAMILY_PLATE_ALT_SIZE : FAMILY_PLATE_SIZE;
+    writeFileSync(resolve(ROOT, CAPSULE_DIR, name), pngBytes(size.width, size.height));
   }
   const plateBytes = readFileSync(resolve(ROOT, CAPSULE_DIR, CAPSULE_FILES[0]));
   check("the generated plate is a real PNG with the right signature", plateBytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])));
   check("the generated plate declares 64x64 dimensions", plateBytes.readUInt32BE(16) === 64 && plateBytes.readUInt32BE(20) === 64);
+  // `UNO-WO-121 / R02`: the second plate must really be a different, differently sized PNG.
+  const altPlateBytesFixture = readFileSync(resolve(ROOT, CAPSULE_DIR, FAMILY_PLATE_ALT));
+  check(
+    "the second generated plate is a distinct PNG at its own 32x48 size",
+    !altPlateBytesFixture.equals(plateBytes)
+      && altPlateBytesFixture.readUInt32BE(16) === FAMILY_PLATE_ALT_SIZE.width
+      && altPlateBytesFixture.readUInt32BE(20) === FAMILY_PLATE_ALT_SIZE.height,
+    `${altPlateBytesFixture.length} bytes`
+  );
 
   const { readUnoPageDocument, UNO_RENDERABLE_MODULES } = await import("../src/core/page-document.ts");
   // `UNO-WO-052 / R01` §2: the seven named synthetic inputs, created exclusively and digest-verified on read-back, then
@@ -6142,7 +6194,8 @@ async function consentPhase(base) {
       const mixedOk = mixedPage.status === "composed"
         && mixedPage.document.sections[0]?.module === "media.image"
         && mixedPage.document.sections[1]?.props?.items?.length === 24
-        && new Set(mixedPage.document.sections[1].props.items.map((item) => item.asset.path)).size === 1;
+        && JSON.stringify(mixedPage.document.sections[1].props.items.map((item) => item.asset.path))
+          === JSON.stringify(GALLERY_BINDINGS.images.map((entry) => entry.owned.path));
       // `UNO-WO-121 / R01`: a Page that composed **no** Gallery keeps the eight-identity ceiling, even when every one of nine
       // bindings is consumed by its own media section. The wider binder is scoped to the Gallery, never to the Page.
       const noGalleryCeiling = composePage(
@@ -6221,12 +6274,94 @@ async function consentPhase(base) {
         && UNO_PAGE_DOCUMENT_LIMITS.mediaCaptionCodePoints === 320
         && UNO_PAGE_DOCUMENT_LIMITS.mediaCaptionMarkdownCodePoints === 4000
         && UNO_OWNED_MEDIA_LIMITS.maxOccurrences === 512;
+      // `UNO-WO-121 / R02`: the aggregate boundary is exactly 32 with a Gallery and 8 without it, and the unchanged
+      // 512-occurrence guard still refuses a Page that declares more.
+      const { planUnoPageAssets } = await import("../src/application/plan-uno-page-assets.ts");
+      const mediaSection = (index) => ({ type: "media", image: { src: GALLERY_SOURCES[index], alt: `Plate ${index}` } });
+      const bindingsFrom = (sources) =>
+        sources.map((source) => ({ source, owned: { zone: "page", path: FAMILY_PLATE } }));
+      const galleryOf = (sources) => ({
+        type: "gallery",
+        items: sources.map((source) => ({ image: { src: source, alt: `Plate ${source}` } })),
+      });
+      const eightMedia = composePage(
+        Array.from({ length: 8 }, (_unused, index) => mediaSection(index)),
+        bindingsFrom(GALLERY_SOURCES.slice(0, 8)),
+      );
+      const nineMediaOnly = composePage(
+        Array.from({ length: 9 }, (_unused, index) => mediaSection(index)),
+        bindingsFrom(GALLERY_SOURCES.slice(0, 9)),
+      );
+      // 32 distinct identities: eight media sections plus a twenty-four item Gallery over the other sources.
+      const thirtyTwo = composePage(
+        [
+          ...Array.from({ length: 8 }, (_unused, index) => mediaSection(index)),
+          galleryOf(GALLERY_SOURCES.slice(8, 32)),
+        ],
+        bindingsFrom(GALLERY_SOURCES.slice(0, 32)),
+      );
+      // 33 distinct identities inside the same section count: nine media sections plus a Gallery over the other twenty-four.
+      const thirtyThree = composePage(
+        [
+          ...Array.from({ length: 9 }, (_unused, index) => mediaSection(index)),
+          galleryOf(GALLERY_SOURCES.slice(9, 33)),
+        ],
+        bindingsFrom(Array.from({ length: 33 }, (_unused, index) => `/assets/wo121-plate-${index}.png`)),
+      );
+      const aggregateBoundary = eightMedia.status === "composed"
+        && nineMediaOnly.status === "refused"
+        && thirtyTwo.status === "composed"
+        && thirtyThree.status === "refused"
+        && thirtyThree.reason === "family:target-refused";
+      // The unchanged 512-occurrence guard: twenty-two 24-item Galleries declare 528 occurrences and are refused by the
+      // planner; twenty-one declare 504 and are planned.
+      const occurrencePage = (count) => ({
+        version: 1,
+        title: "Occurrence ceiling",
+        sections: Array.from({ length: count }, (_unused, index) => ({
+          id: `ceiling-${index}`,
+          module: "media.gallery",
+          props: {
+            list: true,
+            items: Array.from({ length: 24 }, (_unusedItem, itemIndex) => ({
+              asset: { zone: "page", path: `ceiling-${itemIndex}.png` },
+              alt: `Plate ${itemIndex}`,
+            })),
+          },
+        })),
+      });
+      const planFor = (count) => {
+        const parsedCeiling = readUnoPageDocument(occurrencePage(count));
+        if (!parsedCeiling.accepted) return { status: "refused", reason: "reader" };
+        return planUnoPageAssets({
+          accepted: true,
+          identity: {
+            entityId: "e_ceiling",
+            facetId: "foundation",
+            siteId: "main",
+            pageId: "ceiling",
+            localeTag: "en-001",
+            localePathKey: "en-001",
+            routePath: "ceiling",
+            pathname: "/en-001/ceiling",
+          },
+          document: { kind: "json", title: "Ceiling", visibility: "unlisted", pageDocument: parsedCeiling.document },
+          delivery: {},
+        });
+      };
+      const overCeiling = planFor(22);
+      const underCeiling = planFor(21);
+      const occurrenceLimit = overCeiling.status === "refused"
+        && overCeiling.reason === "assets:too-many"
+        && underCeiling.status === "planned"
+        && underCeiling.plan.occurrences.length === 21 * 24;
       localA2.gallery.reader = bound && boundsRefused && mixedOk && unusedRefused && missingRefused && repeatedOk
-        && noGalleryCeiling && nativeGrid && nativeCarousel && nativeList && captions && guardsUnmoved;
+        && noGalleryCeiling && aggregateBoundary && occurrenceLimit
+        && nativeGrid && nativeCarousel && nativeList && captions && guardsUnmoved;
       check(
         "FAMILY_GALLERY_READER one through twenty-four figures are accepted and zero or twenty-five refuse, twenty-four distinct bound identities coexist with a separate Media identity on one Page, the consumed set equals the bound set, repeated identities keep authored order, the ordinary grid and carousel and the required-alt boundary are unchanged, and no shared guard moved",
         localA2.gallery.reader === true,
-        JSON.stringify({ bound, boundsRefused, mixedOk, unusedRefused, missingRefused, repeatedOk, noGalleryCeiling, nativeGrid, nativeCarousel, nativeList, captions, guardsUnmoved }),
+        JSON.stringify({ bound, boundsRefused, mixedOk, unusedRefused, missingRefused, repeatedOk, noGalleryCeiling, aggregateBoundary, occurrenceLimit, nativeGrid, nativeCarousel, nativeList, captions, guardsUnmoved }),
       );
 
       // --- refusal -----------------------------------------------------------------------------------------------------
@@ -6253,8 +6388,12 @@ async function consentPhase(base) {
       );
     }
 
-    // `UNO-WO-121 / R01` (§2 `renderer`/`http`/`rights`): the temporary Page serves the six Gallery variants, and the
-    // twenty-four figure list is really served with one owned locator per occurrence.
+    // `UNO-WO-121 / R02` (§2 `renderer`/`http`/`rights`/`restore`): the temporary Page serves the six Gallery variants, the
+    // twenty-four figure list is really served with one owned locator per occurrence, and every served locator is checked
+    // against the planner's own ordered ledger and the authored bindings rather than against a URL shape.
+    //
+    // Restoration lives **inside** `finally`: R01 wrote the original back only after the block, so an exception could bypass
+    // it. Both the abandoned-write probe below and the enclosing `finally` prove that cannot happen any more.
     {
       const familyPath = resolve(ROOT, SOURCES[4]);
       const original = readFileSync(familyPath);
@@ -6266,9 +6405,28 @@ async function consentPhase(base) {
         }
       };
       tab.on("request", onGalleryRequest);
+      let swapWritten = false;
+      let abandonedOk = false;
+      let abandonedRestored = false;
+      let restoredInFinally = false;
       try {
         const adapterSpecifier = "../src/application/compose-uno-foundation-families.ts";
         const { composeUnoFoundationSubset: composeSwap } = await import(adapterSpecifier);
+        const { planUnoPageAssets } = await import("../src/application/plan-uno-page-assets.ts");
+
+        // --- failure-path evidence -----------------------------------------------------------------------------------
+        // A write abandoned by a throw must still leave the committed bytes behind, because restoration is in `finally`.
+        // This probe uses the same write and the same restore, then proves the digest is back before anything else runs.
+        try {
+          writeFileSync(familyPath, `${JSON.stringify({ version: 1, title: "abandoned", sections: [] }, null, 2)}\n`, "utf8");
+          throw new Error("gallery-fixture-abandoned");
+        } catch (error) {
+          abandonedOk = String(error?.message) === "gallery-fixture-abandoned";
+        } finally {
+          writeFileSync(familyPath, original);
+        }
+        abandonedRestored = sha256Of(SOURCES[4]) === originalDigest;
+
         const swapSource = familySource();
         // The donor Media variants occupy 17–21 so the Gallery variants land on 22–27, where their anchors are generated.
         MEDIA_VARIANT_SOURCES.forEach((variant, index) => {
@@ -6285,15 +6443,19 @@ async function consentPhase(base) {
         });
         if (swapOutcome.status !== "composed") throw new Error(String(swapOutcome.reason));
         writeFileSync(familyPath, `${JSON.stringify(swapOutcome.document, null, 2)}\n`, "utf8");
+        swapWritten = true;
 
-        const servedResponse = await fetch(`${FAMILY_URL}?wo121r01=markup`, { redirect: "manual" });
+        const servedResponse = await fetch(`${FAMILY_URL}?wo121r02=markup`, { redirect: "manual" });
         const servedHtml = servedResponse.status === 200 ? await servedResponse.text() : "";
         const richRegion = galleryRegionOf(servedHtml, GALLERY_ID);
         const richList = galleryListOf(richRegion);
+        const plainRegion = galleryRegionOf(servedHtml, GALLERY_IDS[1]);
+        const borderedRegion = galleryRegionOf(servedHtml, GALLERY_IDS[2]);
+        const absentRegion = galleryRegionOf(servedHtml, GALLERY_IDS[3]);
         const bareList = galleryListOf(galleryRegionOf(servedHtml, GALLERY_IDS[4]));
         const twentyFour = galleryListOf(galleryRegionOf(servedHtml, GALLERY_IDS[5]));
-        const twoList = galleryListOf(galleryRegionOf(servedHtml, GALLERY_IDS[1]));
-        const fourList = galleryListOf(galleryRegionOf(servedHtml, GALLERY_IDS[3]));
+        const twoList = galleryListOf(plainRegion);
+        const fourList = galleryListOf(absentRegion);
         // Each clause is recorded by name, so a failing clause names itself rather than collapsing into one boolean.
         const richMarkup = {
           wrapper: richRegion.includes(`<div class="uno-json-gallery-section" data-uno-surface="muted" id="${GALLERY_ID}">`),
@@ -6307,6 +6469,9 @@ async function consentPhase(base) {
           noIntent: richList.columns === null,
         };
         const otherMarkup = {
+          plainSurface: plainRegion.includes('<div class="uno-json-gallery-section" data-uno-surface="plain"'),
+          borderedSurface: borderedRegion.includes('<div class="uno-json-gallery-section" data-uno-surface="bordered"'),
+          absentSurface: absentRegion.length > 0 && !absentRegion.includes("data-uno-surface"),
           bare: bareList.headings.length === 0 && bareList.prose === 0 && bareList.surface === null && bareList.itemCount === 1,
           two: twoList.columns === "2",
           four: fourList.columns === "4",
@@ -6315,30 +6480,81 @@ async function consentPhase(base) {
           noDonor: !servedHtml.includes("/assets/"),
           served: servedHtml.length > 0,
         };
-        const rendererOk = Object.values(richMarkup).every(Boolean) && Object.values(otherMarkup).every(Boolean);        localA2.gallery.renderer = rendererOk;
-        const occurrences = [...new Set(twentyFour.srcs)];
+        const rendererOk = Object.values(richMarkup).every(Boolean) && Object.values(otherMarkup).every(Boolean);
+        localA2.gallery.renderer = rendererOk;
+
+        // --- http: the planner's own ledger, the authored bindings and the served bytes, occurrence by occurrence --------
+        const planned = planUnoPageAssets({
+          accepted: true,
+          identity: {
+            entityId: ENTITY_ID,
+            facetId: "foundation",
+            siteId: "main",
+            pageId: "wo066-family-composition",
+            localeTag: "en-001",
+            localePathKey: "en-001",
+            routePath: "wo066-family-composition",
+            pathname: `/en-001/${FAMILY_ROUTE[0]}`,
+          },
+          document: { kind: "json", title: "Gallery evidence", visibility: "unlisted", pageDocument: swapOutcome.document },
+          delivery: {},
+        });
+        const galleryOccurrences = planned.status === "planned"
+          ? planned.plan.occurrences.filter((occurrence) => GALLERY_IDS.includes(occurrence.sectionId))
+          : [];
+        const expectedTotal = GALLERY_VARIANTS.reduce((total, variant) => total + variant.items.length, 0);
+        // Every occurrence's own ref must be the ref its donor identity is bound to, and its item slot must be the planner's.
+        const bindingOk = planned.status === "planned" && GALLERY_VARIANTS.every((variant, index) => {
+          const items = planned.plan.bySection.get(GALLERY_IDS[index])?.items ?? [];
+          if (items.length !== variant.items.length) return false;
+          return variant.items.every((entry, itemIndex) => {
+            const occurrence = galleryOccurrences.find((candidate) =>
+              candidate.sectionId === GALLERY_IDS[index] && candidate.itemIndex === itemIndex);
+            return occurrence !== undefined
+              && occurrence.ref.path === galleryOwnedPathFor(entry.image.src)
+              && occurrence.occurrence < planned.plan.occurrences.length
+              && items[itemIndex] === occurrence.url;
+          });
+        });
+        // The served `src` of every item must be exactly the planner's locator for that occurrence, in authored order.
+        const locatorOk = planned.status === "planned" && GALLERY_VARIANTS.every((variant, index) => {
+          const urls = planned.plan.bySection.get(GALLERY_IDS[index])?.items ?? [];
+          return JSON.stringify(galleryListOf(galleryRegionOf(servedHtml, GALLERY_IDS[index])).srcs) === JSON.stringify(urls);
+        });
+        // Each occurrence serves the bytes, MIME and intrinsic size of the plate **its own binding** names.
+        const plateBytes = readFileSync(resolve(ROOT, CAPSULE_DIR, FAMILY_PLATE));
+        const altPlateBytes = readFileSync(resolve(ROOT, CAPSULE_DIR, FAMILY_PLATE_ALT));
         const servedBytes = [];
-        for (const locator of occurrences) {
-          const response = await fetch(`${base}${locator}`);
+        for (const occurrence of galleryOccurrences) {
+          const response = await fetch(`${base}${occurrence.url}`);
           servedBytes.push({
-            locator,
+            occurrence,
             status: response.status,
             type: response.headers.get("content-type"),
             bytes: Buffer.from(await response.arrayBuffer()),
           });
         }
-        const plateBytes = readFileSync(resolve(ROOT, CAPSULE_DIR, FAMILY_PLATE));
-        localA2.gallery.http = occurrences.length === 24
-          && servedBytes.every((entry) => entry.status === 200
+        const bytesOk = servedBytes.length === expectedTotal && servedBytes.every((entry) => {
+          const isFirstPlate = entry.occurrence.ref.path === FAMILY_PLATE;
+          const expected = isFirstPlate ? FAMILY_PLATE_SIZE : FAMILY_PLATE_ALT_SIZE;
+          const expectedBytes = isFirstPlate ? plateBytes : altPlateBytes;
+          return entry.status === 200
             && entry.type === "image/png"
-            && entry.bytes.equals(plateBytes)
+            && entry.bytes.equals(expectedBytes)
             && entry.bytes[0] === 0x89
-            && entry.bytes.readUInt32BE(16) === GALLERY_EXPECTED.intrinsicWidth
-            && entry.bytes.readUInt32BE(20) === GALLERY_EXPECTED.intrinsicHeight);
+            && entry.bytes.readUInt32BE(16) === expected.width
+            && entry.bytes.readUInt32BE(20) === expected.height;
+        });
+        // Two genuinely distinguishable owned identities: different paths, different bytes, different dimensions.
+        const servedPaths = new Set(servedBytes.map((entry) => entry.occurrence.ref.path));
+        const twoPlates = servedPaths.size === 2
+          && !plateBytes.equals(altPlateBytes)
+          && servedBytes.some((entry) => entry.occurrence.ref.path === FAMILY_PLATE_ALT);
+        localA2.gallery.http = rendererOk && bindingOk && locatorOk && bytesOk && twoPlates;
         check(
-          "FAMILY_GALLERY_HTTP the served Gallery is one ordered list per section with the authored heading, Markdown lede and caption, the closed surface, the decorative empty alternative, no invented intent, and twenty-four occurrences each serving this Page's own 64x64 PNG",
-          rendererOk && localA2.gallery.http === true,
-          `${occurrences.length} locators ${servedBytes[0]?.status ?? "none"} ${servedBytes[0]?.type ?? "none"} ${JSON.stringify({ ...richMarkup, ...otherMarkup })}`,
+          "FAMILY_GALLERY_HTTP the served Gallery is one ordered list per section with the authored heading, Markdown lede, caption and all three surfaces, and every one of its occurrences serves the locator, bytes, MIME and intrinsic size of the plate its own binding names",
+          localA2.gallery.http === true,
+          `${galleryOccurrences.length}/${expectedTotal} occurrences ${servedBytes[0]?.status ?? "none"} ${servedBytes[0]?.type ?? "none"} ${JSON.stringify({ ...richMarkup, ...otherMarkup, bindingOk, locatorOk, bytesOk, twoPlates })}`,
         );
         const foreignInPage = [...servedHtml.matchAll(/(?:href|src)="([^"]*)"/gu)]
           .map((match) => match[1])
@@ -6354,17 +6570,24 @@ async function consentPhase(base) {
           JSON.stringify({ foreignInPage: foreignInPage.slice(0, 3), foreignRequests: foreignRequests.slice(0, 2) }),
         );
       } finally {
+        // The restoration is inside `finally`, so every exit path below — a refused swap, a failed request, a thrown
+        // assertion — leaves the committed bytes behind. `restoredInFinally` records that it actually happened.
+        if (swapWritten) writeFileSync(familyPath, original);
+        restoredInFinally = sha256Of(SOURCES[4]) === originalDigest;
         tab.off("request", onGalleryRequest);
       }
-      writeFileSync(familyPath, original);
-      const restoredResponse = await fetch(`${FAMILY_URL}?wo121r01=restored`, { redirect: "manual" });
+      // A fresh request must answer the committed Page again: its own composed Gallery list present, and no temporary
+      // anchor anywhere in the response.
+      const restoredResponse = await fetch(`${FAMILY_URL}?wo121r02=restored`, { redirect: "manual" });
       const restoredHtml = restoredResponse.status === 200 ? await restoredResponse.text() : "";
+      const committedGallery = galleryListOf(galleryRegionOf(restoredHtml, "family-5-gallery"));
       check(
-        "FAMILY_GALLERY_RESTORE the temporary Gallery fixture was restored byte-exactly and a fresh response serves the committed Page without any variant anchor",
-        sha256Of(SOURCES[4]) === originalDigest
-          && restoredHtml.length > 0
+        "FAMILY_GALLERY_RESTORE both the abandoned write and the served swap were restored byte-exactly, and a fresh response serves the committed Page's own Gallery list with no temporary anchor",
+        abandonedOk && abandonedRestored && restoredInFinally && restoredHtml.length > 0
+          && committedGallery.listCount === 1
+          && committedGallery.itemCount === 2
           && GALLERY_IDS.every((id) => !restoredHtml.includes(`id="${id}"`)),
-        `digest=${sha256Of(SOURCES[4]) === originalDigest} fresh=${restoredHtml.length}`,
+        `abandoned=${abandonedOk}/${abandonedRestored} digest=${restoredInFinally} committed=${committedGallery.itemCount} fresh=${restoredHtml.length}`,
       );
     }
 
@@ -6406,7 +6629,7 @@ async function consentPhase(base) {
           await tab.emulateMedia({ colorScheme: testCase.scheme, reducedMotion: testCase.motion });
           const errorsBefore = consoleErrors.length;
           const foreignBefore = foreignRequests.length;
-          await tab.goto(`${FAMILY_URL}?wo121r01=${testCase.key}`, { waitUntil: "networkidle" });
+          await tab.goto(`${FAMILY_URL}?wo121r02=${testCase.key}`, { waitUntil: "networkidle" });
           const reading = await tab.evaluate(readGalleryCase, { case: testCase.key, ids: GALLERY_IDS });
           const pageUrlBefore = tab.url();
           reading.keyboard = await walkToSafeLink(tab, GALLERY_EXPECTED.captionLinkHref);
@@ -6432,7 +6655,10 @@ async function consentPhase(base) {
         process.stdout.write(
           `  INFO  gallery ${reading.case} ${reading.width}px dark=${reading.dark} reduce=${reading.reduce} `
           + `columns=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, variant.trackCount, variant.columns]))} `
-          + `sizes=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.itemCount, variant.naturalWidths[0]]))} `
+          + `sizes=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.id, [...new Set(variant.sizes.map((size) => size.join("x")))]]))} `
+          + `surfaces=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.surface, variant.backgroundColor, variant.borderWidth, variant.borderRadius, variant.padding]))} `
+          + `rows=${JSON.stringify((reading.variants ?? []).map((variant) => [variant.rowCount, variant.geometryOk]))} `
+          + `media=${JSON.stringify(reading.media)} `
           + `keyboard=${reading.keyboard?.presses} presses at=${reading.keyboard?.at} left=${reading.keyboard?.leftAfterTab} `
           + `url=${reading.keyboard?.pageUrlAfter} errors=${reading.errors} foreign=${reading.foreignRequests}\n`,
         );

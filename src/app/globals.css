@@ -1518,9 +1518,10 @@ main {
 }
 
 /* --- Gallery list (`UNO-WO-121 / R01`) ---------------------------------------- */
-/* The donor Gallery is one ordered list of figures. It is one column at a narrow viewport, two at an intermediate one and,
-   without an authored intent, three at a wide one; an authored intent of 2, 3 or 4 stands at the intermediate width and
-   above, so no viewport ever receives fewer columns than the author asked for. */
+/* The donor Gallery is one ordered list of figures. Below `40rem` it is one column, from `40rem` two, and from `64rem` the
+   authored intent (`2`, `3` or `4`) or — when none was authored — the donor's own default of three. A narrow viewport
+   therefore collapses every intent to a single column rather than overflowing, and an unauthored intent is never given an
+   attribute: the default lives here, in the stylesheet, not in the document. */
 .uno-json-gallery-section {
   min-width: 0;
 }

@@ -18,6 +18,15 @@
 /** The Page route the fixture is published at, and the owned plate its single donor image identity resolves to. */
 export const FAMILY_ROUTE = Object.freeze(["wo066-family-composition"]);
 export const FAMILY_PLATE = "wo066-family-plate.png";
+/**
+ * `UNO-WO-121 / R02`: a **second** Page-owned plate, used only by the Gallery swap so at least two owned identities carry
+ * distinguishable bytes, dimensions and served locators. It is test-owned: created exclusively, digest-verified on read-back
+ * and removed by the gate, exactly like the first plate, so no durable asset byte changes.
+ */
+export const FAMILY_PLATE_ALT = "wo121-alt-plate.png";
+/** The two fixtures' intrinsic sizes, so a served occurrence's dimensions can be asserted against its own binding. */
+export const FAMILY_PLATE_SIZE = Object.freeze({ width: 64, height: 64 });
+export const FAMILY_PLATE_ALT_SIZE = Object.freeze({ width: 32, height: 48 });
 export const FAMILY_DONOR_SOURCE = "/assets/wo066-donor-plate.png";
 
 /** `UNO-WO-112 / R01`: the donated hero actions, exactly as authored. One static `https` and one static `mailto`. */

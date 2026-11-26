@@ -575,11 +575,20 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_GALLERY_SOURCE the real adapter composes the donor's Gallery as one ordered list — authored heading and Markdown lede, whole-section surface, a Markdown caption, the decorative form and the donor's own default column intent left absent",
   "FAMILY_GALLERY_READER one through twenty-four figures are accepted and zero or twenty-five refuse, twenty-four distinct bound identities coexist with a separate Media identity on one Page, the consumed set equals the bound set, repeated identities keep authored order, the ordinary grid and carousel and the required-alt boundary are unchanged, and no shared guard moved",
   "FAMILY_GALLERY_REFUSAL every one of the ${GALLERY_REFUSAL_CASES.length} gallery probes refuses the whole Page with its own closed reason and no partial document",
-  "FAMILY_GALLERY_HTTP the served Gallery is one ordered list per section with the authored heading, Markdown lede and caption, the closed surface, the decorative empty alternative, no invented intent, and twenty-four occurrences each serving this Page's own 64x64 PNG",
+  "FAMILY_GALLERY_HTTP the served Gallery is one ordered list per section with the authored heading, Markdown lede, caption and all three surfaces, and every one of its occurrences serves the locator, bytes, MIME and intrinsic size of the plate its own binding names",
+  "const galleryOccurrences = planned.status === \"planned\"",
+  "occurrence.ref.path === galleryOwnedPathFor(entry.image.src)",
+  "const aggregateBoundary = eightMedia.status === \"composed\"",
+  "const occurrenceLimit = overCeiling.status === \"refused\"",
+  "abandonedOk && abandonedRestored && restoredInFinally && restoredHtml.length > 0",
+  "restoredInFinally = sha256Of(SOURCES[4]) === originalDigest;",
+  'data-uno-surface="plain"',
+  "absentSurface:",
+  "geometryOk,",
   "FAMILY_GALLERY_BROWSER ${testCase.key} the six served lists lay out the authored column count, keep their owned locators in order, load their images, own their captions, present their surfaces and reach the caption link by keyboard",
   "FAMILY_GALLERY_BROWSER the browser dimension is the conjunction of all six executed cases at 390, 768 and 1280px in light and dark/reduced motion, with the fixture restored byte-exactly",
   "FAMILY_GALLERY_RIGHTS the served Gallery renders no donor identity, no remote source, no provider and no locator outside this Page's own owned route",
-  "FAMILY_GALLERY_RESTORE the temporary Gallery fixture was restored byte-exactly and a fresh response serves the committed Page without any variant anchor",
+  "FAMILY_GALLERY_RESTORE both the abandoned write and the served swap were restored byte-exactly, and a fresh response serves the committed Page's own Gallery list with no temporary anchor",
   "galleryCaseVerdict(reading, testCase)",
   "const geometry = galleryGeometryReport(readings);",
   "FAMILY_GALLERY_REFUSAL ${probe.label} refuses the whole Page with ${probe.expected} and no document",
@@ -1002,6 +1011,21 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
         'closureC1.labels.includes("PARITY_GALLERY=PASS")',
         'closureC1.labels.includes("PARITY_GALLERY=PENDING")',
         'closureC1.labels.includes("PARITY_GALLERY=PASS")',
+      ],
+      [
+        "occurrence.ref.path === galleryOwnedPathFor(entry.image.src)",
+        "true",
+        "occurrence.ref.path === galleryOwnedPathFor(entry.image.src)",
+      ],
+      [
+        "restoredInFinally = sha256Of(SOURCES[4]) === originalDigest;",
+        "restoredInFinally = true;",
+        "restoredInFinally = sha256Of(SOURCES[4]) === originalDigest;",
+      ],
+      [
+        "absentSurface:",
+        "absentSurfaceIgnored:",
+        "absentSurface:",
       ],
     ];
     for (const [from, to, contract] of shapes) {
@@ -1563,8 +1587,13 @@ describe("the hosted durable-family labels are connected to real predicates", ()
     "DURABLE_FAMILY_SOURCE the appended sections are the composer's own output",
     // `UNO-WO-121 / R01`: the committed durable Page keeps its ordinary grid while the adapter composes the list, so the
   // published-Pages gate must distinguish them rather than conflate them.
-  "DURABLE_FAMILY_SOURCE the composed Gallery is the opt-in list while the committed Page keeps its ordinary grid",
-  "return JSON.stringify(differing) === JSON.stringify([\"family-5-gallery\"]);",
+  "DURABLE_FAMILY_SOURCE the committed grid and the composed list agree on anchor, authored columns, order, assets, alternatives and captions and invent no field",
+  "const GALLERY_SECTION_ID = \"family-5-gallery\";",
+  "JSON.stringify(gridItem.asset) === JSON.stringify(listItem.asset)",
+  "gridItem.alt === listItem.alt",
+  "gridProps.items.length === listProps.items.length",
+  "(gridItem.caption ?? null) === (listItem.caption ?? null)",
+  "galleryDelta.anchor && galleryDelta.representation && galleryDelta.columns",
     "DURABLE_FAMILY_SOURCE the six original sections still equal the starting committed blob",
     "DURABLE_FAMILY_REFUSALS the composer refuses ${label}",
     'outcome.status === "refused" && outcome.reason === reason',
@@ -1628,6 +1657,12 @@ describe("the hosted durable-family labels are connected to real predicates", ()
   it("fails the audit when a durable predicate is neutered rather than deleted", () => {
     for (const [token, replacement] of [
       ["parsed.document.sections.length === 23", "parsed.document.sections.length > 0"],
+      // `UNO-WO-121 / R02`: each semantic clause of the durable Gallery comparison is load-bearing on its own.
+      ["JSON.stringify(gridItem.asset) === JSON.stringify(listItem.asset)", "true"],
+      ["gridItem.alt === listItem.alt", "true"],
+      ["gridProps.items.length === listProps.items.length", "true"],
+      ["(gridItem.caption ?? null) === (listItem.caption ?? null)", "true"],
+      ["galleryDelta.anchor && galleryDelta.representation && galleryDelta.columns", "true"],
       ['outcome.status === "refused" && outcome.reason === reason', "outcome.status !== undefined"],
       ['createHash("sha256").update(bytes).digest("hex") === DURABLE_PLATE_SHA256', "true"],
       ['response.status === 404 && response.headers.get("location") === null && body.length === 0', "true"],

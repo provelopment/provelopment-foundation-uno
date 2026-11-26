@@ -10,7 +10,12 @@
  * WHAT IT IS NOT. No threshold, no credit, no fixture write. The runner owns the transaction; this module owns the shapes.
  */
 
-import { FAMILY_PLATE } from "./family-fixture.mjs";
+import {
+  FAMILY_PLATE,
+  FAMILY_PLATE_ALT,
+  FAMILY_PLATE_ALT_SIZE,
+  FAMILY_PLATE_SIZE,
+} from "./family-fixture.mjs";
 
 /** The Page route the Gallery variants are served from: the committed family composition Page, restored afterwards. */
 export const GALLERY_ROUTE_URL = "wo066-family-composition";
@@ -30,19 +35,42 @@ export const GALLERY_IDS = Object.freeze([
  * The twenty-four distinct donor identities one Gallery may legitimately bind.
  *
  * They are distinct *sources* — the binder requires unique identities and an exact consumed set — while this fixture converges
- * all of them onto the one owned Page plate, which is exactly what a migration that consolidates donor artwork onto one owned
- * asset declares. Each occurrence still receives its own served locator, so item order is observable end to end.
+ * them onto **two** owned Page plates, which is exactly what a migration that consolidates donor artwork onto owned assets
+ * declares. Each occurrence still receives its own served locator, so item order is observable end to end.
  */
 export const GALLERY_SOURCES = Object.freeze(
   Array.from({ length: 24 }, (_unused, index) => `/assets/wo121-plate-${index}.png`),
 );
 
-/** The migration binding for those identities: twenty-four unique sources, one owned Page plate. */
+/**
+ * The migration binding for those identities: twenty-four unique sources across two owned Page plates.
+ *
+ * `UNO-WO-121 / R02`: the last two identities are bound to a deliberately different second plate, so the twenty-four
+ * occurrences carry two distinguishable byte sets, intrinsic sizes and served locators. Repeated occurrences of one identity
+ * still share that identity's own bytes, exactly as declared.
+ */
 export const GALLERY_BINDINGS = Object.freeze({
   images: Object.freeze(
-    GALLERY_SOURCES.map((source) => Object.freeze({ source, owned: Object.freeze({ zone: "page", path: FAMILY_PLATE }) })),
+    GALLERY_SOURCES.map((source, index) => Object.freeze({
+      source,
+      owned: Object.freeze({ zone: "page", path: index >= 22 ? FAMILY_PLATE_ALT : FAMILY_PLATE }),
+    })),
   ),
 });
+
+/** The owned path one donor identity is bound to, or `null` when the fixture declares it to neither plate. */
+export function galleryOwnedPathFor(source) {
+  const entry = GALLERY_BINDINGS.images.find((candidate) => candidate.source === source);
+  return entry === undefined ? null : entry.owned.path;
+}
+
+/** The intrinsic size a served occurrence of one donor identity must carry. */
+export function galleryExpectedSizeFor(source) {
+  const path = galleryOwnedPathFor(source);
+  if (path === FAMILY_PLATE) return FAMILY_PLATE_SIZE;
+  if (path === FAMILY_PLATE_ALT) return FAMILY_PLATE_ALT_SIZE;
+  return null;
+}
 
 /** The donor Gallery the seven dimensions are proven on: heading, Markdown lede, surface, a Markdown caption and decorative. */
 export const GALLERY_SOURCE = Object.freeze({
@@ -82,11 +110,16 @@ function item(index, extra = {}) {
 /**
  * The six served variants, each exercising one dimension of the closed representation:
  *
- * 1. the rich section — heading, Markdown lede, closed surface, a Markdown caption and a decorative figure, **no** column
- *    intent, so the donor's three/two/one default is what a visitor sees;
- * 2–4. the three explicit column intents;
- * 5. the bare list — no heading, no lede, no surface, one column intent absent as well, so nothing is invented;
+ * 1. the rich section — heading, Markdown lede, the **muted** surface, a Markdown caption and a decorative figure, **no**
+ *    column intent, so the donor's three/two/one default is what a visitor sees;
+ * 2. the two-column intent with an explicitly authored **plain** surface;
+ * 3. the three-column intent with an explicitly authored **bordered** surface;
+ * 4. the four-column intent with **no** surface, so the absent case is measured beside the two emphases;
+ * 5. the bare list — no heading, no lede, no surface, no column intent, so nothing is invented;
  * 6. the donor's own ceiling: twenty-four figures, each its own bound identity and its own served occurrence.
+ *
+ * `UNO-WO-121 / R02` authors `plain` and `bordered` explicitly (R01 authored only `muted` and absent), which is what lets the
+ * executed evidence prove the donor's whole closed surface *and* that an authored `plain` has no effect at all.
  */
 export const GALLERY_VARIANTS = Object.freeze([
   Object.freeze({ ...GALLERY_SOURCE }),
@@ -94,12 +127,14 @@ export const GALLERY_VARIANTS = Object.freeze([
     type: "gallery",
     heading: "Two columns",
     columns: 2,
+    surface: "plain",
     items: Object.freeze([item(2), item(3), item(4)]),
   }),
   Object.freeze({
     type: "gallery",
     heading: "Three columns",
     columns: 3,
+    surface: "bordered",
     items: Object.freeze([item(5), item(6), item(7)]),
   }),
   Object.freeze({
@@ -114,6 +149,9 @@ export const GALLERY_VARIANTS = Object.freeze([
     items: Object.freeze(Array.from({ length: 24 }, (_unused, index) => item(index))),
   }),
 ]);
+
+/** The surface each variant authors, in variant order: `null` is the absent case that must have no effect. */
+export const GALLERY_SURFACES = Object.freeze(GALLERY_VARIANTS.map((variant) => variant.surface ?? null));
 
 /** The column counts each variant must actually lay out at 390, 768 and 1280. */
 export const GALLERY_COLUMNS = Object.freeze([
@@ -283,8 +321,26 @@ function expectedColumns(index, width) {
   return want.at390;
 }
 
-/** The closed surface colour the credited `muted` section must compute to in each colour scheme. */
-const MUTED_BACKGROUND = Object.freeze({ light: "rgb(245, 247, 251)", dark: "rgb(20, 27, 36)" });
+/**
+ * The alternative each item must be announced with: the authored text, or the empty string for the explicitly decorative one.
+ * Ownership is per item, never inherited from a neighbour.
+ */
+function expectedAlts(variant) {
+  return variant.items.map((entry) => (entry.image.decorative === true ? "" : entry.image.alt));
+}
+
+/** Whether each item must own a caption at all — an absent caption is never invented. */
+function expectedCaptionPresence(variant) {
+  return variant.items.map((entry) => entry.caption !== undefined);
+}
+
+/** The intrinsic size each item must load, taken from the owned plate its own donor identity is bound to. */
+function expectedSizes(variant) {
+  return variant.items.map((entry) => {
+    const size = galleryExpectedSizeFor(entry.image.src);
+    return size === null ? null : [size.width, size.height];
+  });
+}
 
 /**
  * Judge one browser reading of all six served variants at one width and colour scheme.
@@ -298,6 +354,15 @@ export function galleryCaseVerdict(reading, testCase) {
   const expect = (ok, label) => {
     if (!ok) problems.push(label);
   };
+
+  // The reading must be the case it claims to be: no duplicate, missing or mislabelled observation.
+  expect(reading.case === testCase.key, `case:${reading.case}`);
+  expect(reading.width === testCase.width, `width:${reading.width}`);
+  expect(reading.dark === (testCase.scheme === "dark"), `scheme:${reading.dark}`);
+  expect(reading.reduce === (testCase.motion === "reduce"), `motion:${reading.reduce}`);
+  expect(reading.media?.wide640 === (testCase.width >= 640), `mq640:${reading.media?.wide640}`);
+  expect(reading.media?.wide1024 === (testCase.width >= 1024), `mq1024:${reading.media?.wide1024}`);
+
   const variants = reading.variants ?? [];
   expect(variants.length === GALLERY_IDS.length, `variants=${variants.length}`);
   GALLERY_VARIANTS.forEach((variant, index) => {
@@ -307,40 +372,52 @@ export function galleryCaseVerdict(reading, testCase) {
       return;
     }
     const columns = expectedColumns(index, testCase.width);
+    const authored = variant.columns === undefined ? null : String(variant.columns);
     expect(seen.id === GALLERY_IDS[index], `id:${index}`);
     expect(seen.listCount === 1, `list:${index}`);
     expect(seen.itemCount === variant.items.length, `items:${index}:${seen.itemCount}`);
     expect(seen.imageCount === variant.items.length, `images:${index}:${seen.imageCount}`);
+    expect(seen.figuresPerItem === variant.items.length, `figures:${index}:${seen.figuresPerItem}`);
     // An unauthored intent has no attribute at all and the donor default applies; an authored one must be its own literal.
-    expect(seen.columns === (variant.columns === undefined ? null : String(variant.columns)), `intent:${index}:${seen.columns}`);
+    expect(seen.intent === authored, `intent:${index}:${seen.intent}`);
     expect(seen.trackCount === columns, `tracks:${index}:${seen.trackCount}`);
     expect(seen.imagesLoaded === true, `loaded:${index}`);
     expect(seen.overflow === 0, `overflow:${index}`);
     expect(seen.hasControls === false, `controls:${index}`);
+    // Equal track widths and real row geometry: `columns` cells per row, rows descending, order kept within a row.
+    expect(
+      seen.widths.length === variant.items.length
+        && seen.widths.every((width) => Math.abs(width - seen.widths[0]) <= 1),
+      `widths:${index}`,
+    );
+    expect(seen.rowCount === Math.ceil(variant.items.length / columns), `rows:${index}:${seen.rowCount}`);
+    expect(seen.geometryOk === true, `geometry:${index}`);
+    // Distinct, owned, ascending same-Page occurrence identity, in authored order.
     expect(new Set(seen.srcs).size === seen.srcs.length, `distinct:${index}`);
     expect(seen.srcs.every((src) => /^\/uno-media\//u.test(src)), `owned:${index}`);
     expect(seen.ascending === true, `order:${index}`);
-    if (testCase.width < 640) {
-      // Narrow: one column, in authored order, so each figure begins below the previous one.
-      expect(seen.topsAscending === true, `mobile-order:${index}`);
-    }
+    // Per-item alternative and caption ownership, exactly as authored; no raw Markdown syntax reaches a caption.
+    expect(JSON.stringify(seen.alts) === JSON.stringify(expectedAlts(variant)), `alts:${index}`);
+    expect(JSON.stringify(seen.captionPresence) === JSON.stringify(expectedCaptionPresence(variant)), `captions:${index}`);
+    expect(
+      seen.captionTexts.every((caption) => caption === null || !/(\*\*|\[[^\]]*\]\()/u.test(caption)),
+      `caption-syntax:${index}`,
+    );
+    // Each item loads its own bound plate, at that plate's own intrinsic size.
+    expect(JSON.stringify(seen.sizes) === JSON.stringify(expectedSizes(variant)), `sizes:${index}`);
   });
+
   const rich = variants[0];
   if (rich !== undefined) {
     expect(rich.heading === GALLERY_EXPECTED.heading, "heading");
     expect(rich.ledeStrong === GALLERY_EXPECTED.ledeStrong, "lede");
     expect(rich.captionEm === GALLERY_EXPECTED.captionEm, "caption");
     expect(rich.captionLinkHref === GALLERY_EXPECTED.captionLinkHref, "caption-link");
-    expect(rich.surface === GALLERY_EXPECTED.surface, "surface-attr");
-    expect(rich.backgroundColor === MUTED_BACKGROUND[testCase.scheme], `surface-paint:${rich.backgroundColor}`);
-    expect(rich.alts[1] === "", `decorative-alt:${rich.alts[1]}`);
-    expect(rich.naturalWidths.every((value) => value === GALLERY_EXPECTED.intrinsicWidth), "intrinsic");
   }
   for (const index of [1, 2, 3]) {
     const seen = variants[index];
     if (seen === undefined) continue;
     expect(seen.heading === GALLERY_VARIANTS[index].heading, `heading:${index}`);
-    expect(seen.surface === null, `surface:${index}`);
   }
   const bare = variants[4];
   if (bare !== undefined) {
@@ -349,6 +426,47 @@ export function galleryCaseVerdict(reading, testCase) {
     expect(bare.lede === null, "bare-lede");
     expect(bare.surface === null, "bare-surface");
   }
+
+  // --- the closed surface, measured against its own tokens -----------------------------------------------------
+  const plainIndex = GALLERY_SURFACES.indexOf("plain");
+  const borderedIndex = GALLERY_SURFACES.indexOf("bordered");
+  const mutedIndex = GALLERY_SURFACES.indexOf("muted");
+  const absentIndex = GALLERY_SURFACES.indexOf(null);
+  const plain = variants[plainIndex];
+  const bordered = variants[borderedIndex];
+  const muted = variants[mutedIndex];
+  const absent = variants[absentIndex];
+  const tokens = reading.tokens ?? {};
+  if (plain !== undefined && bordered !== undefined && muted !== undefined && absent !== undefined) {
+    expect(plain.surface === "plain", "plain-attr");
+    expect(bordered.surface === "bordered", "bordered-attr");
+    expect(muted.surface === "muted", "muted-attr");
+    expect(absent.surface === null, "absent-attr");
+    // An authored `plain` is the absence of emphasis: it computes exactly like the section that authors nothing.
+    expect(
+      plain.backgroundColor === absent.backgroundColor
+        && plain.borderWidth === absent.borderWidth
+        && plain.padding === absent.padding
+        && plain.borderRadius === absent.borderRadius,
+      `plain-inert:${plain.backgroundColor}/${plain.borderWidth}/${plain.padding}`,
+    );
+    // `muted` paints the surface token and pads; it never draws a border.
+    expect(muted.backgroundColor === tokens.surface, `muted-token:${muted.backgroundColor}/${tokens.surface}`);
+    expect(muted.borderWidth === "0px", `muted-border:${muted.borderWidth}`);
+    expect(muted.padding !== plain.padding, `muted-padding:${muted.padding}`);
+    expect(muted.borderRadius !== plain.borderRadius, `muted-radius:${muted.borderRadius}`);
+    // `bordered` paints the background token and draws the border token, with the same padding and radius as `muted`.
+    expect(bordered.backgroundColor === tokens.background, `bordered-token:${bordered.backgroundColor}`);
+    expect(bordered.borderWidth === "1px", `bordered-border:${bordered.borderWidth}`);
+    expect(bordered.padding === muted.padding, `bordered-padding:${bordered.padding}`);
+    expect(bordered.borderRadius === muted.borderRadius, `bordered-radius:${bordered.borderRadius}`);
+    // The three emphases are genuinely distinct from one another and from the absent case.
+    expect(
+      new Set([plain.backgroundColor, muted.backgroundColor, bordered.backgroundColor]).size === 3,
+      "surfaces-distinct",
+    );
+  }
+
   expect(reading.keyboard?.reached === true, "keyboard");
   expect(reading.keyboard?.leftAfterTab === true, "keyboard-leave");
   expect(reading.keyboard?.pageUrlBefore === reading.keyboard?.pageUrlAfter, "keyboard-nav");
@@ -357,7 +475,10 @@ export function galleryCaseVerdict(reading, testCase) {
   return Object.freeze({ ok: problems.length === 0, detail: problems.slice(0, 10).join(",") });
 }
 
-/** The executed column geometry, so the run log itself records what each width produced. */
+/**
+ * The executed column geometry and surface measurements, so the run log itself records what each width and scheme produced.
+ * A set of readings that is not exactly the six declared cases — once each — is not evidence, so it reports `ok: false`.
+ */
 export function galleryGeometryReport(readings) {
   const rows = [];
   for (const reading of readings) {
@@ -365,11 +486,16 @@ export function galleryGeometryReport(readings) {
       variant.id,
       expectedColumns(index, reading.width),
       variant.trackCount,
-      variant.columns,
+      variant.intent,
+      variant.surface,
+      variant.padding,
     ]);
-    rows.push([reading.case, reading.width, row]);
+    rows.push([reading.case, reading.width, reading.dark, reading.reduce, row]);
   }
-  const ok = readings.length === GALLERY_CASES.length
+  // A repeated or missing case is not evidence: the six declared keys must each appear exactly once.
+  const keys = readings.map((reading) => reading.case);
+  const distinct = new Set(keys).size === keys.length && keys.length === GALLERY_CASES.length;
+  const ok = distinct
     && readings.every((reading) => {
       const testCase = GALLERY_CASES.find((item) => item.key === reading.case);
       return testCase !== undefined && galleryCaseVerdict(reading, testCase).ok;

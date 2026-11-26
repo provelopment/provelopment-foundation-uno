@@ -502,6 +502,12 @@ const DURABLE_PREFIX_IDS = Object.freeze([
   "components-faq",
   "components-callout",
 ]);
+/**
+ * `UNO-WO-121 / R02`: the one durable section whose committed representation and composed representation legitimately
+ * differ — the committed Page keeps the ordinary native grid it shipped with, while the adapter now composes the donor's
+ * opt-in list. Naming it once keeps the comparison below honest: everything else must still be byte-identical.
+ */
+const GALLERY_SECTION_ID = "family-5-gallery";
 const DURABLE_FAMILY_IDS = Object.freeze([
   "family-0-prose",
   "family-1-callout",
@@ -925,9 +931,9 @@ async function durableFamilySourcePhase() {
         JSON.stringify(DURABLE_PREFIX_IDS),
     );
     check(
-      // `UNO-WO-121 / R01`: the committed durable Page is **not** rewritten. It keeps its ordinary native gallery grid while
-      // the adapter now composes the donor's opt-in list, so the two are distinguished rather than conflated: every other
-      // appended section must still be the composer's own output, and only the Gallery section may differ.
+      // `UNO-WO-121 / R02`: the committed durable Page is **not** rewritten. It keeps its ordinary native gallery grid while the
+      // adapter composes the donor's opt-in list, so the two are distinguished by that representation difference **only**:
+      // every other appended section must still be the composer's own byte-identical output.
       "DURABLE_FAMILY_SOURCE the appended sections are the composer's own output",
       (() => {
         const committed = parsed.document.sections.slice(6);
@@ -936,21 +942,56 @@ async function durableFamilySourcePhase() {
         const differing = committed
           .filter((node, index) => JSON.stringify(node) !== JSON.stringify(recomposed[index]))
           .map((node) => node.id);
-        return JSON.stringify(differing) === JSON.stringify(["family-5-gallery"]);
+        return JSON.stringify(differing) === JSON.stringify([GALLERY_SECTION_ID]);
       })(),
     );
-    // The composed Gallery is the adopted list shape, and the committed Page still carries the ordinary grid it shipped with.
-    const committedGallery = parsed.document.sections.find((node) => node.id === "family-5-gallery");
-    const composedGallery = composed.document.sections.find((node) => node.id === "family-5-gallery");
+    // The Gallery itself is compared **semantically**, never exempted: anchor, authored columns, item count and order, each
+    // item's owned asset, alternative and caption must agree exactly, and neither representation may invent a field beyond
+    // the closed ones it is allowed to carry. A changed asset, alternative, caption, order or a missing item fails.
+    const committedGallery = parsed.document.sections.find((node) => node.id === GALLERY_SECTION_ID);
+    const composedGallery = composed.document.sections.find((node) => node.id === GALLERY_SECTION_ID);
+    const galleryDelta = (() => {
+      const gridProps = committedGallery?.props;
+      const listProps = composedGallery?.props;
+      const itemKeys = (items, allowed) => items.every((item) =>
+        Object.keys(item).every((key) => allowed.includes(key)));
+      const anchor = committedGallery !== undefined
+        && composedGallery !== undefined
+        && committedGallery.id === composedGallery.id
+        && committedGallery.module === "media.gallery"
+        && composedGallery.module === "media.gallery";
+      const representation = gridProps !== undefined
+        && listProps !== undefined
+        && gridProps.list === undefined
+        && listProps.list === true;
+      const columns = gridProps?.columns === listProps?.columns
+        && typeof listProps?.columns === "number";
+      const items = Array.isArray(gridProps?.items)
+        && Array.isArray(listProps?.items)
+        && gridProps.items.length === listProps.items.length
+        && gridProps.items.every((gridItem, index) => {
+          const listItem = listProps.items[index];
+          if (listItem === undefined) return false;
+          return JSON.stringify(gridItem.asset) === JSON.stringify(listItem.asset)
+            && gridItem.alt === listItem.alt
+            && (gridItem.caption ?? null) === (listItem.caption ?? null)
+            && Object.prototype.hasOwnProperty.call(gridItem, "caption")
+              === Object.prototype.hasOwnProperty.call(listItem, "caption");
+        });
+      // The grid may carry only `columns`/`items`; the list adds exactly the representation marker. No item invents a field.
+      const fields = gridProps !== undefined
+        && listProps !== undefined
+        && Object.keys(gridProps).every((key) => key === "columns" || key === "items")
+        && Object.keys(listProps).every((key) => key === "list" || key === "columns" || key === "items")
+        && itemKeys(gridProps.items ?? [], ["asset", "alt", "caption"])
+        && itemKeys(listProps.items ?? [], ["asset", "alt", "caption"]);
+      return { anchor, representation, columns, items, fields };
+    })();
     check(
-      "DURABLE_FAMILY_SOURCE the composed Gallery is the opt-in list while the committed Page keeps its ordinary grid",
-      composedGallery?.module === "media.gallery"
-        && composedGallery?.props?.list === true
-        && committedGallery?.module === "media.gallery"
-        && committedGallery?.props?.list === undefined
-        && Array.isArray(committedGallery?.props?.items)
-        && committedGallery?.props?.items?.length === 2,
-      JSON.stringify({ composed: composedGallery?.props?.list, committed: committedGallery?.props?.list }),
+      "DURABLE_FAMILY_SOURCE the committed grid and the composed list agree on anchor, authored columns, order, assets, alternatives and captions and invent no field",
+      galleryDelta.anchor && galleryDelta.representation && galleryDelta.columns
+        && galleryDelta.items && galleryDelta.fields,
+      JSON.stringify(galleryDelta),
     );
   }
 
