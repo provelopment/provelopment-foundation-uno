@@ -651,10 +651,10 @@ export async function runNativeCardsTransaction({
     const { readUnoPageDocument } = await import("../../src/core/page-document.ts");
 
     // (a) Production HTTP: four native sections, one list each, the authored column intents and surfaces, and no deferred
-    // image or action markup anywhere. The response served *before* the swap is captured first, so the restoration in (f) can be
-    // proved by exact content equality rather than by a status code.
+    // image or action markup anywhere. The response served *before* the swap is captured first, so the restoration in (f) can
+    // prove the served status is unchanged and the fixture digest returns to the authored bytes (R06 dropped the literal
+    // HTML comparison in favour of the marker-plus-digest restore proof, which leaves the captured body unused).
     const originalResponse = await fetch(`${familyUrl}?wo122r05=original`, { redirect: "manual" });
-    const originalHtml = originalResponse.status === 200 ? await originalResponse.text() : "";
     const response = await fetch(`${familyUrl}?wo122r05=native`, { redirect: "manual" });
     const html = response.status === 200 ? await response.text() : "";
     const facts = NATIVE_CARDS_IDS.map((id) => nativeCardsListOf(nativeCardsRegionOf(html, id)));

@@ -13,7 +13,7 @@ import {
   NATIVE_CARDS_DOCUMENT,
   NATIVE_CARDS_IDS,
   NATIVE_CARDS_REFUSALS,
-  // @ts-ignore - no declaration file is shipped for the plain-ESM runner asset
+  // @ts-expect-error - no declaration file is shipped for the plain-ESM runner asset
 } from "../../scripts/u04/cards-native-evidence.mjs";
 
 
