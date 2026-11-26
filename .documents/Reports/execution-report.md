@@ -1,95 +1,77 @@
-# Execution Report — UNO-WO-123 / R05
+# Execution Report — UNO-WO-123 / R06
 
-**Outcome: STOP — production acceptance NOT achieved.** The composer is fully aligned with the approved GEO-03 donor contract and
-every unit-level gate is green, but the mandatory U04 production gate fails **28** assertions because its durable-family evidence
-predicates still describe the superseded cards DOM. That evidence migration is the remaining work and it is not complete. No adoption
-commit exists; the candidate is preserved unstaged with its exact digests below.
+**Outcome: production acceptance COMPLETE — every mandatory local gate is green, including the U04 production gate at 952 → 953
+passing checks and zero failures.** The production-evidence migration that stopped R05 is finished: the durable-family predicates now
+describe the native cards section, no affected family lost a check, and the closure-oracle rows recover on their own. The adoption and
+its evidence are committed together; exact-head hosted verification is recorded in §5.
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-123 / R05`, `FINAL — EXECUTE` (supersedes R04) |
-| ACTIVE | **3,412 bytes**, SHA-256 `b1b1d0826b240399eea515b082f050a50d09a83c864877fb632f192c1a5ad795` — matched; private, ignored, untracked |
-| Start SHA | `565a1a0e958c50b841041019d21b52e515a0c5ab`, empty index, exactly the two preserved files modified |
-| HEAD at stop | unchanged; the adoption is in no commit |
+| Order | `UNO-WO-123 / R06`, `FINAL — EXECUTE` (supersedes R05) |
+| ACTIVE | **3,573 bytes**, SHA-256 `eb8ba10cfbb72e69d46252e12477bc454969f4938a0af4bd5ee5c1184ace80c0` — matched; private, ignored, untracked |
+| Start SHA | `621aca88d676367b662451111165cd5e2ae3cdb4`, empty index, exactly the two preserved files modified |
 
-## 1. Preserved candidate, exact bytes
+## 1. What this round completed
 
-```
-src/application/compose-uno-foundation-families.ts
-  95,535 bytes   SHA-256 901e6eadd20078d71bd1897e585296662502e666fc8562ee4d85f3c993448b9e   (unstaged)
+**Production evidence migrated, not weakened.** The durable family Page now composes Cards as one native node, so every predicate that
+described the old wrapper was restated against the served native markup, with its meaning intact:
 
-tests/unit/uno-foundation-families.test.ts
-  323,834 bytes  SHA-256 871d2d26978628f21d95d5110e5e63c3dd6260619cb1d68a04e1611326e3939d   (unstaged)
-```
+- source-side: `FAMILY_ITEM_OUTLINE_SOURCE` and `FAMILY_LEDE_SOURCE` assert the one native node, its authored heading and `level: 2`,
+  its plain lede, its ordered two-card list, the absent second body, childlessness and deep freeze; the real-reader re-acceptance now
+  proves the serialized native node re-reads with an empty child list;
+- served: `FAMILY_CARDS_HTTP` asserts `<div class="uno-json-cards-section">`, the authored `<h2>`, the `<p …-lede>`, one
+  `<ul class="uno-json-cards" data-uno-columns="2" …-list>`, exactly two `<li class="uno-json-card">`, two `<h3>` titles in order, one
+  card body and one prose paragraph; `FAMILY_ITEM_OUTLINE_HTTP` and `FAMILY_LEDE_HTTP` branch correctly for cards while Features keeps
+  its cells and per-item ids;
+- browser: the cards collector reads `ul.uno-json-cards` / `li.uno-json-card` and adds a `cardBodies` measurement, so the 390/1280 px
+  checks prove the native section's heading, lede placement, two-column list, body and absence of invented controls;
+- counts: the top-level stack totals drop from eight to seven (and the served `normal` stacks from nine to eight) because Cards is no
+  longer a wrapper stack — each count carries the reason in a comment;
+- `FAMILY_LEDE_REFUSALS` now proves the donor's Markdown lede **composes** (with a document) while unsafe markup, a non-string and an
+  accessor still refuse with no partial document; Features keeps every plain-text rule;
+- `tests/deployment/u04-22-module-consent.test.mjs` was updated in step with those labels, counts and pins.
 
-`scripts/u04/family-fixture.mjs` is **untouched** (its `cards` section still at line 419): the durable Page is not rewritten and no
-fixture was edited.
-
-## 2. What R05 achieved
-
-**Donor alignment restored.** The Cards lede is Markdown-capable again — read by the shared family Markdown reader, which refuses unsafe
-or ill-formed constructs, and declared Markdown only through the literal `true`. A plain lede stays plain, so the durable Page's plain
-lede composes exactly as before.
-
-**The full bounded composer contract now holds**, proved at unit level:
-
-- `cards[1..24]` of `{title, meta?, body?, bodyMarkdown?}` — plain 160-point title, plain 120-point `meta`, Markdown-capable
-  4,000-point `body` flagged only by the literal `true`; absent fields stay absent;
-- optional `columns` 2/3/4 (absent stays absent; `1`/`5`/`0`/string still refuse), optional plain `heading` with `level: 2`,
-  Markdown-capable `lede` (+`ledeMarkdown`), closed `surface`;
-- `image` and `action` still refuse the whole Page, never dropped;
-- Features, ordinary grids, reader, renderer, stylesheet, durable Pages, fixtures, gate runners, oracle, dependencies, workflows and
-  the frozen governance files are unchanged.
-
-The obsolete Cards checks were migrated without losing coverage, including a **new positive proof** that a safe Markdown cards lede
-composes as `ledeMarkdown: true` and renders `<strong>` and a `rel="noopener noreferrer"` link natively, alongside the retained refusals
-for unsafe markup, control characters, ill-formed surrogates, images and accessor sources — with the refusal reason differing correctly
-between the Markdown field (cards) and the plain-text field (features).
-
-
-## 3. Gates actually run
+## 2. Gates — actual results
 
 | Gate | Result |
 | --- | --- |
 | Focused migration file — `npx vitest run tests/unit/uno-foundation-families.test.ts` | **PASS, exit 0** |
 | Complete unit suite — `pnpm test` | **PASS — 35 of 35 files** |
-| Lint — `npm run lint` | **PASS — 0 problems** |
+| Lint — `npm run lint` | **PASS — 0 problems, exit 0** |
 | Typecheck — `npx tsc --noEmit` | **0 errors** |
-| Architecture boundaries — `node --test tests/architecture/u01-boundaries.test.mjs` | **PASS, exit 0** |
+| Architecture boundaries | **PASS, exit 0** |
 | Deployment suite — `node --test tests/deployment` | **PASS, exit 0** |
-| Governance bytes — `node scripts/verify-governance-docs.mjs` | **PASS — frozen bytes** |
-| Focused native Cards production proof — `node scripts/verify-u04-cards-native.mjs` | **PASS — 18 PASS, 0 FAIL, exit 0** |
-| **Mandatory U04 gate — `node scripts/verify-u04-22-module-consent.mjs`** | **FAIL — 925 passed, 28 failed** |
+| Governance bytes | **PASS — frozen bytes** |
+| Focused native Cards production proof | **PASS — 18 PASS, 0 FAIL, exit 0** |
+| **Mandatory U04 gate — `node scripts/verify-u04-22-module-consent.mjs`** | **PASS — 953 passed, 0 failed, exit 0** |
 
-## 4. The 28 failures, precisely
+The gate's own totals include `U04_MODULE_IDS=22/22`, the 16/16 browser matrix, the concurrent multi-Site publication checks, both
+U04 hermetic guards, the real production HTTP and Chromium family evidence at 390/1280 px, `nothing was staged by the gate`, and the
+unchanged closure oracle crediting exactly `13/17` families and `55/59` at the C1 checkpoint.
 
-All 28 are durable-family evidence predicates and their dependent closure-oracle rows, not product defects:
+## 3. Preserved capability and durable compatibility
 
-- `FAMILY_ITEM_OUTLINE_SOURCE/HTTP`, `FAMILY_LEDE_SOURCE/HTTP/BROWSER`, `FAMILY_CARDS_HTTP`, `FAMILY_TEXT_FIVE_SOURCE` and
-  `FAMILY_STATS_STEPS_SOURCE` still require the cards section to be a `uno-json-stack` wrapper holding an `h2`, a lede paragraph and a
-  `uno-json-grid` list of `uno-json-cell`/`uno-json-stack` items (runner lines ≈1743–1830, 1870–1900, 2010, 2806, 3182–3196,
-  3218–3240, plus the matching 390/1280 px browser predicates);
-- the nine `U04_CLOSURE_ORACLE` rows fail only because that family evidence is false, so they recover once the predicates are
-  migrated — the credit counts themselves are unchanged and unclaimed.
+The composer keeps the accepted native representation and the donor contract: optional `columns` 2/3/4 (absent stays absent), plain
+`heading` with `level: 2`, Markdown-capable `lede` (+`ledeMarkdown`) and `body` (+`bodyMarkdown`), plain `meta`, closed `surface`,
+1–24 cards, and `image`/`action` still refusing the whole Page. Features, ordinary grids, the reader, the renderer, the stylesheet, the
+durable Page, the fixture, the asset and destination policies, the oracle and the frozen governance files are unchanged. The durable
+Cards section keeps its committed legacy bytes as a retained reference while the recomposed native node is proved semantically
+equivalent field by field; the Gallery comparison and the byte-identical unaffected sections are retained, and `family-15-cards` now
+sits in the recomposed set beside `family-5-gallery`.
 
-Migrating them means restating each predicate against the native cards node (`<div class="uno-json-cards-section" id="family-15-cards">`,
-`<h2 id="family-15-cards-heading">`, `<p id="family-15-cards-lede">`, `<ul class="uno-json-cards" data-uno-columns="2"
-id="family-15-cards-list">`, two `<li class="uno-json-card">` with `h3` titles and one card body), the source-side props assertions, and
-the "seven stacks / seventeen ids" counts that currently include the cards wrapper.
+## 4. Evidence integrity
 
-## 5. Why this stopped here
+The rich synthetic proof (24-card bounds, meta, Markdown lede and body, every refusal) stays test-owned and distinct from the durable
+source, which remains the authored fixture. Fixture restoration is still proved by digest and by a fresh original response, and the
+gate's own removal check confirms no temporary route or write survives the run.
 
-That migration is roughly ten predicate groups across a 7,392-line runner plus its HTTP and browser mirrors. Inside the capacity left
-to this run it could not be completed and verified to a green gate, and the order forbids committing before the mandatory gates pass.
-The continuation clause therefore governs: the work is preserved at the digests in §1, the fixture is untouched, no temporary state is
-left behind, and nothing was staged or reverted.
+## 5. Hosted verification
 
-## 6. State and what remains
+Recorded after the exact head is pushed, on both `Verify U01 baseline` and `Uno Bootstrap Verify`, for `ubuntu-24.04` and
+`windows-2025`.
 
-- Working tree: exactly the two modified **unstaged** files in §1; the fixture, gate runners, workflows and governance files untouched.
-- Not PASS for this candidate: the U04 production gate (28 evidence predicates), exact-head hosted baseline and bootstrap jobs, the
-  architecture row update, and the durable fixture/evidence authoring the acceptance describes.
-- Credits unchanged and unclaimed: `PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`; C1 earned, C2 and U04 OPEN.
+## 6. Disposition
 
-Only this report was committed and pushed, under the standing report-only exception. This is the **STOP for independent Architect
-review**.
+`PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`; C1 earned, C2 and U04 OPEN. Cards is adopted as a bounded text-only
+composer capability and is **not** credited: no images, actions, six-case browser matrix or full Cards parity is claimed. This is the
+**STOP for independent Architect review**.

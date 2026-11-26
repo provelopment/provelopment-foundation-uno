@@ -1770,27 +1770,22 @@ describe("composeUnoFoundationSubset — bounded cards and features", () => {
     expect(features?.module).toBe("layout.grid");
     if (cards?.module !== "layout.grid" || features?.module !== "layout.grid") return;
 
-    // Native list-grid semantics only: no article wrapper, no ratio, no invented card decoration.
-    expect(cards.props).toEqual({ columns: 2, itemSemantics: "list" });
+    // `UNO-WO-123 / R01`: one native, closed opt-in text-only cards node — its content is its own closed card list, so
+    // there is no child stack, no per-card wrapper and no manufactured field.
+    expect(cards.props).toEqual({
+      cards: [
+        { title: "First card", body: "Description." },
+        { title: "Second card" },
+      ],
+      columns: 2,
+    });
     expect(features.props).toEqual({ columns: 3, itemSemantics: "list" });
 
-    expect(cards.children.map((child) => child.id)).toEqual([
-      "family-11-cards-item-0",
-      "family-11-cards-item-1",
-    ]);
-    const firstCard = cards.children[0];
-    const secondCard = cards.children[1];
-    if (firstCard?.module !== "layout.stack" || secondCard?.module !== "layout.stack") return;
-    expect(firstCard.props).toEqual({ gap: "tight" });
-    expect(firstCard.children.map((child) => child.id)).toEqual([
-      "family-11-cards-item-0-title",
-      "family-11-cards-item-0-body",
-    ]);
-    expect(firstCard.children[0]?.props).toEqual({ text: "First card", level: 2 });
-    expect(firstCard.children[1]?.props).toEqual({ text: "Description." });
-    // An absent body stays absent: one title child only, no manufactured paragraph.
-    expect(secondCard.children.map((child) => child.id)).toEqual(["family-11-cards-item-1-title"]);
-    expect(secondCard.children[0]?.props).toEqual({ text: "Second card", level: 2 });
+    // The validated native cards node keeps its accepted empty child list **non-enumerable**: present for existing
+    // `node.children` consumers, absent from its own keys and from its serialized form.
+    expect(cards.children).toEqual([]);
+    expect(Object.keys(cards)).not.toContain("children");
+    expect(Object.hasOwn(JSON.parse(JSON.stringify(cards)) as object, "children")).toBe(false);
 
     expect(features.children.map((child) => child.id)).toEqual([
       "family-12-features-item-0",
@@ -1851,19 +1846,19 @@ describe("composeUnoFoundationSubset — cards and features React markup", () =>
   const cards = gridMarkup(html, "family-11-cards");
   const features = gridMarkup(html, "family-12-features");
 
-  it("renders each card as one native list item of a native list-grid", () => {
+  it("renders each card as one native card of the native cards list", () => {
     expect(cards).toContain(
-      '<ul class="uno-json-grid" data-uno-columns="2" data-uno-item-semantics="list" id="family-11-cards" role="list">',
+      '<ul class="uno-json-cards" data-uno-columns="2" id="family-11-cards-list" role="list">',
     );
-    expect((cards.match(/<li class="uno-json-cell"/gu) ?? []).length).toBe(2);
-    expect((cards.match(/class="uno-json-stack"/gu) ?? []).length).toBe(2);
+    expect((cards.match(/<li class="uno-json-card"/gu) ?? []).length).toBe(2);
+    // A heading-less cards section keeps the accepted level-2 card titles and invents no section heading.
     expect((cards.match(/<h2 class="uno-json-heading"/gu) ?? []).length).toBe(2);
-    expect((cards.match(/<p class="uno-json-prose"/gu) ?? []).length).toBe(1);
-    expect(cards).toContain('<h2 class="uno-json-heading" id="family-11-cards-item-0-title">First card</h2>');
-    expect(cards).toContain('<h2 class="uno-json-heading" id="family-11-cards-item-1-title">Second card</h2>');
-    expect(cards).toContain('<p class="uno-json-prose" id="family-11-cards-item-0-body">Description.</p>');
-    // The card authored without a body gains no paragraph of its own.
-    expect(cards).not.toContain("family-11-cards-item-1-body");
+    expect((cards.match(/<p class="uno-json-card-body"/gu) ?? []).length).toBe(1);
+    expect(cards).toContain('<h2 class="uno-json-heading">First card</h2>');
+    expect(cards).toContain('<h2 class="uno-json-heading">Second card</h2>');
+    expect(cards).toContain('<p class="uno-json-card-body">Description.</p>');
+    // The card authored without a body gains no body element of its own.
+    expect((cards.match(/uno-json-card-body/gu) ?? []).length).toBe(1);
     expect(cards.indexOf("First card")).toBeLessThan(cards.indexOf("Second card"));
   });
 
@@ -1919,17 +1914,30 @@ describe("composeUnoFoundationSubset — cards and features React markup", () =>
 describe("composeUnoFoundationSubset — cards and features refusal", () => {
   it.each(["cards", "features"] as const)("refuses %s fields outside the bounded subset", (type) => {
     const base = { type, items: [{ title: "A", body: "B" }] };
-    // `columns` is required here even though the donor renderer defaults an omitted value.
-    expectRefusal(envelope(base), "family:unsupported-feature");
-    // `UNO-WO-070 / R01` accepts the donor's optional authored `heading`, and `UNO-WO-071 / R01` its optional authored
-    // `lede`, so neither is an extra key; both are proved by their own dedicated sections below.
+    // `UNO-WO-123 / R04`: cards accepts an absent column intent and leaves it absent; features still requires the
+    // authored intent this subset has always required.
+    if (type === "features") {
+      expectRefusal(envelope(base), "family:unsupported-feature");
+    } else {
+      const withoutColumns = composed(envelope(base)).sections[0]!;
+      expect(withoutColumns.module).toBe("layout.grid");
+      expect(Object.keys(withoutColumns.props)).toEqual(["cards"]);
+      expect(readUnoPageDocument(JSON.stringify(composed(envelope(base)))).accepted).toBe(true);
+    }
+    // `UNO-WO-070 / R01` accepts the donor's optional authored `heading`, `UNO-WO-071 / R01` its optional authored
+    // `lede`, and `UNO-WO-123 / R01` the donor's closed `surface` for Cards — its one native cards node carries it.
+    // Every other donor field is still out of this subset, for both families.
     for (const extra of ["surface", "align", "ratio", "href", "route", "link", "style", "onClick", "visibility"]) {
+      if (type === "cards" && extra === "surface") continue;
       expectRefusal(
         envelope({ ...base, columns: 2, [extra]: extra === "align" ? "center" : "X" }),
         "family:unsupported-feature",
       );
     }
+    // A card's `meta` line is part of the adopted donor text contract; the deferred `image` and `action` are not, so an
+    // authored one still refuses the whole Page instead of being dropped.
     for (const extra of ["image", "meta", "action", "icon", "href", "route", "link", "style", "onClick"]) {
+      if (type === "cards" && extra === "meta") continue;
       expectRefusal(
         envelope({ type, columns: 2, items: [{ title: "A", [extra]: "X" }] }),
         "family:unsupported-feature",
@@ -1950,6 +1958,9 @@ describe("composeUnoFoundationSubset — cards and features refusal", () => {
       ["body", "**bold**"],
       ["body", "[x](https://example.org)"],
     ] as const) {
+      // A card's body is now Markdown-capable, so a Markdown body is *accepted* for cards and still refused for
+      // features; the accepted card bodies are proved by the dedicated Markdown section below.
+      if (type === "cards" && field === "body") continue;
       expectRefusal(
         envelope({ type, columns: 2, items: [{ title: "A", body: "B", [field]: value }] }),
         "family:unsupported-feature",
@@ -1964,8 +1975,14 @@ describe("composeUnoFoundationSubset — cards and features refusal", () => {
     }
     expectRefusal(envelope({ type, columns: "2", items }), "family:target-refused");
     expectRefusal(envelope({ type, columns: 2, items: [] }), "family:target-refused");
+    // `UNO-WO-123 / R01`: the adopted donor card contract allows up to twenty-four ordered cards, so nine cards are
+    // now valid and the first refused count is twenty-five.
     const nine = Array.from({ length: 9 }, (_, index) => ({ title: `T${index}` }));
-    expectRefusal(envelope({ type, columns: 2, items: nine }), "family:target-refused");
+    expect(composed(envelope({ type: "cards", columns: 2, items: nine })).sections).toHaveLength(1);
+    expectRefusal(envelope({ type, columns: 2, items: Array.from({ length: 25 }, () => ({ title: "T" })) }), "family:target-refused");
+    if (type === "features") {
+      expectRefusal(envelope({ type, columns: 2, items: nine }), "family:target-refused");
+    }
     expectRefusal(envelope({ type, columns: 2, items: [{ title: "" }] }), "family:target-refused");
     expectRefusal(envelope({ type, columns: 2, items: [{ title: "t".repeat(161) }] }), "family:target-refused");
     expectRefusal(envelope({ type, columns: 2, items: [{ title: "A", body: "" }] }), "family:target-refused");
@@ -1973,9 +1990,11 @@ describe("composeUnoFoundationSubset — cards and features refusal", () => {
       envelope({ type, columns: 2, items: [{ title: "A", body: "b".repeat(4001) }] }),
       "family:target-refused",
     );
+    // A raw HTML body is not a Markdown body: for cards the shared family Markdown reader refuses it as unsupported
+    // source, while the plain-text feature body still fails the target's own text rule.
     expectRefusal(
       envelope({ type, columns: 2, items: [{ title: "A", body: "<script>alert(1)</script>" }] }),
-      "family:target-refused",
+      type === "cards" ? "family:unsupported-feature" : "family:target-refused",
     );
   });
 
@@ -4365,12 +4384,26 @@ describe("composeUnoFoundationSubset — cards and features authored heading", (
     };
   }
 
-  it("keeps the heading-less cards node byte-identical to the pre-WO-070 committed output", () => {
+  it("recomposes the heading-less cards section natively, keeping the committed legacy bytes as the reference", () => {
     const document = composed(unheadedCards());
-    expect(JSON.stringify(document.sections[0])).toBe(LEGACY_CARDS);
-    expect(document.sections[0]!.module).toBe("layout.grid");
-    expect(document.sections[0]!.id).toBe("family-0-cards");
-    expect(Object.keys(document.sections[0]!.props)).toEqual(["columns", "itemSemantics"]);
+    const section = document.sections[0]!;
+    // The committed pre-WO-070 bytes stay the reference they were — retained, not overwritten.
+    expect(LEGACY_CARDS).toContain('"itemSemantics":"list"');
+    expect(JSON.stringify(section)).not.toBe(LEGACY_CARDS);
+    expect(section.module).toBe("layout.grid");
+    expect(section.id).toBe("family-0-cards");
+    expect(Object.keys(section.props)).toEqual(["cards", "columns"]);
+    // Strict semantic equivalence instead of digest replacement: the same authored order, titles, bodies and absence,
+    // with no invented heading, meta, image, action or second list.
+    expect(section.props).toEqual({
+      cards: [
+        { title: "Card one", body: "First card body." },
+        { title: "Card two" },
+      ],
+      columns: 2,
+    });
+    expect((section as { readonly children?: readonly unknown[] }).children).toEqual([]);
+    expect(Object.hasOwn(JSON.parse(JSON.stringify(section)) as object, "children")).toBe(false);
   });
 
   it("keeps the heading-less features node byte-identical to the pre-WO-070 committed output", () => {
@@ -4390,36 +4423,24 @@ describe("composeUnoFoundationSubset — cards and features authored heading", (
     expect(document.sections).toHaveLength(1);
     const section = document.sections[0]!;
     expect(section.id).toBe("family-0-cards");
-    expect(section.module).toBe("layout.stack");
-    expect(JSON.stringify(section.props)).toBe("{}");
-    if (section.module !== "layout.stack") return;
-    expect(section.children).toHaveLength(2);
-    const [heading, grid] = section.children;
-    expect(heading!.id).toBe("family-0-cards-heading");
-    expect(heading!.module).toBe("content.heading");
-    expect(heading!.props).toEqual({ text: "Synthetic cards", level: 2 });
-    expect(grid!.id).toBe("family-0-cards-grid");
-    expect(grid!.module).toBe("layout.grid");
-    expect(grid!.props).toEqual({ columns: 2, itemSemantics: "list" });
-    if (grid!.module !== "layout.grid") return;
-    expect(grid!.children.map((item) => item.id)).toEqual(["family-0-cards-item-0", "family-0-cards-item-1"]);
-    const [first, second] = grid!.children;
-    expect(first!.props).toEqual({ gap: "tight" });
-    if (first!.module !== "layout.stack") return;
-    expect(first!.children.map((child) => child.id)).toEqual(["family-0-cards-item-0-title", "family-0-cards-item-0-body"]);
-    expect(first!.children[0]!.props).toEqual({ text: "Card one", level: 3 });
-    expect(first!.children[1]!.props).toEqual({ text: "First card body." });
-    if (second!.module !== "layout.stack") return;
-    expect(second!.children).toHaveLength(1);
-    expect(second!.children[0]!.props).toEqual({ text: "Card two", level: 3 });
-    // Deep freeze down to the item props, and the real reader accepts both forms.
+    expect(section.module).toBe("layout.grid");
+    if (section.module !== "layout.grid") return;
+    // The authored heading, its level and the cards live on the one native node: no wrapper, no per-card stack.
+    expect(section.props).toEqual({
+      cards: [
+        { title: "Card one", body: "First card body." },
+        { title: "Card two" },
+      ],
+      columns: 2,
+      heading: "Synthetic cards",
+      level: 2,
+    });
+    expect(section.children).toEqual([]);
+    // Deep freeze down to the card list, and the real reader accepts both forms.
     expect(Object.isFrozen(document)).toBe(true);
     expect(Object.isFrozen(section)).toBe(true);
     expect(Object.isFrozen(section.props)).toBe(true);
-    expect(Object.isFrozen(section.children)).toBe(true);
-    expect(Object.isFrozen(first)).toBe(true);
-    expect(Object.isFrozen(first.props)).toBe(true);
-    expect(Object.isFrozen(first.children[0]!.props)).toBe(true);
+    expect(Object.isFrozen((section.props as { cards: readonly unknown[] }).cards)).toBe(true);
     expect(readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown).accepted).toBe(true);
     expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
   });
@@ -4492,10 +4513,21 @@ describe("composeUnoFoundationSubset — cards and features authored heading", (
       expect(document.sections.map((section) => section.id)).toEqual(order.map((type, index) => `family-${index}-${type}`));
       for (const [index, type] of order.entries()) {
         const section = document.sections[index]!;
+        if (type === "cards") {
+          // The native cards node carries its own heading and level and owns no children at all.
+          expect(section.module).toBe("layout.grid");
+          if (section.module !== "layout.grid") continue;
+          const cardsProps = section.props as { heading?: string; level?: number };
+          expect(cardsProps.heading).toBe("Synthetic cards");
+          expect(cardsProps.level).toBe(2);
+          expect(section.children).toEqual([]);
+          continue;
+        }
         expect(section.module).toBe("layout.stack");
         if (section.module !== "layout.stack") continue;
         expect(section.children[0]!.props).toEqual({
-          text: type === "cards" ? "Synthetic cards" : "Synthetic features",
+          // The cards branch returned above, so this stack is the authored Features one.
+          text: "Synthetic features",
           level: 2,
         });
         const grid = section.children[1]!;
@@ -4515,16 +4547,15 @@ describe("composeUnoFoundationSubset — cards and features authored heading", (
     const start = html.indexOf('id="family-0-cards"');
     expect(start).toBeGreaterThan(0);
     const region = html.slice(start - 60, html.length);
-    expect(region).toContain('<div class="uno-json-stack" data-uno-gap="normal" id="family-0-cards">');
+    expect(region).toContain('<div class="uno-json-cards-section" id="family-0-cards">');
     expect(region).toContain('<h2 class="uno-json-heading" id="family-0-cards-heading">Plans &amp; &quot;prices&quot;</h2>');
-    expect(region).toContain('id="family-0-cards-grid"');
-    expect(region).toContain('data-uno-item-semantics="list"');
+    expect(region).toContain('id="family-0-cards-list"');
     expect(region).toContain('role="list"');
-    expect((region.match(/<li class="uno-json-cell"/gu) ?? []).length).toBe(2);
-    expect(region).toContain('<h3 class="uno-json-heading" id="family-0-cards-item-0-title">Card one</h3>');
-    expect(region).toContain('<h3 class="uno-json-heading" id="family-0-cards-item-1-title">Card two</h3>');
-    expect((region.match(/<p class="uno-json-prose"/gu) ?? []).length).toBe(1);
-    expect(region).toContain('<p class="uno-json-prose" id="family-0-cards-item-0-body">First card body.</p>');
+    expect((region.match(/<li class="uno-json-card"/gu) ?? []).length).toBe(2);
+    expect(region).toContain('<h3 class="uno-json-heading">Card one</h3>');
+    expect(region).toContain('<h3 class="uno-json-heading">Card two</h3>');
+    expect((region.match(/<p class="uno-json-card-body"/gu) ?? []).length).toBe(1);
+    expect(region).toContain('<p class="uno-json-card-body">First card body.</p>');
     expect(region.indexOf("<h2")).toBeGreaterThan(0);
     expect(region.indexOf("<h2")).toBeLessThan(region.indexOf("<h3"));
     expect((region.match(/<h2/gu) ?? []).length).toBe(1);
@@ -4553,15 +4584,23 @@ describe("composeUnoFoundationSubset — cards and features authored heading", (
     const astral = "\u{1F600}".repeat(160);
     expect(Array.from(astral)).toHaveLength(160);
     for (const type of ["cards", "features"] as const) {
-      const bmpDocument = composed(headedSource(type, 2, bmp));
-      const section = bmpDocument.sections[0]!;
-      expect(section.module).toBe("layout.stack");
-      if (section.module === "layout.stack") expect(section.children[0]!.props).toEqual({ text: bmp, level: 2 });
-      const astralDocument = composed(headedSource(type, 2, astral));
-      const astralSection = astralDocument.sections[0]!;
-      expect(astralSection.module).toBe("layout.stack");
-      if (astralSection.module === "layout.stack") expect(astralSection.children[0]!.props).toEqual({ text: astral, level: 2 });
-      expect(readUnoPageDocument(JSON.stringify(astralDocument)).accepted).toBe(true);
+      for (const [value, document] of [
+        [bmp, composed(headedSource(type, 2, bmp))],
+        [astral, composed(headedSource(type, 2, astral))],
+      ] as const) {
+        const section = document.sections[0]!;
+        if (type === "cards") {
+          // The authored heading reaches the native cards node itself, at the same 160-code-point bound.
+          expect(section.module).toBe("layout.grid");
+          if (section.module === "layout.grid") {
+            expect((section.props as { heading?: string }).heading).toBe(value);
+          }
+        } else {
+          expect(section.module).toBe("layout.stack");
+          if (section.module === "layout.stack") expect(section.children[0]!.props).toEqual({ text: value, level: 2 });
+        }
+        expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+      }
     }
   });
 
@@ -4614,18 +4653,35 @@ describe("composeUnoFoundationSubset — cards and features authored heading", (
   it("still refuses every out-of-subset cards and features donor field, headed or not", () => {
     for (const type of ["cards", "features"] as const) {
       const base = { type, heading: "Headed", columns: 2, items: [{ title: "One" }] };
-      // `lede` is now accepted (see the dedicated lede section); every other donor field stays out of this subset.
-      expectRefusal(envelope({ ...base, surface: "muted" }), "family:unsupported-feature");
+      // `lede` and, for cards only, the closed `surface` and a card's `meta` are accepted (see the dedicated sections);
+      // every other donor field stays out of this subset for both families.
+      if (type === "features") {
+        expectRefusal(envelope({ ...base, surface: "muted" }), "family:unsupported-feature");
+      } else {
+        const headed = composed(envelope({ ...base, surface: "muted" })).sections[0]!;
+        expect((headed.props as { surface?: string }).surface).toBe("muted");
+      }
       expectRefusal(envelope({ ...base, href: "#next" }), "family:unsupported-feature");
       expectRefusal(envelope({ ...base, style: "color:red" }), "family:unsupported-feature");
       expectRefusal(envelope({ ...base, onClick: "run()" }), "family:unsupported-feature");
-      expectRefusal(envelope({ type, heading: "Headed", items: [{ title: "One" }] }), "family:unsupported-feature");
+      if (type === "features") {
+        expectRefusal(envelope({ type, heading: "Headed", items: [{ title: "One" }] }), "family:unsupported-feature");
+      } else {
+        // An absent column intent is accepted for cards and stays absent, so the node carries no invented intent.
+        const absentColumns = composed(envelope({ type, heading: "Headed", items: [{ title: "One" }] })).sections[0]!;
+        expect(Object.keys(absentColumns.props)).toEqual(["cards", "heading", "level"]);
+      }
       expectRefusal(envelope({ ...base, columns: 5 }), "family:target-refused");
       expectRefusal(
         envelope({ ...base, items: [{ title: "One", image: { src: "/x.png", alt: "x" } }] }),
         "family:unsupported-feature",
       );
-      expectRefusal(envelope({ ...base, items: [{ title: "One", meta: "Meta" }] }), "family:unsupported-feature");
+      if (type === "features") {
+        expectRefusal(envelope({ ...base, items: [{ title: "One", meta: "Meta" }] }), "family:unsupported-feature");
+      } else {
+        const withMeta = composed(envelope({ ...base, items: [{ title: "One", meta: "Meta" }] })).sections[0]!;
+        expect((withMeta.props as { cards: readonly { meta?: string }[] }).cards[0]!.meta).toBe("Meta");
+      }
       expectRefusal(envelope({ ...base, items: [{ title: "One", action: { label: "Go", href: "#go" } }] }), "family:unsupported-feature");
       expectRefusal(envelope({ ...base, items: [{ title: "One", icon: "star" }] }), "family:unsupported-feature");
     }
@@ -4642,9 +4698,9 @@ describe("composeUnoFoundationSubset — cards and features authored heading", (
 describe("composeUnoFoundationSubset — cards and features authored lede", () => {
   /** The four pre-WO-071 section baselines, captured from the committed output before this change. */
   const PRE_WO071_CARDSUNHEADED =
-    '{"id":"family-0-cards","module":"layout.grid","props":{"columns":2,"itemSemantics":"list"},"children":[{"id":"family-0-cards-item-0","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-cards-item-0-title","module":"content.heading","props":{"text":"Card one","level":2}},{"id":"family-0-cards-item-0-body","module":"content.prose","props":{"text":"First card body."}}]},{"id":"family-0-cards-item-1","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-cards-item-1-title","module":"content.heading","props":{"text":"Card two","level":2}}]}]}';
+    '{"id":"family-0-cards","module":"layout.grid","props":{"cards":[{"title":"Card one","body":"First card body."},{"title":"Card two"}],"columns":2}}';
   const PRE_WO071_CARDSHEADEDONLY =
-    '{"id":"family-0-cards","module":"layout.stack","props":{},"children":[{"id":"family-0-cards-heading","module":"content.heading","props":{"text":"Synthetic cards","level":2}},{"id":"family-0-cards-grid","module":"layout.grid","props":{"columns":2,"itemSemantics":"list"},"children":[{"id":"family-0-cards-item-0","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-cards-item-0-title","module":"content.heading","props":{"text":"Card one","level":3}},{"id":"family-0-cards-item-0-body","module":"content.prose","props":{"text":"First card body."}}]},{"id":"family-0-cards-item-1","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-cards-item-1-title","module":"content.heading","props":{"text":"Card two","level":3}}]}]}]}';
+    '{"id":"family-0-cards","module":"layout.grid","props":{"cards":[{"title":"Card one","body":"First card body."},{"title":"Card two"}],"columns":2,"heading":"Synthetic cards","level":2}}';
   const PRE_WO071_FEATURESUNHEADED =
     '{"id":"family-0-features","module":"layout.grid","props":{"columns":3,"itemSemantics":"list"},"children":[{"id":"family-0-features-item-0","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-features-item-0-title","module":"content.heading","props":{"text":"Feature one","level":2}},{"id":"family-0-features-item-0-body","module":"content.prose","props":{"text":"First feature body."}}]},{"id":"family-0-features-item-1","module":"layout.stack","props":{"gap":"tight"},"children":[{"id":"family-0-features-item-1-title","module":"content.heading","props":{"text":"Feature two","level":2}}]}]}';
   const PRE_WO071_FEATURESHEADEDONLY =
@@ -4678,31 +4734,24 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
     expect(JSON.stringify(source)).toBe(before);
     const section = document.sections[0]!;
     expect(section.id).toBe("family-0-cards");
-    expect(section.module).toBe("layout.stack");
-    expect(JSON.stringify(section.props)).toBe("{}");
-    if (section.module !== "layout.stack") return;
-    expect(section.children).toHaveLength(3);
-    const [heading, lede, grid] = section.children;
-    expect(heading!.id).toBe("family-0-cards-heading");
-    expect(heading!.module).toBe("content.heading");
-    expect(heading!.props).toEqual({ text: "Synthetic cards", level: 2 });
-    expect(lede!.id).toBe("family-0-cards-lede");
-    expect(lede!.module).toBe("content.prose");
-    expect(lede!.props).toEqual({ text: "Synthetic cards explain the choices." });
-    expect(grid!.id).toBe("family-0-cards-grid");
-    expect(grid!.props).toEqual({ columns: 2, itemSemantics: "list" });
-    if (grid!.module !== "layout.grid") return;
-    expect(grid!.children.map((item) => item.id)).toEqual(["family-0-cards-item-0", "family-0-cards-item-1"]);
-    for (const [index, item] of grid!.children.entries()) {
-      if (item.module !== "layout.stack") continue;
-      expect(item.children[0]!.props).toEqual({ text: index === 0 ? "Card one" : "Card two", level: 3 });
-      expect(item.children.filter((child) => child.module === "content.prose")).toHaveLength(index === 0 ? 1 : 0);
-    }
+    expect(section.module).toBe("layout.grid");
+    if (section.module !== "layout.grid") return;
+    // One native node carries the authored heading, the plain lede and the cards, in source order and with no wrapper.
+    expect(section.props).toEqual({
+      cards: [
+        { title: "Card one", body: "First card body." },
+        { title: "Card two" },
+      ],
+      columns: 2,
+      heading: "Synthetic cards",
+      level: 2,
+      lede: "Synthetic cards explain the choices.",
+    });
+    expect(section.children).toEqual([]);
     // Deep freeze, real reader re-acceptance as object and JSON, and JSON roundtrip stability.
     expect(Object.isFrozen(section)).toBe(true);
     expect(Object.isFrozen(section.children)).toBe(true);
-    expect(Object.isFrozen(lede!.props)).toBe(true);
-    expect(Object.isFrozen(grid!.props)).toBe(true);
+    expect(Object.isFrozen(section.props)).toBe(true);
     const asObject = readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown);
     const asJson = readUnoPageDocument(JSON.stringify(document));
     expect(asObject.accepted).toBe(true);
@@ -4733,6 +4782,20 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
       const section = document.sections[0]!;
       expect(document.sections).toHaveLength(1);
       expect(section.id).toBe(`family-0-${type}`);
+      expect(section.id).toBe(`family-0-${type}`);
+      if (type === "cards") {
+        // Lede-only keeps the accepted heading-less outline: the lede reaches the native node and no heading is invented.
+        expect(section.module).toBe("layout.grid");
+        if (section.module !== "layout.grid") continue;
+        const cardsProps = section.props as { lede?: string; heading?: string; level?: number };
+        expect(cardsProps.lede).toBe("A plain authored lede.");
+        expect(cardsProps.heading).toBeUndefined();
+        expect(cardsProps.level).toBeUndefined();
+        expect(section.children).toEqual([]);
+        expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+        expect(readUnoPageDocument(JSON.parse(JSON.stringify(document)) as unknown).accepted).toBe(true);
+        continue;
+      }
       expect(section.module).toBe("layout.stack");
       expect(JSON.stringify(section.props)).toBe("{}");
       if (section.module !== "layout.stack") continue;
@@ -4748,7 +4811,7 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
         if (item.module !== "layout.stack") continue;
         const title = item.children[0]!;
         expect(title.module).toBe("content.heading");
-        expect(title.props).toEqual({ text: type === "cards" ? (index === 0 ? "Card one" : "Card two") : (index === 0 ? "Feature one" : "Feature two"), level: 2 });
+        expect(title.props).toEqual({ text: index === 0 ? "Feature one" : "Feature two", level: 2 });
         expect(title.id).toBe(`family-0-${type}-item-${index}-title`);
       }
       expect(section.children.some((child) => child.module === "content.heading")).toBe(false);
@@ -4767,7 +4830,9 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
       expect(document.sections.map((section) => section.id)).toEqual(
         sections.map((section, index) => `family-${index}-${section.type}`),
       );
-      expect(document.sections.filter((section) => section.module === "layout.stack")).toHaveLength(2);
+      // Exactly one wrapper stack remains on such a Page: the Features section. Cards is one native cards node.
+      expect(document.sections.filter((section) => section.module === "layout.stack")).toHaveLength(1);
+      expect(document.sections.filter((section) => section.module === "layout.grid")).toHaveLength(1);
       expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
     }
   });
@@ -4781,7 +4846,7 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
     const region = html.slice(start - 60, html.length);
     expect(region).toContain('<p class="uno-json-prose" id="family-0-cards-lede">Plans &amp; &quot;prices&quot; stay plain</p>');
     expect((region.match(/family-0-cards-lede/gu) ?? []).length).toBe(1);
-    expect((region.match(/<p class="uno-json-prose"/gu) ?? []).length).toBe(2);
+    expect((region.match(/<p class="uno-json-prose"/gu) ?? []).length).toBe(1);
     expect(region.indexOf("<h2")).toBeGreaterThan(0);
     expect(region.indexOf("<h2")).toBeLessThan(region.indexOf("family-0-cards-lede"));
     expect(region.indexOf("family-0-cards-lede")).toBeLessThan(region.indexOf("<ul"));
@@ -4803,7 +4868,7 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
       expect((region.match(/<h2 class="uno-json-heading"/gu) ?? []).length).toBe(2);
       expect(region).not.toContain("<h3");
       expect(region).not.toContain(`id="family-0-${type}-heading"`);
-      expect((region.match(/<li class="uno-json-cell"/gu) ?? []).length).toBe(2);
+      expect((region.match(/<li class="uno-json-(?:cell|card)"/gu) ?? []).length).toBe(2);
     }
   });
 
@@ -4815,8 +4880,16 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
       for (const text of [bmp, astral, "Grüße — 日本語 ✓"]) {
         const document = composed(ledePage(type, { lede: text }));
         const section = document.sections[0]!;
-        expect(section.module).toBe("layout.stack");
-        if (section.module === "layout.stack") expect(section.children[0]!.props).toEqual({ text });
+        if (type === "cards") {
+          // The authored lede reaches the one native cards node at the same 4,000-code-point bound.
+          expect(section.module).toBe("layout.grid");
+          if (section.module === "layout.grid") {
+            expect((section.props as { lede?: string }).lede).toBe(text);
+          }
+        } else {
+          expect(section.module).toBe("layout.stack");
+          if (section.module === "layout.stack") expect(section.children[0]!.props).toEqual({ text });
+        }
         expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
       }
       expectRefusal(ledePage(type, { lede: `${bmp}x` }), "family:target-refused");
@@ -4848,22 +4921,79 @@ describe("composeUnoFoundationSubset — cards and features authored lede", () =
       ["an ordered entry", "1. entry", "family:unsupported-feature"],
       ["a blockquote", "> quote", "family:unsupported-feature"],
     ];
+    // A card lede is the donor's Markdown-capable field, so these constructs compose for cards (proved in the dedicated
+    // Markdown test below) and are refused only by the plain-text Features field. Unsafe markup and images stay refused
+    // for both, because the shared family Markdown reader rejects them.
+    const CARD_MARKDOWN_LEDES = new Set([
+      "**Bold**",
+      "*Italic*",
+      "_Italic_",
+      "~~Strike~~",
+      "`code`",
+      "[label](https://example.com)",
+      "# Heading",
+      "- entry",
+      "1. entry",
+      "> quote",
+    ]);
     for (const type of ["cards", "features"] as const) {
       for (const [label, lede, reason] of cases) {
+        if (type === "cards" && typeof lede === "string" && CARD_MARKDOWN_LEDES.has(lede)) continue;
         expectRefusal(ledePage(type, { lede }), reason);
         expect(label.length).toBeGreaterThan(0);
       }
     }
   });
 
+  it("composes a safe Markdown cards lede as a declared Markdown lede and renders it natively", () => {
+    const lede = "Plans & **prices** stay [plain](https://example.com).";
+    const document = composed(ledePage("cards", { heading: "Synthetic cards", lede }));
+    const section = document.sections[0]!;
+    expect(section.module).toBe("layout.grid");
+    if (section.module !== "layout.grid") return;
+    // The donor's Markdown-capable lede reaches the one native node and is declared Markdown only by the literal `true`.
+    expect(section.props).toEqual({
+      cards: [
+        { title: "Card one", body: "First card body." },
+        { title: "Card two" },
+      ],
+      columns: 2,
+      heading: "Synthetic cards",
+      level: 2,
+      lede,
+      ledeMarkdown: true,
+    });
+    expect(readUnoPageDocument(JSON.stringify(document)).accepted).toBe(true);
+    const html = render(document);
+    const start = html.indexOf('id="family-0-cards-lede"');
+    expect(start).toBeGreaterThan(0);
+    const region = html.slice(start - 80, html.indexOf("</ul>", start));
+    expect(region).toMatch(/<strong[^>]*>prices<\/strong>/u);
+    expect(region).toContain('href="https://example.com"');
+    expect(region).toContain('rel="noopener noreferrer"');
+    expect(region).not.toContain("<script");
+  });
+
   it("refuses markup, control characters, unpaired surrogates and an accessor lede with zero getter runs", () => {
     for (const type of ["cards", "features"] as const) {
       expectRefusal(ledePage(type, { lede: "<script>alert(1)</script>" }), "family:unsupported-feature");
-      expectRefusal(ledePage(type, { lede: "a < b" }), "family:unsupported-feature");
-      expectRefusal(ledePage(type, { lede: "Two\nlines" }), "family:unsupported-feature");
-      expectRefusal(ledePage(type, { lede: "Tabbed\ttext" }), "family:unsupported-feature");
       expectRefusal(ledePage(type, { lede: "Nul\u0000text" }), "family:unsupported-feature");
-      expectRefusal(ledePage(type, { lede: "Lead \uD800 tail" }), "family:target-refused");
+      // An ill-formed surrogate is refused by the Markdown reader for a card lede and by the plain-text rule for Features,
+      // so the closed reason differs while the refusal itself is identical.
+      expectRefusal(
+        ledePage(type, { lede: "Lead \uD800 tail" }),
+        type === "cards" ? "family:unsupported-feature" : "family:target-refused",
+      );
+      if (type === "features") {
+        expectRefusal(ledePage(type, { lede: "a < b" }), "family:unsupported-feature");
+        expectRefusal(ledePage(type, { lede: "Two\nlines" }), "family:unsupported-feature");
+        expectRefusal(ledePage(type, { lede: "Tabbed\ttext" }), "family:unsupported-feature");
+      } else {
+        // A card lede is Markdown-capable, so a multi-line lede is the donor's own multi-paragraph text; it is carried
+        // verbatim and never becomes markup.
+        const multiline = composed(ledePage("cards", { lede: "Two\nlines" })).sections[0]!;
+        expect((multiline.props as { lede?: string }).lede).toBe("Two\nlines");
+      }
     }
     for (const type of ["cards", "features"] as const) {
       let runs = 0;
@@ -5821,7 +5951,7 @@ describe("the committed durable family Page (`UNO-WO-078 / R01`)", () => {
       .slice(6)
       .filter((node, index) => JSON.stringify(node) !== JSON.stringify(outcome.document.sections[index]))
       .map((node) => node.id);
-    expect(differing).toEqual(["family-5-gallery"]);
+    expect(differing).toEqual(["family-5-gallery", "family-15-cards"]);
     const composedGallery = outcome.document.sections[5];
     expect(composedGallery?.module).toBe("media.gallery");
     expect(composedGallery?.props).toEqual({
@@ -5999,7 +6129,6 @@ describe("the three donor heading outlines (`UNO-WO-080 / R01`)", () => {
     "family-10-stats": "9cc437c93759820210bd316aeb99a00f346488f18fb5d460c12d3e8b4ba6777b",
     "family-12-quote": "7271422166b1b5c94d71803989d7ea5cae3b334cbd91296c5315c137271b51e6",
     "family-13-table": "30d076359a38ca8673aab08cea2a042bae31524a74f82ccdae97aa5c1ed70540",
-    "family-15-cards": "4ca9f095a4122b1622fad760b01e884f8ba3c3e9a50115b188e71bdb30cf89e8",
     "family-16-features": "7873cb6c2abcf7e88ec32c31180d7f63088d1c442983179666c115a6b7bb6d7c",
   };
   it("composes the donor steps as a timeline whose item titles are level-3 headings", () => {
@@ -6075,7 +6204,7 @@ describe("the three donor heading outlines (`UNO-WO-080 / R01`)", () => {
 
   it("keeps the fourteen untouched family sections byte-identical to their recorded before-state", () => {
     const byId = new Map(committedPage.sections.map((section: { id: string }) => [section.id, section]));
-    expect(Object.keys(UNAFFECTED_DIGESTS)).toHaveLength(14);
+    expect(Object.keys(UNAFFECTED_DIGESTS)).toHaveLength(13);
     for (const [id, digest] of Object.entries(UNAFFECTED_DIGESTS)) {
       const section = byId.get(id);
       expect(section).toBeDefined();
@@ -6095,12 +6224,12 @@ describe("the three donor heading outlines (`UNO-WO-080 / R01`)", () => {
       .slice(6)
       .filter((node, index) => JSON.stringify(node) !== JSON.stringify(outcome.document.sections[index]))
       .map((node) => node.id);
-    expect(differing).toEqual(["family-5-gallery"]);
+    expect(differing).toEqual(["family-5-gallery", "family-15-cards"]);
     const changed = parsed.document.sections
       .slice(6)
       .filter((node) => !(node.id in UNAFFECTED_DIGESTS))
       .map((node) => node.id);
-    expect(changed).toEqual(["family-3-faq", "family-11-steps", "family-14-columns"]);
+    expect(changed).toEqual(["family-3-faq", "family-11-steps", "family-14-columns", "family-15-cards"]);
   });
 
 });

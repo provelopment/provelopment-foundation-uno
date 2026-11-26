@@ -204,12 +204,12 @@ const PHASE_C_REQUIRED = Object.freeze([
   "family:unsafe-source",
   "FAMILY_TABLE_HTTP the table region is one scroll wrapper with a genuine captioned two-column table",
   "FAMILY_COLUMNS_HTTP the columns region is an authored plain two-column grid of two tight stacks",
-  "FAMILY_CARDS_HTTP the cards region is a headed top-level stack with a native two-column list grid and one body",
+  "FAMILY_CARDS_HTTP the cards region is one native cards section with its authored heading, lede and two-column card list",
   "FAMILY_FEATURES_HTTP the features region is a separate headed top-level stack with a native three-column list grid",
   "FAMILY_SEVENTEEN_HTTP the last four regions add no second main, h1, script, frame or form control",
   "${width}px table shows a captioned two-column table and its scroll control takes focus",
   "${width}px columns show two authored tight stacks with one paragraph and one native list",
-  "${width}px cards show a headed stack with one authored h2, a two-column list grid and two h3 titles",
+  "${width}px cards show one native cards section with the authored h2, its lede and a two-column card list",
   "${width}px features show a separate headed stack with one authored h2, a three-column list grid and two h3 titles",
   "${width}px the composed Page carries seventeen unique top-level sections with no nested inflation",
   // `UNO-WO-069 / R01`: the divider parity candidate. Labels alone are not enough, so the executable predicates that
@@ -275,7 +275,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_LEDE_SOURCE features compose exactly one lede paragraph in the same ordered stack",
   "FAMILY_LEDE_SOURCE the ledes add no node outside the two families and keep the seventeen top-level ids",
   "FAMILY_LEDE_SOURCE the composed JSON matches the installed buffer and the caller source is unmutated",
-  "FAMILY_LEDE_REFUSALS each lede probe refuses the whole Page with its documented reason and no partial document",
+  "FAMILY_LEDE_REFUSALS each lede probe reaches its documented outcome with no partial document when it refuses",
   "FAMILY_LEDE_REFUSALS an authored card lede getter yields family:unsafe-source with zero invocations",
   "FAMILY_LEDE_HTTP each headed family serves exactly one lede paragraph after its h2 and before its native list",
   "FAMILY_LEDE_BROWSER the authored ledes were measured in real Chromium at both viewports",
@@ -330,7 +330,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_TEXT_FIVE_BROWSER the five authored-text families were measured in real Chromium at both viewports",
   "textFiveGetterCalls === 0",
   "textFiveBrowserChecks === 2",
-  "familyAccepted.sections.filter((section) => section.module === \"layout.stack\").length === 8",
+  "familyAccepted.sections.filter((section) => section.module === \"layout.stack\").length === 7",
   'id="family-0-prose" data-uno-align="center"',
   "family-13-table-table",
   "family-3-faq-accordion",
@@ -1220,7 +1220,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     for (const contract of [
       "FAMILY_TABLE_HTTP the table region is one scroll wrapper with a genuine captioned two-column table",
       "FAMILY_COLUMNS_HTTP the columns region is an authored plain two-column grid of two tight stacks",
-      "FAMILY_CARDS_HTTP the cards region is a headed top-level stack with a native two-column list grid and one body",
+      "FAMILY_CARDS_HTTP the cards region is one native cards section with its authored heading, lede and two-column card list",
       "FAMILY_FEATURES_HTTP the features region is a separate headed top-level stack with a native three-column list grid",
       "FAMILY_SEVENTEEN_HTTP the last four regions add no second main, h1, script, frame or form control",
     ]) {
@@ -1234,7 +1234,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     for (const contract of [
       "${width}px table shows a captioned two-column table and its scroll control takes focus",
       "${width}px columns show two authored tight stacks with one paragraph and one native list",
-      "${width}px cards show a headed stack with one authored h2, a two-column list grid and two h3 titles",
+      "${width}px cards show one native cards section with the authored h2, its lede and a two-column card list",
       "${width}px features show a separate headed stack with one authored h2, a three-column list grid and two h3 titles",
       "${width}px the composed Page carries seventeen unique top-level sections with no nested inflation",
     ]) {
@@ -1429,7 +1429,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     }
     for (const label of [
       "FAMILY_LEDE_SOURCE cards compose exactly one lede paragraph in the ordered heading, lede and grid stack",
-      "FAMILY_LEDE_REFUSALS each lede probe refuses the whole Page with its documented reason and no partial document",
+      "FAMILY_LEDE_REFUSALS each lede probe reaches its documented outcome with no partial document when it refuses",
       "FAMILY_LEDE_HTTP each headed family serves exactly one lede paragraph after its h2 and before its native list",
       "FAMILY_LEDE_BROWSER the authored ledes were measured in real Chromium at both viewports",
     ]) {
@@ -1507,7 +1507,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ["textFiveBrowserChecks === 2", "true"],
       ["found.ledeBeforeNative", "true"],
       // `UNO-WO-120 / R01`: Media is the eighth top-level stack.
-      ['familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 8', "true"],
+      ['familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7', "true"],
     ];
     for (const [token, replacement] of mutations) {
       const mutated = source.split(token).join(replacement);

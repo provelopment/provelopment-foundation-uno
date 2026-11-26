@@ -1221,7 +1221,63 @@ function composeSection(
       if (surfaceAuthored) props["surface"] = record["surface"];
       return { id, module: "layout.stack", props, children: wrapped };
     }
-    case "cards":
+    case "cards": {
+      // `UNO-WO-123 / R01`: the Foundation Cards composer adopts the accepted native, closed opt-in **text-only** cards
+      // representation of `layout.grid` (`UNO-WO-122 / R03`) instead of the earlier generic list grid of stacks. One
+      // authored Cards section is therefore one native cards node that owns its own heading, Markdown lede, surface,
+      // column intent and ordered cards — no wrapper stack, no per-card sub-stacks, no manufactured text.
+      //
+      // The donor contract adopted here is the pinned GEO-03 text-only one: an optional plain heading, an optional
+      // Markdown lede, an optional closed surface, an optional 2/3/4 column intent and 1–24 ordered cards of
+      // `{title, meta?, body?}` with a plain 160-code-point title, a plain 120-code-point meta line and a Markdown-capable
+      // 4,000-code-point body. The donor card's image and action stay unrepresentable, so a source that authors either
+      // refuses the whole Page rather than having the field discarded.
+      //
+      // `UNO-WO-123 / R04`: the column intent is **optional**. An authored 2/3/4 reaches the native node unchanged; an
+      // absent one stays absent so the renderer's own three/two/one default applies and no intent is invented here.
+      requireExactKeys(record, ["type", "items"], ["columns", "heading", "lede", "surface"]);
+      const cols = record["columns"];
+      if (cols !== undefined && cols !== 2 && cols !== 3 && cols !== 4) refuseTarget();
+      const rawItems = record["items"];
+      if (!Array.isArray(rawItems)) refuseUnsupportedFeature();
+      if (rawItems.length < 1 || rawItems.length > 24) refuseTarget();
+      const cards: Record<string, unknown>[] = [];
+      for (const rawItem of rawItems) {
+        if (rawItem === null || typeof rawItem !== "object" || Array.isArray(rawItem)) refuseUnsupportedFeature();
+        const entry = rawItem as PlainRecord;
+        // `title` stays plain text, so a donor title that carries Markdown or markup is refused rather than flattened.
+        requireExactKeys(entry, ["title"], ["meta", "body"]);
+        const title = readNewFamilyText(entry["title"]);
+        // Uno's heading bound is wider than the donor card-title bound, so this subset's own limit is enforced here.
+        if (codePointLength(title) > 160) refuseTarget();
+        const card: Record<string, unknown> = { title };
+        if (ownsKey(entry, "meta")) card["meta"] = readSectionPlainText(entry["meta"], 120);
+        // An absent body stays absent: no manufactured paragraph, meta line, image or action.
+        if (ownsKey(entry, "body")) {
+          const body = readRichFamilyText(entry["body"], 4000);
+          card["body"] = body;
+          if (hasFamilyMarkdown(body)) card["bodyMarkdown"] = true;
+        }
+        cards.push(card);
+      }
+      const props: Record<string, unknown> = { cards };
+      if (cols !== undefined) props["columns"] = cols;
+      // The donor's own outline: an authored section heading is the `<h2>` above the cards.
+      if (ownsKey(record, "heading")) {
+        props["heading"] = readSectionHeading(record["heading"]);
+        props["level"] = 2;
+      }
+      // The donor lede is Markdown-capable: it is read by the shared family Markdown reader, which refuses unsafe or
+      // ill-formed constructs, and it is declared as Markdown only through the literal `true`. A plain lede stays plain.
+      if (ownsKey(record, "lede")) {
+        const lede = readRichFamilyText(record["lede"], 4000);
+        props["lede"] = lede;
+        if (hasFamilyMarkdown(lede)) props["ledeMarkdown"] = true;
+      }
+      // The closed whole-section surface reaches the one native node, so it covers the heading, lede and cards together.
+      if (ownsKey(record, "surface")) props["surface"] = record["surface"];
+      return { id, module: "layout.grid", props };
+    }
     case "features": {
       // The donor card also accepts image/meta/action and the donor feature an icon; this subset composes neither, and
       // it requires `columns` explicitly instead of manufacturing the donor renderer's default. `UNO-WO-070 / R01` adds
