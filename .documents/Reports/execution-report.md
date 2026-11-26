@@ -116,17 +116,22 @@ multi-Facet/Site/Page/locale P6 gate passes 179 checks with both declaration pha
 ## 5. Hosted verification at the exact head
 
 The head that carries every product, evidence, test and ledger change of this order is
-`6b2528c127c74841297e664652b8f2c37548b746`. Both workflows ran there, on both operating systems, and every step passed:
+`6b2528c127c74841297e664652b8f2c37548b746`, and the final head — which adds one measured log line to the Gallery HTTP clause
+and then this report — is `4a69a85d72f3c3e12ab705db91f628a04ac537e8`. Both workflows ran at **each** of those heads, on both
+operating systems, and every step passed:
 
-| Workflow | Run | Jobs |
+| Workflow | Product/evidence head `6b2528c` | Final head `4a69a85` |
 | --- | --- | --- |
-| `Verify U01 baseline` | [45736831689](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45736831689) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — **38/38 steps each, 0 failures**, including the governance byte check, **Unit tests**, the production build, bounded output tracing, the home and locale-refusal HTTP passes, fixture fault injection, the **published-Pages HTTP/Chromium gate** (with the semantic durable comparison), the **multi-Site P6** contract and run, the **22-module hermetic guard**, the **22-module production HTTP/Chromium consent run** and deployment readiness |
-| `Uno Bootstrap Verify` | [45736831629](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45736831629) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — **10/10 steps each, 0 failures** |
+| `Verify U01 baseline` | [45736831689](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45736831689) — `ubuntu-24.04` and `windows-2025` success, **38/38 steps each, 0 failures** | [45738918687](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45738918687) — `ubuntu-24.04` and `windows-2025` success, **38/38 steps each, 0 failures** |
+| `Uno Bootstrap Verify` | [45736831629](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45736831629) — both hosts success, **10/10 steps each, 0 failures** | [45738918685](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45738918685) — both hosts success, **10/10 steps each, 0 failures** |
 
-The earlier hosted failures at the R01 heads are part of this record: the pre-R02 gate failed on a ledger-pinned unit assertion
-and on the byte-for-byte durable comparison, and R02's corrections are what the green runs above execute. No run was re-used and
-no step was skipped. This report is committed on top of that head; the same two workflows run again on the report commit, and any
-failure there would supersede this record rather than be explained away.
+Each `Verify U01 baseline` job ran the governance byte check, **Unit tests**, the production build, bounded output tracing, the
+home and locale-refusal HTTP passes, fixture fault injection, the **published-Pages HTTP/Chromium gate** (with the semantic
+durable comparison), the **multi-Site P6** contract and run, the **22-module hermetic guard**, the **22-module production
+HTTP/Chromium consent run** and deployment readiness. The R01 hosted failures are also part of this record: the pre-R02 gate
+failed on a ledger-pinned unit assertion and on the byte-for-byte durable comparison, and R02's corrections are what these green
+runs execute. No run was re-used and no step was skipped.
+
 
 
 ## 6. Risks, adaptations and limits
