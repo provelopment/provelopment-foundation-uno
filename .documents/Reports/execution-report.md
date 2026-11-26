@@ -1,102 +1,86 @@
-# Execution Report — UNO-WO-123 / R03
+# Execution Report — UNO-WO-123 / R04
 
-**Outcome: STOP — incomplete. No adoption commit exists.** R03 resumed from both preserved files exactly as identified. The composer
-adoption is unchanged and intact; the Cards expectation rewrite remains unfinished at **18 failing tests**, all in one file, and the
-fixture/evidence, digest, gate and hosted work that the acceptance requires is still outstanding. Nothing was staged, committed,
-reverted or force-pushed, so `HEAD` stays green and no verification is claimed for the prototype.
+**Outcome: the local Cards adoption checkpoint is COMPLETE and green.** The composer now emits the accepted native Cards
+representation, every Cards expectation in the unit suite is migrated to it, and the **focused migration file, the complete unit
+suite, lint and typecheck are all green**. The candidate is preserved **unstaged** exactly as this order requires; production
+fixture/evidence migration, the remaining mandatory local gates and hosted acceptance are **deferred and not PASS** for it.
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-123 / R03`, `FINAL — EXECUTE` (supersedes R02) |
-| ACTIVE | **2,984 bytes**, SHA-256 `5ac91fc309888173a9670457b4743b260bd6386c0812ac9f44a56a409395a92b` — matched; private, ignored, untracked |
-| Start SHA | `34ea34a316aa2e410a7621739b5696728b23393c`, tree carrying both preserved files, `HEAD` = `origin/main` |
-| HEAD at stop | **unchanged** `34ea34a` — the adoption is in no commit |
+| Order | `UNO-WO-123 / R04`, `FINAL — EXECUTE` (supersedes R03) |
+| ACTIVE | **3,164 bytes**, SHA-256 `e0667f64ea563243384af6394272b30093380d4cd0b309801bbfa01ca7f25b9b` — matched; private, ignored, untracked |
+| Start SHA | `57611d0ba8ce7b137f15b0b827f411b0bfbf7e7c`, empty index, exactly the two preserved files modified |
+| Continuation check | both files matched the order's bytes and SHA-256 exactly before any edit |
 
-## 1. Preserved work, exactly as measured this round
+## 1. Preserved candidate, exact bytes
 
 ```
 src/application/compose-uno-foundation-families.ts
-  95,438 bytes   SHA-256 9638c5bee57783dc2a9de0da57770098f23ed55e0aaabb21dbb30864cb43b88e   +56 / -1
+  95,415 bytes   SHA-256 93b50bc6e6519257407b21a0ca9d04ad3bdc9dd1386365be2f200ac129976d83   (unstaged, uncommitted)
 
 tests/unit/uno-foundation-families.test.ts
-  319,792 bytes  SHA-256 8addf57b94dce6162b9b88ba2fa620142823362445c7d73f247f6e385c6ed250   +41 / -33
+  321,184 bytes  SHA-256 d38015eabedaae8b003c83e5db056f17e88b34989f3a4aac40deb7d23118607e   (unstaged, uncommitted)
 ```
 
-Both are byte-identical to the R02 measurements: R03 could not add a further verified edit to either, so it deliberately changed
-nothing rather than edit blind.
+Nothing else in the tree is modified, added or removed. The index was empty before and after; the adoption is not committed.
 
-The composer emits **one native cards node** (`UNO-WO-122 / R03`): `cards[1..24]` of `{title, meta?, body?, bodyMarkdown?}` with a
-plain 160-point title, plain 120-point `meta` and Markdown-capable 4,000-point `body`; optional plain `heading` with `level: 2`,
-optional Markdown `lede` (+`ledeMarkdown`), closed `surface`, authored `columns` 2/3/4 still required; `image`/`action` still refuse
-the whole Page. `features`, ordinary grids, reader, renderer, stylesheet, durable Pages, policies and frozen governance files are
-untouched.
+## 2. What the composer now does
 
-## 2. The 18 remaining failures, verbatim from the run
+One authored Cards section composes to **one native cards node** — `layout.grid` in its closed opt-in text-only cards
+representation — carrying, in this order: `cards[1..24]`, the optional authored `columns` 2/3/4, the optional plain `heading` with
+explicit `level: 2`, the optional bounded **plain** `lede`, the optional closed `surface`.
 
-```
-bounded cards and features   composes thirteen nodes in source order, leaving the first eleven byte-identical
-authored heading             keeps the heading-less cards node byte-identical to the pre-WO-070 committed output
-authored heading             composes the headed cards source into one stack with an authored h2 and level-3 item titles
-authored heading             resets the authored heading order across a mixed two-family Page in both orders
-authored heading             renders the headed regions with one authored h2, one h3 per item and no invented markup
-authored heading             accepts exactly 160 code points, counting astral characters once each
-authored heading             still refuses every out-of-subset cards and features donor field, headed or not
-authored lede                keeps all four pre-WO-071 baselines byte-identical when no lede is authored
-authored lede                composes heading+lede for cards as an ordered heading, lede paragraph and grid
-authored lede                composes lede-only for both families with level-2 item titles and no synthetic heading
-authored lede                keeps authored order and ids for lede-bearing families mixed with the divider in either order
+- **Cards** are `{title, meta?, body?, bodyMarkdown?}`: plain 160-code-point title, plain 120-code-point `meta`, and an optional
+  Markdown-capable 4,000-code-point `body` declared as Markdown only through the literal `true`. An absent field stays absent.
+- **Column intent is optional.** An authored 2/3/4 is carried unchanged; an absent intent stays absent so the renderer's own default
+  applies and no intent is invented. A `1`, `5`, `0` or string intent still refuses.
+- **Images and actions remain refused**, never dropped: an authored `image`, `action` or any other undeclared key refuses the whole
+  Page through `requireExactKeys`.
+- **The section lede is bounded plain text**, exactly as Features keeps it. A lede carrying Markdown constructs is refused rather
 
-They fall into four classes, each mechanical but requiring the whole block to be read and restated together:
+## 3. Unit-level migration — 18 failures resolved, no coverage lost
 
-1. **`layout.stack`-shaped assertions** (`expected 'layout.grid' to be 'layout.stack'`, `to have a length of 2 but got 1`,
-   `expected 1 to be 2`) — the headed and lede tests still expect a wrapper stack with `-heading`, `-lede` and `-grid` children.
-2. **Byte baselines** — the four `PRE_WO071_*` constants and the pre-WO-070 cards constant encode the superseded JSON and must be
-   recaptured in the native shape.
-3. **Now-accepted refusals** (`expected 'composed' to be 'refused'`) — `surface` and card `meta` are admitted for cards, so those cases
-   must move from the refusal loops into positive cards tests while staying refused for features.
-4. **Digest pins** — the committed durable Page and the three-outline comparisons include the recomposed `family-15-cards` section and
-   need recomputation, keeping the Gallery comparison and every other section byte-identical.
+The order's diagnostic settled the first failure: `composeUnoFoundationSubset` returns the validated document, so the cards node's
+accepted empty `children` is present but non-enumerable. It is now proved exactly that way — `children` equals `[]`, is absent from
+`Object.keys`, and is absent from the serialized node — while the authored-`children` refusal and serialized revalidation contracts
+are untouched.
 
-## 3. One open question the continuation must settle first
+Every other restatement keeps its original semantic coverage:
 
-The first failure reports `expected true to be false` on the assertion that the composed cards node owns no `children` key, yet the
-composer's cards branch returns `{ id, module, props }` with no `children`, and no assembly step in that file adds one. The
-continuation must determine whether the test's `composed()` helper or the `CandidateSection` type narrowing is responsible before
-restating that assertion — guessing would hide a real defect if the composed document were in fact child-bearing, which the reader
-rejects as `document:invalid-children`.
+- the headed, lede and markup blocks now assert the native node, `<ul class="uno-json-cards">`, one `<li class="uno-json-card">` per
+  card, an `<h2>` section heading, `<h3>` card titles, one card body element, authored order and the closed surface;
+- the pre-WO-070 and four `PRE_WO071_*` Cards baselines and the two `family-15-cards` digest pins are **distinguished, not replaced**:
+  the committed legacy bytes are retained as the reference constant, the recomposed node is proved to differ from it, and strict
+  semantic equivalence is asserted field by field (order, titles, bodies, absence, columns, no invented heading/meta/image/action);
+- `UNAFFECTED_DIGESTS` drops to **13** entries, with `family-15-cards` moving into the recomposed set beside `family-5-gallery`, so
+  every other durable section stays byte-identical and the Gallery comparison is retained;
+- `surface` and card `meta` are proved **accepted for cards** and still refused for features; Markdown titles still refuse; a raw-HTML
+  body refuses as `family:unsupported-feature` for cards against `family:target-refused` for features; nine cards are valid and
+  twenty-five is the first refused count; an absent column intent is accepted for cards and still refused for features.
 
-## 4. What else stands between the order and acceptance
+## 4. Gates actually run
 
-1. The 18 failures above, restated without loss.
-2. `scripts/u04/family-fixture.mjs`: author the donor field set on the durable `cards` section (meta, Markdown lede/body, surface, a
-   non-2 column intent, one absent field), then update the cards HTTP/Chromium predicates that still expect `uno-json-grid` markup.
-3. The strict semantic-equivalence proof, the retained Gallery comparison, and fixture restoration by digest plus fresh original
-   content.
-4. Every mandatory local gate, then exact-head hosted baseline and bootstrap jobs, steps and logs on both systems.
-5. `.documents/Architecture/u04-family-parity.md`: the Cards row still records the superseded composition.
+| Gate | Result |
+| --- | --- |
+| Focused migration file — `npx vitest run tests/unit/uno-foundation-families.test.ts` | **PASS, exit 0** |
+| Complete unit suite — `pnpm test` | **PASS — 35 of 35 test files** |
+| Lint — `npm run lint` | **PASS — 0 problems, exit 0** |
+| Typecheck — `npx tsc --noEmit -p tsconfig.json` | **0 errors** |
 
-## 5. Why this stopped here
+## 5. Explicitly NOT PASS for this candidate
 
-Eighteen interlocking tests across three shared describes, plus two digest pins, then fixture, evidence, four local gates and four
-hosted jobs, cannot be completed honestly in what remained of this run. Each block shares helper source and baseline constants with
-features assertions that must keep their exact previous bytes, so a partial edit either weakens coverage or leaves the file
-inconsistent — and the acceptance forbids both. The order's continuation clause governs: the work is preserved at the digests in §1,
-nothing is staged, and resuming requires no reconstruction.
+Per the order, the following are deferred and **not** claimed: production fixture authoring and evidence-predicate migration
+(`scripts/u04/*`), the served-HTTP and Chromium Cards proofs, the remaining mandatory local gates (architecture boundaries, deployment
+suite, the U04 22-module gate and the governance byte check — none re-run against this candidate), and exact-head hosted baseline and
+bootstrap jobs. The durable Page is not rewritten and no fixture is edited. Cards remains `PENDING` and uncredited:
+`PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`; C1 earned, C2 and U04 OPEN.
 
-## 6. State at handoff
+## 6. Disposition
 
-- Working tree: exactly the two modified **unstaged** files in §1, plus this report.
-- `HEAD` = `origin/main` before this report: `34ea34a`, verified green hosted in R02 on both operating systems.
-- Prototype health: `tsc --noEmit` **0 errors**; **34 of 35** test files green; the single failing file is the migration in progress.
-- Credits unchanged and unclaimed: `PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`; C1 earned, C2 and U04 OPEN.
+The candidate is preserved unstaged with the digests in §1 for the separate production-verification order. Only this report was
+committed and pushed, under the standing report-only exception; the adoption itself is untouched in the index and in history. This is
+the **STOP for independent Architect review**.
 
-This is the **STOP for independent Architect review**.
-
-authored lede                renders exactly one escaped lede paragraph between the authored heading and the native list
-authored lede                renders lede-only as one paragraph before the list with level-2 item titles and no invented heading
-authored lede                accepts 4000 code points, including astral characters, and refuses 4001
-authored lede                refuses every malformed lede with the closed reason that matches its cause
-authored lede                refuses markup, control characters, unpaired surrogates and an accessor lede with zero getter runs
-committed durable family Page keeps every committed appended section byte-identical apart from the newly composed Gallery
-three donor heading outlines  keeps exactly the three documented family sections recomposed and nothing else
-```
+  than flattened, so nothing is downgraded silently; the native node still accepts a Markdown lede for directly authored documents.
+- **Features, ordinary grids, the reader, the renderer, the stylesheet, durable Pages/declarations, fixtures, gate runners, the
+  oracle, dependencies, workflows and frozen governance files are untouched.**
