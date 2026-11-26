@@ -1,85 +1,90 @@
-# Execution Report — UNO-WO-122 / R03
+# Execution Report — UNO-WO-122 / R04
 
-**Outcome: NOT DELIVERED. The complete native JSON Cards slice was implemented — reader, markup, stylesheet, evidence module and
-focused tests — proven green at unit level, and then reverted, because the one mandatory piece I could not execute and verify is
-the gate's own production HTTP + Chromium transaction, and this order forbids landing the proof unproven. The repository is back
-at the reviewed state `b5e6b00e47ffd5254208e0a5a561a8182f8cf3b5`, every gate green, `PARITY_CARDS=PENDING`,
-`U04_PARITY=13/17`, `U04_PROXY=55/59`. U04 and C2 remain OPEN.**
+**Outcome: INCOMPLETE — work preserved under the R04 non-destructive stop boundary, nothing committed but this report.**
+The native Cards product slice is complete and compiles, the shared evidence module and the focused entrypoint both exist and
+execute, and the focused production proof reaches real HTTP, real Chromium and a verified byte-exact restore — but its served-page
+stage does not yet observe the swapped fixture, so the capability is **not** evidenced and **not** integrated into the U04 gate.
+Credits are untouched: `PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`, C1 still earned. C2 and U04 remain OPEN.
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-122 / R03`, `FINAL — EXECUTE` (supersedes R02) |
-| ACTIVE | **4,687 bytes**, SHA-256 `48dd6761dfad6310a5ca553926caa0ba3fff3af23199bb391d9d2092b6453a14` — matched exactly; private, ignored, untracked |
-| Start SHA | `b5e6b00e47ffd5254208e0a5a561a8182f8cf3b5` (`HEAD` = `main` = `origin/main` = `ls-remote`; one worktree; one Uno `origin`; clean tree) |
-| Required outcome | functioning native JSON Cards, independently evidenced through production HTTP and Chromium, without touching the composer or existing durable assertions, all gates green — **not delivered** |
-| Actual outcome | nothing landed; `PARITY_CARDS=PENDING`, `13/17`, `55/59`; C1 unchanged |
+| Order | `UNO-WO-122 / R04`, `FINAL — EXECUTE` (supersedes R03) |
+| ACTIVE | **5,020 bytes**, SHA-256 `bcd054c1da1e9770708c6e416b76ec15abebbe72143c1377698c1040acb013c8` — matched exactly; private, ignored, untracked |
+| Base / head | `6f9f3bcf28127f803870e531521aea041efa6cdf` `HEAD` = `main` = `origin/main` (unchanged; no implementation commit) |
+| Stop boundary | invoked: authorized edits preserved **unstaged/untracked**, temporary servers stopped, committed fixture bytes verified intact |
 
-## 1. What was built and proven
+## 1. What exists in the working tree now (unstaged / untracked, preserved)
 
-The composer-free scope of R03 removed the R02 blocker, and the whole slice was implemented and type-checked:
+| Path | Status | Bytes | SHA-256 |
+| --- | --- | --- | --- |
+| `src/core/page-document.ts` | modified, unstaged | 158,398 | `56a370298d876f19879149683ad159f0bea78126e9970cef8af17b52791473f5` |
+| `src/components/uno-page-sections.tsx` | modified, unstaged | 45,703 | `6818e4fc2a6b5a221d4a065b29695efa8f741fdd5def079e61e91eee061c9fea` |
+| `src/app/globals.css` | modified, unstaged | 46,473 | `a5f34d5104ba837630fc6ab4ea9ef597c1f4f9e46ab22677a959808e202be2c7` |
+| `scripts/u04/cards-native-evidence.mjs` | **new, untracked** | 34,071 | `afe9cc68138804ca88fee9f06faa29dec251ddfcb7e269f17f506f91bdd10962` |
+| `scripts/verify-u04-cards-native.mjs` | **new, untracked** | 5,116 | `e89045299c866521f816eac801f27e93a303036fcacf11f5d6c92db99cdab34f` |
 
-- **`src/core/page-document.ts`** — the accepted shape: closed, props-only, **childless** `layout.grid` alternative
-  (`UnoLayoutCard` = `title` + optional `meta`/`body`/`bodyMarkdown`; `UnoLayoutGridCardsProps` = `cards[1..24]` + optional
-  `columns` 2/3/4, `heading`/`level`, `lede`/`ledeMarkdown`, closed `surface`), `isUnoLayoutGridCards`, the childless node variant,
-  `cardItems: 24` / `cardTitleCodePoints: 160` / `cardMetaCodePoints: 120` / `cardTextCodePoints: 4000`, and a validator branch that
-  refuses `cards` **and** `children` (including `children: []`) while ordinary grids keep their required children and 1–8 bound.
-  Two defects my own evidence exposed were fixed here: a card title and meta line are now read by the well-formed-Unicode reader
-  (an unpaired surrogate previously slipped through `readBoundedText`).
-- **`src/components/uno-page-sections.tsx`** — one native `<ul>` with one direct `<li class="uno-json-card">` per card, meta →
-  title → body in authored order, level-3 titles beneath an authored heading and level-2 without one, no invented element and no
-  image/action markup.
-- **`src/app/globals.css`** — the card border/padding, the shared closed surfaces, and the 1 / 2 / authored-or-3 default that lives
-  in the stylesheet so an unauthored intent carries no attribute.
-- **`scripts/u04/cards-native-evidence.mjs`** (new) — the authored native test Page (rich muted default-column list, 24-card
-  explicit-four list, explicit `plain` two-column list, absent-surface list), the exact per-card expected text, the per-width
-  column expectations, **19** closed refusal probes and **6** accepted boundary cases, the served-region/list readers and the case
-  verdict.
-- **Tests, all green before the revert** — `page-document.test.ts` **151/151** with 4 new tests (accept shape, 1/24 vs 0/25, exact
-  160/120/4000 bounds, crossed children + deferred image/action, ordinary grid unchanged); `uno-page-sections.test.ts` **66/66**
-  with 4 new tests (markup and author order, Markdown lede/body, no image/action/column attribute, ordinary grid untouched);
-  `u04-verification-modules.test.mjs` **49/49** with 6 new tests (document accepted, every probe refused with its own reason,
-  bounds accepted, readers exact, honest reading passes, **27 single-fact mutants each fail**).
-- **`scripts/verify-u04-22-module-consent.mjs`** — an additive, isolated transaction was written: authored JSON into the test-owned
+`deployment/efs/content/components.en-001.json` is **byte-identical to the committed fixture** after the run (no diff), and no
+`next` server process was left running. `.next` is build output and `.temp/*` is scratch; neither is part of the tree.
 
-## 2. Why it was reverted
+**Product, as delivered in the tree.** The closed, props-only, childless `layout.grid` alternative: `cards[1..24]`, plain title
+(160 code points, well-formed Unicode enforced — an unpaired surrogate now refuses), optional plain meta (120), Markdown-capable
+body and lede (4,000), optional heading with an explicit valid level, closed whole-section surface, optional columns 2/3/4. One
+native `<ul>` of direct `<li class="uno-json-card">` items reusing the donor's shipped card treatment (border, radius, padding,
+paint), meta → title → body in authored order, level-3 titles under an authored heading and level-2 without one, no invented text
+or intent. Ordinary grids keep their required children, props, bounds and markup; the validated cards node carries `children: []`
+(authored `children` is still refused) so existing `node.children` consumers stay type-correct without editing any unledgered
+test. No new module, no bound change beyond the cards shape, no composer, asset or destination-policy change.
 
-Two facts stayed unproven, and both are load-bearing:
+**Evidence module.** `scripts/u04/cards-native-evidence.mjs` (20 exports) holds the authored native Page (rich muted default-column
+list, 24-card explicit-four bordered list, explicit `plain` two-column list, absent-surface list), the exact per-card expected
+text, the per-width column expectations, **19** closed refusal probes, **6** accepted boundary cases, the served-region/list
 
-1. The transaction had not been run. It is the only place where the production HTTP and Chromium evidence actually exists, and a
-   gate block that has never executed cannot be reported as green evidence. Running it needs a full Next.js build plus three
-   browser cases, which did not fit in what remained of this session.
-2. My deployment audit for the new checks was still red (52 passed, 2 failed on token mismatches), so the guard that is meant to
-   make the native proof impossible to weaken was itself failing.
+## 2. Executed commands and exact results
 
-Landing either state would have produced an unverified acceptance claim: the product without the gate proof is exactly what this
-order forbids, and an unexecuted gate block is what the SOP forbids. The reviewed state was therefore restored and verified:
-`git status` clean, `HEAD` still `b5e6b00`, `pnpm typecheck` 0, `pnpm test` green, `node --test tests/deployment` **346/0**, the
-governance byte check **PASS**, and `verify-u04-22-module-consent` **943/0** reporting `PARITY_CARDS=PENDING`,
-`U04_PARITY=13/17`, `U04_PROXY=55/59`.
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit -p tsconfig.json` | **0 errors** (including every existing test file) |
+| `npx vitest run tests/unit/page-document.test.ts tests/unit/uno-page-sections.test.ts` | **2 files passed** (existing suites unchanged and green) |
+| `node scripts/verify-u04-cards-native.mjs` | **3 passed, 6 failed** — build PASS, server PASS, `REFUSALS` **19/19 PASS**, `BOUNDS` PASS, `RESTORE` PASS (digest true, fresh 200, no anchors), fixture byte-identical PASS; **`HTTP` ×3 and `BROWSER` ×3 FAIL** |
+| `pnpm test` | **not run** this round |
+| `node --test tests/deployment` | **not run** this round |
+| `node scripts/verify-u04-22-module-consent.mjs` | **not run** this round (U04 integration not yet written) |
+| hosted workflows | **not run** (only this report is pushed) |
 
-## 3. What the next round should change
+## 3. The one unresolved gate, precisely
 
-Three rounds have now produced a complete, compiling slice that could not be certified inside one session. The blocker is not the
-design — it is the size of the evidence surface this gate demands in a single pass. I recommend the Owner choose one of:
+**Symptom.** With the authored native document written to `deployment/efs/content/components.en-001.json`, `GET
+/en-001/components` answers **200** with **41,936 bytes** of HTML that contains **none** of the four native section ids, so every
+`HTTP` and `BROWSER` clause fails on `lists=0 items=0 surface=null`.
 
-1. **Split the increment**: one order to land the product plus the unit tests (already proven in §1, and harmless without a
-   credit), then a second order for the gate transaction alone. The product carries no credit until the second lands, so nothing
-   is over-claimed and each order stays inside a verifiable window.
-2. **Move the native proof out of the monolith**: authorise a small `scripts/verify-u04-cards-native.mjs` invoked by the existing
-   gate as one step, so the proof is runnable and verifiable on its own instead of inside a nine-thousand-line run.
-3. **Keep it as-is**, accepting that the round must be spent on the two runs (build + gate, then hosted) and delivers nothing else.
+**What is already excluded.** (a) *Not* a stale build: `.next` is removed before building and the server starts only after a
+successful build. (b) *Not* a warm-cache artefact: the readiness probe was moved off the route under test to `/` and the result was
+identical. (c) *Not* a static route: `.next/prerender-manifest.json` lists four routes and **no** `/en-001/*`, so the Page is
+generated per request. (d) *Not* a reader problem: against the same installed source the reader **accepts** the authored document
+and refuses exactly the 19 closed probes, which are two of the three passing evidence checks. (e) *Not* a manifest problem:
+`deployment/efs/manifest.json` declares `{"id":"components","route":["components"],"publication":"published",…}` with the JSON
+source that was swapped.
 
-Everything needed for option 1 or 2 is described in §1 and can be rebuilt quickly; the two audit-token mismatches are named so they
-are fixed rather than rediscovered.
+**Hypothesis.** The serving path resolves the Page's declared source **once per server process** — an in-memory registry built at
+boot, or a memoised confined read — rather than per request. The U04 gate's own family swap works because that fixture is
+installed **before** its build, so the registry is built from the swapped bytes; my focused entrypoint builds **then** swaps. That
+difference is the most likely single cause and the first thing to test.
 
-## 4. State handed back
+**Next step (one change).** Either (i) install the native document **before** the build in the focused entrypoint, leaving the
+transaction to prove only the served facts plus the restore/fresh-response pair, or (ii) find and bypass the per-process
+memoisation in the serving path so a post-boot swap is visible, as the gate already requires of its own transaction. Then run
+`scripts/verify-u04-cards-native.mjs` to green, add the additive unit/deployment tests, wire the same transaction into
+`verify-u04-22-module-consent.mjs`, and only then run the full local and hosted gates.
 
-`PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`, C1 earned and unchanged, B2 `11/17` / `53/59`, `A2` `63/63`,
-`U04_MODULE_IDS=22/22`, `U04_ASSET_ZONES=4/4`, `U04_BROWSER_MATRIX=16/16`. No product source, stylesheet, planner, asset policy,
-composer, family fixture, durable Page, dependency, workflow, oracle or frozen governance document is changed. The ACTIVE order
-remains private and untracked.
+## 4. Disposition
 
-  fixture zone, production HTTP assertions (`U04_NATIVE_CARDS_HTTP` ×3), reader refusals and bounds against the same production
-  reader (`U04_NATIVE_CARDS_REFUSALS`, `U04_NATIVE_CARDS_BOUNDS`), Chromium at 390/768/1280 (`U04_NATIVE_CARDS_BROWSER` ×3, with a
-  real keyboard walk to the safe link), and a `finally` restore with digest plus fresh-response proof
-  (`U04_NATIVE_CARDS_RESTORE`). Its syntax was verified; **it was never executed.**
+No implementation was committed or pushed; only this report is committed, and it claims no capability. The five paths in §1 are
+the authorized work preserved exactly as R04 requires, with their digests recorded so a continuation can bind to this precise tree
+without fresh discovery. Further continuation requires fresh Owner authorization of that tree.
+
+readers, the case verdict, one browser reader, the keyboard walk and **one** `runNativeCardsTransaction` — the single
+implementation both entrypoints are meant to execute.
+
+**Focused entrypoint.** `scripts/verify-u04-cards-native.mjs` builds from a removed `.next` (no stale build can answer), serves on
+loopback, runs that one transaction against the committed `components` Page fixture, then prints a focused verdict and states
+explicitly that it is not the U04 gate.
