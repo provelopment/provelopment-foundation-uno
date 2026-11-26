@@ -687,6 +687,16 @@ main {
   font-size: 1.125rem;
 }
 
+/* `UNO-WO-124 / R01`: an authored card image keeps its own aspect ratio inside the card's own box and never overflows it. A card
+   that authored no image emits no element, so the card's flex column simply closes up around the text it does carry. */
+.uno-json-card-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: calc(var(--uno-radius) / 2);
+  object-fit: cover;
+}
+
 .uno-json-prose {
   margin: 0;
   line-height: 1.65;

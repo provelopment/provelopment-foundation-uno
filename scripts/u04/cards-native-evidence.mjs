@@ -29,6 +29,18 @@ export const NATIVE_CARDS_IDS = Object.freeze([
 export const NATIVE_CARDS_LINK_HREF = "https://example.org/wo122-notes";
 export const NATIVE_CARDS_LINK_TEXT = "the notes";
 
+/**
+ * `UNO-WO-124 / R01`: one owned asset reference the native card image accepts — the same closed `{zone, path}` shape every other
+ * owned-media module uses, resolved by the Page's own binding list and served only by the bounded media route.
+ */
+export const NATIVE_CARDS_OWNED_IMAGE = Object.freeze({ zone: "page", path: "cards/plate.png" });
+
+/** The authored alternatives the image cases carry: one described, one explicitly decorative (exactly empty). */
+export const NATIVE_CARDS_IMAGE_ALT = Object.freeze({
+  descriptive: "A bordered plate",
+  decorative: "",
+});
+
 /** The shipped card presentation, measured at the fixture's 16px root. */
 export const NATIVE_CARDS_PADDING = "20px 20px 20px 20px";
 export const NATIVE_CARDS_SECTION_PADDING = "16px 20px 16px 20px";
@@ -237,9 +249,40 @@ export const NATIVE_CARDS_REFUSALS = Object.freeze([
     document.sections[0].children = [];
     return document;
   }),
-  refusal("a deferred card image", "document:invalid-props", () =>
+  // `UNO-WO-124 / R01`: a card image is now representable, but only as an **owned** reference with an authored alternative.
+  // Every boundary below is still refused rather than repaired, inferred or defaulted, and a card action stays deferred.
+  refusal("a card image without an alternative", "document:invalid-props", () =>
     richCard((card) => {
-      card.image = { src: "/assets/plate.png", alt: "A plate" };
+      card.asset = NATIVE_CARDS_OWNED_IMAGE;
+    }),
+  ),
+  refusal("a decorative card image with an alternative", "document:invalid-props", () =>
+    richCard((card) => {
+      card.asset = NATIVE_CARDS_OWNED_IMAGE;
+      card.alt = "A plate";
+      card.decorative = true;
+    }),
+  ),
+  refusal("an alternative without an asset", "document:invalid-props", () =>
+    richCard((card) => {
+      card.alt = "A plate";
+    }),
+  ),
+  refusal("a decorative flag without an asset", "document:invalid-props", () =>
+    richCard((card) => {
+      card.decorative = true;
+    }),
+  ),
+  refusal("a card asset in an unknown zone", "document:invalid-props", () =>
+    richCard((card) => {
+      card.asset = { zone: "elsewhere", path: "plate.png" };
+      card.alt = "A plate";
+    }),
+  ),
+  refusal("a card asset with an unsafe path", "document:invalid-props", () =>
+    richCard((card) => {
+      card.asset = { zone: "page", path: "../plate.png" };
+      card.alt = "A plate";
     }),
   ),
   refusal("a deferred card action", "document:invalid-props", () =>
@@ -323,6 +366,22 @@ export const NATIVE_CARDS_ACCEPTED = Object.freeze([
       richCard((card) => {
         card.title = "𝒜".repeat(160);
       }),
+  }),
+  Object.freeze({
+    // `UNO-WO-124 / R01`: the donor's optional owned image — one card described, one explicitly decorative — is now accepted at
+    // exactly the authored values, on a clone, so the shared accepted document and every served proof stay untouched.
+    label: "one descriptive and one decorative owned card image",
+    document: () => {
+      const document = cloneDocument();
+      const rich = document.sections[0].props.cards[0];
+      rich.asset = NATIVE_CARDS_OWNED_IMAGE;
+      rich.alt = NATIVE_CARDS_IMAGE_ALT.descriptive;
+      const fourth = document.sections[1].props.cards[0];
+      fourth.asset = NATIVE_CARDS_OWNED_IMAGE;
+      fourth.alt = NATIVE_CARDS_IMAGE_ALT.decorative;
+      fourth.decorative = true;
+      return document;
+    },
   }),
 ]);
 

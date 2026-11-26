@@ -12,6 +12,7 @@ import {
   NATIVE_CARDS_ACCEPTED,
   NATIVE_CARDS_DOCUMENT,
   NATIVE_CARDS_IDS,
+  NATIVE_CARDS_OWNED_IMAGE,
   NATIVE_CARDS_REFUSALS,
   // @ts-expect-error - no declaration file is shipped for the plain-ESM runner asset
 } from "../../scripts/u04/cards-native-evidence.mjs";
@@ -3149,7 +3150,32 @@ describe("native cards (UNO-WO-122)", () => {
       expect(outcome.accepted, probe.label).toBe(false);
       if (!outcome.accepted) expect(outcome.reason, probe.label).toBe(probe.expected);
     }
-    expect(NATIVE_CARDS_REFUSALS.length).toBe(19);
+    expect(NATIVE_CARDS_REFUSALS.length).toBe(24);
+  });
+
+  it("accepts the donor's optional owned card image with its authored alternative, described or decorative", () => {
+    const imageCase = NATIVE_CARDS_ACCEPTED.find((probe: { label: string }) =>
+      probe.label.includes("owned card image"));
+    expect(imageCase).toBeDefined();
+    if (imageCase === undefined) return;
+    const outcome = readUnoPageDocument(JSON.stringify(imageCase.document()));
+    expect(outcome.accepted).toBe(true);
+    if (!outcome.accepted) return;
+    const rich = outcome.document.sections[0];
+    const plates = outcome.document.sections[1];
+    expect(rich).toBeDefined();
+    expect(plates).toBeDefined();
+    if (rich === undefined || plates === undefined) return;
+    if (!("cards" in rich.props) || !("cards" in plates.props)) throw new Error("expected two cards grids");
+    // `UNO-WO-124 / R01`: the owned reference and the authored alternative survive exactly, and only the decorative card
+    // declares the literal flag — nothing is inferred from the other card or from the file name.
+    expect(rich.props.cards[0]).toMatchObject({ asset: NATIVE_CARDS_OWNED_IMAGE, alt: "A bordered plate" });
+    expect(rich.props.cards[0]).not.toHaveProperty("decorative");
+    expect(plates.props.cards[0]).toMatchObject({ asset: NATIVE_CARDS_OWNED_IMAGE, alt: "", decorative: true });
+    // A card that authored no image keeps none, and the accepted document still round-trips unchanged.
+    expect(rich.props.cards[1]).not.toHaveProperty("asset");
+    expect(rich.props.cards[1]).not.toHaveProperty("alt");
+    expect(readUnoPageDocument(JSON.stringify(outcome.document)).accepted).toBe(true);
   });
 
   it("accepts the donor's exact bounds and every accepted card count, and refuses one beyond them", () => {

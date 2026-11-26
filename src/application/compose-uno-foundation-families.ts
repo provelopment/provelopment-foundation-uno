@@ -207,6 +207,12 @@ interface MediaBindingContext {
    * Media bindings an ordinary Page already needed while nothing else gains a wider binder.
    */
   galleryComposed: boolean;
+  /**
+   * `UNO-WO-124 / R01`: set only by the Cards arm that actually composed an owned card image. It shares the Gallery's 32-binding
+   * aggregate ceiling, so a 24-image Cards section and a 24-image Gallery can each coexist with an ordinary Page's bindings while
+   * every Page that composed neither keeps the eight-binding ceiling unchanged.
+   */
+  cardsComposed: boolean;
 }
 
 /** The ordinary aggregate image-binding ceiling across a Page, and the Gallery-scoped one (`UNO-WO-121 / R01`). */
@@ -1246,7 +1252,7 @@ function composeSection(
         if (rawItem === null || typeof rawItem !== "object" || Array.isArray(rawItem)) refuseUnsupportedFeature();
         const entry = rawItem as PlainRecord;
         // `title` stays plain text, so a donor title that carries Markdown or markup is refused rather than flattened.
-        requireExactKeys(entry, ["title"], ["meta", "body"]);
+        requireExactKeys(entry, ["title"], ["meta", "body", "image"]);
         const title = readNewFamilyText(entry["title"]);
         // Uno's heading bound is wider than the donor card-title bound, so this subset's own limit is enforced here.
         if (codePointLength(title) > 160) refuseTarget();
@@ -1257,6 +1263,39 @@ function composeSection(
           const body = readRichFamilyText(entry["body"], 4000);
           card["body"] = body;
           if (hasFamilyMarkdown(body)) card["bodyMarkdown"] = true;
+        }
+        // `UNO-WO-124 / R01`: the donor card's optional image reaches the native node only as an **owned** reference resolved
+        // from this Page's own binding list. The identity must be bound and is then recorded as consumed, so a missing, extra,
+        // misowned or unbound asset refuses the whole Page; nothing is fetched, inferred or invented here.
+        if (ownsKey(entry, "image")) {
+          const rawImage = entry["image"];
+          if (rawImage === null || typeof rawImage !== "object" || Array.isArray(rawImage)) {
+            refuseUnsupportedFeature();
+          }
+          const image = rawImage as PlainRecord;
+          requireExactKeys(image, ["src"], ["alt", "decorative"]);
+          const source = readMediaSourceIdentity(image["src"]);
+          if (source === null) refuseUnsupportedFeature();
+          const rawDecorative = image["decorative"];
+          if (rawDecorative !== undefined && typeof rawDecorative !== "boolean") refuseUnsupportedFeature();
+          const decorative = rawDecorative === true;
+          const rawAlt = image["alt"];
+          if (rawAlt !== undefined && typeof rawAlt !== "string") refuseUnsupportedFeature();
+          let alt = "";
+          if (decorative) {
+            if (rawAlt !== undefined && rawAlt.length !== 0) refuseTarget();
+          } else if (rawAlt === undefined || rawAlt.trim().length === 0) {
+            refuseTarget();
+          } else {
+            alt = readNewFamilyText(rawAlt);
+          }
+          const owned = media.lookup.get(source);
+          if (owned === undefined) refuseUnsupportedFeature();
+          media.usedSources.add(source);
+          media.cardsComposed = true;
+          card["asset"] = owned;
+          card["alt"] = alt;
+          if (rawDecorative !== undefined) card["decorative"] = rawDecorative;
         }
         cards.push(card);
       }
@@ -1618,6 +1657,7 @@ export function composeUnoFoundationSubset(input: unknown, bindings?: unknown): 
       lookup: readImageBindings(migration?.images),
       usedSources: new Set<string>(),
       galleryComposed: false,
+      cardsComposed: false,
     };
     const contacts: ContactBindingContext = {
       acknowledged: readContactAcknowledgements(migration?.contactForms),
@@ -1639,7 +1679,7 @@ export function composeUnoFoundationSubset(input: unknown, bindings?: unknown): 
     // `UNO-WO-121 / R01`: the aggregate ceiling is eight identities for every Page that composed no Gallery, and thirty-two
     // only for a Page that actually composed the opt-in list Gallery. The wider ceiling is scoped to the Gallery, never
     // granted by the mere presence of a binding list.
-    if (!media.galleryComposed && media.lookup.size > IMAGE_BINDING_CEILING) refuseUnsupportedFeature();
+    if (!media.galleryComposed && !media.cardsComposed && media.lookup.size > IMAGE_BINDING_CEILING) refuseUnsupportedFeature();
 
     // The same exact-set rule for contact acknowledgements: every acknowledged `formRef` must be consumed by an authored
     // section and every authored section must be acknowledged. An acknowledgement never becomes publication or delivery

@@ -1348,7 +1348,9 @@ async function main() {
       ["ragged table row", "family:target-refused", (s) => { s.sections[13].rows[1] = ["Only one cell"]; }],
       ["column body plus list", "family:unsupported-feature", (s) => { s.sections[14].items[0].items = ["Conflicting list"]; }],
       ["blank column title", "family:target-refused", (s) => { s.sections[14].items[0].title = ""; }],
-      ["card media", "family:unsupported-feature", (s) => { s.sections[15].items[0].image = { src: "/assets/extra.png" }; }],
+      // `UNO-WO-124 / R01`: a card image is now representable, so this probe proves the boundary that still refuses — media whose
+      // identity no binding owns. The complete donor shape is authored so the only remaining defect is the unbound authority.
+      ["card media", "family:unsupported-feature", (s) => { s.sections[15].items[0].image = { src: "/assets/extra.png", alt: "An extra plate" }; }],
       ["card column count", "family:target-refused", (s) => { s.sections[15].columns = 5; }],
       ["feature icon", "family:unsupported-feature", (s) => { s.sections[16].items[0].icon = "star"; }],
       ["empty feature body", "family:target-refused", (s) => { s.sections[16].items[0].body = ""; }],

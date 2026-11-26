@@ -236,6 +236,9 @@ function SectionNode({
         // adaptation for a heading-less cards section.
         const ItemTag = HEADING_TAGS[(level === undefined ? 2 : Math.min(6, level + 1)) as 2 | 3 | 4 | 5 | 6];
         const ledeParsed = ledeMarkdown === true ? parseFamilyMarkdown(lede) : null;
+        // `UNO-WO-124 / R01`: the server-resolved projection of this section's own card images, indexed by card position. A card
+        // that authored no image has no entry here and therefore emits no element at all.
+        const images = mediaOf(media, node.id).items;
         return (
           <div className="uno-json-cards-section" data-uno-surface={surface} id={node.id}>
             {Tag === null || heading === undefined ? null : (
@@ -255,8 +258,19 @@ function SectionNode({
             <ul className="uno-json-cards" data-uno-columns={columns} id={`${node.id}-list`} role="list">
               {cards.map((card, index) => {
                 const bodyParsed = card.bodyMarkdown === true ? parseFamilyMarkdown(card.body) : null;
+                const image = images?.[index];
                 return (
                   <li className="uno-json-card" key={`${card.title}:${index}`}>
+                    {image === undefined ? null : (
+                      <Image
+                        alt={card.alt ?? ""}
+                        className="uno-json-card-image"
+                        height={image.height}
+                        src={image.src}
+                        unoptimized
+                        width={image.width}
+                      />
+                    )}
                     {card.meta === undefined ? null : <p className="uno-json-card-meta">{card.meta}</p>}
                     <ItemTag className="uno-json-heading">{card.title}</ItemTag>
                     {card.body === undefined ? null : bodyParsed !== null ? (

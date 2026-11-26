@@ -20,7 +20,7 @@ import type { UnoPublishedPageAccepted } from "./plan-uno-published-page";
 import type { UnoOwnedAssetRef, UnoOwnedMediaPurpose } from "../core/assets/uno-owned-media";
 import { UNO_OWNED_MEDIA_LIMITS } from "../core/assets/uno-owned-media";
 import type { UnoSectionNode } from "../core/page-document";
-import { isUnoExternalVideoProps } from "../core/page-document";
+import { isUnoExternalVideoProps, isUnoLayoutGridCards } from "../core/page-document";
 
 /** The closed refusal vocabulary of this plan. One literal per failure family. */
 export type UnoPageAssetRefusal =
@@ -125,6 +125,16 @@ function collect(nodes: readonly UnoSectionNode[], out: PendingOccurrence[]): vo
     if (node.module === "media.gallery" || node.module === "media.carousel") {
       node.props.items.forEach((item, itemIndex) => {
         out.push({ sectionId: node.id, slot: "image", purpose: "image", itemIndex, ref: item.asset });
+      });
+      continue;
+    }
+    // `UNO-WO-124 / R01`: a native cards grid contributes one image occurrence per card that authored an owned image, indexed by
+    // the card's own position so the projection can never shift an image onto a neighbouring card. A card without an image
+    // contributes nothing at all, so an unauthored card never becomes a hole that silently consumed someone else's asset.
+    if (node.module === "layout.grid" && isUnoLayoutGridCards(node.props)) {
+      node.props.cards.forEach((card, itemIndex) => {
+        if (card.asset === undefined) return;
+        out.push({ sectionId: node.id, slot: "image", purpose: "image", itemIndex, ref: card.asset });
       });
       continue;
     }

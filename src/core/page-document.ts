@@ -222,6 +222,19 @@ export interface UnoLayoutCard {
   readonly body?: string;
   /** Only ever the literal `true`, for a body that has been read by the shared Markdown reader. */
   readonly bodyMarkdown?: true;
+  /**
+   * `UNO-WO-124 / R01`: the donor card's optional **owned** image. The reference is a validated declaration inside this Page
+   * and nothing more — the server adapter still proves presence, ownership, bytes and signature, and only an accepted
+   * published Page makes the occurrence addressable. An external or provider image is not representable.
+   */
+  readonly asset?: UnoOwnedAssetRef;
+  /**
+   * The authored alternative text, required whenever `asset` is present. A meaningful image carries a non-empty alternative;
+   * an explicitly decorative one carries exactly the empty string, which is the same native rule `media.image` uses.
+   */
+  readonly alt?: string;
+  /** Only ever the literal `true`, and only beside an exactly empty `alt`. */
+  readonly decorative?: boolean;
 }
 
 /**
@@ -2380,7 +2393,11 @@ function readLayoutCards(value: unknown): UnoLayoutCard[] {
     if (!(index in value)) throw new RefusedDocument("document:invalid-props");
     const item = readPlainData(value[index]);
     if (item === null) throw new RefusedDocument("document:invalid-props");
-    if (!hasExactlyKeys(item, ["title"], ["meta", "body", "bodyMarkdown"])) {
+    if (!hasExactlyKeys(
+      item,
+      ["title"],
+      ["meta", "body", "bodyMarkdown", "asset", "alt", "decorative"],
+    )) {
       throw new RefusedDocument("document:invalid-props");
     }
     // A card title and meta line are literal well-formed plain text: an unpaired surrogate or a control character cannot be
@@ -2400,11 +2417,41 @@ function readLayoutCards(value: unknown): UnoLayoutCard[] {
       : bodyMarkdown === true
         ? requireFamilyMarkdown(item["body"], UNO_PAGE_DOCUMENT_LIMITS.cardTextCodePoints)
         : optionalMarkdownCapableText(item["body"], UNO_PAGE_DOCUMENT_LIMITS.cardTextCodePoints, true);
+    // `UNO-WO-124 / R01`: the donor card's optional owned image, read with the same native rules `media.image` applies. The
+    // alternative is required beside an asset, an explicitly decorative image needs it exactly empty and a described one
+    // needs a non-empty alternative; an authored alternative or decorative flag with no asset is a crossed shape and refuses.
+    const rawDecorative = item["decorative"];
+    if (rawDecorative !== undefined && typeof rawDecorative !== "boolean") {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const decorative = rawDecorative === true;
+    const hasAsset = item["asset"] !== undefined;
+    if (!hasAsset && (item["alt"] !== undefined || rawDecorative !== undefined)) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    const asset = hasAsset ? readOwnedAsset(item["asset"], "image") : undefined;
+    let alt: string | undefined;
+    if (asset !== undefined) {
+      if (item["alt"] === undefined) throw new RefusedDocument("document:invalid-props");
+      // The same native alternative reader `media.image` uses, so an explicitly decorative card image can carry the exactly
+      // empty alternative the native rule requires while a described one must still say something.
+      alt = readBoundedText(
+        item["alt"],
+        UNO_PAGE_DOCUMENT_LIMITS.mediaAltCodePoints,
+        "document:invalid-props",
+        decorative,
+        false,
+      );
+      if (decorative && alt.length !== 0) throw new RefusedDocument("document:invalid-props");
+      if (!decorative && alt.trim().length === 0) throw new RefusedDocument("document:invalid-props");
+    }
     cards.push({
       title,
       ...(meta === undefined ? {} : { meta }),
       ...(body === undefined ? {} : { body }),
       ...(bodyMarkdown === undefined ? {} : { bodyMarkdown }),
+      ...(asset === undefined || alt === undefined ? {} : { asset, alt }),
+      ...(asset === undefined || rawDecorative === undefined ? {} : { decorative }),
     });
   }
   return cards;
