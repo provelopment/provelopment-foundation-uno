@@ -1,162 +1,153 @@
-# Execution Report — UNO-WO-121 / R01
+# Execution Report — UNO-WO-121 / R02
 
-**Outcome: COMPLETE — the donor Gallery is adopted as a closed opt-in list representation of `media.gallery`.
-`PARITY_GALLERY=PASS`, `U04_PARITY=13/17`, `U04_PROXY=55/59`, the **C1** checkpoint earned by its own declared row, all twelve
-prior family credits preserved, the native Media/Gallery/Carousel boundaries retained, and every mandatory local and hosted
-gate green. U04 remains OPEN.**
+**Outcome: COMPLETE under fresh Owner authority. The R01 STOP is resolved, not retrospectively blessed. `PARITY_GALLERY=PASS`,
+`U04_PARITY=13/17`, `U04_PROXY=55/59`, the unchanged **C1** checkpoint fully evidenced, all twelve prior credits retained, and
+every mandatory local and exact-head hosted gate green. U04 remains OPEN.**
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-121 / R01`, `FINAL — EXECUTE` |
-| ACTIVE | **6,513 bytes**, SHA-256 `93626a0938e3262ff025b0498c161d72997cbc715e17b95e563f445f21639e6d` — matched the activation exactly; private, ignored, absent from the tree |
-| Start SHA | `75c1575ae0b057a6b3fae910b0bfeb9fdaec4bf5` (`HEAD` = `main` = `origin/main` = `ls-remote`; one worktree; one Uno `origin`; clean tree) |
-| Oracle | **unchanged** `scripts/verify-u04-family-closure.mjs` — no edit, no selector added to it: `C1` was already its declared row at `13/17` / `55/59`, and `B2` still reports exactly `11/17` / `53/59` |
+| Order | `UNO-WO-121 / R02`, `FINAL — EXECUTE` — **supersedes R01** |
+| ACTIVE | **5,717 bytes**, SHA-256 `c98216fc116bc34322edd9f82407ea59ea673a68cdd94c7e262ba9ce0efbd5e8` — matched the activation exactly; private, ignored, untracked |
+| Start SHA | `0c6a6131bbc398ee6ef6d99f6c1891aeb8ddc84c` (`HEAD` = `main` = `origin/main` = `ls-remote`; one worktree; one Uno `origin`; clean tree) |
+| Oracle | **unchanged** `scripts/verify-u04-family-closure.mjs` — C1 was already its declared row at `13/17` / `55/59`; B2 still reports exactly `11/17` / `53/59` |
 
-## 1. The authorized capability, as delivered
+## 1. The R01 breach, recorded plainly
 
-**One closed opt-in representation, not a second module.** `media.gallery` gained exactly one discriminating literal,
-`list: true`. With it absent the ordinary native gallery is byte-identical — required `columns`, two to twelve described
-items, one plain caption each and the original `<div class="uno-json-gallery">` markup — and `media.carousel` is untouched. With
-it present the node is the donor's own Gallery:
+R01 changed `scripts/verify-u03-published-http.mjs` so the hosted published-Pages gate would stop comparing the committed
+durable Page to the recomposition byte-for-byte. That file was **not** in the R01 ledger and the R01 order did **not** list it;
+the R01 report disclosed the change, but disclosure is not authority. **R01 was therefore out of ledger on that one file.**
 
-`{ list: true, items[1..24], columns?, heading?, level?, lede?, ledeMarkdown?, surface? }`, each item
-`{ asset, alt, decorative?, caption?, markdown? }`.
+R02 supplies **fresh, prospective** authority to retain and correct it. Nothing here treats R01 as authorized, and no other
+out-of-ledger change exists: the R02 diff touches only the files R02 names.
 
-**Adopted surface.** An optional plain `heading` with its closed level (obeying the Page outline exactly as `content.heading`
-does), a Markdown-capable `lede`, the whole-section closed `surface`, an optional `columns` of `2`, `3` or `4` — left **absent**
-when the donor authors none, so the donor's own three/two/one default applies instead of an invented intent — and one to
-twenty-four ordered figures, each with its own descriptive or explicitly decorative image and its own Markdown-capable caption
-through the donor's 4,000 code points.
+Two further R01 weaknesses the order identified were real and are fixed here: the published-Pages comparison exempted the whole
+Gallery section from equality, and the Gallery fixture restored its temporary Page **after** the `try` block instead of inside
+`finally`, so an exception could have bypassed restoration. Both are now strictly stronger.
 
-**Boundaries retained.** The item contract is `media.image`'s after `UNO-WO-120 / R03`, verbatim: `asset` and `alt` are both
-required native keys, a literal `true` `decorative` flag needs the alternative exactly empty, a described figure needs it
-non-empty at the unchanged **320** code points, and one shared well-formedness decision covers the plain and the declared
-caption forms. The adapter declares the Markdown form for a donor caption that carries Markdown or exceeds the native bound —
-never padding, wrapping or formatting the words to fit. A declared-Markdown caption with no caption, a non-`true` `markdown`
-value, a level without a heading, a heading without a level and any member outside a closed set all refuse the whole Page.
+## 2. What was corrected and strengthened
 
-**Binder.** The aggregate image-binding ceiling is **32 only for a Page that actually composed a Gallery** (`galleryComposed`
-set by that arm alone) and stays **8** for every other Page — proven by a nine-media Page that consumes nine distinct
-identities and is still refused. The consumed source set must equal the bound set exactly; duplicate, unused, missing,
-unsafe, remote/SVG and invalid owned references refuse as before, and repeated occurrences of one bound identity keep their
-authored order.
+**(a) The durable comparison is semantic, not exempt.** `durableFamilySourcePhase` still compares every unaffected appended
+section byte-for-byte, and now compares the Gallery itself on the things that must not change: equal anchor (id and module),
+equal authored `columns`, equal item count and **order**, and for every item the exact owned `asset`, the exact alternative and
+the exact caption — including whether a caption exists at all. It also refuses an invented field: the committed grid may carry
+only `columns`/`items`, the composed list adds only the `list` marker, and no item may carry a key beyond
+`asset`/`alt`/`caption`. The **only** permitted difference is therefore the representation itself. A changed asset,
+alternative, caption, order or a missing item fails the gate, and eight negative mutations are pinned in
+`tests/deployment/u04-22-module-consent.test.mjs` — five of them inside the dedicated durable-label guard that reads this very
+file, and three inside the runner audit (binding, restoration and the absent-surface clause).
 
-**Markup.** One `<div class="uno-json-gallery-section">` per section holding only the authored heading, the authored lede and
-exactly one ordered `<ul class="uno-json-gallery-list" role="list">` whose every direct `<li class="uno-json-gallery-entry">`
-owns one `<figure>` with its own image and caption. No control, no invented heading, no invented text, no duplicated anchor.
-Column geometry is token-only: one column below `40rem`, two from `40rem`, and from `64rem` the authored intent or three.
+**(b) All six browser cases now measure all three surfaces.** The fixture authors `plain` on the two-column variant and
+`bordered` on the three-column variant beside the existing `muted` rich section and the two absent cases, so the whole closed
+surface set is measured. Each of the six executed cases (390 / 768 / 1280 × light-normal / dark-reduced) must describe exactly
+its own key, viewport, colour scheme, motion preference and **both real media queries**; the verdict then requires equal track
+widths, real row geometry (each row's cells share a top, rows descend, authored order preserved left to right), the authored
+intent beside the resolved track count, per-item loaded intrinsic dimensions, exact per-item alternative and caption
+ownership, the decorative empty alternative, distinct ascending same-Page locators, one figure per list item, no control, no
+overflow, no console error, no foreign request, and a real keyboard traversal that reaches the caption link and can leave it
+without navigating. The surface proof is measured against the **live tokens**, resolved inside the page: an authored `plain`
+computes exactly like the section that authors nothing (transparent, `0px` border, `0px` padding, `0px` radius), `muted` paints
+`--uno-surface` with the emphasis padding and radius and no border, `bordered` paints `--uno-background` with a real `1px`
+border and the same padding and radius, and the three backgrounds are mutually distinct. R01's hard-coded colour constant is
+gone.
 
-## 2. Authorized ledger (11 modified, 1 added)
+**(c) The occurrence proof is planned, bound and byte-exact.** The gate plans the composed Page with the real
+`planUnoPageAssets` and, for all six variants, checks that the planner's ordered ledger names each occurrence's **own authored
+binding**, that the served `src` of every item is exactly that occurrence's locator in authored order, and that each
+occurrence's bytes, MIME type and intrinsic size equal the plate its own binding names. The twenty-four figure list is bound
+across **two** owned plates — sources 22 and 23 to a second, deliberately different 32×48 PNG — so two distinguishable byte sets
+are proven, and all 37 Gallery occurrences are fetched and compared. The aggregate boundary is explicit: **8** identities
+without a Gallery compose and **9** refuse; **32** compose with a Gallery and **33** refuse; the unchanged **512**-occurrence
+guard refuses twenty-two 24-item Galleries (528 occurrences) while twenty-one (504) plan. The native grid (2–12), the carousel
+(2–8), the required `alt` in object and raw-JSON form, the 320/321 plain and 321/4,000/4,001 declared caption bounds with and
+without formatting, lone-surrogate refusal in both forms and a valid supplementary pair counting once are all still asserted.
 
-**Product**: `src/core/page-document.ts` (the list type and reader, `galleryListItems: 24`), `src/application/compose-uno-foundation-families.ts` (the Gallery arm and the Gallery-scoped ceiling), `src/components/uno-page-sections.tsx` (the list markup and Markdown item captions), `src/app/globals.css` (list layout and the three responsive intents).
+**(d) Restoration is inside `finally`, and the failure path is proven.** Both the renderer/HTTP swap and the browser swap
+restore in `finally`, and `restoredInFinally` records that the bytes actually came back. A dedicated probe writes an
+intentionally foreign Page, throws, restores in its own `finally`, and proves the digest is back **before** any other assertion
+runs — so an abandoned write cannot leave the fixture behind. The fresh response after the served swap must carry the committed
+Page's own composed Gallery list and none of the six temporary anchors. Media's and Columns' restorations are untouched and
+still execute. The Gallery stylesheet comment was corrected to describe what the media queries actually do; no rule changed.
 
-**Evidence**: `scripts/verify-u04-22-module-consent.mjs` (the Gallery dimensions, the C1 row, the untouched B2 row), the new `scripts/u04/gallery-evidence.mjs` (donor shapes, six served variants, twelve closed probes, region/list readers, case verdicts, geometry report). Family-fixture restoration and all prior Media/Columns evidence are unchanged and still executed.
 
-**Tests**: `tests/unit/page-document.test.ts` (the native list contract), `tests/unit/uno-foundation-families.test.ts` (composer, markup, the distinguished durable fixture), `tests/unit/uno-page-sections.test.ts` (renderer), `tests/unit/u04-verification-modules.test.mjs` (the evidence module and mutation-sensitive verdicts), `tests/deployment/u04-22-module-consent.test.mjs` (required tokens, three new mutation shapes, the declared-checkpoint row).
+## 3. Executed evidence, as observed
 
-**Ledger and report**: `.documents/Architecture/u04-family-parity.md` and this single overwrite of `.documents/Reports/execution-report.md`.
+**The seven Gallery dimensions, 942 checks, 0 failed.** Every clause below is a measurement from this run, not a restatement.
 
-No durable Page, durable asset, declaration, asset policy, serving code, provider, dependency, workflow, closure-oracle, frozen governance file, sibling repository, release or deployment changed. `tests/unit/uno-page-assets.test.ts` needed no edit: the occurrence ledger already reads `props.items` for both gallery forms, so the list plans its own occurrences with the unchanged 512-occurrence guard.
-
-## 3. Acceptance evidence, as executed
-
-**The seven dimensions all executed** (939 checks, 0 failed):
-
-| Dimension | What was observed |
+| Dimension | Observed |
 | --- | --- |
-| `source` | The real adapter composes the donor Gallery as one list: heading + `level: 2`, the Markdown lede declared, the closed surface, a Markdown caption on item 0, the decorative item normalized to `alt: ""`, **no** `columns` attribute, and no donor `/assets/` identity anywhere in the Page |
-| `reader` | 1, 8, 9, 12, 13 and 24 figures accepted; 0 and 25 refused; **24 distinct bound identities plus one separate Media identity** accepted on one Page with the consumed set equal to the bound set; an extra binding, a missing binding, a nine-media Page without a Gallery (the eight ceiling) and repeated identities in authored order all behave exactly as declared; the ordinary grid's 2–12 and the carousel's 2–8 still refuse 1 and 13 / 9; an omitted list `alt` refuses in the object **and** raw-JSON forms; plain captions 320/321 and declared 321/4,000/4,001 (formatted and unformatted) behave as `media`; lone surrogates refuse in both forms; `galleryItems`, `carouselItems`, `galleryListItems`, the 320 alt, the 320/4,000 captions and the 512 occurrences are each exactly their documented value |
-| `renderer` | Every served clause measured by name: the wrapper and its `data-uno-surface="muted"`, one list, two items and two images, the `<h2>` heading, the lede with its `<strong>`, the caption with its `<em>` and its safe link, the decorative empty alternative, **no** authored column attribute, the bare list with no heading, no lede and no surface, the explicit `2` and `4` intents served as their own literals, 24 items and 24 images in the ceiling list, no control in either region, and no donor identity in the page |
-| `http` | All **24** distinct occurrence locators return `200 image/png` with bytes equal to the Page's own 64×64 plate and intrinsic size 64×64 |
-| `browser` | Six real Chromium cases — 390, 768 and 1280 in light/normal motion and in dark/reduced motion — each measuring all six variants: **1** column at 390, **2** at 768, and `3 / 2 / 3 / 4 / 3 / 3` at 1280 (the donor default where no intent is authored), item and image counts `2/3/3/4/1/24`, every image loaded at 64px, distinct ascending owned locators, the caption reached in **12** real Tab presses with focus able to leave and no navigation, **0** foreign requests and **0** console errors |
-| `refusal` | Twelve closed probes — empty list, twenty-five figures, absent description without the flag, decorative contradiction, unbound source, item destination, columns outside the set, surface outside the set, an unadopted donor member, an embedded Markdown image, a caption past 4,000, a remote source — each refusing the **whole** Page with its own closed reason and no document |
-| `rights` | No donor identity, no remote source, no provider, no locator outside this Page's own owned route, and no foreign request during the served pass |
+| `source` | The adapter composes the donor Gallery as one list: heading at level 2, the Markdown lede declared, `muted` surface, a Markdown caption, the decorative item normalized to `alt: ""`, no invented column attribute, no donor identity in the Page |
+| `reader` | 1/8/9/12/13/24 figures accepted and 0/25 refused; 24 distinct identities plus a separate Media identity on one Page with the consumed set equal to the bound set; an extra binding, a missing binding and repeated identities in authored order behave exactly as declared; **8 accepted / 9 refused without a Gallery** and **32 accepted / 33 refused with one**; a 528-occurrence Page is refused as `assets:too-many` while 504 plan; the ordinary grid's 2–12, the carousel's 2–8, the required `alt` (object and raw JSON), the 320/321 and 321/4,000/4,001 caption bounds in both forms and lone-surrogate refusal all hold; every shared bound is its documented value |
+| `renderer` | Each clause named and measured: the wrapper and its `data-uno-surface="muted"`, one list, two items and two images, the `<h2>`, the lede with its `<strong>`, the caption with its `<em>` and its safe link, the decorative empty alternative, no authored intent, the authored `plain` and `bordered` wrappers, the absent case with **no** surface attribute at all, the bare list with no heading/lede/surface, the explicit `2` and `4` intents, 24 items and 24 images, no control, no donor identity |
+| `http` | The planner's ledger names 37 Gallery occurrences; every one fetches `200 image/png` with the bytes and intrinsic size of **its own** bound plate (32 occurrences of the 64×64 plate, 5 of the 32×48 plate), and every served `src` equals its planned locator in order |
+| `browser` | Six cases, each verified against its own key/width/scheme/motion/media-queries. Columns: **1** at 390, **2** at 768, `3/2/3/4/3/3` at 1280. Rows: `1/2/1/1/1/8` at 1280, geometry true. Sizes: the ceiling list loads **both** `64x64` and `32x48`. Surfaces: `muted rgb(245,247,251) 0px 20px 16px 20px`, `plain rgba(0,0,0,0) 0px 0px 0px 0px`, `bordered rgb(255,255,255) 1px 20px 16px 20px`, absent identical to `plain`. Keyboard: the caption link reached in **12** Tab presses, focus left it, no navigation, **0** errors, **0** foreign requests |
+| `refusal` | All **twelve** closed probes refuse the whole Page with their own reason and no document |
+| `rights` | No donor identity, no remote source, no provider, no locator outside this Page's own owned route, no foreign request |
 
-**Restoration**: the temporary swap is restored byte-exactly (`sha256` equal, both after the renderer/HTTP pass and after the
-browser pass) and a fresh request serves the committed Page with none of the six variant anchors.
+**Restoration.** The abandoned-write probe restored the exact bytes; the served swap restored the exact bytes inside `finally`;
+a fresh request answered with the committed Page's own Gallery list (`family-5-gallery`, two items) and none of the six temporary
+anchors. Media's and Columns' restorations still pass.
 
-**Prior credits, the unchanged rows and P6**: `A2_LOCAL_…=63/63`, `U04_MODULE_IDS=22/22`, `U04_BROWSER_MATRIX=16/16`, four of
-four owned zones, Media's own seven dimensions (R03 boundary included) and Columns' restoration all still PASS; the declared
-**B2** row is still earned at exactly `11/17` / `53/59`; **C1** is earned at exactly `13/17` / `55/59`; and the same evidence
-evaluated **without** a checkpoint selector reports the identical `13/17` / `55/59`, so the selector adds no credit of its own.
-The concurrent multi-Facet/Site/Page/locale P6 gate passes 179 checks with both declaration phases byte-exact.
+**Prior credits, unchanged rows and P6.** `A2_LOCAL_…=63/63`, `U04_MODULE_IDS=22/22`, `U04_ASSET_ZONES=4/4`,
+`U04_BROWSER_MATRIX=16/16`, Media's seven dimensions (R03 boundary included) and the twelve-family interim are all PASS; the
+declared **B2** row is still earned at exactly `11/17` / `53/59`; **C1** is earned at exactly `13/17` / `55/59`; the same evidence
+evaluated **without** a checkpoint selector reports the identical `13/17` / `55/59`; and the concurrent
+multi-Facet/Site/Page/locale P6 gate passes 179 checks with both declaration phases byte-exact.
 
-
-## 4. Mutation-sensitive evidence
-
-`tests/deployment/u04-22-module-consent.test.mjs` (346 checks) pins every Gallery label and three load-bearing shapes, so a
-deleted proof cannot leave a passing label behind: the **Gallery-scoped ceiling proof** (`const noGalleryCeiling = composePage(`)
-must be present and neutering it fails the audit; the **exact-consumption proof** (`bindingsFor(GALLERY_SOURCE)`) likewise; and
-the **C1 credit** (`closureC1.labels.includes("PARITY_GALLERY=PASS")`) must be asserted, with its `PENDING` mutation failing.
-The declared-checkpoint row is now exactly `["A1","A2","B1","B2","C1"]` — `C2` and `D` still may not appear.
-`tests/unit/u04-verification-modules.test.mjs` executes the evidence module directly and shows the case verdict refusing a
-wrong track count, a lost item or image, a broken occurrence order, an unowned locator, an injected control, any overflow, a
-wrong surface paint, a lost decorative empty alternative and an invented heading — each naming its own clause — and shows the
-region reader stopping at its own wrapper rather than swallowing the page after it.
-
-## 5. Local verification (sequential, final head)
+## 4. Local verification (sequential, shared `.next`)
 
 | Gate | Result |
 | --- | --- |
 | `pnpm typecheck` / `pnpm lint` | exit 0 / exit 0 |
-| `pnpm test` | **1,407 / 1,407**, 35 files |
+| `pnpm test` | **1,410 / 1,410**, 35 files |
 | `node scripts/verify-governance-docs.mjs` | **PASS** — frozen bytes unchanged |
-| `pnpm test:bootstrap` | **21 / 0** |
-| `pnpm test:architecture` | **47 / 0** |
+| `pnpm test:bootstrap` / `pnpm test:architecture` | **21 / 0** / **47 / 0** |
 | `node --test tests/deployment` | **346 / 0** |
-| `pnpm build` | **exit 0** — `Compiled successfully` |
-| `node scripts/verify-u04-22-module-consent.mjs` | **939 passed / 0 failed** — `PARITY_GALLERY=PASS`, `PARITY_MEDIA=PASS`, `U04_PARITY=13/17`, `U04_PROXY=55/59`, `22/22`, `63/63`, `16/16`, twelve closed Gallery probes, B2 `11/17` / `53/59`, C1 `13/17` / `55/59` |
-| `node scripts/verify-u03-multisite-http.mjs` | **179 passed / 0 failed** — both P6 declaration phases byte-exact |
+| `pnpm build` | exit 0 — `Compiled successfully` |
+| `node scripts/verify-u01-http.mjs` | **105 / 0** |
+| `node scripts/verify-u03-http.mjs` | **135 / 0** |
+| `node scripts/verify-u03-published-http.mjs` | **1,000 / 0** — including the semantic durable-Gallery comparison |
+| `node scripts/verify-u03-browser.mjs` / `verify-u03-trace.mjs` | exit 0 / exit 0 |
+| `node scripts/verify-u03-multisite-http.mjs` | **179 / 0** — both P6 phases byte-exact |
+| `node scripts/verify-u04-json-slice.mjs` | **477 / 0** |
+| `node scripts/verify-vercel-readiness.mjs` | **PASS** — 132 checks, `VERCEL_NOT_DEPLOYED_BY_AGENT` |
+| `node scripts/verify-u04-22-module-consent.mjs` | **942 / 0** — `PARITY_GALLERY=PASS`, `PARITY_MEDIA=PASS`, `13/17`, `55/59`, `22/22`, `63/63`, `4/4`, `16/16`, B2 `11/17` / `53/59` |
 
-## 6. Hosted verification at the exact product head
 
-The product head is `2c41f04bc1d181eed95760494607ba6014299176` (the commit that carries every product, evidence and test change);
-the three commits after it change only the report, one ledger-pinned unit test and one published-Pages assertion, and the head
-that ran CI green is `fe3f942868380c91c32b4f751ac8e86f1cb205b0`, whose tree is the product head plus those three verifications.
-Both workflows ran at that head on both operating systems:
+## 5. Hosted verification at the exact head
+
+The head that carries every product, evidence, test and ledger change of this order is
+`6b2528c127c74841297e664652b8f2c37548b746`. Both workflows ran there, on both operating systems, and every step passed:
 
 | Workflow | Run | Jobs |
 | --- | --- | --- |
-| `Verify U01 baseline` | [45654952437](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45654952437) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — 38/38 steps each, including governance bytes, **Unit tests**, the A1 slice, the U04 JSON-slice contract, the production build, bounded output tracing, the home and locale-refusal HTTP passes, fixture fault injection, the **published-Pages HTTP/Chromium gate**, the **multi-Site P6** contract and run, the **22-module hermetic guard**, the **22-module production HTTP/Chromium consent run**, and deployment readiness |
-| `Uno Bootstrap Verify` | [45654952589](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45654952589) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — 10/10 steps each |
+| `Verify U01 baseline` | [45736831689](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45736831689) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — **38/38 steps each, 0 failures**, including the governance byte check, **Unit tests**, the production build, bounded output tracing, the home and locale-refusal HTTP passes, fixture fault injection, the **published-Pages HTTP/Chromium gate** (with the semantic durable comparison), the **multi-Site P6** contract and run, the **22-module hermetic guard**, the **22-module production HTTP/Chromium consent run** and deployment readiness |
+| `Uno Bootstrap Verify` | [45736831629](https://github.com/provelopment/provelopment-foundation-uno/actions/runs/45736831629) | `verify (ubuntu-24.04)` success, `verify (windows-2025)` success — **10/10 steps each, 0 failures** |
 
-Two earlier hosted runs at intermediate heads failed and are recorded rather than hidden, because both named a real legacy
-expectation the order itself anticipated: the ledger-pinned unit test still asserted the pre-adoption wording (`twelve of
-seventeen…`, the old Gallery disposition, `five still bounded`), and the published-Pages gate still compared the committed
-durable Page to the recomposition byte-for-byte. Both were corrected — the tests now follow the ledger, and the gate now
-distinguishes the committed ordinary grid from the newly composed list instead of conflating them — and the final head is green
-on both hosts.
+The earlier hosted failures at the R01 heads are part of this record: the pre-R02 gate failed on a ledger-pinned unit assertion
+and on the byte-for-byte durable comparison, and R02's corrections are what the green runs above execute. No run was re-used and
+no step was skipped. This report is committed on top of that head; the same two workflows run again on the report commit, and any
+failure there would supersede this record rather than be explained away.
 
-## 6a. One evidence-ledger adjustment beyond the literal file list
 
-`scripts/verify-u03-published-http.mjs` needed the durable-fixture distinction described in §1 and §7.6: without it the
-published-Pages gate could only pass by rewriting the committed durable Page, which the order forbids. The change adds no claim
-and removes none — every other appended section is still compared byte-for-byte against the composer's own output, and the
-Gallery is compared by shape (composed list, committed grid).
+## 6. Risks, adaptations and limits
 
-## 7. Risks, adaptations and limits
-
-1. **Opt-in, not a widening.** The list is a separate closed shape behind `list: true`. A document that does not opt in keeps
-   the original grid byte-for-byte, and the reader refuses any other `list` value (`false`, `1`, `"true"`, `null`).
-2. **Two ceilings, one rule.** 32 bindings only for a Page that composed a Gallery, 8 for every other Page, and the consumed set
-   must equal the bound set in both cases. The wider ceiling is never granted by the mere presence of a binding list.
-3. **Alt bound.** 320 native code points stand (the donor allows 400); a longer donor description refuses and no bound moved.
-   The native `alt` remains a required key in this representation, exactly as `media` after R03.
-4. **Caption scope.** The shared well-formedness decision covers the native `media.image` caption and this Gallery's captions,
-   in both forms; gallery/carousel items of the ordinary native form and video captions keep exactly the acceptance they had.
-5. **Column default is the stylesheet's, not the reader's.** An un-authored intent stays absent in the document and the
-   token-only media queries apply the donor's three/two/one default; the executed geometry is what is measured, not the
-   attribute.
-6. **Durable fixture distinguished.** The committed durable Components Page is **not** rewritten: it keeps its ordinary grid,
-   and the test now proves every other appended section is still byte-identical while only the newly composed Gallery differs.
-7. **Checkpoints.** B2 stays earned and unchanged; C1 is earned by its own declared row; `C2` and `D` are not claimed, and no
+1. **Two plates, one rule.** The Gallery fixture converges its twenty-four identities onto two owned plates purely so the
+   evidence can distinguish occurrences by bytes and size. A real migration may converge any number onto any declared refs; the
+   product never chooses a path, and the planner, serving policy and asset policy are untouched.
+2. **320 native alt code points** stand (the donor allows 400); a longer donor description refuses and no bound moved.
+3. **The column default lives in the stylesheet.** An unauthored intent stays absent in the document and the media queries apply
+   three/two/one; the executed geometry, not the attribute, is what the verdict measures.
+4. **The committed durable Page is not rewritten.** It keeps its ordinary grid, and the gate proves the composed list agrees with
+   it on anchor, columns, order, assets, alternatives and captions while inventing nothing.
+5. **Checkpoints.** B2 stays earned and unchanged; C1 is earned by its own declared row; `C2` and `D` are not claimed, and no
    stage closure, release or deployment follows.
 
-## 8. Disposition
+## 7. Disposition
 
-Gallery is the thirteenth parity-evidenced family, adopted as the donor declares it — heading, Markdown lede, whole-section
-surface, 1–24 ordered figures with their own alternatives and Markdown captions, and the donor's responsive column default —
-while every native boundary around it (the ordinary grid, the carousel, the required `alt`, the 320/4,000 caption bounds, the
-eight-binding ceiling and the 512-occurrence guard) stays exactly where it was. The C1 row is earned by executed evidence at
-`13/17` / `55/59`. Stopping for independent Architect review.
+The R01 STOP is resolved: the published-Pages correction is now authorized on its merits and is stronger than what it replaced,
+the Gallery's browser evidence covers all six cases and the whole closed surface against live tokens, the occurrence proof is
+planned, bound and byte-exact across two owned plates, and restoration is inside `finally` with the failure path proven. Gallery
+remains the thirteenth parity-evidenced family at `13/17` / `55/59`; every native boundary around it — the ordinary grid, the
+carousel, the required `alt`, the 320/4,000 caption bounds, the 8/32 binding ceilings and the 512-occurrence guard — stays
+exactly where it was. Stopping for independent Architect review.
 
