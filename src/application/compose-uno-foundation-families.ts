@@ -1381,18 +1381,8 @@ function composeSection(
         }
         if (ownsKey(entry, "icon")) {
           const rawIcon = entry["icon"];
-          let source: string | null = null;
-          if (typeof rawIcon === "string") {
-            source = readMediaSourceIdentity(rawIcon);
-          } else if (rawIcon !== null && typeof rawIcon === "object" && !Array.isArray(rawIcon)) {
-            // A donor icon may also arrive as an authored object: its identity is still the one `src` the reader classifies.
-            const icon = rawIcon as PlainRecord;
-            requireExactKeys(icon, ["src"], ["alt", "decorative"]);
-            source = readMediaSourceIdentity(icon["src"]);
-            // A feature icon is decorative: an authored alternative or an explicit non-decorative flag is a crossed shape.
-            if (ownsKey(icon, "alt") && icon["alt"] !== "") refuseTarget();
-            if (ownsKey(icon, "decorative") && icon["decorative"] !== true) refuseTarget();
-          }
+          if (typeof rawIcon !== "string") refuseUnsupportedFeature();
+          const source = readMediaSourceIdentity(rawIcon);
           if (source === null) refuseUnsupportedFeature();
           const owned = media.lookup.get(source);
           if (owned === undefined) refuseUnsupportedFeature();

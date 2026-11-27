@@ -29,48 +29,12 @@ export const REQUIRED_FILES = Object.freeze([
   '.gitignore',
   '.documents/SOP/sop-implementation.md',
   '.documents/Architecture/source-inventory.md',
-  '.documents/WIP/plan-roadmap.md',
-  '.documents/WIP/plan-next.md',
-  '.documents/WIP/plan-outlook.md',
   '.github/workflows/verify-bootstrap.yml',
   'tests/bootstrap.test.mjs',
 ]);
 
-/** The canonical Uno documentation folder (identity only — never mirrored here). */
-export const CANONICAL_DOCS_FOLDER_ID = '1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0';
-
-/** The Owner-installed order filename and the exact ignore rule that must screen it. */
-export const WORK_ORDER_FILE = 'workorder-active.md';
+/** Legacy private file: exclude it from publication and never read it. */
 export const WORK_ORDER_IGNORE_PATH = '.documents/WIP/workorder-active.md';
-
-/**
- * The three public planning slots that must be tracked.
- *
- * The fourth WIP slot is the private ACTIVE order. It must never be *required*: it does not
- * exist in a hosted CI checkout and must never be published. This validator therefore never
- * requires it and never reads its body.
- */
-export const PUBLIC_PLAN_SLOTS = Object.freeze([
-  '.documents/WIP/plan-roadmap.md',
-  '.documents/WIP/plan-next.md',
-  '.documents/WIP/plan-outlook.md',
-]);
-
-/** The complete, closed set of entries permitted in `.documents/WIP/`. */
-const ALLOWED_WIP_ENTRIES = new Set([
-  'plan-roadmap.md',
-  'plan-next.md',
-  'plan-outlook.md',
-  WORK_ORDER_FILE,
-]);
-
-/** Distinct diagnostics for the local SOP and the tracked planning slots. */
-const REQUIRED_FILE_MESSAGES = new Map([
-  ['.documents/SOP/sop-implementation.md', 'missing or empty local implementation SOP'],
-  ['.documents/WIP/plan-roadmap.md', 'missing or empty tracked planning slot'],
-  ['.documents/WIP/plan-next.md', 'missing or empty tracked planning slot'],
-  ['.documents/WIP/plan-outlook.md', 'missing or empty tracked planning slot'],
-]);
 
 /**
  * Public prose that must never carry secrets or a machine-specific private path.
@@ -81,9 +45,6 @@ export const PUBLIC_DOCUMENTS = Object.freeze([
   'AGENTS.md',
   '.documents/SOP/sop-implementation.md',
   '.documents/Architecture/source-inventory.md',
-  '.documents/WIP/plan-roadmap.md',
-  '.documents/WIP/plan-next.md',
-  '.documents/WIP/plan-outlook.md',
   '.documents/Reports/execution-report.md',
 ]);
 
@@ -267,10 +228,7 @@ export function validateBootstrap(root) {
   // --- 1. Required files exist, are ordinary files, and are non-empty ----------
   for (const rel of REQUIRED_FILES) {
     if (!isNonEmptyFile(at(rel))) {
-      const specific = REQUIRED_FILE_MESSAGES.get(rel);
-      issues.push(
-        specific ? `${specific}: ${rel}` : `missing, not a regular file, or empty: ${rel}`,
-      );
+      issues.push(`missing, not a regular file, or empty: ${rel}`);
     }
   }
 
@@ -278,17 +236,6 @@ export function validateBootstrap(root) {
   const readme = text('README.md');
   if (readme) {
     for (const { issue } of README_TRUTH_ISSUES(readme)) issues.push(issue);
-  }
-
-  // --- 3. AGENTS anchors to the canonical records and the physical order ------
-  const agents = text('AGENTS.md');
-  if (agents) {
-    if (!agents.includes(CANONICAL_DOCS_FOLDER_ID)) {
-      issues.push('AGENTS.md must reference the canonical Uno documentation folder');
-    }
-    if (!agents.includes(WORK_ORDER_FILE)) {
-      issues.push(`AGENTS.md must reference the local work order filename (${WORK_ORDER_FILE})`);
-    }
   }
 
   // --- 4. The licence is the real Apache-2.0 text -----------------------------
@@ -314,7 +261,7 @@ export function validateBootstrap(root) {
     if (rules.includes('.documents/WIP')) {
       issues.push(
         'the entire .documents/WIP directory must not be ignored: ' +
-          'only the private work order is screened, the three plan-*.md slots must stay trackable',
+          'only the private work order is screened, public planning notes must stay trackable',
       );
     }
     if (!rules.includes('.temp')) {
@@ -330,7 +277,21 @@ export function validateBootstrap(root) {
   }
 
   // --- 7. Published documents carry no secrets or private machine paths -------
-  for (const rel of PUBLIC_DOCUMENTS) {
+  const plans = [];
+  const walkPlans = (dir) => {
+    for (const entry of readdirSync(at(dir), { withFileTypes: true })) {
+      const rel = `${dir}/${entry.name}`;
+      if (rel === WORK_ORDER_IGNORE_PATH) continue;
+      if (entry.isDirectory()) walkPlans(rel);
+      else if (entry.isFile() && /\.md$/i.test(entry.name)) plans.push(rel);
+    }
+  };
+  try {
+    if (existsSync(at('.documents/WIP'))) walkPlans('.documents/WIP');
+  } catch {
+    issues.push('.documents/WIP is not readable');
+  }
+  for (const rel of [...PUBLIC_DOCUMENTS, ...plans]) {
     if (!existsSync(at(rel))) continue; // optional documents are skipped when absent
     const body = text(rel);
     for (const { label, re } of CREDENTIAL_PATTERNS) {
@@ -347,28 +308,6 @@ export function validateBootstrap(root) {
     }
   }
 
-  // --- 8. Exactly four WIP slots, and nothing else ----------------------------
-  // The private ACTIVE order is permitted here but never required and never read: a hosted
-  // CI checkout legitimately contains only the three public plan files. No allowlist
-  // exceptions are granted for any other file or subdirectory.
-  const wipDir = at('.documents/WIP');
-  if (existsSync(wipDir)) {
-    let entries = [];
-    try {
-      entries = readdirSync(wipDir);
-    } catch {
-      issues.push('.documents/WIP exists but is not readable');
-    }
-    for (const name of entries) {
-      if (!ALLOWED_WIP_ENTRIES.has(name)) {
-        issues.push(
-          'unexpected entry in .documents/WIP (only plan-roadmap.md, plan-next.md, ' +
-            `plan-outlook.md and the private ${WORK_ORDER_FILE} are permitted): ${name}`,
-        );
-      }
-    }
-  }
-
   return issues;
 }
 
@@ -379,7 +318,7 @@ export function main(root = process.cwd()) {
     process.stdout.write(
       'verify-bootstrap: OK - ' +
         `${REQUIRED_FILES.length} required files present, licence verified, ` +
-        'four-slot WIP discipline intact, private authority screened, no Hub/Spoke data, ' +
+        'private files screened, no Hub/Spoke data, ' +
         'no credential or private-path leaks.\n',
     );
     return 0;

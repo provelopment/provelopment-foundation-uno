@@ -19,7 +19,8 @@ composition, never a parity uplift.** U04 remains OPEN. **B2 (`11/17` / `53/59`)
 `UNO-WO-120 / R03` credits `media` without moving the B2 row, and `UNO-WO-121 / R01` credits `gallery`, so the checkpoint-free
 thirteen-family result is `13/17` / `55/59`. Earlier rows (`B1` `8/17` / `50/59` and the nine-, ten- and
 eleven- and twelve-family interims `9/17` / `51/59`, `10/17` / `52/59`, `11/17` / `53/59`, `12/17` / `54/59`) are retained as
-regressions, and no later checkpoint target — `C2` or `D` — is asserted here.
+regressions. **C2 (`15/17` / `57/59`) is now earned** with `cards` and `features` together, so the fourteen-family Cards interim is
+closed history rather than the current claim, and only the `D` target — all seventeen families at `59/59` — remains unasserted.
 That one `divider` candidate was independently accepted under `UNO-WO-069 / R01` and is not Owner closure.
 
 ## 1. Provenance and licence
@@ -711,3 +712,17 @@ Accounting is unchanged: **22/22** module IDs, **4/4** asset zones, **16/16** br
 ## Earned closure row — fourteen families
 
 The unchanged closure oracle, fed only evidence this repository executed and no checkpoint selector, credits fourteen of seventeen families and reports `U04_PARITY=14/17` with `U04_PROXY=56/59`. Cards is the fourteenth: its seven dimensions are the pinned donor source and rights, the strict reader's accepted and refused probes, the served markup, the byte-equal production delivery at distinct occurrence locators, the three-width Chromium readings and the preserved closed refusals. The historical A1, A2, B1, B2 and C1 rows above keep exactly the scores they declared. This row is parity evidence, never a claim of full semantic parity for the donor card.
+
+## Earned closure row — fifteen families (**C2**)
+
+With the Features increment, the same unchanged oracle, still fed only executed evidence, credits fifteen of seventeen families and reports `U04_PARITY=15/17` with `U04_PROXY=57/59` under the declared **C2** checkpoint, whose target families are `cards` and `features`. Features is the fifteenth. Its seven dimensions are:
+
+- **source** — the composed native `layout.grid` features node carrying the authored heading, level, Markdown lede, column intent and ordered 1–24 unit list, together with the pinned donor row in this ledger;
+- **reader** — the strict reader re-accepting the serialized Page with the native node intact;
+- **renderer** — the served `<div class="uno-json-features-section">`, its authored `<h2>`, its lede paragraph and its `<ul class="uno-json-features">`/`<li class="uno-json-feature">` list;
+- **http** — the accepted production response that delivered that region;
+- **browser** — the features-specific Chromium reading passing at both 390 and 1280 widths: authored outline, three tracks, unique ids, no invented control and no overflow;
+- **refusal** — the preserved closed last-four refusal probes, including the icon and malformed-value cases;
+- **rights** — the donor source and licence recorded in this ledger's `features` row.
+
+The fourteen-family Cards interim stays reproduced as closed history, and the earlier A1, A2, B1, B2 and C1 rows keep exactly the scores they declared. This row is parity evidence for a bounded adoption, never a claim of full semantic parity for the donor feature list, and U04 remains **OPEN**: only `actions` and `contactForm` are uncredited, and the stage's shell, accessibility, asset-rights and responsive exit criteria are separate obligations.

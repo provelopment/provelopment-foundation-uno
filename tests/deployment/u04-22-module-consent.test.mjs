@@ -205,12 +205,12 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_TABLE_HTTP the table region is one scroll wrapper with a genuine captioned two-column table",
   "FAMILY_COLUMNS_HTTP the columns region is an authored plain two-column grid of two tight stacks",
   "FAMILY_CARDS_HTTP the cards region is one native cards section with its authored heading, lede and two-column card list",
-  "FAMILY_FEATURES_HTTP the features region is a separate headed top-level stack with a native three-column list grid",
+  "FAMILY_FEATURES_HTTP the features region is one native headed features section with a three-column list",
   "FAMILY_SEVENTEEN_HTTP the last four regions add no second main, h1, script, frame or form control",
   "${width}px table shows a captioned two-column table and its scroll control takes focus",
   "${width}px columns show two authored tight stacks with one paragraph and one native list",
   "${width}px cards show one native cards section with the authored h2, its lede and a two-column card list",
-  "${width}px features show a separate headed stack with one authored h2, a three-column list grid and two h3 titles",
+  "${width}px features show one native headed section with one authored h2, a three-column feature list and two h3 titles",
   "${width}px the composed Page carries seventeen unique top-level sections with no nested inflation",
   // `UNO-WO-069 / R01`: the divider parity candidate. Labels alone are not enough, so the executable predicates that
   // make each label meaningful are required tokens too, and A03 mutates them one at a time.
@@ -248,14 +248,14 @@ const PHASE_C_REQUIRED = Object.freeze([
   // meaningful, so a neutered comparison cannot pass as evidence.
   'heading: "Synthetic cards",',
   'heading: "Synthetic features",',
-  "FAMILY_ITEM_OUTLINE_SOURCE cards compose one frozen top-level stack with an authored h2 before a nested list grid of level-3 item titles",
-  "FAMILY_ITEM_OUTLINE_SOURCE features compose the same stack, authored h2 and nested level-3 item outline",
+  "FAMILY_ITEM_OUTLINE_SOURCE cards compose one frozen native cards node carrying the authored h2, lede and ordered card list",
+  "FAMILY_ITEM_OUTLINE_SOURCE features compose one frozen native features node carrying the authored h2, lede, column intent and ordered feature list",
   "FAMILY_ITEM_OUTLINE_SOURCE the seventeen top-level ids and all other fifteen families are unchanged",
   "FAMILY_ITEM_OUTLINE_SOURCE the real reader re-accepts both headed families from the serialized JSON",
   "FAMILY_ITEM_OUTLINE_HTTP both headed families serve exactly one authored h2 before two nested h3 titles, one list and no duplicate id",
   "${width}px the headed families keep one h2 before every item h3 with no invented control or overflow",
   'JSON.stringify(section.props) === "{}"',
-  'heading.module === "content.heading"',
+  'props.features.every((feature) => typeof feature?.title === "string" && feature.title.length > 0)',
   "title.props.level === 3",
   'outlineOk(cardsRegion, "cards", "Synthetic cards", 2)',
   'outlineOk(featuresRegion, "features", "Synthetic features", 3)',
@@ -272,7 +272,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   'lede: "Synthetic cards explain the choices.",',
   'lede: "Synthetic features describe the work.",',
   "FAMILY_LEDE_SOURCE cards compose exactly one lede paragraph in the ordered heading, lede and grid stack",
-  "FAMILY_LEDE_SOURCE features compose exactly one lede paragraph in the same ordered stack",
+  "FAMILY_LEDE_SOURCE features compose exactly one authored lede on their one native node",
   "FAMILY_LEDE_SOURCE the ledes add no node outside the two families and keep the seventeen top-level ids",
   "FAMILY_LEDE_SOURCE the composed JSON matches the installed buffer and the caller source is unmutated",
   "FAMILY_LEDE_REFUSALS each lede probe reaches its documented outcome with no partial document when it refuses",
@@ -280,7 +280,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_LEDE_HTTP each headed family serves exactly one lede paragraph after its h2 and before its native list",
   "FAMILY_LEDE_BROWSER the authored ledes were measured in real Chromium at both viewports",
   "${width}px each headed family shows its authored lede as one visible paragraph between the h2 and the list",
-  'lede?.id === `family-${index}-${type}-lede`',
+  'props.lede === expectedText',
   'JSON.stringify(lede?.props) === JSON.stringify({ text: expectedText })',
   "ledeAt > headingEnd",
   "ledeAt < listAt",
@@ -330,7 +330,7 @@ const PHASE_C_REQUIRED = Object.freeze([
   "FAMILY_TEXT_FIVE_BROWSER the five authored-text families were measured in real Chromium at both viewports",
   "textFiveGetterCalls === 0",
   "textFiveBrowserChecks === 2",
-  "familyAccepted.sections.filter((section) => section.module === \"layout.stack\").length === 7",
+  "familyAccepted.sections.filter((section) => section.module === \"layout.stack\").length === 6",
   'id="family-0-prose" data-uno-align="center"',
   "family-13-table-table",
   "family-3-faq-accordion",
@@ -1221,7 +1221,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       "FAMILY_TABLE_HTTP the table region is one scroll wrapper with a genuine captioned two-column table",
       "FAMILY_COLUMNS_HTTP the columns region is an authored plain two-column grid of two tight stacks",
       "FAMILY_CARDS_HTTP the cards region is one native cards section with its authored heading, lede and two-column card list",
-      "FAMILY_FEATURES_HTTP the features region is a separate headed top-level stack with a native three-column list grid",
+      "FAMILY_FEATURES_HTTP the features region is one native headed features section with a three-column list",
       "FAMILY_SEVENTEEN_HTTP the last four regions add no second main, h1, script, frame or form control",
     ]) {
       const mutated = source.replace(contract, "FAMILY_UNVERIFIED recorded");
@@ -1235,7 +1235,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       "${width}px table shows a captioned two-column table and its scroll control takes focus",
       "${width}px columns show two authored tight stacks with one paragraph and one native list",
       "${width}px cards show one native cards section with the authored h2, its lede and a two-column card list",
-      "${width}px features show a separate headed stack with one authored h2, a three-column list grid and two h3 titles",
+      "${width}px features show one native headed section with one authored h2, a three-column feature list and two h3 titles",
       "${width}px the composed Page carries seventeen unique top-level sections with no nested inflation",
     ]) {
       const mutated = source.replace(contract, "${width}px region unverified");
@@ -1340,7 +1340,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       // The source contract: an authored h2 before a nested level-3 grid, in one top-level stack with empty props.
       ['heading: "Synthetic cards",', 'heading: "Cards",'],
       ['JSON.stringify(section.props) === "{}"', "true"],
-      ['heading.module === "content.heading"', "true"],
+      ['props.features.every((feature) => typeof feature?.title === "string" && feature.title.length > 0)', "true"],
       ["title.props.level === 3", "true"],
       // The served-HTML hierarchy for both headed families.
       ['outlineOk(cardsRegion, "cards", "Synthetic cards", 2)', "true"],
@@ -1393,7 +1393,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
     }
     // Deleting a whole outline assertion must be caught by its own label.
     for (const label of [
-      "FAMILY_ITEM_OUTLINE_SOURCE cards compose one frozen top-level stack with an authored h2 before a nested list grid of level-3 item titles",
+      "FAMILY_ITEM_OUTLINE_SOURCE cards compose one frozen native cards node carrying the authored h2, lede and ordered card list",
       "FAMILY_ITEM_OUTLINE_HTTP both headed families serve exactly one authored h2 before two nested h3 titles, one list and no duplicate id",
       "${width}px the headed families keep one h2 before every item h3 with no invented control or overflow",
     ]) {
@@ -1409,7 +1409,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ['lede: "Synthetic cards explain the choices.",', ""],
       ['lede: "Synthetic features describe the work.",', ""],
       // The composed shape: lede id and text comparisons turned unconditional.
-      ["lede?.id === `family-${index}-${type}-lede`", "true"],
+      ["props.lede === expectedText", "true"],
       ["JSON.stringify(lede?.props) === JSON.stringify({ text: expectedText })", "true"],
       // The served order predicate collapsed.
       ["ledeAt > headingEnd", "true"],
@@ -1507,7 +1507,7 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       ["textFiveBrowserChecks === 2", "true"],
       ["found.ledeBeforeNative", "true"],
       // `UNO-WO-120 / R01`: Media is the eighth top-level stack.
-      ['familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7', "true"],
+      ['familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 6', "true"],
     ];
     for (const [token, replacement] of mutations) {
       const mutated = source.split(token).join(replacement);
@@ -1580,11 +1580,11 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       assert.notEqual(mutated, source, token);
       assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
     }
-    // The declared checkpoints are exactly the earned rows — the A1 regression, the A2 delivery, the B1 row, the B2 row and now
-    // the C1 row this order delivered. A higher checkpoint would claim a row the Owner has not delivered, so it must never
-    // appear: C2 and D stay absent until their own orders authorize them.
+    // The declared checkpoints are exactly the earned rows — the A1 regression, the A2 delivery, the B1 row, the B2 row, the
+    // C1 row and now the C2 row this increment earned from executed evidence. A higher checkpoint would claim a row that has
+    // not been earned, so it must never appear: D stays absent until its own increment earns it.
     const declared = [...source.matchAll(/checkpoint:\s*"([A-Z0-9]+)",$/gmu)].map((match) => match[1]);
-    assert.deepEqual(declared, ["A1", "A2", "B1", "B2", "C1"]);
+    assert.deepEqual(declared, ["A1", "A2", "B1", "B2", "C1", "C2"]);
   });
 
   it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {

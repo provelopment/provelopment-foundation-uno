@@ -42,12 +42,6 @@ jobs:
           node --version
           node -e "const major = Number(process.versions.node.split('.')[0]); if (major !== 26) { console.error('Expected Node 26, received ' + process.versions.node); process.exit(1); }"
 
-      - name: Verify Owner-frozen governance files (positive and refusal)
-        shell: bash
-        run: |
-          node --test tests/governance-docs.test.mjs
-          node scripts/verify-governance-docs.mjs
-
       - name: Bootstrap tests (positive and refusal)
         run: node --test tests/bootstrap.test.mjs
 

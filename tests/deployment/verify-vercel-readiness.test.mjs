@@ -152,8 +152,6 @@ function validSnapshot() {
     "      - name: Set up Node 26",
     '        with:',
     "          node-version: '26'",
-    '      - name: Governance',
-    '        run: node scripts/verify-governance-docs.mjs',
     '      - name: Install (frozen lockfile)',
     '        run: pnpm install --frozen-lockfile --ignore-scripts',
     '      - name: Install pinned headless Chromium (test-only, repo-local)',

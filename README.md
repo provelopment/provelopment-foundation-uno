@@ -10,7 +10,7 @@ Current maturity, implemented features and outstanding gates live only in curren
 
 ## Develop and verify
 
-Use the versions required by the actual `package.json`, lockfile and CI: **Node.js 26.x**, **pnpm 11.6.0**. Inside the physically verified Uno checkout, under the active work order only:
+Use the versions required by the actual `package.json`, lockfile and CI: **Node.js 26.x**, **pnpm 11.6.0**. From the Uno checkout:
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
@@ -27,6 +27,6 @@ A passing HTTP test of the current informational page does not establish public 
 
 ## Authority and rights
 
-Read [AGENTS.md](AGENTS.md) and the [Implementation SOP](.documents/SOP/sop-implementation.md). Only the exact private, Owner-activated `.documents/WIP/workorder-active.md` and its explicit ledger authorize implementation. The Architect maintains the [seven canonical Drive documents](https://drive.google.com/drive/folders/1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0) as direction and guardrails, not status logs. The [source inventory](.documents/Architecture/source-inventory.md) retains source rights and the 17/22 capability mapping.
+Read [AGENTS.md](AGENTS.md) and the [Implementation SOP](.documents/SOP/sop-implementation.md). One Owner request authorizes work on the requested local outcome. Push, release and deployment require separate authorization. The Architect maintains the [seven canonical Drive documents](https://drive.google.com/drive/folders/1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0) as direction and guardrails, not status logs. The [source inventory](.documents/Architecture/source-inventory.md) retains source rights and the 17/22 capability mapping.
 
-Apache-2.0 does not automatically license Provelopment trademarks, unreviewed imagery or separately licensed Connect code. Do not publish secrets, private authoring data or unapproved integrations. Changes to this frozen README, `AGENTS.md` or the local SOP require explicit Owner approval and exact-hash verification.
+Apache-2.0 does not automatically license Provelopment trademarks, unreviewed imagery or separately licensed Connect code. Do not publish secrets, private authoring data or unapproved integrations.

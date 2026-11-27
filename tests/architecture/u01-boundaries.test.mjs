@@ -690,8 +690,10 @@ test('README and AGENTS describe the current technical baseline truthfully', () 
       `README.md must not carry the superseded claim: ${obsolete}`,
     );
   }
-  assert.match(readme, /technical baseline/i);
-  assert.match(agents, /technical baseline/i);
+  // The local policy files state the real authority boundary, not a frozen historical status line.
+  assert.match(agents, /Owner request authorizes/i);
+  assert.match(agents, /Push, release and deployment/i);
+  assert.match(doc('.documents/SOP/sop-implementation.md'), /not authorization/i);
 
   // The README must point progress at GitHub instead of freezing a stage or a commit.
   assert.match(readme, /github\.com\/provelopment\/provelopment-foundation-uno/);

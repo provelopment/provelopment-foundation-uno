@@ -1,41 +1,13 @@
-# Foundation Uno — Next
+# Foundation Uno: Next
 
-No item in this slot is authorised. It is a planning note, never executable authority.
+This slot stays optional and carries no authority. The active sequence and verified status live in `plan-execution.md`; the evidence ledger lives in `.documents/Architecture/u04-family-parity.md`.
 
-## One unissued candidate: the rest of U04
+## Current next step
 
-U04 is **OPEN**. The landed slice delivers the version-1 JSON Page document contract and **11 of the twenty-two**
-approved module renderers — `layout.stack`, `layout.grid`, `content.heading`, `content.prose`,
-`content.actions`, `content.hero`, `content.stats`, `content.testimonials`, and now `layout.bento`,
-`content.pricing`, `content.timeline` — served end to end by the real production build with a two-card semantic
-article grid, a linked statistics description list, quoted figures, asymmetric bento tiles, authored pricing
-options and an ordered milestone list; an unlisted Page that is canonical to itself with `noindex,nofollow` and no
-discovery leakage; twenty-eight distinct refusals as genuine 404s; and a byte-exact restoration of the committed
-unpublished declarations. Family composition coverage is **0 of 17**. Nothing here is a reduction of the
-Owner-approved 22/17 obligation.
+C2 is earned: the unchanged closure evaluator returned `15/17` and `57/59` from executed evidence, with `features` credited on all seven dimensions. The `cards` + `features` row is closed and the fourteen-family Cards interim (`14/17`, `56/59`) is retained as reproduced history.
 
-**The single next candidate for the Owner to authorise** is one further U04 increment containing, in this order:
+The only remaining family row is **D**: prove `actions` and `contactForm` across the same seven dimensions, then let the evaluator return `17/17` and `59/59` before asserting it. After the family row, the separate U04 shell, accessibility, asset-rights and responsive exit criteria still apply.
 
-1. the typed, versioned `src/core/modules/uno-family-composition.ts` translator covering all seventeen pinned
-   Foundation Page families as compositions of the approved twenty-two IDs — with a positive and a unique
-   negative real-DOM proof per family, and a `KEEP`/`ADAPT`/`REWRITE`/`COMPOSE` decision recorded for each;
-2. the remaining eleven module renderers, including the one tightly scoped client island for tabs, modal and
-   carousel with its keyboard, focus and reduced-motion contract, and the display-only honest contact state;
-3. `deployment/site.config.json` as the third, disjoint presentation authority, with its strict schema, safe
-   defaults for older installations and fail-closed behaviour on an invalid present file;
-4. the owned-asset policy and guarded reader over the four authorised zones, with the temporary media fixture
-   proof (image, poster, video) and the refusal matrix for unowned, unlicensed and remote media;
-5. the presentation shell — one header, nav derived only from published public Pages, one main, one footer,
-   skip link, `aria-current`, and the 320/390/768/1280 responsive and accessibility evidence.
+## Security follow-up
 
-**Security follow-up that must not be forgotten.** The advisory `GHSA-fc5q-39xc-vjpf` is carried as a named,
-development-only exception expiring **2026-12-18T00:00:00Z**. Before that date a suitable increment must either
-adopt a published repaired `picomatch` — the guard fails closed the moment one exists, so the exception cannot be
-silently prolonged — or return to the Owner for a fresh, separately reasoned decision. A `minimatch` moderate
-remains disclosed in the development graph.
-
-**What the Owner must judge, and no Agent may decide:** whether U04 closes on that evidence; the real HTTPS
-canonical origin; which named real Pages may publish; whether the protected `/` demonstration is retired; whether
-rebuild-to-publish is the operational model; and whether any base-path deployment scope is approved at all. U05
-contact delivery, any provider integration and every release, tag or domain action remain out of scope until the
-Owner authorises them separately.
+The development-only advisory exception for `GHSA-fc5q-39xc-vjpf` expires **2026-12-18T00:00:00Z**. Adopt a published repair or take a fresh Owner decision before then; do not let the guard expire silently.

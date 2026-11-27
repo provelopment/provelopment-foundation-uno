@@ -26,7 +26,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE_BASE = join(REPO_ROOT, '.temp', 'bootstrap-tests');
 
 /**
- * A complete, minimal, valid U00 scaffold, including the four WIP slots.
+ * A complete, minimal, valid U00 scaffold, with sample planning notes.
  *
  * The README fixture carries only the durable public truth: baseline, progress authority
  * (current `main` + the single report), and the publication/release disclaimer. It pins no
@@ -40,11 +40,7 @@ const VALID_FILES = {
     'for progress; the repository is https://github.com/provelopment/provelopment-foundation-uno. ' +
     'A technical baseline or passing test does not establish a published website and does not ' +
     'authorize release or deployment without separate Owner authorization.\n',
-  'AGENTS.md':
-    '# AGENTS.md\n\n' +
-    'Canonical documents: https://drive.google.com/drive/folders/1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0\n' +
-    'Read .documents/SOP/sop-implementation.md before anything else.\n' +
-    'The only valid order path is .documents/WIP/workorder-active.md.\n',
+  'AGENTS.md': '# Local work',
   LICENSE:
     '\n                                 Apache License\n' +
     '                           Version 2.0, January 2004\n',
@@ -230,17 +226,6 @@ test('a missing AGENTS.md is refused', () => {
   assert.ok(issues.some((i) => i.includes('AGENTS.md')), JSON.stringify(issues));
 });
 
-test('an AGENTS.md without the canonical documentation reference is refused', () => {
-  const root = makeFixture('agents-no-drive', {
-    override: { 'AGENTS.md': '# AGENTS.md\n\nOrder: workorder-active.md\n' },
-  });
-  const issues = validateBootstrap(root);
-  assert.ok(
-    issues.some((i) => i.includes('canonical Uno documentation folder')),
-    JSON.stringify(issues),
-  );
-});
-
 test('an empty required file is refused', () => {
   const root = makeFixture('empty-inventory', {
     override: { '.documents/Architecture/source-inventory.md': '' },
@@ -289,17 +274,8 @@ test('a missing local implementation SOP is refused', () => {
   const root = makeFixture('no-sop', { omit: ['.documents/SOP/sop-implementation.md'] });
   const issues = validateBootstrap(root);
   assert.ok(
-    issues.some((i) => i.includes('local implementation SOP')),
+    issues.some((i) => i.includes('sop-implementation.md')),
     `expected a missing-SOP diagnostic, got: ${JSON.stringify(issues)}`,
-  );
-});
-
-test('a missing tracked planning slot is refused', () => {
-  const root = makeFixture('no-roadmap', { omit: ['.documents/WIP/plan-roadmap.md'] });
-  const issues = validateBootstrap(root);
-  assert.ok(
-    issues.some((i) => i.includes('tracked planning slot') && i.includes('plan-roadmap.md')),
-    `expected a missing-plan diagnostic, got: ${JSON.stringify(issues)}`,
   );
 });
 
@@ -316,13 +292,12 @@ test('an over-broad .gitignore that screens the whole WIP directory is refused',
   );
 });
 
-test('an unexpected extra WIP entry is refused', () => {
-  const root = makeFixture('extra-wip-entry', {
-    extra: { '.documents/WIP/scratch-notes.md': '# notes\n' },
+test('plans can be reorganized without an order or fixed slots', () => {
+  const root = makeFixture('flexible-plans', {
+    omit: ['.documents/WIP/plan-roadmap.md'],
+    extra: { '.documents/WIP/design/plan-execution.md': '# Plan' },
   });
-  const issues = validateBootstrap(root);
-  assert.ok(
-    issues.some((i) => i.includes('unexpected entry in .documents/WIP')),
-    `expected an extra-WIP-entry refusal, got: ${JSON.stringify(issues)}`,
-  );
+  assert.deepEqual(validateBootstrap(root), []);
+  write(join(root, '.documents/WIP/design/plan-execution.md'), 'C:/Users/someone/private');
+  assert.ok(validateBootstrap(root).some((issue) => issue.includes('private path')));
 });

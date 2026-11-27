@@ -33,6 +33,9 @@ import { runComposedCardsTransaction } from "./u04/cards-composed-evidence.mjs";
 // exactly what the mandatory native and composed Cards transactions executed.
 let nativeCardsPassed = false;
 let cardsClosureEvidence = null;
+// `UNO-WO-126 / R01`: the Features dimensions this run executes, one literal per closure dimension. Each is filled by the
+// assertion that actually ran; the oracle alone turns a complete record into credit.
+const featuresClosureEvidence = { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: false };
 import { evaluateU04FamilyClosure } from "./verify-u04-family-closure.mjs";
 // `UNO-WO-112 / R01`: the cohesive verification modules this entrypoint orchestrates. The fixture, the Hero expectations,
 // the seven-dimension record and the process harness each live in one testable file under `scripts/u04/`.
@@ -1371,7 +1374,7 @@ async function main() {
         partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
       };
     });
-    check(
+    featuresClosureEvidence.refusal = check(
       "FAMILY_LAST_FOUR_REFUSALS each last-four probe refuses the whole Page with its documented reason",
       lastFourProbes.every((probe) => probe.actual === probe.expected && probe.partial === false),
       JSON.stringify(lastFourProbes),
@@ -1380,8 +1383,8 @@ async function main() {
     // `UNO-WO-071 / R01`: eight further whole-Page refusals over the two newly lede-bearing families, each from a fresh
     // source, plus a zero-invocation accessor probe. Every probe mutates exactly one authored lede.
     const ledeProbes = [
-      // `UNO-WO-123 / R06`: a card lede is the donor's Markdown-capable field, so Markdown emphasis and a link now
-      // compose; unsafe markup and a non-string still refuse the whole Page, and Features keeps every plain-text rule.
+      // `UNO-WO-125 / R06`: both ledes are the donor's Markdown-capable field, so Markdown emphasis and a link compose;
+      // unsafe markup, a non-string and an ill-formed surrogate still refuse the whole Page.
       ["card lede Markdown emphasis composes", "composed", (s) => { s.sections[15].lede = "**Bold** lede"; }],
       ["card lede Markdown link composes", "composed", (s) => { s.sections[15].lede = "[label](https://example.test)"; }],
       ["card lede markup", "family:unsupported-feature", (s) => { s.sections[15].lede = "<b>bold</b>"; }],
@@ -1389,7 +1392,7 @@ async function main() {
       ["feature lede blank", "family:target-refused", (s) => { s.sections[16].lede = ""; }],
       ["feature lede padded", "family:target-refused", (s) => { s.sections[16].lede = " Padded lede"; }],
       ["feature lede oversize", "family:target-refused", (s) => { s.sections[16].lede = "x".repeat(4001); }],
-      ["feature lede unpaired surrogate", "family:target-refused", (s) => { s.sections[16].lede = "Lead \uD800 tail"; }],
+      ["feature lede unpaired surrogate", "family:unsupported-feature", (s) => { s.sections[16].lede = "Lead \uD800 tail"; }],
     ].map(([expectedLabel, expected, mutate]) => {
       const ledeSource = familySource();
       mutate(ledeSource);
@@ -1731,55 +1734,37 @@ async function main() {
             && Object.isFrozen(props.cards);
           return { ok: cardsOk, detail: `${section.id}/${section.module}/${JSON.stringify(props)}` };
         }
-        const stackOk = section.module === "layout.stack"
+        // `UNO-WO-125 / R06`: features is one native features node too — the authored heading, level, lede, column intent
+        // and ordered feature list live on that node, and it owns no children.
+        const props = section.props ?? {};
+        const featuresOk = section.module === "layout.grid"
           && section.id === `family-${index}-${type}`
-          && JSON.stringify(section.props) === "{}"
+          && Array.isArray(props.features)
+          && props.features.length === 2
+          && props.columns === columns
+          && props.heading === headingText
+          && props.level === 2
+          && typeof props.lede === "string"
+          && props.lede.length > 0
+          && props.features.every((feature) => typeof feature?.title === "string" && feature.title.length > 0)
+          && props.features[0]?.body !== undefined
+          && props.features[1]?.body === undefined
           && Array.isArray(section.children)
-          && section.children.length === 3;
-        const detail = `${section.id}/${section.module}/${JSON.stringify(section.props)}`;
-        if (!stackOk) return { ok: false, detail };
-        const [heading, lede, grid] = section.children;
-        const headingOk = heading.module === "content.heading"
-          && heading.id === `family-${index}-${type}-heading`
-          && JSON.stringify(heading.props) === JSON.stringify({ text: headingText, level: 2 });
-        const ledeOk = lede.module === "content.prose"
-          && lede.id === `family-${index}-${type}-lede`
-          && typeof lede.props.text === "string"
-          && lede.props.text.length > 0;
-        const gridOk = grid.module === "layout.grid"
-          && grid.id === `family-${index}-${type}-grid`
-          && JSON.stringify(grid.props) === JSON.stringify({ columns, itemSemantics: "list" })
-          && Array.isArray(grid.children)
-          && grid.children.length === 2;
-        if (!headingOk || !ledeOk || !gridOk) {
-          return { ok: false, detail: `${detail} heading=${headingOk} lede=${ledeOk} grid=${gridOk}` };
-        }
-        const itemsOk = grid.children.every((item, itemIndex) => {
-          const title = item.children?.[0];
-          const idsOk = item.module === "layout.stack"
-            && item.id === `family-${index}-${type}-item-${itemIndex}`
-            && JSON.stringify(item.props) === JSON.stringify({ gap: "tight" })
-            && title !== undefined
-            && title.module === "content.heading"
-            && title.id === `family-${index}-${type}-item-${itemIndex}-title`
-            && title.props.level === 3;
-          const bodyCount = (item.children ?? []).filter((child) => child.module === "content.prose").length;
-          return idsOk && bodyCount === (itemIndex === 0 ? 1 : 0);
-        });
-        return {
-          ok: itemsOk && Object.isFrozen(section) && Object.isFrozen(grid) && Object.isFrozen(section.children),
-          detail,
-        };
+          && section.children.length === 0
+          && Object.isFrozen(section)
+          && Object.isFrozen(props)
+          && Object.isFrozen(props.features);
+        return { ok: featuresOk, detail: `${section.id}/${section.module}/${JSON.stringify(props)}` };
       };
       const cards = outline(15, "cards", "Synthetic cards", 2);
       const features = outline(16, "features", "Synthetic features", 3);
       check(
-        "FAMILY_ITEM_OUTLINE_SOURCE cards compose one frozen top-level stack with an authored h2 before a nested list grid of level-3 item titles",
+        "FAMILY_ITEM_OUTLINE_SOURCE cards compose one frozen native cards node carrying the authored h2, lede and ordered card list",
         cards.ok,
         cards.detail,
       );
-      check(
-        "FAMILY_ITEM_OUTLINE_SOURCE features compose the same stack, authored h2 and nested level-3 item outline",
+      featuresClosureEvidence.source = check(
+        "FAMILY_ITEM_OUTLINE_SOURCE features compose one frozen native features node carrying the authored h2, lede, column intent and ordered feature list",
         features.ok,
         features.detail,
       );
@@ -1795,7 +1780,7 @@ async function main() {
       );
       const reCards = familyReparsed.accepted === true ? familyReparsed.document.sections[15] : undefined;
       const reFeatures = familyReparsed.accepted === true ? familyReparsed.document.sections[16] : undefined;
-      check(
+      featuresClosureEvidence.reader = check(
         "FAMILY_ITEM_OUTLINE_SOURCE the real reader re-accepts both headed families from the serialized JSON",
         reCards?.module === "layout.grid"
           && Array.isArray(reCards?.props?.cards)
@@ -1804,9 +1789,12 @@ async function main() {
           && reCards?.props?.heading === "Synthetic cards"
           && Array.isArray(reCards?.children)
           && reCards?.children?.length === 0
-          && reFeatures?.module === "layout.stack"
-          && reFeatures?.children?.[0]?.props?.level === 2
-          && reFeatures?.children?.[2]?.children?.every((item) => item.children?.[0]?.props?.level === 3) === true,
+          && reFeatures?.module === "layout.grid"
+          && reFeatures?.props?.level === 2
+          && reFeatures?.props?.heading === "Synthetic features"
+          && reFeatures?.props?.features?.length === 2
+          && Array.isArray(reFeatures?.children)
+          && reFeatures?.children?.length === 0,
         `${reCards?.module ?? "missing"}/${reFeatures?.module ?? "missing"}`,
       );
     }
@@ -1830,6 +1818,23 @@ async function main() {
             && Object.isFrozen(section)
             && Object.isFrozen(props);
           return { ok: cardsOk, detail: `${section?.id}/children=${(section?.children ?? []).length}/lede=${String(props.lede ?? "missing")}` };
+        }
+        // `UNO-WO-125 / R06`: features carries the authored lede on its one native node.
+        if (type === "features") {
+          const props = section?.props ?? {};
+          const featuresOk = section?.module === "layout.grid"
+            && section?.id === `family-${index}-${type}`
+            && props.lede === expectedText
+            && props.ledeMarkdown === undefined
+            && props.heading === "Synthetic features"
+            && props.level === 2
+            && Array.isArray(props.features)
+            && props.features.length === 2
+            && Array.isArray(section?.children)
+            && section?.children?.length === 0
+            && Object.isFrozen(section)
+            && Object.isFrozen(props);
+          return { ok: featuresOk, detail: `${section?.id}/children=${(section?.children ?? []).length}/lede=${String(props.lede ?? "missing")}` };
         }
         if (section === undefined || section.module !== "layout.stack") return { ok: false, detail: `missing ${index}` };
         const [heading, lede, grid] = section.children ?? [];
@@ -1858,7 +1863,7 @@ async function main() {
         cardsLede.detail,
       );
       check(
-        "FAMILY_LEDE_SOURCE features compose exactly one lede paragraph in the same ordered stack",
+        "FAMILY_LEDE_SOURCE features compose exactly one authored lede on their one native node",
         featuresLede.ok,
         featuresLede.detail,
       );
@@ -1866,9 +1871,9 @@ async function main() {
       check(
         "FAMILY_LEDE_SOURCE the ledes add no node outside the two families and keep the seventeen top-level ids",
         JSON.stringify(ledeIds) === JSON.stringify(FAMILY_IDS)
-          // `UNO-WO-075 / R01` wraps five further families and `UNO-WO-120 / R01` wraps Media, so the fixture holds eight
-          // top-level stacks; `UNO-WO-123 / R06` composes Cards as one native node, which is not a stack.
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7
+          // `UNO-WO-075 / R01` wraps five further families and `UNO-WO-120 / R01` wraps Media, so the fixture holds seven
+          // top-level stacks; Cards and, since `UNO-WO-125 / R06`, Features compose as native nodes, which are not stacks.
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 6
           && familyAccepted.sections[8]?.id === "family-8-divider"
           && JSON.stringify(familyAccepted.sections[8]?.props) === JSON.stringify({ variant: "divider" }),
         `${ledeIds.length}/${ledeIds.join(",")}`,
@@ -1934,9 +1939,9 @@ async function main() {
       check(
         "FAMILY_STATS_STEPS_SOURCE the authored-text families keep the seventeen ids and no other family changes",
         JSON.stringify(familyAccepted.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS)
-          // `UNO-WO-120 / R01`: Media contributes the eighth top-level stack; `UNO-WO-123 / R06` composes Cards as one
-          // native cards node, so seven top-level stacks remain.
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7
+          // `UNO-WO-120 / R01`: Media contributes its own top-level stack; Cards and Features compose as native nodes, so
+          // six top-level stacks remain.
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 6
           && familyAccepted.sections[7]?.module === "content.actions"
           && familyAccepted.sections[8]?.id === "family-8-divider"
           && familyAccepted.sections[12]?.module === "content.testimonials",
@@ -2861,8 +2866,9 @@ async function main() {
       check(
         "FAMILY_TEXT_FIVE_SOURCE the three remaining authored-text families add no top-level node and keep the seventeen ids",
         JSON.stringify(familyAccepted.sections.map((section) => section.id)) === JSON.stringify(FAMILY_IDS)
-          // `UNO-WO-120 / R01`: Media contributes the eighth top-level stack; Cards is now one native node, leaving seven.
-          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 7
+          // `UNO-WO-120 / R01`: Media contributes its own top-level stack; Cards and Features compose as native nodes,
+          // leaving six.
+          && familyAccepted.sections.filter((section) => section.module === "layout.stack").length === 6
           && textFiveEvidence.every((evidence) => evidence.ok),
         `${familyAccepted.sections.filter((section) => section.module === "layout.stack").length} stacks`,
       );
@@ -3289,22 +3295,25 @@ async function main() {
       cardsRegion.slice(0, 240),
     );
     const featuresRegion = featuresOpen < 0 ? "" : familyHtml.slice(featuresOpen, familyHtml.indexOf("</main>", featuresOpen));
-    check(
-      "FAMILY_FEATURES_HTTP the features region is a separate headed top-level stack with a native three-column list grid",
+    featuresClosureEvidence.renderer = check(
+      "FAMILY_FEATURES_HTTP the features region is one native headed features section with a three-column list",
       featuresRegion.length > 0
-        && featuresRegion.includes('<div class="uno-json-stack" data-uno-gap="normal" id="family-16-features">')
+        && featuresRegion.includes('<div class="uno-json-features-section" id="family-16-features">')
         && featuresRegion.includes('<h2 class="uno-json-heading" id="family-16-features-heading">Synthetic features</h2>')
-        && /<ul class="uno-json-grid" data-uno-columns="3" data-uno-item-semantics="list" id="family-16-features-grid" role="list">/u.test(featuresRegion)
-        && (featuresRegion.match(/<li class="uno-json-cell"/gu) ?? []).length === 2
-        && (featuresRegion.match(/<h3 class="uno-json-heading"/gu) ?? []).length === 2
+        && /<ul class="uno-json-features" data-uno-columns="3" id="family-16-features-list" role="list">/u.test(featuresRegion)
+        && (featuresRegion.match(/<li class="uno-json-feature"/gu) ?? []).length === 2
+        && (featuresRegion.match(/<h3 class="uno-json-feature-title"/gu) ?? []).length === 2
         && featuresRegion.indexOf(">Feature one</h3>") > 0
         && featuresRegion.indexOf(">Feature one</h3>") < featuresRegion.indexOf(">Feature two</h3>")
-        && (featuresRegion.match(/<p class="uno-json-prose"/gu) ?? []).length === 2
-        && featuresRegion.includes('<p class="uno-json-prose" id="family-16-features-lede">Synthetic features describe the work.</p>')
+        && (featuresRegion.match(/<p class="uno-json-features-lede"/gu) ?? []).length === 1
+        && featuresRegion.includes('<p class="uno-json-features-lede">Synthetic features describe the work.</p>')
+        && (featuresRegion.match(/<p class="uno-json-feature-body"/gu) ?? []).length === 1
         && featuresRegion.includes(">First feature body.</p>")
         && !/data-uno-ratio|<article\b|<a\b|<img\b|<button\b|<form\b|icon/iu.test(featuresRegion),
       featuresRegion.slice(0, 240),
     );
+    // `UNO-WO-126 / R01`: the HTTP dimension is the accepted response that delivered that region.
+    featuresClosureEvidence.http = familyHtmlResponse.status === 200 && featuresRegion.length > 0;
     // `UNO-WO-070 / R01`: the authored h2 → h3 outline as actually served, for both headed families.
     {
       const regionIds = (region) => [...region.matchAll(/(?<![-\w])id="([^"]+)"/gu)].map((match) => match[1]);
@@ -3313,24 +3322,22 @@ async function main() {
       const allIds = [...cardsIds, ...featuresIds];
       const outlineOk = (region, type, headingText, columns) => {
         const h2 = [...region.matchAll(/<h2 class="uno-json-heading" id="([^"]+)">([^<]*)<\/h2>/gu)];
-        const h3 = [...region.matchAll(/<h3 class="uno-json-heading"[^>]*>([^<]*)<\/h3>/gu)];
+        const h3 = [...region.matchAll(/<h3 class="uno-json-(?:heading|feature-title)"[^>]*>([^<]*)<\/h3>/gu)];
         // `UNO-WO-123 / R06`: the native cards section serves one `<ul class="uno-json-cards">` of `<li class="uno-json-card">`
-        // whose `<h3>` titles are the authored card titles; Features keeps the list grid of cells and per-item ids.
+        // whose `<h3>` titles are the authored card titles; Features serves its own native feature list.
         const isCards = type === "cards";
         const listOk = isCards
           ? new RegExp(`<ul class="uno-json-cards" data-uno-columns="${columns}" id="family-15-cards-list" role="list">`, "u").test(region)
-          : new RegExp(`<ul class="uno-json-grid" data-uno-columns="${columns}" data-uno-item-semantics="list" id="family-16-features-grid" role="list">`, "u").test(region);
+          : new RegExp(`<ul class="uno-json-features" data-uno-columns="${columns}" id="family-16-features-list" role="list">`, "u").test(region);
         const itemsOk = isCards
           ? (region.match(/<li class="uno-json-card">/gu) ?? []).length === 2
             && h3.length === 2
             && h3[0]?.[1] === "Card one"
             && h3[1]?.[1] === "Card two"
-          : (region.match(/<li class="uno-json-cell"/gu) ?? []).length === 2
+          : (region.match(/<li class="uno-json-feature"/gu) ?? []).length === 2
             && h3.length === 2
             && h3[0]?.[1] === "Feature one"
-            && h3[1]?.[1] === "Feature two"
-            && region.includes('id="family-16-features-item-0-title"')
-            && region.includes('id="family-16-features-item-1-title"');
+            && h3[1]?.[1] === "Feature two";
         return h2.length === 1
           && h2[0][1] === `family-${isCards ? 15 : 16}-${type}-heading`
           && h2[0][2] === headingText
@@ -3353,29 +3360,36 @@ async function main() {
     // `UNO-WO-071 / R01`: the two authored ledes exactly as served, in source order inside each family root.
     {
       const ledeOk = (region, index, type, text) => {
-        const ledeTag = `<p class="uno-json-prose" id="family-${index}-${type}-lede">${text}</p>`;
+        const isCardsLede = index === 15;
+        const ledeTag = isCardsLede
+          ? `<p class="uno-json-prose" id="family-${index}-${type}-lede">${text}</p>`
+          : `<p class="uno-json-features-lede">${text}</p>`;
         const headingEnd = region.indexOf("</h2>");
         const ledeAt = region.indexOf(ledeTag);
-        const listAt = region.indexOf(`id="family-${index}-${type}-${type === "cards" ? "list" : "grid"}"`);
+        const listAt = region.indexOf(`id="family-${index}-${type}-list"`);
         const isCards = type === "cards";
-        return (region.match(new RegExp(`id="family-${index}-${type}-lede"`, "gu")) ?? []).length === 1
+        const ledeCount = isCardsLede
+          ? (region.match(new RegExp(`id="family-${index}-${type}-lede"`, "gu")) ?? []).length
+          : (region.match(/class="uno-json-features-lede"/gu) ?? []).length;
+        return ledeCount === 1
           && ledeAt > 0
           && headingEnd > 0
           && ledeAt > headingEnd
           && listAt > 0
           && ledeAt < listAt
           && (region.match(/<h2 class="uno-json-heading"/gu) ?? []).length === 1
-          && (region.match(/<h3 class="uno-json-heading"/gu) ?? []).length === 2
-          && (region.match(isCards ? /<li class="uno-json-card">/gu : /<li class="uno-json-cell"/gu) ?? []).length === 2
-          // A native cards section carries exactly one prose paragraph (its lede) beside one card body; Features keeps two.
-          && (region.match(/<p class="uno-json-prose"/gu) ?? []).length === (isCards ? 1 : 2)
+          && (region.match(/<h3 class="uno-json-(?:heading|feature-title)"/gu) ?? []).length === 2
+          && (region.match(isCards ? /<li class="uno-json-card">/gu : /<li class="uno-json-feature"/gu) ?? []).length === 2
+          // Each headed family serves exactly one authored lede paragraph before its own native list.
+          && (region.match(/<p class="uno-json-(?:prose|features-lede)"/gu) ?? []).length === 1
           && !/<main\b|<h1\b|<script\b|<a\b|<iframe\b|<form\b|<button\b|<img\b|example\.test|donor/iu.test(region);
       };
       check(
         "FAMILY_LEDE_HTTP each headed family serves exactly one lede paragraph after its h2 and before its native list",
         ledeOk(cardsRegion, 15, "cards", "Synthetic cards explain the choices.")
           && ledeOk(featuresRegion, 16, "features", "Synthetic features describe the work.")
-          && (familyHtml.match(/<p class="uno-json-prose" id="family-\d+-(?:cards|features)-lede"/gu) ?? []).length === 2,
+          && ((familyHtml.match(/id="family-15-cards-lede"/gu) ?? []).length
+            + (familyHtml.match(/<p class="uno-json-features-lede"/gu) ?? []).length) === 2,
         `cards=${cardsRegion.length} features=${featuresRegion.length}`,
       );
     }
@@ -3508,9 +3522,9 @@ async function main() {
       }
       check(
         "FAMILY_TEXT_FIVE_HTTP the three remaining authored-text families add seven stacks and three headings with no duplicate id, extra main or external destination",
-        // `UNO-WO-120 / R01`: Media adds its section stack and one inner text stack, so nine `normal` stacks were served;
-        // `UNO-WO-123 / R06` composes Cards as one native cards node, so eight remain.
-        (familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length === 8
+        // `UNO-WO-120 / R01`: Media adds its section stack and one inner text stack; Cards and Features compose as native
+        // nodes, so seven `normal` stacks are served.
+        (familyHtml.match(/<div class="uno-json-stack" data-uno-gap="normal"/gu) ?? []).length === 7
           && (familyHtml.match(/<h2 class="uno-json-heading" id="family-(?:2-list|3-faq|13-table)-heading"/gu) ?? []).length === 3
           && (familyHtml.match(/<section class="uno-json-prose" id="family-3-faq-lede"/gu) ?? []).length === 1
           && (familyHtml.match(/<div class="uno-family-md uno-json-list-lede">/gu) ?? []).length === 1
@@ -4209,6 +4223,7 @@ async function consentPhase(base) {
       if (!ok) dividerOk = false;
       return check(`DIVIDER_PARITY_BROWSER ${label}`, ok, detail);
     };
+    let featuresBrowserProven = true;
     for (const width of [390, 1280]) {
       requests.length = 0;
       await tab.setViewportSize({ width, height: 900 });
@@ -4487,10 +4502,10 @@ async function consentPhase(base) {
           features: (() => {
             const root = document.querySelector("#family-16-features");
             const heading = root?.querySelector(":scope > h2.uno-json-heading") ?? null;
-            const grid = root?.querySelector(":scope > ul.uno-json-grid") ?? null;
+            const grid = root?.querySelector(":scope > ul.uno-json-features") ?? null;
             const items = [...(grid?.children ?? [])];
             const ids = [...(root?.querySelectorAll("[id]") ?? [])].map((node) => node.id);
-            const lede = root?.querySelector("#family-16-features-lede") ?? null;
+            const lede = root?.querySelector(".uno-json-features-lede") ?? null;
             const ledeRect = lede?.getBoundingClientRect();
             return {
               rootTag: root?.tagName ?? "",
@@ -4513,12 +4528,12 @@ async function consentPhase(base) {
               semantics: grid?.getAttribute("data-uno-item-semantics") ?? "",
               ratio: grid?.getAttribute("data-uno-ratio") ?? "",
               items: items.length,
-              itemsAreCells: items.every((item) => item.classList.contains("uno-json-cell")),
-              itemTitles: [...(grid?.querySelectorAll("h3.uno-json-heading") ?? [])].map((node) => node.textContent ?? ""),
-              itemTitleIds: [...(grid?.querySelectorAll("h3.uno-json-heading") ?? [])].map((node) => node.id),
+              itemsAreFeatures: items.every((item) => item.classList.contains("uno-json-feature")),
+              itemTitles: [...(grid?.querySelectorAll("h3.uno-json-feature-title") ?? [])].map((node) => node.textContent ?? ""),
               h2: root?.querySelectorAll("h2").length ?? -1,
               h3: root?.querySelectorAll("h3").length ?? -1,
-              paragraphs: [...(root?.querySelectorAll("p.uno-json-prose") ?? [])].map((node) => node.textContent ?? ""),
+              paragraphs: [...(root?.querySelectorAll("p.uno-json-prose, p.uno-json-features-lede") ?? [])].map((node) => node.textContent ?? ""),
+              bodies: [...(root?.querySelectorAll("p.uno-json-feature-body") ?? [])].map((node) => node.textContent ?? ""),
               articles: root?.querySelectorAll("article").length ?? -1,
               controls: root?.querySelectorAll("a, img, form, button, input, textarea, select, iframe").length ?? -1,
               uniqueIds: new Set(ids).size === ids.length,
@@ -4712,18 +4727,18 @@ async function consentPhase(base) {
           && seen.cards.ledeText === "Synthetic cards explain the choices."
           && seen.cards.articles === 0 && seen.cards.controls === 0 && seen.cards.uniqueIds,
         JSON.stringify(seen.cards).slice(0, 240));
-      familyCheck(`${width}px features show a separate headed stack with one authored h2, a three-column list grid and two h3 titles`,
-        seen.features.rootTag === "DIV" && seen.features.rootGap === "normal"
+      featuresBrowserProven = featuresBrowserProven && familyCheck(`${width}px features show one native headed section with one authored h2, a three-column feature list and two h3 titles`,
+        seen.features.rootTag === "DIV" && seen.features.rootGap === ""
           && seen.features.headingTag === "H2" && seen.features.headingId === "family-16-features-heading"
           && seen.features.headingText === "Synthetic features" && seen.features.headingIsFirst
-          && seen.features.gridTag === "UL" && seen.features.gridId === "family-16-features-grid"
-          && seen.features.columns === "3" && seen.features.semantics === "list" && seen.features.ratio === ""
-          && seen.features.items === 2 && seen.features.itemsAreCells
+          && seen.features.gridTag === "UL" && seen.features.gridId === "family-16-features-list"
+          && seen.features.columns === "3" && seen.features.semantics === "" && seen.features.ratio === ""
+          && seen.features.items === 2 && seen.features.itemsAreFeatures
           && JSON.stringify(seen.features.itemTitles) === JSON.stringify(["Feature one", "Feature two"])
-          && JSON.stringify(seen.features.itemTitleIds) === JSON.stringify(["family-16-features-item-0-title", "family-16-features-item-1-title"])
           && seen.features.h2 === 1 && seen.features.h3 === 2
-          && JSON.stringify(seen.features.paragraphs) === JSON.stringify(["Synthetic features describe the work.", "First feature body."])
-          && seen.features.ledeTag === "P" && seen.features.ledeId === "family-16-features-lede"
+          && JSON.stringify(seen.features.paragraphs) === JSON.stringify(["Synthetic features describe the work."])
+          && JSON.stringify(seen.features.bodies) === JSON.stringify(["First feature body."])
+          && seen.features.ledeTag === "P" && seen.features.ledeId === ""
           && seen.features.ledeText === "Synthetic features describe the work."
           && seen.features.articles === 0 && seen.features.controls === 0 && seen.features.uniqueIds,
         JSON.stringify(seen.features).slice(0, 240));
@@ -5123,6 +5138,8 @@ async function consentPhase(base) {
       familyCheck(`${width}px the family visit made no foreign or provider request`,
         requests.length === 0 && requests.every((entry) => !entry.foreign && !entry.provider), JSON.stringify(requests.slice(0, 3)));
     }
+    // `UNO-WO-126 / R01`: the Chromium dimension is the features-specific reading that passed at both viewports.
+    featuresClosureEvidence.browser = featuresBrowserProven;
     // `UNO-WO-069 / R01`: the same separator invariants under `prefers-color-scheme: dark` and
     // `prefers-reduced-motion: reduce`, at both viewports, then the regular media settings are restored.
     for (const width of [390, 1280]) {
@@ -7439,29 +7456,32 @@ async function consentPhase(base) {
       // `UNO-WO-124 / R10`: **Cards** is the fourteenth credited family, and it is fed into the same unchanged oracle **without**
       // a checkpoint selector. Every dimension comes from executed work, so the row below is what the evidence earns — fourteen
       // families, `14/17` and `56/59` — and every earlier row above stays exactly the score it declared.
+      const closureEvidence = {
+        divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
+        prose: a1Evidence.prose,
+        callout: a1Evidence.callout,
+        table: localA2.table,
+        list: localA2.list,
+        hero: localA2.hero,
+        stats: localA2.stats,
+        steps: localA2.steps,
+        quote: localA2.quote,
+        faq: localA2.faq,
+        columns: localA2.columns,
+        media: localA2.media,
+        gallery: localA2.gallery,
+        cards: cardsClosureEvidence,
+      };
+      // `UNO-WO-124 / R10`: the closed Cards interim stays measured history, so its own 14/17 row is reproduced from the same
+      // executed evidence rather than being deleted when the next row opens.
       const closureCards = evaluateU04FamilyClosure({
-        families: {
-          divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
-          prose: a1Evidence.prose,
-          callout: a1Evidence.callout,
-          table: localA2.table,
-          list: localA2.list,
-          hero: localA2.hero,
-          stats: localA2.stats,
-          steps: localA2.steps,
-          quote: localA2.quote,
-          faq: localA2.faq,
-          columns: localA2.columns,
-          media: localA2.media,
-          gallery: localA2.gallery,
-          cards: cardsClosureEvidence,
-        },
+        families: closureEvidence,
         modules: UNO_RENDERABLE_MODULES.length,
         zones: UNO_OWNED_MEDIA_ZONES.length,
         browserMatrix: matrixCases.length,
       });
       check(
-        "U04_CLOSURE_ORACLE the unchanged oracle credits exactly fourteen families at 14/17 and 56/59 for the Cards evidence this run executed, with no checkpoint selector",
+        "U04_CLOSURE_ORACLE the closed Cards interim still credits exactly fourteen families at 14/17 and 56/59 from the evidence this run executed, with no checkpoint selector",
         closureCards.ok === true
           && JSON.stringify(closureCards.credited)
             === JSON.stringify([
@@ -7476,6 +7496,49 @@ async function consentPhase(base) {
           && familyOk
           && dividerOk,
         closureCards.ok ? `${closureCards.parity}/17 ${closureCards.proxy}/59 ${closureCards.credited.join(",")}` : String(closureCards.reason),
+      );
+      // `UNO-WO-126 / R01`: the C2 row. Source and rights are read from the pinned ledger row, the other five dimensions are the
+      // verdicts of assertions this run executed, and the unchanged oracle must return exactly 15/17 and 57/59 with the C2
+      // checkpoint selector. If any dimension is unproven the oracle refuses and this check fails rather than printing a claim.
+      const featuresLedgerRow = readFileSync(resolve(ROOT, ".documents/Architecture/u04-family-parity.md"), "utf8");
+      // The ledger row is read as plain text, so no pattern can quietly match a different family.
+      const featuresRow = featuresLedgerRow.split("\n").find((line) => line.startsWith("| `features`")) ?? "";
+      const featuresClosure = Object.freeze({
+        source: featuresClosureEvidence.source && featuresRow.includes("page-document.ts"),
+        reader: featuresClosureEvidence.reader,
+        renderer: featuresClosureEvidence.renderer,
+        http: featuresClosureEvidence.http,
+        browser: featuresClosureEvidence.browser,
+        refusal: featuresClosureEvidence.refusal,
+        rights: /licen[cs]e|rights|MIT|attribution/iu.test(featuresRow),
+      });
+      const closureC2 = evaluateU04FamilyClosure({
+        families: { ...closureEvidence, features: featuresClosure },
+        modules: UNO_RENDERABLE_MODULES.length,
+        zones: UNO_OWNED_MEDIA_ZONES.length,
+        browserMatrix: matrixCases.length,
+        checkpoint: "C2",
+      });
+      check(
+        "U04_CLOSURE_ORACLE the unchanged oracle credits the C2 row at 15/17 and 57/59, opening Features on evidence rather than declaration",
+        closureC2.ok === true
+          && JSON.stringify(closureC2.credited)
+            === JSON.stringify([
+              "prose", "callout", "table", "list", "hero", "stats", "steps", "quote", "faq", "columns", "media", "gallery", "cards", "features", "divider",
+            ])
+          && closureC2.parity === 15
+          && closureC2.proxy === 57
+          && closureC2.labels.includes("PARITY_FEATURES=PASS")
+          && closureC2.labels.includes("PARITY_CARDS=PASS")
+          && closureC2.labels.includes("U04_PARITY=15/17")
+          && closureC2.labels.includes("U04_PROXY=57/59")
+          && closureC2.labels.includes("PARITY_ACTIONS=PENDING")
+          && closureC2.labels.includes("PARITY_CONTACTFORM=PENDING")
+          && familyOk
+          && dividerOk,
+        closureC2.ok
+          ? `${closureC2.parity}/17 ${closureC2.proxy}/59 ${closureC2.credited.join(",")} features=${JSON.stringify(featuresClosure)}`
+          : `${String(closureC2.reason)} features=${JSON.stringify(featuresClosure)}`,
       );
       const creditedNames = new Set((closureC1.credited ?? []).map((family) => `PARITY_${family.toUpperCase()}`));
       const pendingNames = new Set((closureC1.pending ?? []).map((family) => `PARITY_${family.toUpperCase()}`));

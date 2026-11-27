@@ -165,6 +165,15 @@ enforced in code and paired with an unfiltered full-graph audit (exactly one hig
 production audit (zero). The eleven remaining registered IDs still refuse as `document:renderer-unavailable`.
 Family composition coverage remains **0 of 17**; U04 stays **OPEN**.
 
+**Bounded progress (`UNO-WO-126 / R01`).** The `features` family is credited from executed evidence, so the unchanged closure
+oracle now returns **15/17** families and **57/59** proxy under the declared **C2** checkpoint, whose target families are `cards`
+and `features`. The fourteen-family Cards interim (14/17, 56/59) is retained as closed, reproduced history. Features was earned on
+all seven dimensions: the composed native node, the strict reader's re-acceptance, the served markup, the accepted production
+response, the Chromium reading at 390 and 1280, the preserved closed refusals, and the ledger's source and rights row. The whole
+gate passes **969 checks with 0 failures**. This entry supersedes the earlier family counts above. U04 stays **OPEN**: only
+`actions` and `contactForm` are uncredited, and the stage's shell, accessibility, asset-rights and responsive criteria remain
+separate obligations.
+
 Scope: one owner and **one** presentation shell — assets, responsive navigation and
 accessibility.
 

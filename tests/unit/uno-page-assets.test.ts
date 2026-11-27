@@ -11,6 +11,7 @@ import {
   readUnoPageAssetOccurrence,
   unoMediaLocatorPath,
 } from "../../src/application/plan-uno-page-assets";
+import { composeUnoFoundationSubset } from "../../src/application/compose-uno-foundation-families";
 import type { UnoPublishedPageAccepted } from "../../src/application/plan-uno-published-page";
 import { readUnoPageDocument } from "../../src/core/page-document";
 
@@ -228,4 +229,31 @@ describe("planUnoPageAssets", () => {
     if (inside.status === "planned") expect(inside.plan.occurrences).toHaveLength(21 * 24);
   });
 
+});
+
+describe("owned assets from authored families", () => {
+  const images = Array.from({ length: 32 }, (_, i) => ({ source: `/assets/i${i}.png`, owned: { zone: "page", path: `i${i}.png` } }));
+  const compose = (sections: unknown[], count: number) => composeUnoFoundationSubset({ version: 1, title: "Owned assets", sections }, { images: images.slice(0, count) });
+  const item = ({ source }: { source: string }) => ({ image: { src: source, alt: "Sample" } });
+  it.each([24, 32])("plans every occurrence across %i distinct bound images", (count) => {
+    const sections: unknown[] = [{ type: "cards", items: images.slice(0, 24).map((image) => ({ title: "Card", ...item(image) })) }];
+    if (count > 24) sections.push({ type: "gallery", items: images.slice(24).map(item) });
+    const result = compose(sections, count);
+    expect(result.status).toBe("composed");
+    if (result.status !== "composed") return;
+    const planned = planUnoPageAssets(page(JSON.stringify(result.document)));
+    expect(planned.status).toBe("planned");
+    if (planned.status === "planned") expect(planned.plan.occurrences.map((o) => [o.sectionId, o.itemIndex, o.ref.path])).toEqual(images.slice(0, count).map(({ owned }, i) => [i < 24 ? "family-0-cards" : "family-1-gallery", i < 24 ? i : i - 24, owned.path]));
+  });
+  it("accepts only the donor string icon and resolves it through this Page's bindings", () => {
+    const section = (icon: unknown) => [{ type: "features", items: [{ title: "Feature", icon }] }];
+    const source = images[0]!.source;
+    const result = compose(section(source), 1);
+    expect(result.status).toBe("composed");
+    if (result.status !== "composed") return;
+    const planned = planUnoPageAssets(page(JSON.stringify(result.document)));
+    expect(planned.status).toBe("planned");
+    if (planned.status === "planned") expect(planned.plan.occurrences).toMatchObject([{ sectionId: "family-0-features", itemIndex: 0, slot: "image", ref: images[0]!.owned }]);
+    for (const icon of [{ src: source }, { src: source, decorative: true }, "/assets/unbound.png"]) expect(compose(section(icon), 1)).toMatchObject({ status: "refused", reason: "family:unsupported-feature" });
+  });
 });

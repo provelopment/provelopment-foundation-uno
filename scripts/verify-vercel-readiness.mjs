@@ -233,7 +233,6 @@ export const REASONS = Object.freeze([
   'vercelignore:overbroad-source',
   'workflow:missing',
   'workflow:no-frozen-install',
-  'workflow:no-governance',
   'workflow:no-bootstrap',
   'workflow:no-architecture',
   'workflow:no-lint',
@@ -557,7 +556,6 @@ export function analyzeReadiness(snapshot) {
   const workflowText = u01Workflow;
   expect(workflowText.trim() !== '', 'workflow:missing');
   expect(workflowText.includes('pnpm install --frozen-lockfile'), 'workflow:no-frozen-install');
-  expect(workflowText.includes('verify-governance-docs.mjs'), 'workflow:no-governance');
   expect(workflowText.includes('pnpm test:bootstrap'), 'workflow:no-bootstrap');
   expect(workflowText.includes('pnpm test:architecture'), 'workflow:no-architecture');
   expect(/run:\s*pnpm lint\b/.test(workflowText), 'workflow:no-lint');

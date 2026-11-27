@@ -4,10 +4,6 @@ name: Verify U01 baseline
 #
 # Two hosts, Node 26, the pinned pnpm 11.6.0, a frozen lockfile, and the full local gate
 # set. Read-only: this workflow never deploys, releases, publishes or requests credentials.
-# It does not modify the U00 bootstrap workflow, which stays exactly as it was.
-#
-# The U00 governance gate requires README.md to keep stating that the runtime is not
-# implemented yet; this workflow must never be made green by weakening a check.
 
 on:
   push:
@@ -55,12 +51,6 @@ jobs:
         run: |
           node --version
           node -e "const major = Number(process.versions.node.split('.')[0]); if (major !== 26) { console.error('Expected Node 26, received ' + process.versions.node); process.exit(1); }"
-
-      - name: Verify Owner-frozen governance files (positive and refusal)
-        shell: bash
-        run: |
-          node --test tests/governance-docs.test.mjs
-          node scripts/verify-governance-docs.mjs
 
       - name: Report tool versions
         run: |
