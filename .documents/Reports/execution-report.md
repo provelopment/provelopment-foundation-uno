@@ -99,10 +99,58 @@ Contact remains presentation-only: delivery is switched off, no provider, recipi
   validated configuration and fail-closed behaviour, and the absence of unauthorised publication or data exposure.
 - Independent acceptance is the Chief Master Architect's; this report does not self-accept or self-close the stage.
 
-## Next executable outcome
+## Proposed U04 closure determination (for independent acceptance)
 
-Work the U04 shell, navigation, accessibility, responsive and asset-rights obligations against the existing implementation,
-verify each at the four required widths, reconcile the U03 record, then submit the complete U04 evidence for independent
-acceptance. U05 contact functionality stays presentation-only until delivery activation is separately authorized.
+**Not self-accepted.** Family parity is complete (`17/17`, `59/59`) and the shell, focus, contrast, reduced-motion,
+responsive and asset-rights obligations are backed by executed readings at four widths. The proposed determination is:
+
+- **Satisfied:** one shell; keyboard operation and visible focus; semantic markup and interactions; contrast in both
+  schemes; reduced motion; responsive operation at 320/390/768/1280; owned-asset confinement, provenance and licensing;
+  validated configuration and fail-closed behaviour; absence of unauthorised publication, external delivery or private
+  data exposure.
+- **Partially satisfied:** accessible and responsive navigation — the shell affords the skip route and the demonstration
+  route carries a working on-this-page navigation, but published Pages carry no cross-Page navigation because no Site-level
+  label/route source exists in the declarations.
+- **Recommendation:** accept U04 on the satisfied obligations with cross-Page navigation recorded as the first U05
+  integration item, or return a decision on the navigation source so it can be implemented inside U04.
+
+## Verification this increment (local, Node 26.13.1, pnpm 11.6.0)
+
+| Gate | Result |
+| --- | --- |
+| U04 22-module, consent and closure | **996 checks, 0 failed** (20 new shell/focus/contrast readings) |
+| Published Page HTTP + Chromium | 1005 checks, 0 failed |
+| Deployment suites | 394 passed, 0 failed |
+| Unit / architecture / bootstrap | 1427 / 47 / 19 pass |
+| Lint, typecheck, build, trace | clean, zero warnings |
+| Readiness, Multi-Site, U01/U03 HTTP, audit | pass; no known vulnerabilities |
+
+
+## U04 presentation shell — requirement to evidence
+
+The Owner's eleven exit obligations were audited against the implementation and the executing gates. Only one genuine
+implementation gap was found and corrected: the **published** Page shell had a `<main>` with no `id` and no skip
+affordance (those existed only on the demonstration route). The route now renders the same `uno-skip-link` targeting
+`<main id="main">`, reusing the one stylesheet's existing focus treatment.
+
+| Requirement | Implementation | Executed evidence |
+| --- | --- | --- |
+| One coherent shell | `src/app/(site)/[...segments]/layout.tsx` (one `<html lang>`), `page.tsx` (skip link, one `<main id="main">`), one stylesheet | U04 gate 320/390/768/1280: exactly one main landmark, one skip anchor first in the body, overflow 0 |
+| Accessible, responsive navigation | Demonstration route's `nav.uno-nav[aria-label="On this page"]`; authored in-Page anchors; no cross-Page Site nav source exists | U04 gate: skip-link and landmark behaviour at four widths; in-Page actions/breadcrumb-free targets reach their sections in Chromium |
+| Public Page navigation and locale | Serving composition, canonical/`hreflang`/`x-default`, alias redirect, 404 boundaries | Published gate: `/en-001`, `/en-001/about`, `/en-001/components` declare their authored language; x-default only where authored; sitemap and robots agree; Multi-Site gate byte-exact |
+| Keyboard operation and visible focus | Global `:focus-visible` 3px token ring; disclosures, tabs, modal and table scroll are keyboard operable | U04 gate: skip link is the first Tab stop, becomes visible, ring is 3px solid `--uno-focus`; Enter lands on `#main`; disclosure/tab/modal focus returns proved |
+| Semantic markup and interactions | One `<main>`, one `<h1>`, native `ul/ol/figure/details/blockquote/table` renderers | U04 gate: 17 family ids in order, unique ids, level-3 outlines, native disclosures, table scopes |
+| Colour contrast, light and dark | Tokenised palette with `prefers-color-scheme: dark` | U04 gate: measured WCAG ratios at four widths — light and dark, body ≥ 4.5:1, large ≥ 3:1 |
+| Reduced motion | `@media (prefers-reduced-motion: reduce)` clamps transitions | 16-case matrix (four widths × two schemes × two motions) plus the dark/reduced family loop |
+| Responsive 320/390/768/1280 | Fluid shell, no fixed widths | `MATRIX_WIDTHS` matrix: zero horizontal overflow in all 16 cases |
+| Owned-asset confinement and licensing | Owned-media policy, four zones, binding ceilings, ledger provenance | U04 gate: 4/4 zones, 22/22 modules, owned locators only; ledger rows record donor source and Apache-2.0 |
+| Validated configuration, fail-closed | Declaration validation, closed refusals, strict reader | Readiness 131 checks; published gate refusals; 22-module refusal matrices; `VERCEL_NOT_DEPLOYED_BY_AGENT` |
+| No unauthorised publication or exposure | Delivery-OFF contact, no provider call, no private path or credential in the payload | Readiness and trace gates; U04 gate contact refusals; bootstrap leak scan |
+
+**Outstanding limitation.** Cross-Page navigation is not implemented for published Pages. Building it needs a Site-level
+label and route source that the committed declarations do not carry (`uno.config.json` holds no Site name and the Page
+contract has no navigation module), so it is a design decision for the Owner rather than something to invent here. The
+demonstration route's on-this-page navigation remains the only shell navigation in the tree.
+
 
 - Gallery and Cards semantic comparisons, the six-section preservation digest, historical Page bytes, owned asset identities, refusal contracts, validation limits and the closure evaluator are unchanged.

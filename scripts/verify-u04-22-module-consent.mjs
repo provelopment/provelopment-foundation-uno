@@ -5295,6 +5295,150 @@ async function consentPhase(base) {
     // `UNO-WO-128 / R06`: the D row's Chromium dimensions are the per-viewport readings accumulated above.
     actionsClosureEvidence.browser = actionsBrowserProven;
     contactFormClosureEvidence.browser = contactBrowserProven;
+    // `UNO-WO-129 / R02`: WCAG relative-contrast arithmetic over two computed `rgb()` strings. The page reports what it
+    // computed; the ratio itself is decided here, so a colour change that lowers contrast fails the gate.
+    const contrastRatioOf = (foreground, background) => {
+      const triple = (value) => (String(value).match(/[\d.]+/gu) ?? []).slice(0, 3).map(Number);
+      const luminance = (rgb) => {
+        const channel = (raw) => {
+          const scaled = raw / 255;
+          return scaled <= 0.03928 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
+        };
+        return 0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1]) + 0.0722 * channel(rgb[2]);
+      };
+      const first = luminance(triple(foreground));
+      const second = luminance(triple(background));
+      const [high, low] = first >= second ? [first, second] : [second, first];
+      return (high + 0.05) / (low + 0.05);
+    };
+
+
+    // The published shell, at every required width: one landmark addressed as `#main`, the skip affordance that reaches it,
+    // the visible focus ring it gains on focus, and measured text contrast in both colour schemes.
+    const readColors = () => {
+      const background = (element, fallback) => {
+        let node = element;
+        while (node !== null) {
+          const parts = (getComputedStyle(node).backgroundColor.match(/[\d.]+/gu) ?? []).map(Number);
+          if (parts.length >= 3 && (parts.length === 3 || parts[3] > 0.9)) return getComputedStyle(node).backgroundColor;
+          node = node.parentElement;
+        }
+        return fallback;
+      };
+      const read = (selector, fallback) => {
+        const element = document.querySelector(selector);
+        return element === null
+          ? null
+          : { color: getComputedStyle(element).color, background: background(element, fallback) };
+      };
+      return {
+        scheme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
+        heading: read("main h1", "rgb(255, 255, 255)"),
+        paragraph: read("main p", "rgb(255, 255, 255)"),
+      };
+    };
+    const readShell = () => {
+      const mains = [...document.querySelectorAll("main")];
+      const main = document.getElementById("main");
+      const skip = document.querySelector("a.uno-skip-link");
+      return {
+        mainCount: mains.length,
+        mainIsTheLandmark: main !== null && main === mains[0],
+        skipCount: document.querySelectorAll("a.uno-skip-link").length,
+        skipHref: skip?.getAttribute("href") ?? "",
+        skipIsFirstAnchor: document.body.querySelector("a") === skip,
+        skipPrecedesMain: skip !== null && main !== null
+          && (skip.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+        overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      };
+    };
+    const readFocus = () => {
+      const element = document.activeElement;
+      const style = element === null ? null : getComputedStyle(element);
+      const rect = element === null ? null : element.getBoundingClientRect();
+      const probe = document.createElement("span");
+      probe.style.color = "var(--uno-focus)";
+      document.body.appendChild(probe);
+      const token = getComputedStyle(probe).color;
+      probe.remove();
+      return {
+        tag: element?.tagName ?? "",
+        className: element?.getAttribute("class") ?? "",
+        href: element?.getAttribute("href") ?? "",
+        visible: rect !== null && rect.height > 0 && rect.top >= 0,
+        outlineWidth: style === null ? -1 : parseFloat(style.outlineWidth),
+        outlineStyle: style?.outlineStyle ?? "",
+        outlineColor: style?.outlineColor ?? "",
+        offset: style === null ? -1 : parseFloat(style.outlineOffset),
+        focusToken: token,
+      };
+    };
+    const readLanding = () => {
+      const main = document.getElementById("main");
+      const rect = main?.getBoundingClientRect() ?? null;
+      return {
+        hash: window.location.hash,
+        path: window.location.pathname,
+        mainVisible: rect !== null && rect.height > 0 && rect.top < window.innerHeight,
+      };
+    };
+    const ratiosOf = (colors) => (colors.heading === null || colors.paragraph === null
+      ? null
+      : {
+        heading: contrastRatioOf(colors.heading.color, colors.heading.background),
+        paragraph: contrastRatioOf(colors.paragraph.color, colors.paragraph.background),
+      });
+
+    for (const width of [320, 390, 768, 1280]) {
+      await tab.setViewportSize({ width, height: 900 });
+      await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
+      await tab.goto(FAMILY_URL, { waitUntil: "load" });
+      await delay(200);
+      const shell = await tab.evaluate(readShell);
+      familyCheck(`${width}px the published shell renders exactly one main landmark addressed as #main`,
+        shell.mainCount === 1 && shell.mainIsTheLandmark
+          && shell.skipCount === 1 && shell.skipHref === "#main"
+          && shell.skipIsFirstAnchor && shell.skipPrecedesMain && shell.overflow === 0,
+        JSON.stringify(shell));
+
+      // The skip link is translated off-canvas until focused, so its live box is the proof that the focus treatment applies.
+      await tab.evaluate(() => {
+        document.body.setAttribute("tabindex", "-1");
+        document.body.focus();
+      });
+      await tab.keyboard.press("Tab");
+      const focus = await tab.evaluate(readFocus);
+      familyCheck(`${width}px the skip link is the first keyboard stop, becomes visible and shows the token focus ring`,
+        focus.tag === "A" && focus.className.includes("uno-skip-link") && focus.href === "#main"
+          && focus.visible && focus.outlineStyle === "solid" && focus.outlineWidth >= 3
+          && focus.outlineColor === focus.focusToken && focus.offset >= 2,
+        JSON.stringify(focus));
+
+      await tab.keyboard.press("Enter");
+      await delay(150);
+      const landed = await tab.evaluate(readLanding);
+      familyCheck(`${width}px the skip link reaches the main landmark in the same document`,
+        landed.hash === "#main" && landed.path === "/en-001/wo066-family-composition" && landed.mainVisible,
+        JSON.stringify(landed));
+
+      const lightRatio = ratiosOf(await tab.evaluate(readColors));
+      familyCheck(`${width}px light-mode text meets WCAG AA (4.5:1 body, 3:1 large)`,
+        lightRatio !== null && lightRatio.heading >= 3 && lightRatio.paragraph >= 4.5,
+        JSON.stringify(lightRatio));
+
+      await tab.emulateMedia({ colorScheme: "dark", reducedMotion: "no-preference" });
+      await tab.goto(FAMILY_URL, { waitUntil: "load" });
+      await delay(200);
+      const darkColors = await tab.evaluate(readColors);
+      const darkRatio = ratiosOf(darkColors);
+      familyCheck(`${width}px dark-mode text meets WCAG AA (4.5:1 body, 3:1 large)`,
+        darkColors.scheme === "dark" && darkRatio !== null
+          && darkRatio.heading >= 3 && darkRatio.paragraph >= 4.5,
+        JSON.stringify({ scheme: darkColors.scheme, ...darkRatio }));
+    }
+    await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
+
+
     // `UNO-WO-069 / R01`: the same separator invariants under `prefers-color-scheme: dark` and
     // `prefers-reduced-motion: reduce`, at both viewports, then the regular media settings are restored.
     for (const width of [390, 1280]) {
@@ -7811,4 +7955,3 @@ try {
   }
   process.exitCode = failures.length === 0 ? exitCode : 1;
 }
-

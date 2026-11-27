@@ -96,11 +96,19 @@ function renderPage(
   }
 
   return (
-    <main className="uno-shell uno-narrow">
-      <h1>{page.document.title}</h1>
-      {page.document.description !== undefined ? <p>{page.document.description}</p> : null}
-      {body}
-    </main>
+    <>
+      {/* `UNO-WO-129 / R01`: the published shell carries the same skip affordance as the demonstration page, so a keyboard
+          visitor can bypass the page body without meeting an authored control first. The `#main` target is the one `<main>`
+          this document renders, and the visible-on-focus treatment comes from the one stylesheet. */}
+      <a className="uno-skip-link" href="#main">
+        Skip to main content
+      </a>
+      <main className="uno-shell uno-narrow" id="main">
+        <h1>{page.document.title}</h1>
+        {page.document.description !== undefined ? <p>{page.document.description}</p> : null}
+        {body}
+      </main>
+    </>
   );
 }
 

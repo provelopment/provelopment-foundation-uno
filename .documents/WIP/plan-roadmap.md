@@ -81,8 +81,15 @@ second Entity, host binding or publisher authority exists in the authored graph.
 
 ### U03 — Public routing, content and metadata parity
 
-**State: IN PROGRESS — the Owner has explicitly accepted the first pure canonical candidate-address
-schema (`UNO-WO-019 / R01` §3). Nothing is served, published, indexed or redirected.**
+**State: technical obligations implemented and verified locally; real-domain publication and independent
+acceptance outstanding.** The Owner accepted the first pure canonical candidate-address schema (`UNO-WO-019 / R01` §3).
+The record below is preserved as history; since those entries, the published-Page, Multi-Site and trace gates were
+added and pass: canonical addresses with an optional base path resolve per Site, a published Page declares its own
+authored `<html lang>`, canonical, same-Page `hreflang` alternates and `x-default` only where authored, an alias
+redirect is proved, `robots.txt` and `sitemap.xml` agree with the HTML, and refusals stay real 404s with no discovery
+leakage. Two locales and an unlisted Page are served and verified over real HTTP and Chromium in a reversible
+fixture. Nothing is published to a real domain, indexed or pointed at an Owner-chosen origin: those remain
+Owner-controlled publication decisions, and U03 is not accepted.
 
 Scope: public routing, content and metadata parity — canonical addresses, an optional base
 path, Page and locale behaviour, and visibility. `canonicalLocaleTag` remains distinct from

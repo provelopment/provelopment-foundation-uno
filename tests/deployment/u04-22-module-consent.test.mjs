@@ -1861,3 +1861,75 @@ describe("the checkpoint-D labels are connected to real predicates", () => {
     }
   });
 });
+
+/**
+ * `UNO-WO-129 / R03` — the U04 shell obligations are connected to executed readings.
+ *
+ * The skip affordance, the single landmark, the visible focus ring and the measured contrast are asserted against a real
+ * page at four widths. This guard requires each reading to stay in the runner and each page-side attribute to stay in the
+ * route, so a later edit cannot keep a label while deleting the measurement or the markup it measures.
+ */
+describe("the U04 shell obligations are connected to real predicates", () => {
+  const gateSource = readFileSync(resolve(ROOT, "scripts/verify-u04-22-module-consent.mjs"), "utf8");
+  const routeSource = readFileSync(resolve(ROOT, "src/app/(site)/[...segments]/page.tsx"), "utf8");
+
+  const SHELL_REQUIRED = Object.freeze([
+    'const MATRIX_WIDTHS = Object.freeze([320, 390, 768, 1280]);',
+    "const contrastRatioOf = (foreground, background) =>",
+    "mainIsTheLandmark: main !== null && main === mains[0]",
+    'skipHref: skip?.getAttribute("href") ?? ""',
+    "skipIsFirstAnchor: document.body.querySelector(\"a\") === skip",
+    "const readFocus = () =>",
+    "outlineWidth: style === null ? -1 : parseFloat(style.outlineWidth)",
+    "focus.outlineColor === focus.focusToken",
+    "focus.outlineWidth >= 3",
+    "the published shell renders exactly one main landmark addressed as #main",
+    "the skip link is the first keyboard stop, becomes visible and shows the token focus ring",
+    "the skip link reaches the main landmark in the same document",
+    "light-mode text meets WCAG AA (4.5:1 body, 3:1 large)",
+    "dark-mode text meets WCAG AA (4.5:1 body, 3:1 large)",
+    "lightRatio.heading >= 3 && lightRatio.paragraph >= 4.5",
+    "darkRatio.heading >= 3 && darkRatio.paragraph >= 4.5",
+  ]);
+
+  const ROUTE_REQUIRED = Object.freeze([
+    'className="uno-skip-link"',
+    'href="#main"',
+    'id="main"',
+  ]);
+
+  const shellAudit = (text) => SHELL_REQUIRED.filter((token) => !text.includes(token));
+  const routeAudit = (text) => ROUTE_REQUIRED.filter((token) => !text.includes(token));
+
+  it("keeps every shell reading in the runner and the skip affordance in the published route", () => {
+    assert.deepEqual(shellAudit(gateSource), []);
+    assert.deepEqual(routeAudit(routeSource), []);
+  });
+
+  it("fails the audit when a shell reading or a shell attribute is removed", () => {
+    for (const token of SHELL_REQUIRED) {
+      const mutated = gateSource.split(token).join("SHELL_REMOVED");
+      assert.notEqual(mutated, gateSource, token);
+      assert.ok(shellAudit(mutated).includes(token), token);
+    }
+    for (const token of ROUTE_REQUIRED) {
+      const mutated = routeSource.split(token).join("");
+      assert.notEqual(mutated, routeSource, token);
+      assert.ok(routeAudit(mutated).includes(token), token);
+    }
+  });
+
+  it("fails the audit when a shell predicate is neutered", () => {
+    for (const [token, replacement] of [
+      ["mainIsTheLandmark: main !== null && main === mains[0]", "mainIsTheLandmark: main !== null"],
+      ["focus.outlineColor === focus.focusToken", "true"],
+      ["focus.outlineWidth >= 3", "focus.outlineWidth >= 0"],
+      ["lightRatio.heading >= 3 && lightRatio.paragraph >= 4.5", "true"],
+      ["darkRatio.heading >= 3 && darkRatio.paragraph >= 4.5", "true"],
+    ]) {
+      const mutated = gateSource.split(token).join(replacement);
+      assert.notEqual(mutated, gateSource, token);
+      assert.ok(shellAudit(mutated).includes(token), token);
+    }
+  });
+});
