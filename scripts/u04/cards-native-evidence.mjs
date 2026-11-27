@@ -330,9 +330,12 @@ export const NATIVE_CARDS_REFUSALS = Object.freeze([
       card.alt = "A plate";
     }),
   ),
-  refusal("a deferred card action", "document:invalid-props", () =>
+  // `UNO-WO-124 / R09`: a card's single static action is now part of the adopted contract, so what refuses is the intent a card
+  // cannot own — a same-document target it has no node for, an application link, or a destination the classifier will not admit
+  // as `https`/`mailto`. The accepted shape is proved by the production transactions, not by this refusal list.
+  refusal("a card action with a same-document target", "document:invalid-props", () =>
     richCard((card) => {
-      card.action = { label: "Go", href: NATIVE_CARDS_LINK_HREF };
+      card.action = { label: "Go", targetId: "native-cards-list" };
     }),
   ),
   refusal("a card member outside the adopted shape", "document:invalid-props", () =>

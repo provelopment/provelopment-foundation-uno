@@ -3145,12 +3145,51 @@ describe("native cards (UNO-WO-122)", () => {
   });
 
   it("refuses every closed native Cards probe with the reason its own shape earns", () => {
-    for (const probe of NATIVE_CARDS_REFUSALS) {
+    // `UNO-WO-124 / R07`: the module's own probe list still names the deferred card action; that capability is now adopted, so the
+    // loop proves every remaining refusal and the card action is proved below against its own closed contract.
+    for (const probe of NATIVE_CARDS_REFUSALS.filter((entry: { label: string }) => entry.label !== "a deferred card action")) {
       const outcome = readUnoPageDocument(JSON.stringify(probe.mutate()));
       expect(outcome.accepted, probe.label).toBe(false);
       if (!outcome.accepted) expect(outcome.reason, probe.label).toBe(probe.expected);
     }
     expect(NATIVE_CARDS_REFUSALS.length).toBe(24);
+    // `UNO-WO-124 / R07`: a card's single static action is now part of the adopted contract, so the reader's own probes for it
+    // change shape: the accepted anchor is read with its label, classified destination and closed variant, while the fragment,
+    // application-link and unsafe intents stay refused with the reason their own shape earns.
+    const withAction = JSON.parse(JSON.stringify(NATIVE_CARDS_DOCUMENT)) as {
+      sections: { props: { cards: Record<string, unknown>[] } }[];
+    };
+    withAction.sections[0]!.props.cards[0] = {
+      title: "Card with an action",
+      action: { label: "Read the plate", href: "https://example.org/plate", variant: "secondary" },
+    };
+    const acceptedAction = readUnoPageDocument(JSON.stringify(withAction));
+    expect(acceptedAction.accepted, "a card's static action").toBe(true);
+    if (acceptedAction.accepted) {
+      const acceptedCard = (acceptedAction.document.sections[0] as { props: { cards: readonly unknown[] } }).props.cards[0];
+      expect(acceptedCard).toMatchObject({
+        title: "Card with an action",
+        action: { label: "Read the plate", href: "https://example.org/plate", variant: "secondary" },
+      });
+    }
+    for (const [label, action] of [
+      ["a card action with a same-document target", { label: "Go", targetId: "card-a" }],
+      ["a card action with an application link", { label: "Go", linkId: "home" }],
+      ["a card action with a script destination", { label: "Go", href: "javascript:alert(1)" }],
+      ["a card action with a telephone destination", { label: "Go", href: "tel:+15555550100" }],
+      ["a card action with two destinations", { label: "Go", href: "https://example.org/a", targetId: "card-a" }],
+      ["a card action without a label", { href: "https://example.org/a" }],
+    ] as const) {
+      const probe = JSON.parse(JSON.stringify(NATIVE_CARDS_DOCUMENT)) as {
+        sections: { props: { cards: Record<string, unknown>[] } }[];
+      };
+      probe.sections[0]!.props.cards[0] = { title: "Card with an action", action };
+      const outcome = readUnoPageDocument(JSON.stringify(probe));
+      expect(outcome.accepted, label).toBe(false);
+      if (!outcome.accepted) {
+        expect(["document:invalid-props", "document:unsafe-link"], label).toContain(outcome.reason);
+      }
+    }
   });
 
   it("accepts the donor's optional owned card image with its authored alternative, described or decorative", () => {

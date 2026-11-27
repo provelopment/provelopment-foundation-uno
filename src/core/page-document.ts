@@ -212,9 +212,10 @@ export interface UnoLayoutGridProps {
  * body. Nothing is manufactured — an absent field stays absent, and the renderer emits the authored fields in the donor's own
  * order (meta, title, body).
  *
- * The donor card also carries an image and one action. Those two capabilities are deliberately deferred, so this representation
- * has no key for either: a document that authors `image` or `action` on a card is refused rather than having the field silently
- * discarded.
+ * The donor card also carries an image and one action. The image is adopted from `UNO-WO-124 / R01` as an owned reference, and
+ * the action from `UNO-WO-124 / R07` as Hero's own static outbound anchor; every other action intent — a same-document
+ * `targetId`, an application `linkId`, a route, a provider or an unsafe destination — is refused rather than resolved or
+ * silently discarded.
  */
 export interface UnoLayoutCard {
   readonly title: string;
@@ -235,6 +236,13 @@ export interface UnoLayoutCard {
   readonly alt?: string;
   /** Only ever the literal `true`, and only beside an exactly empty `alt`. */
   readonly decorative?: boolean;
+  /**
+   * `UNO-WO-124 / R07`: the donor card's optional single action, adopted as Hero's own **static outbound** anchor — one plain
+   * label and one `https`/`mailto` destination admitted by the unchanged `classifyAuthorDestination`, with the closed optional
+   * variant. A card owns no section target and no route projection, so the `targetId`, `linkId` and `route` intents stay
+   * unrepresentable here and refuse the Page instead of being resolved.
+   */
+  readonly action?: UnoOutboundActionItem & { readonly variant?: UnoHeroActionVariant };
 }
 
 /**
@@ -1356,6 +1364,35 @@ function readActionItems(
   return items;
 }
 
+/**
+ * `UNO-WO-124 / R07`: one card's optional single action, adopting Hero's own **static outbound** contract.
+ *
+ * The shape is exactly `{label, href}` with the closed optional `variant`, and the destination must be classified by the
+ * unchanged `classifyAuthorDestination` as precisely `mailto` or `https` — so a `tel:`, provider, relative, `javascript:` or
+ * otherwise unrepresentable destination is the same `unsafe-link` refusal Hero gives it. A card owns no section target and no
+ * route projection, so the `targetId`, `linkId` and `routeTarget` intents are shape refusals here rather than being resolved.
+ */
+function readCardAction(value: unknown): UnoOutboundActionItem & { readonly variant?: UnoHeroActionVariant } {
+  const item = readPlainData(value);
+  if (item === null) throw new RefusedDocument("document:invalid-props");
+  if (!hasExactlyKeys(item, ["label", "href"], ["variant"])) throw new RefusedDocument("document:invalid-props");
+  const label = readBoundedText(
+    item["label"],
+    UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
+    "document:invalid-props",
+    false,
+    false,
+  );
+  const variant = optionalHeroActionVariant(item["variant"]);
+  // A non-string destination is a *shape* refusal; only a string can be an unsafe-link refusal.
+  const href = item["href"];
+  if (typeof href !== "string") throw new RefusedDocument("document:invalid-props");
+  const verdict = classifyAuthorDestination(href);
+  if (!verdict.accepted || (verdict.category !== "mailto" && verdict.category !== "https")) {
+    throw new RefusedDocument("document:unsafe-link");
+  }
+  return { label, href: verdict.href, ...(variant === undefined ? {} : { variant }) };
+}
 /** The closed optional hero-action variant, or a props refusal for any other value. */
 function optionalHeroActionVariant(value: unknown): UnoHeroActionVariant | undefined {
   if (value === undefined) return undefined;
@@ -2396,7 +2433,7 @@ function readLayoutCards(value: unknown): UnoLayoutCard[] {
     if (!hasExactlyKeys(
       item,
       ["title"],
-      ["meta", "body", "bodyMarkdown", "asset", "alt", "decorative"],
+      ["meta", "body", "bodyMarkdown", "asset", "alt", "decorative", "action"],
     )) {
       throw new RefusedDocument("document:invalid-props");
     }
@@ -2445,6 +2482,10 @@ function readLayoutCards(value: unknown): UnoLayoutCard[] {
       if (decorative && alt.length !== 0) throw new RefusedDocument("document:invalid-props");
       if (!decorative && alt.trim().length === 0) throw new RefusedDocument("document:invalid-props");
     }
+    // `UNO-WO-124 / R07`: the card's optional single action, read by Hero's static outbound contract — a plain label, one
+    // `https`/`mailto` destination and the closed optional variant. It carries no target, route or application link, so it can
+    // never depend on another node, a declaration or a server projection.
+    const action = item["action"] === undefined ? undefined : readCardAction(item["action"]);
     cards.push({
       title,
       ...(meta === undefined ? {} : { meta }),
@@ -2452,6 +2493,7 @@ function readLayoutCards(value: unknown): UnoLayoutCard[] {
       ...(bodyMarkdown === undefined ? {} : { bodyMarkdown }),
       ...(asset === undefined || alt === undefined ? {} : { asset, alt }),
       ...(asset === undefined || rawDecorative === undefined ? {} : { decorative }),
+      ...(action === undefined ? {} : { action }),
     });
   }
   return cards;

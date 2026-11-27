@@ -278,6 +278,19 @@ function SectionNode({
                     ) : (
                       <p className="uno-json-card-body">{card.body}</p>
                     )}
+                    {card.action === undefined ? null : (
+                      // `UNO-WO-124 / R07`: the card's own single action is one ordinary anchor to an already-classified static
+                      // destination — never a button, never a fragment, never an inline handler. Its closed variant is a
+                      // presentation attribute, and the anchor is keyboard-reachable and visibly focused by the stylesheet.
+                      <a
+                        className="uno-json-card-action"
+                        data-uno-variant={card.action.variant ?? "primary"}
+                        href={card.action.href}
+                        rel="noreferrer noopener"
+                      >
+                        {card.action.label}
+                      </a>
+                    )}
                   </li>
                 );
               })}

@@ -237,6 +237,19 @@ export async function runComposedCardsTransaction({
       JSON.stringify(facts.images.map((image) => [image.count, image.alt, image.firstInItem])),
     );
 
+    // (c2) `UNO-WO-124 / R07`: the card's own single action is served as one ordinary anchor — its classified destination as the
+    // href, its closed variant as a presentation attribute, its label as the anchor's own text, and no button or handler.
+    assert(
+      `${prefix}_ACTION the served card carries one static action anchor with its classified destination, closed variant and own label`,
+      html.includes('class="uno-json-card-action"')
+        && html.includes('href="https://example.org/wo124-card"')
+        && html.includes('data-uno-variant="secondary"')
+        && html.includes("Read the plate")
+        && !/javascript:/iu.test(html)
+        && !/<button[^>]*uno-json-card-action/iu.test(html),
+      `anchor=${html.includes('class="uno-json-card-action"')} href=${html.includes('href="https://example.org/wo124-card"')} variant=${html.includes('data-uno-variant="secondary"')}`,
+    );
+
     // (d) Real delivery: same-origin authoritative locators, distinct per occurrence, served bytes **byte-for-byte** equal to each
     // installed plate, and that plate's own intrinsic dimensions read from the response it returned.
     const firstSource = facts.images[0]?.src;

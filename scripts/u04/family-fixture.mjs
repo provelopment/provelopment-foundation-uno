@@ -485,7 +485,7 @@ export const COMPOSED_CARDS_ALT = Object.freeze({
 
 /** The composed section's authored facts, in card order, as the served document must show them. */
 export const COMPOSED_CARDS_CARDS = Object.freeze([
-  Object.freeze({ title: "Composed ownership", meta: "Card one", image: "first", alt: "described" }),
+  Object.freeze({ title: "Composed ownership", meta: "Card one", image: "first", alt: "described", action: Object.freeze({ label: "Read the plate", href: "https://example.org/wo124-card", variant: "secondary" }) }),
   Object.freeze({ title: "Composed omission", meta: null, image: null, alt: null }),
   Object.freeze({ title: "Composed repetition", meta: null, image: "first", alt: "" }),
   Object.freeze({ title: "Composed second plate", meta: null, image: "second", alt: "second" }),
@@ -507,6 +507,7 @@ export function composedCardsSource() {
         items: COMPOSED_CARDS_CARDS.map((card) => ({
           title: card.title,
           ...(card.meta === null ? {} : { meta: card.meta }),
+          ...(card.action === undefined ? {} : { action: card.action }),
           ...(card.image === "first"
             ? { image: card.alt === "" ? { src: COMPOSED_CARDS_SOURCES.first, decorative: true } : { src: COMPOSED_CARDS_SOURCES.first, alt: COMPOSED_CARDS_ALT.described } }
             : card.image === "second"

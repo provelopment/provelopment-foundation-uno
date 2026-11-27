@@ -1252,7 +1252,7 @@ function composeSection(
         if (rawItem === null || typeof rawItem !== "object" || Array.isArray(rawItem)) refuseUnsupportedFeature();
         const entry = rawItem as PlainRecord;
         // `title` stays plain text, so a donor title that carries Markdown or markup is refused rather than flattened.
-        requireExactKeys(entry, ["title"], ["meta", "body", "image"]);
+        requireExactKeys(entry, ["title"], ["meta", "body", "image", "action"]);
         const title = readNewFamilyText(entry["title"]);
         // Uno's heading bound is wider than the donor card-title bound, so this subset's own limit is enforced here.
         if (codePointLength(title) > 160) refuseTarget();
@@ -1296,6 +1296,25 @@ function composeSection(
           card["asset"] = owned;
           card["alt"] = alt;
           if (rawDecorative !== undefined) card["decorative"] = rawDecorative;
+        }
+        // `UNO-WO-124 / R07`: the donor card's optional single action, adopted under Hero's own static outbound contract only —
+        // one plain label, one `href` the strict reader classifies as `https`/`mailto`, and the closed optional variant. A `route`
+        // or `link` destination stays outside this subset and refuses the whole Page, so no destination is resolved here.
+        if (ownsKey(entry, "action")) {
+          const rawAction = entry["action"];
+          if (rawAction === null || typeof rawAction !== "object" || Array.isArray(rawAction)) {
+            refuseUnsupportedFeature();
+          }
+          const action = rawAction as PlainRecord;
+          requireExactKeys(action, ["label"], ["href", "route", "link", "variant"]);
+          const destinations = ["href", "route", "link"].filter((name) => ownsKey(action, name));
+          if (destinations.length !== 1 || !ownsKey(action, "href")) refuseUnsupportedFeature();
+          const outbound: Record<string, unknown> = {
+            label: readDonorText(action["label"], true),
+            href: readDonorText(action["href"], false),
+          };
+          if (ownsKey(action, "variant")) outbound["variant"] = action["variant"];
+          card["action"] = outbound;
         }
         cards.push(card);
       }

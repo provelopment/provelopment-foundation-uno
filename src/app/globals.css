@@ -1641,6 +1641,58 @@ main {
   line-height: 1.6;
 }
 
+/*
+ * `UNO-WO-124 / R07`: the card's own single action. Three closed presentations of one ordinary anchor — a filled primary, an
+ * outlined secondary and a plain text link — each keeping the donor's own inline-block rhythm, with a visible focus ring for
+ * keyboard users and a reduced-motion-safe hover transition.
+ */
+.uno-json-card-action {
+  align-self: flex-start;
+  display: inline-block;
+  margin-top: 0.875rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--uno-accent, currentColor);
+  border-radius: 0.375rem;
+  background: var(--uno-accent, currentColor);
+  color: var(--uno-on-accent, #fff);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+  transition: opacity 120ms ease-in-out;
+}
+
+.uno-json-card-action[data-uno-variant="secondary"] {
+  background: transparent;
+  color: inherit;
+}
+
+.uno-json-card-action[data-uno-variant="link"] {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.uno-json-card-action:hover {
+  opacity: 0.85;
+}
+
+.uno-json-card-action:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uno-json-card-action {
+    transition: none;
+  }
+}
+
 @media (min-width: 640px) {
   .uno-json-cards,
   .uno-json-cards[data-uno-columns="2"],

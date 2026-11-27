@@ -4682,7 +4682,29 @@ describe("composeUnoFoundationSubset — cards and features authored heading", (
         const withMeta = composed(envelope({ ...base, items: [{ title: "One", meta: "Meta" }] })).sections[0]!;
         expect((withMeta.props as { cards: readonly { meta?: string }[] }).cards[0]!.meta).toBe("Meta");
       }
-      expectRefusal(envelope({ ...base, items: [{ title: "One", action: { label: "Go", href: "#go" } }] }), "family:unsupported-feature");
+      // `UNO-WO-124 / R07`: a card's single action is part of the adopted donor contract, so the fragment destination that used to
+    // refuse as an unsupported field now refuses as what it is — a target the composer will not resolve for a card.
+    expectRefusal(
+      envelope({ ...base, items: [{ title: "One", action: { label: "Go", href: "#go" } }] }),
+      type === "cards" ? "family:target-refused" : "family:unsupported-feature",
+    );
+    if (type === "cards") {
+      const withAction = composed(envelope({
+        ...base,
+        items: [{ title: "One", action: { label: "Go", href: "https://example.org/card", variant: "secondary" } }],
+      })).sections[0]!;
+      expect((withAction.props as { cards: readonly { action?: unknown }[] }).cards[0]!.action).toEqual({
+        label: "Go",
+        href: "https://example.org/card",
+        variant: "secondary",
+      });
+      for (const destination of [{ route: "family-1" }, { link: "home" }]) {
+        expectRefusal(
+          envelope({ ...base, items: [{ title: "One", action: { label: "Go", ...destination } }] }),
+          "family:unsupported-feature",
+        );
+      }
+    }
       expectRefusal(envelope({ ...base, items: [{ title: "One", icon: "star" }] }), "family:unsupported-feature");
     }
   });
