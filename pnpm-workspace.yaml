@@ -23,5 +23,15 @@
 # package and lockfile integrity. Re-adding a suppression, or a resurfacing
 # HIGH/critical, is refused by that guard and by
 # tests/deployment/u04-security-exception.test.mjs.
+#
+# Repair recorded 2026-11-27 (UNO-WO-127 / R04). A fresh full-graph audit
+# reported one moderate development-only finding, GHSA-g3hv-75wg-m249 on
+# minimatch (>=7.0.0 <11.0.1), reachable only through the lint toolchain
+# (@typescript-eslint/*). A patched range is published, so the repair was
+# adopted rather than waived: @typescript-eslint/parser and typescript-eslint
+# moved from 8.72.2 to 8.74.0, which depends on minimatch ^11.0.1. The
+# unfiltered full-graph audit now reports no known vulnerabilities, and the
+# production graph was already clean. The picomatch disclosure above stands as
+# history: it was never repaired, only retired from the reported graph.
 packages:
   - "."

@@ -2,27 +2,29 @@
 
 Planning snapshot: November 27, 2026. This file records proposed work, not permission to publish, close a stage, or deploy.
 
-## Current status after the workflow reset
+## Current status after the deployment-integrity repair
 
 The per-task work-order system and the exact-byte prose freeze are retired. An Owner request now authorizes one local outcome; push, release and deployment still need separate authorization. The WIP folder accepts additional planning files, and every Markdown file there is still scanned for credentials and machine-specific paths.
 
-Verified in this checkout after the reset:
+Verified in this checkout after the repair:
 
-- Bootstrap: 19 tests plus the scaffold verifier pass; an extra planning file is accepted, and a private path planted in it is still refused.
-- Architecture: 47 pass. Unit: 1427 pass across 36 files. Lint and typecheck are clean with no suppressions.
+- The hosted failure is fixed at its cause: the durable Features wrapper and the composed native features node are proved equivalent clause by clause, never exempted. The production gate now reports **1005 passed, 0 failed** (it reported 68 passed / 1 failed before).
+- Bootstrap: 19 tests plus the scaffold verifier pass. Architecture: 47 pass. Unit: 1427 pass across 36 files. Lint and typecheck are clean with no suppressions.
 - Production build: succeeds with zero warnings; the trace inspector confirms only declared inputs ship.
-- Real HTTP: 105 pass. Deployment readiness: 131 checks pass. Deployment suites: 349 pass.
+- Real HTTP: 105 pass. Deployment readiness: 131 checks pass. Deployment suites: **388 pass** (349 plus 38 mutation-sensitive equivalence assertions and one minimatch repair gate).
+- Dependencies: `pnpm audit` reports no known vulnerabilities on the unfiltered graph; no waiver, override or suppression was added.
 - U04 22-module consent gate, real production HTTP plus Chromium: 969 checks, 0 failed.
 - Parity is **15/17 families and 57/59**, earned by the unchanged closure oracle under the declared **C2** checkpoint. The fourteen-family Cards interim (14/17, 56/59) stays reproduced as closed history.
 
 ## Starting point and the open row
 
-Local main is `8f4f340`, three commits ahead of `origin/main` at `f906172`: the Features composer adoption (`0c6ef32`) and two report-only commits. Preserve them.
+Local main carries `58ac18c`, published to `origin/main`, plus this increment which is committed locally and **not pushed**. Push, hosted-CI observation, release and deployment each still need separate Owner authorization.
 
 The composer emits one native Features node, its verification matches that representation, and Features is credited on all seven dimensions. C2 is earned, so only the **D** row remains: `actions` and `contactForm`, which together would take the oracle to `17/17` and `59/59`.
 
-## 1. Earn the D row
+## 1. Earn the D row (gated on exact-head CI)
 
+0. Push the corrected SHA under Owner authorization and confirm every hosted job on Ubuntu and Windows, then keep D blocked until that evidence exists.
 1. Prove `actions` and `contactForm` across the same seven dimensions; keep contact presentation-only until delivery is separately authorized.
 2. Never pre-label or hard-code a credit; let the unchanged oracle return `17/17` and `59/59` before asserting it.
 3. Run every applicable gate before any authorized push, then verify the exact pushed SHA and every hosted job.

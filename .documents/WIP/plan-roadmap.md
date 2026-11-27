@@ -3,12 +3,13 @@
 Unfinished stages and their exit gates, nothing more. **No stage in this file is
 accepted.** A stage closes only when the independent Chief Master Architect records
 `ACCEPT` against a published execution report, and the Owner authorises the next stage
-with a new work order.
+separately.
 
 This file is a public planning summary. It is not an authorisation, not an acceptance
-record, and not a substitute for the Owner-installed `workorder-active.md`. **No
-implementation permission may be inferred from this file or from any other planning slot:
-planning describes intended stages, and only an Owner-issued work order authorises work.**
+record, and not a substitute for an Owner instruction. **No implementation permission may
+be inferred from this file or from any other planning slot: planning describes intended
+stages, and only an Owner request authorises a local outcome.** Push, release and
+deployment each require their own separate Owner authorization.
 
 ---
 

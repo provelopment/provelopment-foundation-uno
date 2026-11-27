@@ -1626,6 +1626,20 @@ describe("the hosted durable-family labels are connected to real predicates", ()
   "gridProps.items.length === listProps.items.length",
   "(gridItem.caption ?? null) === (listItem.caption ?? null)",
   "galleryDelta.anchor && galleryDelta.representation && galleryDelta.columns",
+    // `UNO-WO-127 / R01`: the committed Features wrapper is proved equivalent to the composed native node, never exempted.
+    // The label, the comparator call, the reader acceptance and each clause the verifier itself decides must stay present.
+    "DURABLE_FAMILY_SOURCE the committed Features wrapper and the composed native features node agree on identity, heading, lede, columns, units, absent fields and invent nothing",
+    "DURABLE_FAMILY_SOURCE the composed native features node is accepted by the strict reader and stays childless",
+    "from \"./u03/durable-features-equivalence.mjs\";",
+    "featuresEquivalenceDelta(committedFeatures, composedFeatures)",
+    "featuresEquivalenceHolds(featuresDelta)",
+    "isUnoLayoutGridFeatures(composedFeatures?.props ?? {})",
+    "composedFeatures.children.length !== 0",
+    "propertyIsEnumerable.call(composedFeatures, \"children\")",
+    // `UNO-WO-127 / R02`: the served historical rendering is pinned to the same authored strings the proof compares.
+    "DURABLE_FAMILY_HTTP the Features family serves its authored heading, lede and three unit titles in order",
+    "DURABLE_FAMILY_HTTP the Features family invents no icon treatment",
+    "!raw.includes(\"uno-json-feature-icon\")",
     "DURABLE_FAMILY_SOURCE the six original sections still equal the starting committed blob",
     "DURABLE_FAMILY_REFUSALS the composer refuses ${label}",
     'outcome.status === "refused" && outcome.reason === reason',
@@ -1695,6 +1709,13 @@ describe("the hosted durable-family labels are connected to real predicates", ()
       ["gridProps.items.length === listProps.items.length", "true"],
       ["(gridItem.caption ?? null) === (listItem.caption ?? null)", "true"],
       ["galleryDelta.anchor && galleryDelta.representation && galleryDelta.columns", "true"],
+      // `UNO-WO-127 / R01`: the Features equivalence cannot be neutered either — the call, its result, the native-node
+      // recognition, the childless requirement and the served icon refusal are each load-bearing.
+      ["featuresEquivalenceHolds(featuresDelta)", "true"],
+      ["isUnoLayoutGridFeatures(composedFeatures?.props ?? {})", "true"],
+      ["composedFeatures.children.length !== 0", "false"],
+      ['propertyIsEnumerable.call(composedFeatures, "children")', "false"],
+      ['!raw.includes("uno-json-feature-icon")', "true"],
       ['outcome.status === "refused" && outcome.reason === reason', "outcome.status !== undefined"],
       ['createHash("sha256").update(bytes).digest("hex") === DURABLE_PLATE_SHA256', "true"],
       ['response.status === 404 && response.headers.get("location") === null && body.length === 0', "true"],

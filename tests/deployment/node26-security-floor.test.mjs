@@ -427,8 +427,22 @@ test('the vulnerable eslint-config-next meta-package is gone from manifest and l
   assert.equal(/\beslint-import-resolver-typescript@/.test(lock), false, 'resolver chain must not resolve');
   // Its direct replacements must be present at the exact reviewed versions.
   assert.equal(declared['@next/eslint-plugin-next'], '16.4.6');
-  assert.equal(declared['typescript-eslint'], '8.72.2');
+  // `UNO-WO-127 / R04`: the reviewed toolchain moved to 8.74.0 so the development-only minimatch advisory
+  // (`GHSA-g3hv-75wg-m249`, `>=7.0.0 <11.0.1`) is repaired upstream rather than waived.
+  assert.equal(declared['typescript-eslint'], '8.74.0');
   assert.equal(declared['eslint-plugin-react-hooks'], '7.1.1');
+});
+
+test('the development-only minimatch advisory is repaired upstream, not waived', () => {
+  // The advisory covers `>=7.0.0 <11.0.1`. A patched range is published, so no resolved version may fall inside it: the
+  // legacy 3.x lineage stays legitimate because it predates the advisory, and everything modern must be at or above 11.0.1.
+  const resolved = lockVersions(read('pnpm-lock.yaml'), 'minimatch');
+  assert.ok(resolved.length > 0, 'minimatch must still resolve for the lint toolchain');
+  for (const version of resolved) {
+    const vulnerable = compareVersions(version, '7.0.0') >= 0 && compareVersions(version, '11.0.1') < 0;
+    assert.equal(vulnerable, false, `lock resolves the vulnerable minimatch ${version}`);
+  }
+  assert.ok(resolved.some((version) => compareVersions(version, '11.0.1') >= 0), resolved.join(','));
 });
 
 test('the workspace declares no advisory waiver and no leftover expiry', () => {

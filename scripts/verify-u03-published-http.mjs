@@ -35,6 +35,11 @@ import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { prepareUnoU03FixtureTransaction } from "./uno-u03-fixture-transaction.mjs";
+import {
+  FEATURES_SECTION_ID,
+  featuresEquivalenceDelta,
+  featuresEquivalenceHolds,
+} from "./u03/durable-features-equivalence.mjs";
 import { verifyUnoU03Browser } from "./verify-u03-browser.mjs";
 
 // Node prints a benign "typeless package.json" notice for the repository's TypeScript modules. It is expected, is
@@ -856,7 +861,7 @@ async function durableFamilySourcePhase() {
   const { composeUnoFoundationSubset } = await import(
     "../src/application/compose-uno-foundation-families.ts"
   );
-  const { readUnoPageDocument } = await import("../src/core/page-document.ts");
+  const { isUnoLayoutGridFeatures, readUnoPageDocument } = await import("../src/core/page-document.ts");
 
   for (const relativePath of [DURABLE_SOURCE, DURABLE_BINDINGS, DURABLE_COMPONENTS, DURABLE_ASSET]) {
     check(`DURABLE_FAMILY_SOURCE ${relativePath} exists`, existsSync(resolve(ROOT, relativePath)));
@@ -931,9 +936,11 @@ async function durableFamilySourcePhase() {
         JSON.stringify(DURABLE_PREFIX_IDS),
     );
     check(
-      // `UNO-WO-121 / R02`: the committed durable Page is **not** rewritten. It keeps its ordinary native gallery grid while the
-      // adapter composes the donor's opt-in list, so the two are distinguished by that representation difference **only**:
-      // every other appended section must still be the composer's own byte-identical output.
+      // `UNO-WO-121 / R02`, `UNO-WO-123 / R06`, `UNO-WO-127 / R01`: the committed durable Page is **not** rewritten. It keeps
+      // its ordinary native gallery grid while the adapter composes the donor's opt-in list, its superseded Cards outline
+      // while the adapter composes the native Cards node, and its historical Features wrapper while the adapter composes the
+      // native features node. Those three representation differences are then proved semantically below; every other
+      // appended section must still be the composer's own byte-identical output.
       "DURABLE_FAMILY_SOURCE the appended sections are the composer's own output",
       (() => {
         const committed = parsed.document.sections.slice(6);
@@ -944,7 +951,7 @@ async function durableFamilySourcePhase() {
           .map((node) => node.id);
         // `UNO-WO-123 / R06`: the durable Page is still not rewritten, so Cards differs for the same reason Gallery does —
         // the committed bytes keep the superseded wrapper while the composer emits the accepted native node.
-        return JSON.stringify(differing) === JSON.stringify([GALLERY_SECTION_ID, "family-15-cards"]);
+        return JSON.stringify(differing) === JSON.stringify([GALLERY_SECTION_ID, "family-15-cards", FEATURES_SECTION_ID]);
       })(),
     );
     // `UNO-WO-123 / R07`: the durable Cards difference is proved **semantically**, never exempted. The committed Page keeps the
@@ -992,6 +999,37 @@ async function durableFamilySourcePhase() {
               ? card.body === undefined
               : card.body !== undefined && card.body === body.props?.text);
         });
+      })(),
+    );
+    // `UNO-WO-127 / R01`: the durable Features difference is proved **semantically**, never exempted. The committed Page
+    // keeps the historical outline — a `layout.stack` wrapper holding a level-2 authored heading, a plain prose lede and an
+    // ordinary `layout.grid` of `itemSemantics: "list"` stacks with one level-3 title each — while the composer emits one
+    // native, childless features grid carrying the same heading, level, lede, column intent and ordered titles. Identity,
+    // heading, lede, columns, unit count, unit order, unit titles, the exact authored key sets and the preservation of every
+    // absent optional field (body, icon, surface, meta, image, action) are decided clause by clause, so the section is never
+    // passed by an exception list: altering, dropping, reordering or inventing anything fails this predicate.
+    const committedFeatures = parsed.document.sections.find((node) => node.id === FEATURES_SECTION_ID);
+    const composedFeatures = composed.document.sections.find((node) => node.id === FEATURES_SECTION_ID);
+    const featuresDelta = featuresEquivalenceDelta(committedFeatures, composedFeatures);
+    check(
+      "DURABLE_FAMILY_SOURCE the committed Features wrapper and the composed native features node agree on identity, heading, lede, columns, units, absent fields and invent nothing",
+      featuresEquivalenceHolds(featuresDelta)
+        && isUnoLayoutGridFeatures(composedFeatures?.props ?? {}),
+      JSON.stringify(featuresDelta),
+    );
+    check(
+      "DURABLE_FAMILY_SOURCE the composed native features node is accepted by the strict reader and stays childless",
+      (() => {
+        if (composedFeatures === undefined || !isUnoLayoutGridFeatures(composedFeatures.props)) return false;
+        if (!Array.isArray(composedFeatures.children) || composedFeatures.children.length !== 0) return false;
+        if (Object.prototype.propertyIsEnumerable.call(composedFeatures, "children")) return false;
+        const reread = readUnoPageDocument(JSON.parse(JSON.stringify(composed.document)));
+        if (!reread.accepted) return false;
+        const rereadFeatures = reread.document.sections.find((node) => node.id === FEATURES_SECTION_ID);
+        return rereadFeatures !== undefined
+          && rereadFeatures.module === "layout.grid"
+          && isUnoLayoutGridFeatures(rereadFeatures.props)
+          && rereadFeatures.props.features.length === composedFeatures.props.features.length;
       })(),
     );
     // The Gallery itself is compared **semantically**, never exempted: anchor, authored columns, item count and order, each
@@ -1235,6 +1273,33 @@ async function checkDurableFamilyHttp(base) {
   for (const [label, pattern] of families) {
     check(`DURABLE_FAMILY_HTTP the Page renders ${label}`, pattern.test(raw));
   }
+
+  // `UNO-WO-127 / R02`: the committed Page is served as its own historical outline, so the Features family must show the
+  // same authored heading, lede and three unit titles the equivalence proof compared, in the authored order, and must never
+  // acquire the native icon treatment that only the composer's own node introduces.
+  const featuresAuthored = [
+    "Sample feature set",
+    "Each feature is an authored title only, laid out as a native list grid.",
+    "Plain title",
+    "Native list item",
+    "No decorative icon",
+  ];
+  let featuresOrdered = true;
+  let featuresPrevious = raw.indexOf(`id="${FEATURES_SECTION_ID}"`);
+  if (featuresPrevious < 0) featuresOrdered = false;
+  for (const text of featuresAuthored) {
+    const at = raw.indexOf(text, featuresPrevious < 0 ? 0 : featuresPrevious);
+    if (at < 0 || (featuresPrevious >= 0 && at <= featuresPrevious)) featuresOrdered = false;
+    if (at >= 0) featuresPrevious = at;
+  }
+  check(
+    "DURABLE_FAMILY_HTTP the Features family serves its authored heading, lede and three unit titles in order",
+    featuresOrdered,
+  );
+  check(
+    "DURABLE_FAMILY_HTTP the Features family invents no icon treatment",
+    !raw.includes("uno-json-feature-icon"),
+  );
 
   check(
     "DURABLE_FAMILY_HTTP the contact family renders only the inert delivery-OFF notice",
