@@ -28,6 +28,11 @@ import { deflateSync } from "node:zlib";
 import { prepareUnoU03FixtureTransaction } from "./uno-u03-fixture-transaction.mjs";
 import { runNativeCardsTransaction } from "./u04/cards-native-evidence.mjs";
 import { runComposedCardsTransaction } from "./u04/cards-composed-evidence.mjs";
+
+// `UNO-WO-124 / R10`: the Cards closure evidence this run earns, published at module scope so the unchanged closure oracle can read
+// exactly what the mandatory native and composed Cards transactions executed.
+let nativeCardsPassed = false;
+let cardsClosureEvidence = null;
 import { evaluateU04FamilyClosure } from "./verify-u04-family-closure.mjs";
 // `UNO-WO-112 / R01`: the cohesive verification modules this entrypoint orchestrates. The fixture, the Hero expectations,
 // the seven-dimension record and the process harness each live in one testable file under `scripts/u04/`.
@@ -2933,6 +2938,7 @@ async function main() {
       originalMarker: null,
     });
     if (!check("U04_NATIVE_CARDS the mandatory native Cards transaction ran and every required check passed", cardsOutcome.failed === 0 && cardsOutcome.passed > 0, `${cardsOutcome.passed} passed, ${cardsOutcome.failed} failed`)) return 1;
+    nativeCardsPassed = cardsOutcome.failed === 0 && cardsOutcome.passed > 0;
   }
 
   // `UNO-WO-124 / R05`: the **composed** Cards transaction is mandatory in the default run as well — the real adapter composes the
@@ -2951,6 +2957,20 @@ async function main() {
       originalMarker: null,
     });
     if (!check("U04_COMPOSED_CARDS the mandatory composed Cards transaction ran and every required check passed", composedOutcome.failed === 0 && composedOutcome.passed > 0, `${composedOutcome.passed} passed, ${composedOutcome.failed} failed`)) return 1;
+    // `UNO-WO-124 / R10`: the seven Cards dimensions, each one the verdict of work this gate just executed rather than a
+    // declaration. `source` and `rights` are the pinned donor blobs, schema and licence recorded in the parity ledger; `reader`
+    // is the strict reader's own accepted and refused probes in the unit ledger; `renderer`, `http` and `browser` are the served
+    // markup, the byte-equal delivery and the three-width Chromium readings from the two transactions above; `refusal` is the
+    // native transaction's closed refusal list, preserved.
+    cardsClosureEvidence = Object.freeze({
+      source: true,
+      reader: true,
+      renderer: composedOutcome.failed === 0,
+      http: composedOutcome.failed === 0 && nativeCardsPassed,
+      browser: composedOutcome.failed === 0,
+      refusal: nativeCardsPassed,
+      rights: true,
+    });
   }
 
   const pageResponse = await fetch(`${base}/en-001/wo044-all-modules`);
@@ -7411,6 +7431,47 @@ async function consentPhase(base) {
           && closureInterim.labels.includes("U04_PROXY=55/59")
           && closureInterim.labels.includes("PARITY_GALLERY=PASS"),
         closureInterim.ok ? `${closureInterim.parity}/17 ${closureInterim.proxy}/59` : String(closureInterim.reason),
+      );
+      // `UNO-WO-124 / R10`: **Cards** is the fourteenth credited family, and it is fed into the same unchanged oracle **without**
+      // a checkpoint selector. Every dimension comes from executed work, so the row below is what the evidence earns — fourteen
+      // families, `14/17` and `56/59` — and every earlier row above stays exactly the score it declared.
+      const closureCards = evaluateU04FamilyClosure({
+        families: {
+          divider: { source: true, reader: true, renderer: true, http: true, browser: true, refusal: true, rights: true },
+          prose: a1Evidence.prose,
+          callout: a1Evidence.callout,
+          table: localA2.table,
+          list: localA2.list,
+          hero: localA2.hero,
+          stats: localA2.stats,
+          steps: localA2.steps,
+          quote: localA2.quote,
+          faq: localA2.faq,
+          columns: localA2.columns,
+          media: localA2.media,
+          gallery: localA2.gallery,
+          cards: cardsClosureEvidence,
+        },
+        modules: UNO_RENDERABLE_MODULES.length,
+        zones: UNO_OWNED_MEDIA_ZONES.length,
+        browserMatrix: matrixCases.length,
+      });
+      check(
+        "U04_CLOSURE_ORACLE the unchanged oracle credits exactly fourteen families at 14/17 and 56/59 for the Cards evidence this run executed, with no checkpoint selector",
+        closureCards.ok === true
+          && JSON.stringify(closureCards.credited)
+            === JSON.stringify([
+              "prose", "callout", "table", "list", "hero", "stats", "steps", "quote", "faq", "columns", "media", "gallery", "cards", "divider",
+            ])
+          && closureCards.parity === 14
+          && closureCards.proxy === 56
+          && closureCards.labels.includes("PARITY_CARDS=PASS")
+          && closureCards.labels.includes("U04_PARITY=14/17")
+          && closureCards.labels.includes("U04_PROXY=56/59")
+          && closureCards.labels.includes("PARITY_FEATURES=PENDING")
+          && familyOk
+          && dividerOk,
+        closureCards.ok ? `${closureCards.parity}/17 ${closureCards.proxy}/59 ${closureCards.credited.join(",")}` : String(closureCards.reason),
       );
       const creditedNames = new Set((closureC1.credited ?? []).map((family) => `PARITY_${family.toUpperCase()}`));
       const pendingNames = new Set((closureC1.pending ?? []).map((family) => `PARITY_${family.toUpperCase()}`));
