@@ -22,6 +22,7 @@ import { resolveUnoCommittedBase } from "../application/resolve-uno-committed-ba
 import { resolveUnoCommittedLocales } from "../application/resolve-uno-committed-locales";
 import {
   UNO_MANIFEST_PATH,
+  UNO_PRESENTATION_PATH,
   UNO_SELECTION_PATH,
   UNO_SOURCE_LIMITS,
   loadUnoCandidateSource,
@@ -40,6 +41,13 @@ import {
   type UnoSiteAddressBinding,
 } from "../core/efs/uno-config";
 import { localePathKey } from "../core/efs/uno-locales";
+import {
+  validateUnoPresentationConfig,
+  type UnoPresentationConfig,
+  type UnoPresentationRefusal,
+  type UnoPresentationSiteKey,
+} from "../core/efs/uno-presentation";
+import { planUnoSiteNavigation, type UnoSiteNavigationOutcome } from "../application/plan-uno-site-navigation";
 import {
   buildUnoCandidateRouteIndex,
   buildUnoSiteRouteIndex,
@@ -887,19 +895,18 @@ export type UnoServingDiscoveryOutcome =
  * Each Site is planned from its own decisions and its own locale authority, so a same-Page `hreflang`, `x-default` or
  * automatic link can never span two Sites even when their public URLs are combined for the same request authority.
  */
-async function planOneSiteDiscovery(
+/**
+ * Collect the accepted plans of one Site, in candidate order.
+ *
+ * Shared by the discovery planner and the navigation planner so both derive from **one** eligibility path: the same confined
+ * read, the same committed authority, the same accepted decision, and the same identity check against the candidate.
+ */
+async function collectSiteDecisions(
   authority: QualifiedAuthority,
   binding: UnoSiteAddressBinding,
   host: string,
   candidates: readonly UnoSiteRouteCandidate[],
-): Promise<UnoServingDiscoveryPlan | null> {
-  const stored = resolveUnoCommittedLocales({
-    manifest: authority.manifest,
-    selection: authority.selection,
-    site: { facetId: binding.facetId, siteId: binding.siteId },
-  });
-  if (!stored.accepted) return null;
-
+): Promise<UnoPublishedPageAccepted[]> {
   const decisions: UnoPublishedPageAccepted[] = [];
   for (const candidate of candidates) {
     const pathname = requestPathOf(binding, candidate.pathname);
@@ -918,6 +925,23 @@ async function planOneSiteDiscovery(
     if (planned.document.kind === "json" && planned.document.pageDocument === undefined) continue;
     decisions.push(planned);
   }
+  return decisions;
+}
+
+async function planOneSiteDiscovery(
+  authority: QualifiedAuthority,
+  binding: UnoSiteAddressBinding,
+  host: string,
+  candidates: readonly UnoSiteRouteCandidate[],
+): Promise<UnoServingDiscoveryPlan | null> {
+  const stored = resolveUnoCommittedLocales({
+    manifest: authority.manifest,
+    selection: authority.selection,
+    site: { facetId: binding.facetId, siteId: binding.siteId },
+  });
+  if (!stored.accepted) return null;
+
+  const decisions = await collectSiteDecisions(authority, binding, host, candidates);
   if (decisions.length === 0) return null;
 
   const plan = planUnoPublicDiscovery({
@@ -1234,4 +1258,119 @@ export async function renderUnoServingSitemap(hostInput?: unknown): Promise<stri
   if (document.length > 512 * 1024) return null;
   return document;
 }
+
+/**
+ * The committed presentation configuration (`U04`, navigation).
+ *
+ * Absent is normal and is **not** an error: a project with no `deployment/site.config.json` simply has no shell navigation.
+ * A file that exists but cannot be read, exceeds the declared bound or fails validation refuses the presentation only — the
+ * Page is still served, because presentation can never become publication authority.
+ */
+export type UnoServingPresentation =
+  | { readonly status: "absent" }
+  | { readonly status: "invalid"; readonly reason: UnoPresentationRefusal }
+  | { readonly status: "accepted"; readonly config: UnoPresentationConfig };
+
+/** Read and validate the fixed presentation file. Never throws, never falls back to another Site's entry. */
+function readPresentation(root: string): UnoServingPresentation {
+  try {
+    if (!statSync(resolve(root, UNO_PRESENTATION_PATH)).isFile()) return { status: "absent" };
+  } catch {
+    return { status: "absent" };
+  }
+  const parsed = readFixedJson(root, UNO_PRESENTATION_PATH, UNO_SOURCE_LIMITS.configBytes);
+  if (parsed === null) return { status: "invalid", reason: "presentation:not-object" };
+  const validated = validateUnoPresentationConfig(parsed);
+  return validated.accepted
+    ? { status: "accepted", config: validated.config }
+    : { status: "invalid", reason: validated.reason };
+}
+
+/** The identifiers one navigation request names: the current Site and Page, by value and never by position. */
+export interface UnoServingNavigationRequest {
+  readonly host: string;
+  readonly site: UnoPresentationSiteKey;
+  readonly localeTag: string;
+  readonly pageId: string;
+  readonly pathname: string;
+}
+
+/**
+ * Plan the shell navigation for one served Page.
+ *
+ * The Site is resolved from the committed authority (never from the request alone), its accepted Pages are collected through
+ * the same eligibility path discovery uses, and the pure planner turns them plus the validated presentation into entries.
+ * Every failure — refused authority, unbound Site, malformed presentation — is an **absence** of navigation, never a throw and
+ * never a partial list.
+ */
+export async function planUnoServingNavigation(
+  request: UnoServingNavigationRequest,
+): Promise<UnoSiteNavigationOutcome> {
+  const host = readHost(request.host);
+  if (host === null) return { status: "absent", reason: "navigation:not-configured" };
+  const site = request.site;
+  if (!/^[a-z0-9][a-z0-9._-]{0,63}$/u.test(site.facetId) || !/^[a-z0-9][a-z0-9._-]{0,63}$/u.test(site.siteId)) {
+    return { status: "absent", reason: "navigation:not-configured" };
+  }
+  if (typeof request.pageId !== "string" || typeof request.pathname !== "string" || !request.pathname.startsWith("/")) {
+    return { status: "absent", reason: "navigation:not-configured" };
+  }
+
+  const authority = readAuthority();
+  if (authority.mode === "refused") return { status: "absent", reason: "navigation:authority-unavailable" };
+
+  const presentation = readPresentation(authority.root);
+  if (presentation.status === "invalid") {
+    return { status: "absent", reason: "navigation:configuration-invalid" };
+  }
+  if (presentation.status === "absent") return { status: "absent", reason: "navigation:not-configured" };
+
+  const isSitePage = (candidate: { readonly facetId: string; readonly siteId: string }): boolean =>
+    candidate.facetId === site.facetId && candidate.siteId === site.siteId;
+
+  let pages: UnoPublishedPageAccepted[] = [];
+  if (authority.mode === "qualified") {
+    const index = buildUnoSiteRouteIndex(authority.manifest, authority.selection);
+    if (!index.accepted) return { status: "absent", reason: "navigation:authority-unavailable" };
+    const candidates = index.candidates.filter(isSitePage);
+    if (candidates.length === 0) return { status: "absent", reason: "navigation:site-undeclared" };
+    // The Site must be bound to this very authority, so a sibling Site's Pages can never be enumerated into this shell.
+    const binding = bindingsForHost(authority, host).find(
+      (candidate) => candidate.facetId === site.facetId && candidate.siteId === site.siteId,
+    );
+    if (binding === undefined) return { status: "absent", reason: "navigation:site-undeclared" };
+    pages = await collectSiteDecisions(authority, binding, host, candidates);
+  } else {
+    const index = buildUnoCandidateRouteIndex(authority.manifest, authority.selection);
+    if (!index.accepted) return { status: "absent", reason: "navigation:authority-unavailable" };
+    const candidates = index.candidates.filter(isSitePage);
+    if (candidates.length === 0) return { status: "absent", reason: "navigation:site-undeclared" };
+    // The legacy one-Site form: candidates already carry request pathnames, exactly as `planUnoServingPage` reads them.
+    for (const candidate of candidates) {
+      const loaded = await loadUnoCandidateSource({ repoRoot: authority.root, pathname: candidate.pathname });
+      if (!loaded.accepted) continue;
+      const planned = planUnoPublishedPage({
+        manifest: authority.manifest,
+        selection: authority.selection,
+        base: { canonical: authority.canonical, aliases: [...authority.aliases] },
+        pathname: candidate.pathname,
+        loadedSource: { accepted: true, candidate: loaded.candidate, kind: loaded.kind, text: loaded.text },
+      });
+      if (!planned.accepted) continue;
+      if (planned.identity.pathname !== candidate.pathname) continue;
+      if (planned.document.kind === "json" && planned.document.pageDocument === undefined) continue;
+      pages.push(planned);
+    }
+  }
+
+  return planUnoSiteNavigation({
+    site: { facetId: site.facetId, siteId: site.siteId },
+    localeTag: request.localeTag,
+    currentPageId: request.pageId,
+    currentPathname: request.pathname,
+    pages,
+    presentation: presentation.config,
+  });
+}
+
 

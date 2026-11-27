@@ -23,7 +23,7 @@ import type { UnoPublishedPageAccepted } from '../../../application/plan-uno-pub
 import type { UnoPageMedia } from '../../../core/assets/uno-owned-media';
 import { UnoPageSections } from '../../../components/uno-page-sections';
 import { UnoSafeMarkdownPage, parseUnoSafeMarkdown } from '../../../components/uno-safe-markdown-page';
-import { planUnoServingDiscovery } from '../../../config/uno-serving';
+import { planUnoServingDiscovery, planUnoServingNavigation } from '../../../config/uno-serving';
 import { readSiteRequest, resolveSiteRequest } from './layout';
 
 /** Every request is decided from the committed authority on its own terms. */
@@ -80,11 +80,12 @@ export async function generateMetadata({ params }: { params: Promise<CatchAllRou
 }
 
 /** Render one visible `h1`, the optional description and exactly one body: inert Markdown or the JSON Page. */
-function renderPage(
+async function renderPage(
+  host: string,
   page: UnoPublishedPageAccepted,
   media: UnoPageMedia | undefined,
   routeHrefs?: ReadonlyMap<string, string>,
-): ReactNode {
+): Promise<ReactNode> {
   let body: ReactNode;
   if (page.document.kind === 'json') {
     if (page.document.pageDocument === undefined) notFound();
@@ -95,14 +96,50 @@ function renderPage(
     body = <UnoSafeMarkdownPage blocks={parsed.blocks} />;
   }
 
+  // The shell navigation is derived, never declared: the Site's accepted public Pages in this Page's own locale, ordered by
+  // the validated presentation configuration. An absent or malformed configuration simply renders no navigation.
+  const navigation = await planUnoServingNavigation({
+    host,
+    site: { facetId: page.identity.facetId, siteId: page.identity.siteId },
+    localeTag: page.identity.localeTag,
+    pageId: page.identity.pageId,
+    pathname: page.identity.pathname,
+  });
+
   return (
     <>
       {/* `UNO-WO-129 / R01`: the published shell carries the same skip affordance as the demonstration page, so a keyboard
-          visitor can bypass the page body without meeting an authored control first. The `#main` target is the one `<main>`
-          this document renders, and the visible-on-focus treatment comes from the one stylesheet. */}
+          visitor can bypass the navigation and the page body without meeting an authored control first. The `#main` target is
+          the one `<main>` this document renders, and the visible-on-focus treatment comes from the one stylesheet. */}
       <a className="uno-skip-link" href="#main">
         Skip to main content
       </a>
+      {navigation.status === 'planned' ? (
+        <header className="uno-header">
+          <div className="uno-shell uno-header__row">
+            {navigation.plan.brand === null ? null : navigation.plan.brand.href === null ? (
+              <p className="uno-brand">
+                <span className="uno-brand__name">{navigation.plan.brand.name}</span>
+              </p>
+            ) : (
+              <a className="uno-brand" href={navigation.plan.brand.href}>
+                <span className="uno-brand__name">{navigation.plan.brand.name}</span>
+              </a>
+            )}
+            <nav className="uno-nav" aria-label={navigation.plan.ariaLabel}>
+              <ul>
+                {navigation.plan.entries.map((entry) => (
+                  <li key={entry.pageId}>
+                    <a href={entry.href} aria-current={entry.current ? 'page' : undefined}>
+                      {entry.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </div>
+        </header>
+      ) : null}
       <main className="uno-shell uno-narrow" id="main">
         <h1>{page.document.title}</h1>
         {page.document.description !== undefined ? <p>{page.document.description}</p> : null}
@@ -120,5 +157,5 @@ export default async function SitePage({ params }: { params: Promise<CatchAllRou
   if (decision.kind === 'redirect') redirect(decision.location);
   if (decision.kind === 'refused') notFound();
 
-  return renderPage(decision.page, decision.media, decision.routeHrefs);
+  return renderPage(request.host, decision.page, decision.media, decision.routeHrefs);
 }

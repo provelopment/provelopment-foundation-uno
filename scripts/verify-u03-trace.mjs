@@ -24,7 +24,11 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /** Declared project-relative inputs the server routes read at runtime. */
-const DECLARATION_PATHS = Object.freeze(["deployment/efs/manifest.json", "deployment/uno.config.json"]);
+const DECLARATION_PATHS = Object.freeze([
+  "deployment/efs/manifest.json",
+  "deployment/uno.config.json",
+  "deployment/site.config.json",
+]);
 const CONTENT_ROOT = "deployment/efs/content";
 
 /** Project-relative prefixes that may legitimately appear in a bounded server trace. */
@@ -33,6 +37,7 @@ const ALLOWED_PROJECT_PREFIXES = Object.freeze([
   "deployment/efs/capsule/",
   "deployment/efs/manifest.json",
   "deployment/uno.config.json",
+  "deployment/site.config.json",
   `${CONTENT_ROOT}/`,
 ]);
 
@@ -53,7 +58,6 @@ const FORBIDDEN_PROJECT_FILES = Object.freeze([
   "pnpm-lock.yaml",
   "tsconfig.json",
   "tsconfig.tsbuildinfo",
-  "deployment/site.config.json",
   "workorder-active.md",
 ]);
 

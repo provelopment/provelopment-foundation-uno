@@ -81,6 +81,13 @@ export const UNO_SOURCE_LIMITS = Object.freeze({
 /** The fixed declaration files, relative to the trusted root. Never overridable by a caller. */
 export const UNO_MANIFEST_PATH = "deployment/efs/manifest.json";
 export const UNO_SELECTION_PATH = "deployment/uno.config.json";
+/**
+ * The installation-wide presentation, navigation and branding configuration (`U04`, navigation).
+ *
+ * It is a fixed declaration path like the other two — never caller-supplied — and it is read only by the Page route's shell.
+ * Absence is normal; a malformed file removes navigation and never touches publication.
+ */
+export const UNO_PRESENTATION_PATH = "deployment/site.config.json";
 export const UNO_CONTENT_ROOT = "deployment/efs/content";
 
 /**

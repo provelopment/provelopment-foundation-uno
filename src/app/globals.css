@@ -287,6 +287,16 @@ ol {
   color: var(--uno-foreground);
 }
 
+/* The current Page is indicated three ways at once: `aria-current="page"` for assistive technology, a rule under the label
+   that does not depend on colour alone, and the foreground token for sighted readers in both colour schemes. */
+.uno-nav a[aria-current="page"] {
+  color: var(--uno-foreground);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 0.15em;
+  text-underline-offset: 0.35em;
+}
+
 /* --- Hero --------------------------------------------------------------------- */
 
 .uno-hero {

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "sites": [
+    {
+      "site": { "facetId": "foundation", "siteId": "main" },
+      "brand": { "name": "Foundation Uno", "homePage": "home" },
+      "navigation": {
+        "ariaLabel": "Primary",
+        "items": [
+          { "page": "home" },
+          { "page": "about" },
+          { "page": "components" }
+        ]
+      }
+    }
+  ]
+}
