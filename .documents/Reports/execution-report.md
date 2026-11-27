@@ -1,46 +1,48 @@
-# Execution Report — UNO-WO-124 / R12
+# Execution Report — UNO-WO-125 / R01
 
-**Cards accreditation is complete and substantiated: the parity ledger now records the earned fourteen-family row, and the gate's unchanged oracle asserts `PARITY_CARDS=PASS`, `U04_PARITY=14/17`, `U04_PROXY=56/59` — green locally and on both hosted OSes at `001f16a`.**
+**Delivered: the Cards closure dimensions are now evidence-derived rather than declared, verified locally and on Ubuntu. Not delivered: Features parity and C2. `PARITY_FEATURES=PENDING`, `U04_PARITY=14/17`, `U04_PROXY=56/59`.**
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-124 / R12`, `FINAL — EXECUTE` |
-| ACTIVE | **3,339 bytes**, SHA-256 `54628e7fe1fbbe893b65a22082e707f2636235046f0b0608da6a90931632652a` — matched |
-| Start SHA | `a5a4af5d3ba99b11ec126604d3708d2f6277c0c7` = `origin/main`; clean tree |
-| Code head | **`001f16a14f09b2a90f1c7d29c021663dce3f4044`** — `docs(u04): substantiate the earned fourteen-family Cards row in the parity ledger` |
+| Order | `UNO-WO-125 / R01`, `FINAL — EXECUTE` |
+| ACTIVE | **3,548 bytes**, SHA-256 `f8b1d92c77fd7f72cb9ec4372ba2124dcea1515cc71b8ee0ed2a768bbd815e46` — matched |
+| Start SHA | `96e56d9ac9482529845944e40ae897d3a4e66cfe` = `origin/main`; clean tree |
+| Code head | **`7ffb35b76c27b5e0c64266166cdef07519ec1609`** — `test(u04): derive the Cards source, reader and rights dimensions from recorded evidence` |
 
-## What closed the gap
+## What was delivered
 
-R11 left the claim earned but un-narrated. The obstruction was not, as R11 reported, a byte-identical canonical copy of the ledger — that was my misreading. The test named *“keeps the committed ledger identical to the canonical inventory”* is a **guard lattice over the single ledger**: positive pins for every row already delivered (`6/17`, `8/17`, `50/59`, `9/17`, `51/59`, `11/17`, `53/59`) and negative matches for every row not yet earned (`2/17`, `3/17`, `14/17`, `15/17`, `FAMILY_PARITY=14/17`, and phrases that would over-claim).
+The order asked for evidence-backed source, reader and rights results instead of unconditional `true` assignments. That is now true in the mandatory gate: `cardsClosureEvidence` reads the pinned provenance and licence rows the ledger already carries for `cards` (`cardsSourceRow`, `cardsRightsRow`) and takes `reader` from the strict reader's own accepted and refused probes executed by the mandatory native transaction. `renderer`, `http`, `browser` and `refusal` continue to come from the composed and native transactions' own outcomes. No dimension is declared any more.
 
-So the correct change was two-sided and is now committed:
+The fourteen-family row still holds on those stricter inputs: the unchanged oracle, with no checkpoint selector, reports `U04_PARITY=14/17` and `U04_PROXY=56/59`.
 
-- **Ledger** (`.documents/Architecture/u04-family-parity.md`): one appended section recording the earned row — fourteen of seventeen families, `U04_PARITY=14/17` with `U04_PROXY=56/59`, Cards as the fourteenth — with each of the seven dimensions named against the executed evidence that carries it (pinned donor source and rights, strict reader probes, served markup, byte-equal production delivery at distinct occurrence locators, three-width Chromium readings, preserved closed refusals). It states explicitly that this is parity evidence and **not** a claim of full semantic parity for the donor card, so the guards that forbid that phrase still hold.
-- **Guard** (`tests/unit/uno-foundation-families.test.ts`): the negative match on `14/17` became a **positive pin**, with `56/59` pinned beside the existing `53/59`. The `15/17` negative, the `FAMILY_PARITY=` guard and every earlier pin are untouched, so the lattice still forbids any unearned row — it simply now pins the earned one.
+## What was not delivered, and why
 
-Every historical row is unchanged: A1, A2, B1, B2 and the C1 checkpoint still assert exactly the scores they declared.
+**Features parity and C2 were not implemented.** The mapping I read in the composer (`case "features"`, lines 1339–1404) shows how far the current subset is from the donor contract the order specifies: it requires `columns` explicitly, bounds items to **8**, composes neither Markdown lede nor Markdown item bodies, has **no section surface**, and — decisively — **no icon at all**. Icons are the donor feature's whole visual identity and, per the order, must arrive as *owned asset identities rendered decoratively*, which means a native representation extension: reader support for an owned icon on a list item, planner involvement, renderer markup and stylesheet, refusal coverage, and only then composer wiring, plus the 24-item bound and the absent-column default.
 
-## Gates — executed at `001f16a`
+That is a larger contract change than the Cards action, and it cannot be done honestly in the capacity this run had left. I did not start it, because a half-added icon contract would have left the tree red or the feature unverifiable — and I will not push either.
+
+Also still owed from WO-124: the real **24-image Cards** and **combined 32-distinct-binding Cards/Gallery** production cases. These need a generalised multi-plate fixture installer and the identity-ceiling interaction to be evidenced deliberately (an over-bound refusal is one of the cases), which is its own contained piece of work.
+
+## Gates executed at `7ffb35b`
 
 | Gate | Result |
 | --- | --- |
-| `npx tsc --noEmit` / `npm run lint` | **0 / 0** |
-| `pnpm test` | **1,416 / 1,416, 35 of 35 files** |
-| Deployment fixtures and readiness | **PASS** |
-| Focused Cards family file | **224 / 224** |
-| **Mandatory U04 gate** | **PASS — 968 passed, 0 failed**, including *“the unchanged oracle credits exactly fourteen families at 14/17 and 56/59 … with no checkpoint selector”* |
-| Hosted `Verify U01 baseline` | **completed/success — 38/38 steps, 0 failed on `ubuntu-24.04` and `windows-2025`** |
+| `pnpm test` | **1,416 / 1,416, 35 files** |
+| **Mandatory U04 gate** | **PASS — 968 passed, 0 failed**, including the fourteen-family oracle row at `14/17` and `56/59` |
+| Hosted `Verify U01 baseline` — `ubuntu-24.04` | **completed/success, 38/38 steps, 0 failed** |
+| Hosted `Verify U01 baseline` — `windows-2025` | **in progress when this report was written**; earlier polls of the same job shape resolved to success, but it is not yet evidence and is not claimed |
 | Hosted `Uno Bootstrap Verify` | **completed/success** |
 
-An intermediate poll showed the Windows job `in_progress` with six steps flagged; the completed result is **38/38 with zero failures**, which is the evidence of record.
+## Exact next steps for Features
 
-## Still outstanding, stated plainly
-
-The combined **24-image** Cards and **32-binding** Cards/Gallery production cases are **not built**. They are additional resource-boundary stress evidence, not a precondition of the row the oracle earned, but the order names them and they remain owed. `features`, `actions` and `contactForm` stay pending; C2 and U04 stay open.
+1. Extend the native list-item representation with an optional owned icon (`asset`, decorative alt = `""`, `decorative: true`), read with the existing owned-asset reader, and render it as a decorative image before the title; keep the feature presentation distinct from bordered cards (no card border, icon-led layout).
+2. Add the donor's optional section `surface` to the features wrapper, the Markdown lede, Markdown item bodies (via `content.prose { markdown: true }` as Hero does) and the absent-column default, then raise the item bound to the donor's 24 with the aggregate ceiling preserved.
+3. Prove it the way Cards was proved: reader positives and refusals, composer ownership and binding consumption, served markup, byte-equal icon delivery over production HTTP, three-width Chromium readings, and the omission case.
+4. Then feed `features` into the unchanged oracle for the fifteenth family and C2 at `15/17` and `57/59`, updating the ledger and its historical pins together, with guards against overclaiming retained.
 
 ## Preserved
 
-C1 and all earlier credit: the 22 modules, the four zones and browser matrix, the nine families credited before this work, the owned-image and card-action proofs, the seventeen-family baseline fixture, the ordinary eight-binding ceiling and every closed refusal. `cards` is parity-evidenced, never asserted as full semantic parity. No stage closure, release or deployment.
+Every earlier credit: C1, the twenty-two modules, four zones and browser matrix, the fourteen credited families including Cards, the owned-image and card-action proofs, the seventeen-family baseline fixture, the ordinary eight-binding ceiling and every closed refusal. `actions` and `contactForm` remain pending; C2 and U04 stay open; no stage closure, release or deployment.
 
 ## Disposition
 
