@@ -2962,14 +2962,18 @@ async function main() {
     // is the strict reader's own accepted and refused probes in the unit ledger; `renderer`, `http` and `browser` are the served
     // markup, the byte-equal delivery and the three-width Chromium readings from the two transactions above; `refusal` is the
     // native transaction's closed refusal list, preserved.
+    // `UNO-WO-125 / R01`: source, reader and rights are derived from what exists, never declared `true`.
+    const cardsLedger = readFileSync(resolve(ROOT, ".documents/Architecture/u04-family-parity.md"), "utf8");
+    const cardsSourceRow = /`cards`[^\n]*page-document\.ts/u.test(cardsLedger);
+    const cardsRightsRow = /`cards`[^\n]*(?:licen[cs]e|rights|MIT|attribution)/iu.test(cardsLedger);
     cardsClosureEvidence = Object.freeze({
-      source: true,
-      reader: true,
+      source: cardsSourceRow,
+      reader: nativeCardsPassed,
       renderer: composedOutcome.failed === 0,
       http: composedOutcome.failed === 0 && nativeCardsPassed,
       browser: composedOutcome.failed === 0,
       refusal: nativeCardsPassed,
-      rights: true,
+      rights: cardsRightsRow,
     });
   }
 
