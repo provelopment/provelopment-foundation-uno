@@ -2603,6 +2603,22 @@ function readLayoutCards(value: unknown): UnoLayoutCard[] {
   return cards;
 }
 
+/**
+ * `UNO-WO-125 / R03`: a `layout.grid` that declares its own closed content — through `cards` or through `features` — owns that content
+ * and therefore carries no `children` key at all. This is read structurally from the raw props, so the section-level key check agrees
+ * with the representation's own reader branch instead of demanding an empty array the authored source never had.
+ */
+function declaresOwnedContentGrid(record: Record<string, unknown>): boolean {
+  if (declaresCardsGrid(record as Parameters<typeof declaresCardsGrid>[0])) return true;
+  if (record["module"] !== "layout.grid") return false;
+  const props = record["props"];
+  if (typeof props !== "object" || props === null || Array.isArray(props)) return false;
+  return (
+    Object.prototype.hasOwnProperty.call(props, "cards") ||
+    Object.prototype.hasOwnProperty.call(props, "features")
+  );
+}
+
 function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet<object>): UnoSectionNode {
   if (depth > UNO_PAGE_DOCUMENT_LIMITS.depth) throw new RefusedDocument("document:too-deep");
   if (typeof value === "object" && value !== null) {
@@ -2630,7 +2646,7 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
     throw new RefusedDocument("document:renderer-unavailable");
   }
 
-  const ownsChildren = CHILD_BEARING_MODULES.includes(moduleName) && !declaresCardsGrid(record);
+  const ownsChildren = CHILD_BEARING_MODULES.includes(moduleName) && !declaresOwnedContentGrid(record);
   const requiredKeys = ownsChildren ? ["id", "module", "props", "children"] : ["id", "module", "props"];
   if (!hasExactlyKeys(record, requiredKeys, [])) {
     throw new RefusedDocument(ownsChildren ? "document:invalid-children" : "document:invalid-section");
