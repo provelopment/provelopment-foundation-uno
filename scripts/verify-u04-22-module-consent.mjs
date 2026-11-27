@@ -5438,7 +5438,6 @@ async function consentPhase(base) {
     }
     await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
 
-
     // `UNO-WO-069 / R01`: the same separator invariants under `prefers-color-scheme: dark` and
     // `prefers-reduced-motion: reduce`, at both viewports, then the regular media settings are restored.
     for (const width of [390, 1280]) {

@@ -53,6 +53,7 @@ function validSnapshot() {
     "const UNO_DEPLOYMENT_INPUTS = [",
     "  './deployment/efs/manifest.json',",
     "  './deployment/uno.config.json',",
+    "  './deployment/site.config.json',",
     "  './deployment/efs/content/**/*.md',",
     "  './deployment/efs/content/**/*.json',",
     "];",

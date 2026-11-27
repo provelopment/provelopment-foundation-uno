@@ -140,7 +140,11 @@ visibility behaviour.
 
 ### U04 — One owner, one presentation shell
 
-**OPEN.** Started by the Owner at `bc4763c`; the stage is not closed and this run does not close it.
+**OPEN — implementation and evidence complete; independent acceptance outstanding.** Started by the Owner at `bc4763c`.
+Both shell gaps found by the obligation audit are closed: the published `<main>` now carries `id="main"` with the shared skip
+affordance, and cross-Page navigation is derived from the Site's accepted public Pages under the validated
+`deployment/site.config.json` presentation envelope. Every one of the eleven exit obligations now has an executed reading;
+nothing here closes the stage.
 
 **Bounded progress (`UNO-WO-035 / R01`).** The version-1 JSON Page document contract exists
 (`src/core/page-document.ts`, closed envelope, closed refusals, strict duplicate-key JSON reading,

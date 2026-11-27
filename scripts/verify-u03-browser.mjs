@@ -355,6 +355,165 @@ async function assertDurableFamily(context, base, pageCase, ids, viewportName, c
  * The single exported entry point. Accepts only the internally generated loopback base and the immutable fixture
  * expectations; returns counted results so the host runner keeps one authoritative tally and its own restoration path.
  */
+/**
+ * The presentation shell's navigation (`U04`).
+ *
+ * WHAT THIS PROVES. On every served public Page, at 320, 390, 768 and 1280 pixels, in light and dark, and with reduced
+ * motion: the shell renders at most one labelled primary navigation immediately before the one `<main>`; every destination it
+ * offers is a Page **this run also serves publicly**; every label is the authored title of the Page it points at; every
+ * destination stays inside the served Page's own locale; exactly the served Page carries `aria-current="page"`; the brand
+ * links to an eligible Home Page; and each destination is a keyboard stop that shows the 3px token focus ring.
+ *
+ * WHAT IT REFUSES. An `unlisted` or refused address may never appear as a destination, so the caller passes the addresses it
+ * knows must stay out of navigation. When the caller knows navigation is configured for these Pages (`requireNavigation`), an
+ * absent shell fails rather than passing by omission.
+ *
+ * WHAT IT IS NOT. It does not read the presentation file, decide publication or re-implement the planner: it observes the
+ * rendered shell and compares it with the public surface the run already established.
+ */
+const SHELL_NAV_WIDTHS = Object.freeze([320, 390, 768, 1280]);
+
+/** Read the shell navigation from the live document. */
+function readShellNavigation() {
+  const header = document.querySelector("header.uno-header");
+  const nav = document.querySelector("header.uno-header nav.uno-nav");
+  const brand = document.querySelector("header.uno-header a.uno-brand");
+  const links = [...(nav?.querySelectorAll("a") ?? [])];
+  return {
+    present: nav !== null,
+    label: nav?.getAttribute("aria-label") ?? "",
+    items: links.map((link) => ({
+      href: link.getAttribute("href"),
+      text: (link.textContent ?? "").trim(),
+      current: link.getAttribute("aria-current"),
+    })),
+    brandHref: brand?.getAttribute("href") ?? null,
+    brandText: (brand?.textContent ?? "").trim(),
+    headerPrecedesMain: header !== null && header.nextElementSibling !== null
+      && header.nextElementSibling.id === "main",
+    overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  };
+}
+
+/** Read the focused element's live box and computed ring. */
+function readShellFocus() {
+  const element = document.activeElement;
+  const style = element === null ? null : getComputedStyle(element);
+  const rect = element === null ? null : element.getBoundingClientRect();
+  const probe = document.createElement("span");
+  probe.style.color = "var(--uno-focus)";
+  document.body.appendChild(probe);
+  const token = getComputedStyle(probe).color;
+  probe.remove();
+  return {
+    href: element?.getAttribute("href") ?? null,
+    visible: rect !== null && rect.height > 0 && rect.top >= 0,
+    outlineWidth: style === null ? -1 : parseFloat(style.outlineWidth),
+    outlineStyle: style?.outlineStyle ?? "",
+    outlineColor: style?.outlineColor ?? "",
+    focusToken: token,
+  };
+}
+
+
+/**
+ * Assert the shell navigation across every public Page this run serves.
+ *
+ * `options.requireNavigation` says the caller knows the configuration names these Pages, so absence is a failure.
+ * `options.excludedPaths` are addresses the run proved must never be advertised (refused or unlisted).
+ */
+async function assertShellNavigation(browser, base, pages, options, check) {
+  const excluded = new Set(options.excludedPaths ?? []);
+  const publicPathnames = new Set(pages.map((page) => page.pathname));
+  const titleOf = new Map(pages.map((page) => [page.pathname, page.title]));
+  const requireNavigation = options.requireNavigation === true;
+
+  for (const pageCase of pages) {
+    const context = await browser.newContext();
+    try {
+      const tab = await context.newPage();
+      for (const width of SHELL_NAV_WIDTHS) {
+        await tab.setViewportSize({ width, height: 900 });
+        await tab.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
+        await tab.goto(`${base}${pageCase.pathname}`, { waitUntil: "load" });
+        const nav = await tab.evaluate(readShellNavigation);
+        const label = `SHELL_NAV ${pageCase.pathname} @${width}px`;
+
+        if (!nav.present) {
+          check(`${label} renders a labelled primary navigation`, requireNavigation === false, "no navigation rendered");
+          continue;
+        }
+
+        check(`${label} places that navigation before the one main landmark without overflow`,
+          nav.label === "Primary" && nav.headerPrecedesMain && nav.overflow === 0,
+          JSON.stringify({ label: nav.label, before: nav.headerPrecedesMain, overflow: nav.overflow }));
+
+        check(`${label} offers only destinations this run serves publicly`,
+          nav.items.every((item) => typeof item.href === "string" && publicPathnames.has(item.href)),
+          JSON.stringify(nav.items.map((item) => item.href)));
+
+        check(`${label} advertises no refused or unlisted address`,
+          nav.items.every((item) => typeof item.href === "string" && !excluded.has(item.href)),
+          JSON.stringify([...excluded]));
+
+        check(`${label} labels every entry with the authored title of its own Page`,
+          nav.items.every((item) => item.text === titleOf.get(item.href)),
+          JSON.stringify(nav.items.map((item) => [item.href, item.text, titleOf.get(item.href)])));
+
+        check(`${label} keeps every destination inside the served Page's own locale`,
+          nav.items.every((item) => typeof item.href === "string"
+            && item.href.startsWith(`/${pageCase.locale.toLowerCase()}`)),
+          JSON.stringify({ locale: pageCase.locale, hrefs: nav.items.map((item) => item.href) }));
+
+        // A served Page that the presentation file does not name is simply not one of the offered destinations: navigation
+        // must then claim **no** current entry rather than marking a Page the visitor is not on. When it is offered, exactly
+        // one entry — that one — carries `aria-current="page"`.
+        const offered = nav.items.some((item) => item.href === pageCase.pathname);
+        const currents = nav.items.filter((item) => item.current === "page");
+        check(`${label} marks the served Page as current exactly when navigation offers it`,
+          currents.length === (offered ? 1 : 0)
+            && (offered ? currents[0]?.href === pageCase.pathname : true)
+            && nav.items.every((item) => item.current === null || item.current === "page"),
+          JSON.stringify({ served: pageCase.pathname, offered, currents: currents.map((item) => item.href) }));
+
+        check(`${label} names the Site and links the brand to an advertised Home destination`,
+          nav.brandText.length > 0
+            && (nav.brandHref === null || nav.items.some((item) => item.href === nav.brandHref)),
+          JSON.stringify({ brandText: nav.brandText, brandHref: nav.brandHref }));
+
+        // Keyboard: each advertised destination is a real Tab stop with the same token ring as the skip link.
+        await tab.evaluate(() => {
+          document.body.setAttribute("tabindex", "-1");
+          document.body.focus();
+        });
+        const stops = [];
+        for (let step = 0; step < nav.items.length + 3; step += 1) {
+          await tab.keyboard.press("Tab");
+          stops.push(await tab.evaluate(readShellFocus));
+        }
+        check(`${label} reaches every destination by keyboard with the token focus ring`,
+          nav.items.every((item) => {
+            const stop = stops.find((candidate) => candidate.href === item.href);
+            return stop !== undefined && stop.visible && stop.outlineStyle === "solid"
+              && stop.outlineWidth >= 3 && stop.outlineColor === stop.focusToken;
+          }),
+          JSON.stringify(stops.map((stop) => [stop.href, stop.outlineWidth])));
+
+        // Dark mode with reduced motion must not remove the shell or its current-Page indication.
+        await tab.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+        await tab.goto(`${base}${pageCase.pathname}`, { waitUntil: "load" });
+        const darkNav = await tab.evaluate(readShellNavigation);
+        check(`${label} keeps its navigation, destinations and current Page in dark mode with reduced motion`,
+          darkNav.present && darkNav.items.length === nav.items.length && darkNav.overflow === 0
+            && darkNav.items.filter((item) => item.current === "page").length === (offered ? 1 : 0),
+          JSON.stringify(darkNav.items.map((item) => [item.href, item.current])));
+      }
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 export async function verifyUnoU03Browser({
   base,
   pages,
@@ -362,6 +521,8 @@ export async function verifyUnoU03Browser({
   keyboardPage = null,
   durableFamilyPage = null,
   durableFamilyIds = null,
+  requireNavigation = false,
+  excludedPaths = [],
 }) {
   const passes = [];
   const failures = [];
@@ -638,6 +799,9 @@ export async function verifyUnoU03Browser({
         }
       }
     }
+    // `U04` navigation: the shell's primary navigation on every served public Page, at four widths, in both colour
+    // schemes and with reduced motion, with destinations, labels, current-Page indication and keyboard reach all read back.
+    await assertShellNavigation(browser, base, pages, { requireNavigation, excludedPaths }, check);
   } finally {
     await browser.close();
   }

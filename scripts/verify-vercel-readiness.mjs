@@ -733,6 +733,7 @@ export function analyzeReadiness(snapshot) {
         './deployment/efs/content/**/*.json',
         './deployment/efs/content/**/*.md',
         './deployment/efs/manifest.json',
+        './deployment/site.config.json',
         './deployment/uno.config.json',
       ]),
     'trace:include-allowlist',

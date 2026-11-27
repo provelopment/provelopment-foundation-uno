@@ -19,7 +19,7 @@
  * HTTP/browser proof. On missing, unreadable or malformed trace evidence it FAILS — never skips.
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -27,8 +27,14 @@ import { pathToFileURL } from "node:url";
 const DECLARATION_PATHS = Object.freeze([
   "deployment/efs/manifest.json",
   "deployment/uno.config.json",
-  "deployment/site.config.json",
 ]);
+
+/**
+ * The presentation configuration is **optional by design**: a project that does not author it renders no shell navigation, so
+ * no build can be refused merely for omitting it. When the inspected project *does* author it, however, the build must ship
+ * it — otherwise a deployed navigation would silently disappear — so presence in the project makes it mandatory in the trace.
+ */
+const OPTIONAL_DECLARATION_PATHS = Object.freeze(["deployment/site.config.json"]);
 const CONTENT_ROOT = "deployment/efs/content";
 
 /** Project-relative prefixes that may legitimately appear in a bounded server trace. */
@@ -220,6 +226,12 @@ export function inspectTrace({ root, buildDir, expectPublishedSources = false })
 
   for (const declarationPath of DECLARATION_PATHS) {
     if (!project.has(declarationPath)) reasons.push("source:not-traced");
+  }
+  for (const declarationPath of OPTIONAL_DECLARATION_PATHS) {
+    // Authored but not shipped is the failure this rule exists to catch; not authored at all is a supported state.
+    if (existsSync(resolve(physicalRoot, declarationPath)) && !project.has(declarationPath)) {
+      reasons.push("source:not-traced");
+    }
   }
 
   if (expectPublishedSources) {

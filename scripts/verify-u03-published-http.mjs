@@ -1545,6 +1545,10 @@ async function committedStarterPhase(nextBin) {
       keyboardPage: COMMITTED_PAGES[2],
       durableFamilyPage: COMMITTED_PAGES[2],
       durableFamilyIds: DURABLE_FAMILY_IDS,
+      // The committed starter Site has a validated presentation entry naming Home, About and Components, so an absent
+      // navigation here is a failure rather than an acceptable "not configured" state.
+      requireNavigation: true,
+      excludedPaths: COMMITTED_REFUSALS,
     });
     for (const name of browserProof.passes) check(name, true);
     for (const failure of browserProof.failures) {
@@ -1737,6 +1741,9 @@ async function assertOverHttp(base, child) {
     base,
     pages: PUBLIC_PAGES,
     refusedPaths: REFUSED_PAGES,
+    // The fixture Site's published Pages are all public, while the same Site also authors a draft, an unlisted Page and
+    // malformed sources: none of those addresses may ever appear as a navigation destination.
+    excludedPaths: REFUSED_PAGES,
   });
   for (const name of browserProof.passes) check(name, true);
   for (const failure of browserProof.failures) {

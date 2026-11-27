@@ -234,6 +234,7 @@ export const CORE_AUTHORED_FILES = Object.freeze([
   'src/core/efs/uno-page-header.ts',
   'src/core/efs/uno-discovery-policy.ts',
   'src/core/efs/uno-canonical-base.ts',
+  'src/core/efs/uno-presentation.ts',
   'src/core/efs/uno-locales.ts',
   'src/core/modules/capability-registry.ts',
   'src/core/page-authoring-policy.ts',

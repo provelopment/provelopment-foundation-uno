@@ -278,10 +278,22 @@ test('refuses scripts and the public folder in a server payload', () => {
   }
 });
 
-test('refuses an undeclared deployment declaration', () => {
-  const root = makeRoot();
-  writeTrace(root, "page", [...boundedEntries(), "../../../deployment/site.config.json"]);
-  assertRefused(inspect(root), "trace:forbidden-path");
+test('accepts the presentation declaration, which the shell route reads, and still refuses an authored-but-untraced one', () => {
+  // The presentation file is optional by design, so a project that authors it must ship it — and a build that ships it is
+  // bounded, because the path is an authorized declaration and nothing else comes with it.
+  const shipped = makeRoot();
+  writeTrace(shipped, "page", [...boundedEntries(), "../../../deployment/site.config.json"]);
+  assert.equal(inspect(shipped).accepted, true);
+
+  const omitted = makeRoot();
+  mkdirSync(resolve(omitted, "deployment"), { recursive: true });
+  writeFileSync(
+    resolve(omitted, "deployment/site.config.json"),
+    `${JSON.stringify({ version: 1, sites: [] }, null, 2)}\n`,
+    "utf8",
+  );
+  writeTrace(omitted, "page", boundedEntries());
+  assertRefused(inspect(omitted), "source:not-traced");
 });
 
 test('refuses an unexpected project path outside every allowlisted subtree', () => {
@@ -395,6 +407,7 @@ test('the next config declares exactly the narrow deployment inputs', () => {
     "./deployment/efs/content/**/*.json",
     "./deployment/efs/content/**/*.md",
     "./deployment/efs/manifest.json",
+    "./deployment/site.config.json",
     "./deployment/uno.config.json",
   ]);
 });
