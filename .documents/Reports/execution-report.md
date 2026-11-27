@@ -1,57 +1,50 @@
-# Execution Report — UNO-WO-125 / R03
+# Execution Report — UNO-WO-125 / R04
 
-**Delivered: the defect that made the native Features representation unreadable from authored source, fixed and proven. Not delivered: composer adoption, which I implemented, validated, and then reverted rather than publish a red `main`.** `PARITY_FEATURES=PENDING`, `U04_PARITY=14/17`, `U04_PROXY=56/59`.
+**Delivered: a dedicated, executed proof of the native Features representation — reader, refusals, presentation and stylesheet — 36 of 36 files green. Not delivered: composer adoption, so Features is still uncounted.** `PARITY_FEATURES=PENDING`, `U04_PARITY=14/17`, `U04_PROXY=56/59`.
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-125 / R03`, `FINAL — EXECUTE` |
-| ACTIVE | **3,892 bytes**, SHA-256 `e7d74e72bc918eedbcd731dac504e9407b45f0546b68fe9d51913dcc2e74a04a` — matched |
-| Start SHA | `5a16ba823e216e0c70155c9df34860dbd865cddc` = `origin/main`; clean tree |
-| Code head | **`c57d49f6851c8b3e833bd6818f7787f232ff2c06`** — `fix(u04): exempt a declared features grid from the childless section key check` |
+| Order | `UNO-WO-125 / R04`, `FINAL — EXECUTE` |
+| ACTIVE | **3,485 bytes**, SHA-256 `7c5c1b0465a8f1c48d797eef7c2ceee06bfeede6a20d27e0152bf429c2fa83de` — matched |
+| Start SHA | `4e58d6aa91fa7399e402b8fc3cbf259f3080fd1a` = `origin/main`; clean tree |
+| Code head | **`66e76279b463b11dae78690ad75500ff7c95b4a8`** — `test(u04): prove the native features representation, its refusals and its presentation` |
 
-## The defect this run found and fixed
+## What landed
 
-R02's features representation was never reachable from a real Page, and the suite could not tell me because it exercised the reader on objects the reader itself had produced. `readNode` decides a section's required key set from `CHILD_BEARING_MODULES` and exempted only a declared **cards** grid, so every authored `layout.grid { features }` was required to carry `children` and was refused with `document:invalid-children` **before** its own branch ran. A grid that declares its own closed content is childless by contract, so the exemption now covers both shapes:
+`tests/unit/u04-features-representation.test.ts` — seven executed assertions that the representation R02 added and R03 repaired actually **behaves**, which nothing in the suite previously established:
 
-- `declaresOwnedContentGrid` reads `props.cards` **or** `props.features` structurally from the raw section, and delegates the cards half to the existing `declaresCardsGrid` so the two can never drift.
-- Proven by probe: a features node with heading, lede, columns and level reads `accepted=true`; the bare `{ features: [{ title }] }` node reads `accepted=true`. Both were `invalid-children` before the fix.
-- The probe file was deleted before the gates; it is not part of the tree.
+- **Reader**: one childless node carrying heading, level, Markdown lede, closed surface, explicit columns and three ordered units, with unit one keeping its body, its Markdown declaration and its owned icon, and unit two — which authored none of those — keeping no key at all. A headingless, ledeless, columnless node is accepted and **no default is invented**: `columns` stays absent for the renderer's own three/two/one intent.
+- **Childless serialization**: `children` is a real empty array for the grid contract's consumers, yet absent from `JSON.stringify`, and the serialized document re-reads rather than refusing itself as authored `children`.
+- **Ceiling**: twenty-four units accepted, twenty-five refused, zero refused.
+- **Crossed shapes**: declared `children` (empty or real), an icon with an authored alternative, an external icon identity, a Markdown body declaration without a body, a Markdown lede without a lede, an unknown unit field, the ordinary grid's `itemSemantics` beside `features`, and `cards` beside `features` — each refuses rather than dropping a field.
+- **Presentation**: the authored surface, the section `<h2>` with its stable anchor id, the Markdown lede, the `ul` with `data-uno-columns`, its id and `role="list"`, exactly three border-free units, unit titles at the level the outline implies, a plain body as one paragraph, **no `<img>` where no icon was projected**, and no card markup anywhere. A headingless node renders level-two titles and **no** `data-uno-columns`, `data-uno-surface` or heading.
+- **Stylesheet**: the features list, its explicit column rules, its closed muted surface and its icon rule are all present in the one sheet production ships.
 
-## Gates at `c57d49f`
+## Gates at `66e7627`
 
 | Gate | Result |
 | --- | --- |
 | `npx tsc --noEmit` | **0 errors** |
 | `npm run lint` | **0 problems** |
-| `pnpm test` | **1,416 / 1,416, 35 of 35 files** |
-| **Mandatory U04 gate** | **PASS — 968 passed, 0 failed**; fourteen-family oracle row still `14/17`, `56/59` |
+| `pnpm test` | **36 of 36 files pass**, seven of those assertions new |
+| **Mandatory U04 gate** | **PASS — 968 passed, 0 failed**; fourteen-family row still `14/17`, `56/59` |
 
-## Why composer adoption is not in this head
+## Why Features still earns nothing
 
-I wrote the full adoption — the opt-in features node carrying heading, Markdown lede, closed surface, optional 2/3/4 columns, the donor 24-item bound, Markdown bodies, and the donor icon resolved only through this Page's bindings with the identity recorded as consumed (the cards arm's precedent) — and it composed and read correctly. It is **not pushed**, because the family ledger pins the previous shape in twenty-four assertions I could not rewrite correctly within this window, and a red `main` is a worse outcome than an honest absence. The work is reverted, not abandoned: the composer arm is a contained change, and the fix it depended on is now landed.
+Credit comes only from the composer emitting an accepted features node from donor source. That arm is written, composes and reads correctly (proved in R03), but the family ledger still pins the previous stack/grid shape in twenty-four assertions across six blocks, and the twenty-fifth — the extracted seventeen-family fixture — plus the committed-Page byte comparison would move with it. Rewriting them is mechanical but not small: each becomes simpler, one node with `features`, `heading`, `level`, `lede`, `ledeMarkdown`, `surface` and `columns` in place of a wrapper stack carrying a grid and per-item sub-stacks. I have chosen in three consecutive orders not to publish a red `main`, and this order's contribution is the proof layer those rewritten assertions will lean on.
 
-The twenty-four assertions to rewrite, by block:
+Blocks to rewrite, in order: `composes thirteen nodes in source order`; `cards and features React markup`; the four refusal tests whose subject is now representable or bounded differently (both 64 KiB caps included); the whole `cards and features authored heading` block, six assertions; the whole `cards and features authored lede` block, eight assertions; the committed durable Page byte comparison; the three documented heading outlines; and `tests/unit/u04-verification-modules.test.mjs`.
 
-- node count and source order (`composes thirteen nodes in source order`);
-- feature markup (`cards and features React markup`);
-- refusals that are now representable or bounded differently — `features fields outside the bound`, `malformed features values`, both `64 KiB` caps, `media malformed alt or caption values`, `gallery invalid owned targets`;
-- the whole `cards and features authored heading` block, six assertions;
-- the whole `cards and features authored lede` block, eight assertions;
-- the committed durable family Page byte comparison and the three documented heading outlines.
+## Then
 
-Each becomes simpler, not harder: one features node with `features`, `heading`, `level`, `lede`, `ledeMarkdown`, `surface` and `columns`, in place of a wrapper stack carrying a grid and per-item sub-stacks.
-
-## Exact remaining sequence
-
-1. Rewrite the twenty-four pinned expectations above, with the extracted fixture's expectation (`tests/unit/u04-verification-modules.test.mjs`), which refused only because of the defect now fixed.
-2. Re-apply the composer arm with its unit coverage: icons present, absent and repeated; unbound icon refused; non-decorative icon refused; Markdown lede and body; surface; absent and explicit columns; twenty-four items accepted, twenty-five refused.
-3. Production evidence over real HTTP and Chromium at three widths, then the `features` row into the unchanged oracle for `15/17`, `57/59` and C2, with ledger prose and guards updated together.
-4. Cards assurance still owed from WO-124: the 24-image and combined 32-binding Cards/Gallery cases.
+1. Re-apply the composer arm with icon coverage at the composer level: bound, unbound, repeated, non-decorative.
+2. Production evidence over real HTTP and Chromium at three widths, then the `features` row into the unchanged oracle for `15/17`, `57/59` and C2 — with ledger prose, pins and overclaim guards updated together.
+3. Cards assurance still owed from WO-124: the 24-image and combined 32-binding Cases/Gallery cases.
 
 ## Preserved
 
-C1, the twenty-two modules, the four zones and browser matrix, the fourteen credited families, the owned-image and card-action proofs, the seventeen-family fixture, the eight-binding ceiling and every closed refusal. The cards grid remains byte-identical; the new exemption changes only what a **declared** features grid may omit, and no document that previously composed now refuses.
+C1, the twenty-two modules, four zones, browser matrix, fourteen credited families, image and action proofs, the seventeen-family fixture, the eight-binding ceiling, every closed refusal, and every byte of the cards representation and the ordinary grid.
 
 ## Disposition
 
-STOP for independent review. The next activation should begin with the twenty-four pinned expectations, which are the only thing standing between the written adoption and the credit.
+STOP for independent review. The proof layer is now in place; the next activation is the twenty-four expectations and then the arm itself.
