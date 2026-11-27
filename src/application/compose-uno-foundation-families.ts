@@ -213,6 +213,12 @@ interface MediaBindingContext {
    * every Page that composed neither keeps the eight-binding ceiling unchanged.
    */
   cardsComposed: boolean;
+  /**
+   * `UNO-WO-125 / R05`: true once a features section has resolved an owned decorative icon. A features list may legitimately
+   * bind up to its own twenty-four authored icons, so — exactly like cards and gallery — its composition moves the binding set
+   * out of the ordinary single-image ceiling and into the shared thirty-two ceiling that already governs those families.
+   */
+  featuresComposed: boolean;
 }
 
 /** The ordinary aggregate image-binding ceiling across a Page, and the Gallery-scoped one (`UNO-WO-121 / R01`). */
@@ -1337,70 +1343,82 @@ function composeSection(
       return { id, module: "layout.grid", props };
     }
     case "features": {
-      // The donor card also accepts image/meta/action and the donor feature an icon; this subset composes neither, and
-      // it requires `columns` explicitly instead of manufacturing the donor renderer's default. `UNO-WO-070 / R01` adds
-      // exactly one optional donor field: the authored plain-text section heading, plus `UNO-WO-071 / R01`'s authored
-      // plain-text lede. No other donor field becomes representable.
-      requireExactKeys(record, ["type", "columns", "items"], ["heading", "lede"]);
+      // `UNO-WO-125 / R05`: the Foundation Features composer adopts the accepted native, closed opt-in **features**
+      // representation of `layout.grid` (`UNO-WO-125 / R02`) instead of the earlier generic list grid of stacks. One authored
+      // Features section is therefore one native features node that owns its own heading, Markdown lede, surface, column intent
+      // and ordered icon-led units — no wrapper stack, no per-item sub-stacks, no manufactured text and no synthesized default.
+      //
+      // The donor contract adopted here is the pinned feature one: an optional plain heading, an optional Markdown lede, an
+      // optional closed surface, an optional 2/3/4 column intent and 1–24 ordered features of `{title, body?, icon?}` with a
+      // plain 160-code-point title and a Markdown-capable 4,000-code-point body. An absent column intent stays absent, so the
+      // renderer's own three/two/one default applies and no intent is invented here.
+      //
+      // The donor icon is adopted **only** as an owned, decorative identity resolved from this Page's own binding list: the
+      // identity must be bound and is then recorded as consumed, so a missing, extra, misowned or unbound icon refuses the whole
+      // Page. Nothing is fetched, inferred or invented, and the icon never carries an authored alternative because it is
+      // decorative by contract.
+      requireExactKeys(record, ["type", "items"], ["columns", "heading", "lede", "surface"]);
       const cols = record["columns"];
-      if (cols !== 2 && cols !== 3 && cols !== 4) refuseTarget();
+      if (cols !== undefined && cols !== 2 && cols !== 3 && cols !== 4) refuseTarget();
       const rawItems = record["items"];
       if (!Array.isArray(rawItems)) refuseUnsupportedFeature();
-      // Uno's `itemSemantics: "list"` grid carries one native `<li>` per child, within its own bounded child count.
-      if (rawItems.length < 1 || rawItems.length > 8) refuseTarget();
-      // The donor's own outline: an authored section heading is the `<h2>` and its item titles are `<h3>`; without one
-      // the legacy grid keeps its level-2 item titles and invents no section heading. `UNO-WO-071 / R01` adds the donor's
-      // optional authored lede as one plain-text paragraph above the list, never as Markdown or a synthesized default.
-      const headingAuthored = ownsKey(record, "heading");
-      const ledeAuthored = ownsKey(record, "lede");
-      const headingText = headingAuthored ? readSectionHeading(record["heading"]) : null;
-      const ledeText = ledeAuthored ? readSectionLede(record["lede"]) : null;
-      const itemLevel = headingAuthored ? 3 : 2;
-      const children: CandidateSection[] = [];
-      for (let itemIndex = 0; itemIndex < rawItems.length; itemIndex += 1) {
-        const rawItem = rawItems[itemIndex];
+      if (rawItems.length < 1 || rawItems.length > 24) refuseTarget();
+      const features: Record<string, unknown>[] = [];
+      for (const rawItem of rawItems) {
         if (rawItem === null || typeof rawItem !== "object" || Array.isArray(rawItem)) refuseUnsupportedFeature();
         const entry = rawItem as PlainRecord;
-        requireExactKeys(entry, ["title"], ["body"]);
+        // `title` stays plain text, so a donor title that carries Markdown or markup is refused rather than flattened.
+        requireExactKeys(entry, ["title"], ["body", "icon"]);
         const title = readNewFamilyText(entry["title"]);
-        // Uno's heading bound is wider than the donor item-title bound, so this subset's own limit is enforced here.
+        // Uno's heading bound is wider than the donor feature-title bound, so this subset's own limit is enforced here.
         if (codePointLength(title) > 160) refuseTarget();
-        const itemId = `${id}-item-${itemIndex}`;
-        const nested: CandidateSection[] = [
-          { id: `${itemId}-title`, module: "content.heading", props: { text: title, level: itemLevel } },
-        ];
+        const feature: Record<string, unknown> = { title };
         // An absent body stays absent: no manufactured paragraph, meta line, action or icon.
         if (ownsKey(entry, "body")) {
-          nested.push({
-            id: `${itemId}-body`,
-            module: "content.prose",
-            props: { text: readNewFamilyText(entry["body"]) },
-          });
+          const body = readRichFamilyText(entry["body"], 4000);
+          feature["body"] = body;
+          if (hasFamilyMarkdown(body)) feature["bodyMarkdown"] = true;
         }
-        children.push({ id: itemId, module: "layout.stack", props: { gap: "tight" }, children: nested });
+        if (ownsKey(entry, "icon")) {
+          const rawIcon = entry["icon"];
+          let source: string | null = null;
+          if (typeof rawIcon === "string") {
+            source = readMediaSourceIdentity(rawIcon);
+          } else if (rawIcon !== null && typeof rawIcon === "object" && !Array.isArray(rawIcon)) {
+            // A donor icon may also arrive as an authored object: its identity is still the one `src` the reader classifies.
+            const icon = rawIcon as PlainRecord;
+            requireExactKeys(icon, ["src"], ["alt", "decorative"]);
+            source = readMediaSourceIdentity(icon["src"]);
+            // A feature icon is decorative: an authored alternative or an explicit non-decorative flag is a crossed shape.
+            if (ownsKey(icon, "alt") && icon["alt"] !== "") refuseTarget();
+            if (ownsKey(icon, "decorative") && icon["decorative"] !== true) refuseTarget();
+          }
+          if (source === null) refuseUnsupportedFeature();
+          const owned = media.lookup.get(source);
+          if (owned === undefined) refuseUnsupportedFeature();
+          media.usedSources.add(source);
+          media.featuresComposed = true;
+          feature["icon"] = owned;
+        }
+        features.push(feature);
       }
-      if (!headingAuthored && !ledeAuthored) {
-        // Byte-compatible legacy output: the original grid root with its original id and no heading or lede wrapper.
-        return { id, module: "layout.grid", props: { columns: cols, itemSemantics: "list" }, children };
+      const props: Record<string, unknown> = { features };
+      if (cols !== undefined) props["columns"] = cols;
+      // The donor's own outline: an authored section heading is the `<h2>` above the features.
+      if (ownsKey(record, "heading")) {
+        props["heading"] = readSectionHeading(record["heading"]);
+        props["level"] = 2;
       }
-      const grid: CandidateSection = {
-        id: `${id}-grid`,
-        module: "layout.grid",
-        props: { columns: cols, itemSemantics: "list" },
-        children,
-      };
-      // One top-level node per authored family: the same stable anchor id wraps the authored text in source order — the
-      // optional heading, the optional lede and then the list grid. A lede alone invents no heading and keeps the
-      // heading-less level-2 item titles.
-      const wrapped: CandidateSection[] = [];
-      if (headingAuthored) {
-        wrapped.push({ id: `${id}-heading`, module: "content.heading", props: { text: headingText, level: 2 } });
+      // The donor lede is Markdown-capable: it is read by the shared family Markdown reader, which refuses unsafe or ill-formed
+      // constructs, and it is declared as Markdown only through the literal `true`. A plain lede stays plain.
+      if (ownsKey(record, "lede")) {
+        const lede = readRichFamilyText(record["lede"], 4000);
+        props["lede"] = lede;
+        if (hasFamilyMarkdown(lede)) props["ledeMarkdown"] = true;
       }
-      if (ledeAuthored) {
-        wrapped.push({ id: `${id}-lede`, module: "content.prose", props: { text: ledeText } });
-      }
-      wrapped.push(grid);
-      return { id, module: "layout.stack", props: {}, children: wrapped };
+      // The closed whole-section surface reaches the one native node, so it covers the heading, lede and features together.
+      if (ownsKey(record, "surface")) props["surface"] = record["surface"];
+      return { id, module: "layout.grid", props };
     }
     case "actions": {
       // The donor also accepts `href`/`route`/`link` destinations, an action `variant` and section heading/lede/align/
@@ -1676,7 +1694,7 @@ export function composeUnoFoundationSubset(input: unknown, bindings?: unknown): 
       lookup: readImageBindings(migration?.images),
       usedSources: new Set<string>(),
       galleryComposed: false,
-      cardsComposed: false,
+      cardsComposed: false, featuresComposed: false,
     };
     const contacts: ContactBindingContext = {
       acknowledged: readContactAcknowledgements(migration?.contactForms),
@@ -1698,7 +1716,9 @@ export function composeUnoFoundationSubset(input: unknown, bindings?: unknown): 
     // `UNO-WO-121 / R01`: the aggregate ceiling is eight identities for every Page that composed no Gallery, and thirty-two
     // only for a Page that actually composed the opt-in list Gallery. The wider ceiling is scoped to the Gallery, never
     // granted by the mere presence of a binding list.
-    if (!media.galleryComposed && !media.cardsComposed && media.lookup.size > IMAGE_BINDING_CEILING) refuseUnsupportedFeature();
+    if (!media.galleryComposed && !media.cardsComposed && !media.featuresComposed && media.lookup.size > IMAGE_BINDING_CEILING) {
+      refuseUnsupportedFeature();
+    }
 
     // The same exact-set rule for contact acknowledgements: every acknowledged `formRef` must be consumed by an authored
     // section and every authored section must be acknowledged. An acknowledgement never becomes publication or delivery
