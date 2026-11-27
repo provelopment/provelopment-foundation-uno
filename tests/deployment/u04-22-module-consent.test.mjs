@@ -1581,10 +1581,12 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
       assert.ok(audit(mutated).some((entry) => entry.includes(token.slice(0, 40))), `${token}: ${audit(mutated).join(",")}`);
     }
     // The declared checkpoints are exactly the earned rows — the A1 regression, the A2 delivery, the B1 row, the B2 row, the
-    // C1 row and now the C2 row this increment earned from executed evidence. A higher checkpoint would claim a row that has
-    // not been earned, so it must never appear: D stays absent until its own increment earns it.
+    // C1 row, the C2 row and now the D row this increment earned from executed evidence. A higher checkpoint would claim a
+    // row that has not been earned, so it must never appear: the sequence ends at the final row.
+    //
+    // `UNO-WO-128 / R01` — D is earned, so no checkpoint above D exists to forbid.
     const declared = [...source.matchAll(/checkpoint:\s*"([A-Z0-9]+)",$/gmu)].map((match) => match[1]);
-    assert.deepEqual(declared, ["A1", "A2", "B1", "B2", "C1", "C2"]);
+    assert.deepEqual(declared, ["A1", "A2", "B1", "B2", "C1", "C2", "D"]);
   });
 
   it("the guard is intact and the family fixture keeps the seventeen-mapping contract", () => {
@@ -1640,6 +1642,8 @@ describe("the hosted durable-family labels are connected to real predicates", ()
     "DURABLE_FAMILY_HTTP the Features family serves its authored heading, lede and three unit titles in order",
     "DURABLE_FAMILY_HTTP the Features family invents no icon treatment",
     "!raw.includes(\"uno-json-feature-icon\")",
+    // `UNO-WO-128 / R01`: the D row's two families are audited against the gate that earns them, in the dedicated block
+    // below this list — every label there is paired with the assertion, probe, accumulator and oracle target behind it.
     "DURABLE_FAMILY_SOURCE the six original sections still equal the starting committed blob",
     "DURABLE_FAMILY_REFUSALS the composer refuses ${label}",
     'outcome.status === "refused" && outcome.reason === reason',
@@ -1784,5 +1788,76 @@ describe("native Cards mandatory wiring (UNO-WO-122 / R05)", () => {
     // A duplicated second implementation must be rejected as well.
     const duplicated = `${runner}\nawait runNativeCardsTransaction({});\n`;
     assert.ok(nativeCardsWiring(duplicated).some((problem) => problem.startsWith("calls:")));
+  });
+});
+
+/**
+ * `UNO-WO-128 / R08` — the D row's labels are connected to the assertions that earn them.
+ *
+ * `scripts/verify-u04-22-module-consent.mjs` is the runner that produces the checkpoint-D credit. This guard reads its source
+ * and requires each label to appear beside the executable predicate behind it, so no later edit can keep the label while
+ * deleting the probe, the composed-node reading, the serializer round-trip, the served markup, the Chromium accumulator or
+ * the exact oracle target. It proves its own sensitivity by mutating the text.
+ */
+describe("the checkpoint-D labels are connected to real predicates", () => {
+  const gateSource = readFileSync(resolve(ROOT, "scripts/verify-u04-22-module-consent.mjs"), "utf8");
+
+  const D_REQUIRED = Object.freeze([
+    "const actionsClosureEvidence = { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false };",
+    "const contactFormClosureEvidence = { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false };",
+    "FAMILY_ACTIONS_REFUSALS every closed destination, target and shape refusal holds with no partial document",
+    "FAMILY_CONTACT_REFUSALS every acknowledgement, mode, field and grammar refusal holds with no partial document",
+    "probes.every((probe) => probe.actual === probe.expected && probe.partial === false)",
+    "FAMILY_D_SOURCE the composed family-7-actions is one frozen content.actions node of two authored same-document targets",
+    "FAMILY_D_SOURCE the composed family-6-contactform is one frozen interaction.contact node with empty props and no reference",
+    "FAMILY_D_READER the real reader re-accepts the actions node and its two ordered targets from serialized JSON",
+    "FAMILY_D_READER the real reader re-accepts the contact node with empty props from serialized JSON",
+    "FAMILY_D_ACTIONS_HTTP the composed actions are two native same-document anchors in the authored order",
+    "FAMILY_D_CONTACT_HTTP the contact section serves only the fixed delivery-OFF notice with no control or reference",
+    "actionsClosureEvidence.browser = actionsBrowserProven",
+    "contactFormClosureEvidence.browser = contactBrowserProven",
+    "actionsBrowserProven = actionsBrowserProven && familyCheck(",
+    "contactBrowserProven = contactBrowserProven && familyCheck(",
+    'rights: actionsRow.includes("page-document.ts") && donorLicenceDeclared',
+    'rights: contactRow.includes("page-document.ts") && donorLicenceDeclared',
+    'checkpoint: "D",',
+    "U04_CLOSURE_ORACLE the unchanged oracle credits the D row at 17/17 and 59/59, closing the seventeen-family campaign on evidence",
+    "closureD.parity === 17",
+    "closureD.proxy === 59",
+    'closureD.labels.includes("PARITY_ACTIONS=PASS")',
+    'closureD.labels.includes("PARITY_CONTACTFORM=PASS")',
+    'closureD.labels.includes("U04_PARITY=17/17")',
+    'closureD.labels.includes("U04_PROXY=59/59")',
+  ]);
+
+  const dAudit = (text) => D_REQUIRED.filter((token) => !text.includes(token));
+
+  it("keeps every checkpoint-D label, probe, accumulator and oracle target in the gate", () => {
+    assert.deepEqual(dAudit(gateSource), []);
+  });
+
+  it("fails the audit when any checkpoint-D predicate is removed", () => {
+    for (const token of D_REQUIRED) {
+      const mutated = gateSource.split(token).join("D_REMOVED");
+      assert.notEqual(mutated, gateSource, token);
+      assert.ok(dAudit(mutated).includes(token), token);
+    }
+  });
+
+  it("fails the audit when a checkpoint-D predicate is neutered", () => {
+    for (const [token, replacement] of [
+      ["probes.every((probe) => probe.actual === probe.expected && probe.partial === false)", "true"],
+      ["actionsBrowserProven = actionsBrowserProven && familyCheck(", "actionsBrowserProven = true || familyCheck("],
+      ["contactBrowserProven = contactBrowserProven && familyCheck(", "contactBrowserProven = true || familyCheck("],
+      ['rights: actionsRow.includes("page-document.ts") && donorLicenceDeclared', "rights: true"],
+      ['rights: contactRow.includes("page-document.ts") && donorLicenceDeclared', "rights: true"],
+      ["closureD.parity === 17", "closureD.parity > 0"],
+      ["closureD.proxy === 59", "closureD.proxy > 0"],
+      ['closureD.labels.includes("U04_PARITY=17/17")', "true"],
+    ]) {
+      const mutated = gateSource.split(token).join(replacement);
+      assert.notEqual(mutated, gateSource, token);
+      assert.ok(dAudit(mutated).includes(token), token);
+    }
   });
 });

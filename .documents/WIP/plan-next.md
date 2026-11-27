@@ -4,11 +4,11 @@ This slot stays optional and carries no authority. The active sequence and verif
 
 ## Current next step
 
-Deployment integrity is restored: the production gate proves the committed Features wrapper and the composed native features node equivalent and reports `1005 passed, 0 failed`. C2 remains earned — the unchanged closure evaluator returns `15/17` and `57/59` from executed evidence, with `features` credited on all seven dimensions, and the fourteen-family Cards interim (`14/17`, `56/59`) stays reproduced history.
+Checkpoint D is earned: the unchanged evaluator returns `U04_PARITY=17/17` and `U04_PROXY=59/59` with `PARITY_ACTIONS=PASS` and `PARITY_CONTACTFORM=PASS`, all from evidence the gate executed. C2 (15/17, 57/59) and the Cards interim stay reproduced as history, and the exact head `1485354` is green on Ubuntu and Windows.
 
-1. Push the corrected SHA under Owner authorization and confirm both hosted jobs at that exact head.
-2. Only then prove the **D** row — `actions` and `contactForm` across the same seven dimensions — and let the evaluator return `17/17` and `59/59` before asserting it.
-3. After the family row, the separate U04 shell, accessibility, asset-rights and responsive exit criteria still apply.
+1. Family parity is not stage closure. Complete the U04 shell, navigation and locale, keyboard and focus, semantics, contrast and dark-mode and reduced-motion, the 320/390/768/1280 matrix, owned-asset licensing, validated configuration and fail-closed behaviour.
+2. Reconcile the U03 record against the existing implementation, then submit the complete U04 evidence for independent acceptance.
+3. Do not self-accept. A further push needs separate Owner authorization.
 
 ## Security follow-up
 

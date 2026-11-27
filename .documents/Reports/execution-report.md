@@ -55,18 +55,54 @@ A fresh full-graph audit reported one moderate development-only finding absent f
 | Closure oracle (unchanged) | C2 reproduced: `U04_PARITY=15/17`, `U04_PROXY=57/59`, `PARITY_FEATURES=PASS`, `PARITY_CARDS=PASS`; closed interim still 14/17 and 56/59 |
 | Deployment readiness | PASS, `VERCEL_NOT_DEPLOYED_BY_AGENT` |
 
-## Earned parity
+## Checkpoint D earned — all seventeen families
 
-`15/17` families and `57/59`, produced by the unchanged evaluator from evidence executed in this run. The fourteen-family Cards interim remains reproduced history. `actions` and `contactForm` remain uncredited, so checkpoint D is not claimed and U04 stays open.
+The same unchanged evaluator, fed only evidence this run executed, now credits **every** family and returns `U04_PARITY=17/17`
+and `U04_PROXY=59/59` under the declared **D** checkpoint, with `PARITY_ACTIONS=PASS` and `PARITY_CONTACTFORM=PASS`. `actions`
+and `contactForm` each earned seven dimensions:
+
+| Dimension | `actions` | `contactForm` |
+| --- | --- | --- |
+| source | Composed `content.actions` with two authored same-document targets, frozen props, ids unchanged | Composed `interaction.contact` with props exactly `{}`, reference validated then discarded |
+| reader | Strict reader re-accepting both targets from serialized JSON | Strict reader re-accepting the empty node |
+| renderer | Served `<ul class="uno-json-actions">` of two `<li>` and two native `<a>`, authored order, no control | Served `<section class="uno-json-contact">` with only the fixed OFF line, no control or echoed reference |
+| http | Accepted production response that delivered the list | Accepted production response that delivered the notice |
+| browser | Chromium at 390 and 1280: exactly two reachable same-document links | Chromium at 390 and 1280: visible inert notice plus same-document navigation that reaches it |
+| refusal | Seven closed refusals: external, mail and site-route destinations, unknown target, nested target, unknown field, empty label | Six closed refusals: missing acknowledgement, mismatched reference, non-`delivery-off` mode, unacknowledged reference, donor delivery field, invalid grammar |
+| rights | Ledger row source identity under the ledger's Apache-2.0 donor declaration | Same provenance chain |
+
+The C2 row (15/17, 57/59), the Cards interim (14/17, 56/59) and every earlier checkpoint stay reproduced as history. The
+`features` rights predicate was tightened from a case-insensitive `MIT` match — which "limit" could satisfy — to the ledger's
+real chain: the row must name its `page-document.ts` donor provenance and the ledger must declare the donor licence.
+
+Contact remains presentation-only: delivery is switched off, no provider, recipient, credential or submission path exists.
+
+## Hosted CI at the corrected head
+
+`1485354` was pushed non-force (`58ac18c..1485354`) and every check run at that exact SHA completed successfully:
+
+| Check run | Status | Conclusion | Completed |
+| --- | --- | --- | --- |
+| `verify (ubuntu-24.04)` | completed | **success** | 13:19:35Z |
+| `verify (windows-2025)` | completed | **success** | 13:21:06Z |
+| `verify (windows-2025)` (bootstrap) | completed | **success** | 13:16:15Z |
+| `verify (ubuntu-24.04)` (bootstrap) | completed | **success** | 13:16:04Z |
+
 
 ## Authorization and outstanding work
 
-- Commit: local only. Push, hosted-CI observation, release, deployment and real-site publication each need separate Owner authorization; without a push the corrected SHA cannot be verified on Ubuntu and Windows.
-- Checkpoint D (`actions`, `contactForm`) is gated on exact-head CI being green, which cannot exist before that push.
-- Remaining U04 obligations are unchanged: one coherent shell, accessible responsive navigation, keyboard focus, semantics, contrast/dark-mode/reduced-motion, the 320/390/768/1280 matrix, owned-asset licensing, validated configuration and fail-closed behaviour, and the U03 roadmap reconciliation.
+- `1485354` is pushed and green on both hosts. This increment (the D row and its guard) is local only; a further push needs
+  separate Owner authorization.
+- U04 remains **OPEN** on its non-family obligations, which family parity does not satisfy: one coherent presentation shell,
+  accessible responsive navigation and public Page locale behaviour, keyboard access and visible focus, semantic markup,
+  contrast and dark-mode and reduced-motion behaviour, the 320/390/768/1280 matrix, owned-asset licensing boundaries,
+  validated configuration and fail-closed behaviour, and the absence of unauthorised publication or data exposure.
+- Independent acceptance is the Chief Master Architect's; this report does not self-accept or self-close the stage.
 
 ## Next executable outcome
 
-Push `main` under Owner authorization, verify every hosted workflow at that exact SHA on both hosts, then earn `actions` and `contactForm` through the same seven dimensions so the unchanged oracle returns `17/17` and `59/59`. Contact stays presentation-only until delivery is separately authorized.
+Work the U04 shell, navigation, accessibility, responsive and asset-rights obligations against the existing implementation,
+verify each at the four required widths, reconcile the U03 record, then submit the complete U04 evidence for independent
+acceptance. U05 contact functionality stays presentation-only until delivery activation is separately authorized.
 
 - Gallery and Cards semantic comparisons, the six-section preservation digest, historical Page bytes, owned asset identities, refusal contracts, validation limits and the closure evaluator are unchanged.

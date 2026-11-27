@@ -36,6 +36,10 @@ let cardsClosureEvidence = null;
 // `UNO-WO-126 / R01`: the Features dimensions this run executes, one literal per closure dimension. Each is filled by the
 // assertion that actually ran; the oracle alone turns a complete record into credit.
 const featuresClosureEvidence = { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false, rights: false };
+// `UNO-WO-128 / R01`: the D checkpoint's two remaining families earn their dimensions the same way — one literal per executed
+// observation, filled only by an assertion this run actually made.
+const actionsClosureEvidence = { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false };
+const contactFormClosureEvidence = { source: false, reader: false, renderer: false, http: false, browser: false, refusal: false };
 import { evaluateU04FamilyClosure } from "./verify-u04-family-closure.mjs";
 // `UNO-WO-112 / R01`: the cohesive verification modules this entrypoint orchestrates. The fixture, the Hero expectations,
 // the seven-dimension record and the process harness each live in one testable file under `scripts/u04/`.
@@ -1351,6 +1355,79 @@ async function main() {
       JSON.stringify(familyProbes),
     );
 
+    // `UNO-WO-128 / R02`: the `actions` family's closed refusal contract. Each probe mutates one authored destination or
+    // shape in a fresh source and must refuse the whole Page with the adapter's own reason and no own `document` key.
+    {
+      const probes = [
+        ["an external destination", "family:unsupported-feature", (s) => { s.sections[7].actions[0].href = "https://example.test/"; }],
+        ["a mail destination", "family:unsupported-feature", (s) => { s.sections[7].actions[0].href = "mailto:hello@example.test"; }],
+        ["a site route instead of a fragment", "family:unsupported-feature", (s) => { s.sections[7].actions[0].href = "/en-001/components"; }],
+        ["a fragment naming no composed section", "family:target-refused", (s) => { s.sections[7].actions[0].href = "#family-99-ghost"; }],
+        ["a fragment naming a nested child", "family:target-refused", (s) => { s.sections[7].actions[0].href = "#family-4-media-caption"; }],
+        ["an unknown action field", "family:unsupported-feature", (s) => { s.sections[7].actions[0].variant = "primary"; }],
+        ["an empty label", "family:target-refused", (s) => { s.sections[7].actions[0].label = ""; }],
+      ].map(([label, expected, mutate]) => {
+        const probeSource = familySource();
+        mutate(probeSource);
+        const outcome = composeUnoFoundationSubset(probeSource, familyBindings());
+        return {
+          label,
+          expected,
+          actual: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+          partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+        };
+      });
+      actionsClosureEvidence.refusal = check(
+        "FAMILY_ACTIONS_REFUSALS every closed destination, target and shape refusal holds with no partial document",
+        probes.every((probe) => probe.actual === probe.expected && probe.partial === false),
+        JSON.stringify(probes),
+      );
+    }
+
+    // `UNO-WO-128 / R03`: the `contactForm` family's closed refusal contract — the acknowledgement must exist, match exactly
+    // and be `delivery-off`, and no donor delivery field may compose.
+    {
+      const withoutAcknowledgement = familyBindings();
+      withoutAcknowledgement.contactForms = [];
+      const mismatched = familyBindings();
+      mismatched.contactForms = [{ formRef: "wo066-other", mode: "delivery-off" }];
+      const wrongMode = familyBindings();
+      wrongMode.contactForms = [{ formRef: "wo066-contact", mode: "delivery-on" }];
+      const probes = [
+        ["a missing acknowledgement", "family:target-refused", () => composeUnoFoundationSubset(familySource(), withoutAcknowledgement)],
+        ["a mismatched reference", "family:unsupported-feature", () => composeUnoFoundationSubset(familySource(), mismatched)],
+        ["a non-delivery-off mode", "family:unsupported-feature", () => composeUnoFoundationSubset(familySource(), wrongMode)],
+        ["an unacknowledged reference", "family:unsupported-feature", () => {
+          const source = familySource();
+          source.sections[6].formRef = "wo066-other";
+          return composeUnoFoundationSubset(source, familyBindings());
+        }],
+        ["a donor delivery field", "family:unsupported-feature", () => {
+          const source = familySource();
+          source.sections[6].recipient = "hello@example.test";
+          return composeUnoFoundationSubset(source, familyBindings());
+        }],
+        ["an invalid reference grammar", "family:target-refused", () => {
+          const source = familySource();
+          source.sections[6].formRef = "Wo066 Contact";
+          return composeUnoFoundationSubset(source, familyBindings());
+        }],
+      ].map(([label, expected, run]) => {
+        const outcome = run();
+        return {
+          label,
+          expected,
+          actual: String(outcome.status === "refused" ? outcome.reason : outcome.status),
+          partial: Object.prototype.hasOwnProperty.call(outcome, "document"),
+        };
+      });
+      contactFormClosureEvidence.refusal = check(
+        "FAMILY_CONTACT_REFUSALS every acknowledgement, mode, field and grammar refusal holds with no partial document",
+        probes.every((probe) => probe.actual === probe.expected && probe.partial === false),
+        JSON.stringify(probes),
+      );
+    }
+
     // `UNO-WO-068 / R03`: eight further whole-Page refusals over the last four families, each from a fresh source.
     const lastFourProbes = [
       ["table link authority", "family:unsupported-feature", (s) => { s.sections[13].links = []; }],
@@ -1797,6 +1874,60 @@ async function main() {
           && reFeatures?.children?.length === 0,
         `${reCards?.module ?? "missing"}/${reFeatures?.module ?? "missing"}`,
       );
+    // `UNO-WO-128 / R01`: the `actions` and `contactForm` source and reader dimensions. The composed nodes are read from the
+    // accepted document and from the re-read serialized bytes, so both claims are about the real adapter's output.
+    {
+      const actionsNode = familyAccepted.sections[7];
+      const contactNode = familyAccepted.sections[6];
+      const actionsItems = actionsNode?.props?.items;
+      actionsClosureEvidence.source = check(
+        "FAMILY_D_SOURCE the composed family-7-actions is one frozen content.actions node of two authored same-document targets",
+        actionsNode?.id === "family-7-actions"
+          && actionsNode?.module === "content.actions"
+          && Array.isArray(actionsItems)
+          && actionsItems.length === 2
+          && actionsItems.every((item, index) => {
+            const target = index === 0 ? "family-4-media" : "family-6-contactform";
+            return Object.keys(item).length === 2
+              && typeof item.label === "string" && item.label.trim().length > 0
+              && item.targetId === target
+              && FAMILY_IDS.includes(item.targetId)
+              && item.targetId !== "family-7-actions";
+          })
+          && Object.isFrozen(actionsNode)
+          && Object.isFrozen(actionsNode.props)
+          && Object.isFrozen(actionsItems),
+        `${actionsNode?.module ?? "missing"}/${JSON.stringify(actionsItems ?? null)}`,
+      );
+      contactFormClosureEvidence.source = check(
+        "FAMILY_D_SOURCE the composed family-6-contactform is one frozen interaction.contact node with empty props and no reference",
+        contactNode?.id === "family-6-contactform"
+          && contactNode?.module === "interaction.contact"
+          && JSON.stringify(contactNode?.props) === JSON.stringify({})
+          && Object.keys(contactNode?.props ?? {}).length === 0
+          && Object.isFrozen(contactNode)
+          && Object.isFrozen(contactNode.props)
+          && !JSON.stringify(contactNode).includes("formRef")
+          && !JSON.stringify(contactNode).includes("wo066-contact"),
+        `${contactNode?.module ?? "missing"}/${JSON.stringify(contactNode?.props ?? null)}`,
+      );
+      const reActions = familyReparsed.accepted === true ? familyReparsed.document.sections[7] : undefined;
+      const reContact = familyReparsed.accepted === true ? familyReparsed.document.sections[6] : undefined;
+      actionsClosureEvidence.reader = check(
+        "FAMILY_D_READER the real reader re-accepts the actions node and its two ordered targets from serialized JSON",
+        reActions?.module === "content.actions"
+          && Array.isArray(reActions?.props?.items)
+          && JSON.stringify(reActions.props.items) === JSON.stringify(actionsItems),
+        `${reActions?.module ?? "missing"}`,
+      );
+      contactFormClosureEvidence.reader = check(
+        "FAMILY_D_READER the real reader re-accepts the contact node with empty props from serialized JSON",
+        reContact?.module === "interaction.contact"
+          && JSON.stringify(reContact?.props) === JSON.stringify({}),
+        `${reContact?.module ?? "missing"}/${JSON.stringify(reContact?.props ?? null)}`,
+      );
+    }
+
     }
     // `UNO-WO-071 / R01`: the two authored plain-text ledes on the composed document and the installed buffer.
     {
@@ -3149,11 +3280,21 @@ async function main() {
         && (galleryMarkup.match(/<figcaption class="uno-json-media-caption">/gu) ?? []).length === 1
         && galleryMarkup.includes("First fixture image"),
     );
-    check(
-      "FAMILY_HTTP=200 the composed actions point at real same-document targets",
+    // `UNO-WO-128 / R04`: the `actions` renderer dimension is the served native anchor list — one `<li>` and one `<a>` per
+    // authored action, in the authored order, each pointing at its own composed top-level target and nothing else.
+    const actionsListMatch = /<ul class="uno-json-actions" id="family-7-actions"[^>]*>([\s\S]*?)<\/ul>/u.exec(familyHtml);
+    const actionsMarkup = actionsListMatch === null ? "" : actionsListMatch[1];
+    actionsClosureEvidence.renderer = check(
+      "FAMILY_D_ACTIONS_HTTP the composed actions are two native same-document anchors in the authored order",
       familyHtml.includes('<a class="uno-json-action" href="#family-4-media">See the image</a>')
-        && familyHtml.includes('<a class="uno-json-action" href="#family-6-contactform">Contact notice</a>'),
+        && familyHtml.includes('<a class="uno-json-action" href="#family-6-contactform">Contact notice</a>')
+        && (actionsMarkup.match(/<li class="uno-json-action-item">/gu) ?? []).length === 2
+        && (actionsMarkup.match(/<a class="uno-json-action" href="#family-/gu) ?? []).length === 2
+        && actionsMarkup.indexOf('href="#family-4-media"') < actionsMarkup.indexOf('href="#family-6-contactform"')
+        && !/<form\b|<button\b|<input\b|<script\b|onclick|target=|rel=/iu.test(actionsMarkup),
+      actionsMarkup.slice(0, 240),
     );
+    actionsClosureEvidence.http = familyHtmlResponse.status === 200 && actionsMarkup.length > 0;
     // `UNO-WO-067 / R01`: each appended family is inspected only inside its own top-level region, so an older module can
     // never satisfy a new claim. `UNO-WO-072 / R01` adds one case: an authored-text family is a `layout.stack` wrapper, so
     // that region starts at the wrapper and ends at the next top-level family anchor instead of an inner `</section>`.
@@ -3656,11 +3797,18 @@ async function main() {
     }
     const contactStart = familyHtml.indexOf('<section class="uno-json-contact" id="family-6-contactform">');
     const contactMarkup = contactStart < 0 ? "" : familyHtml.slice(contactStart, familyHtml.indexOf("</section>", contactStart));
-    check(
-      "FAMILY_HTTP=200 the contact section is present with the fixed delivery-OFF status",
+    // `UNO-WO-128 / R05`: the `contactForm` renderer dimension is the served notice — the fixed delivery-OFF line and
+    // nothing else: no form, input, textarea, button, action, method, handler, iframe or echoed reference.
+    contactFormClosureEvidence.renderer = check(
+      "FAMILY_D_CONTACT_HTTP the contact section serves only the fixed delivery-OFF notice with no control or reference",
       contactStart >= 0
-        && contactMarkup.includes('<p class="uno-json-contact-status">Delivery is switched off. Nothing entered here is sent or stored.</p>'),
+        && contactMarkup.includes('<p class="uno-json-contact-status">Delivery is switched off. Nothing entered here is sent or stored.</p>')
+        && !/<form\b|<input\b|<textarea\b|<button\b|<iframe\b|<script\b|action=|method=|onsubmit|onclick/iu.test(contactMarkup)
+        && !contactMarkup.includes("wo066-contact")
+        && !contactMarkup.includes("formRef"),
+      contactMarkup.slice(0, 240),
     );
+    contactFormClosureEvidence.http = familyHtmlResponse.status === 200 && contactMarkup.length > 0;
     check("FAMILY_HTTP=200 the divider is rendered", familyHtml.includes('id="family-8-divider"') && /<hr\b/u.test(familyHtml));
 
     // `UNO-WO-112 / R01` (§2 `http`/`renderer`/`rights`): the hero dimension is the real production response — the authored
@@ -4224,6 +4372,10 @@ async function consentPhase(base) {
       return check(`DIVIDER_PARITY_BROWSER ${label}`, ok, detail);
     };
     let featuresBrowserProven = true;
+    // `UNO-WO-128 / R06`: the D row's browser dimensions are the same per-viewport readings, accumulated so one failing
+    // viewport fails the dimension instead of being averaged away.
+    let actionsBrowserProven = true;
+    let contactBrowserProven = true;
     for (const width of [390, 1280]) {
       requests.length = 0;
       await tab.setViewportSize({ width, height: 900 });
@@ -4597,12 +4749,12 @@ async function consentPhase(base) {
         JSON.stringify({ decoded: seen.galleryDecoded, captions: seen.captions }));
       familyCheck(`${width}px the media family uses a server-owned locator`,
         ownedLocator.test(seen.mediaSource) && seen.mediaAlt.trim().length > 0, seen.mediaSource);
-      familyCheck(`${width}px the contact notice is visible and inert`,
+      contactBrowserProven = contactBrowserProven && familyCheck(`${width}px the contact notice is visible and inert`,
         seen.contactStatus === "Delivery is switched off. Nothing entered here is sent or stored."
           && seen.contactControls === 0 && seen.contactHandlers === false
           && !seen.contactHtml.includes("wo066-contact") && !seen.contactHtml.includes("contactForms"),
         JSON.stringify({ status: seen.contactStatus, controls: seen.contactControls, handlers: seen.contactHandlers }));
-      familyCheck(`${width}px the composed actions are two real same-document links`,
+      actionsBrowserProven = actionsBrowserProven && familyCheck(`${width}px the composed actions are two real same-document links`,
         seen.actionCount === 2 && seen.html.includes('href="#family-4-media"') && seen.html.includes('href="#family-6-contactform"'),
         String(seen.actionCount));
 
@@ -5132,7 +5284,7 @@ async function consentPhase(base) {
           return target !== null && target.getBoundingClientRect().height > 0;
         })(),
       }));
-      familyCheck(`${width}px the contact action stays in the same document and reaches its target`,
+      contactBrowserProven = contactBrowserProven && familyCheck(`${width}px the contact action stays in the same document and reaches its target`,
         reached.hash === "#family-6-contactform" && reached.path === "/en-001/wo066-family-composition" && reached.targetVisible,
         JSON.stringify(reached));
       familyCheck(`${width}px the family visit made no foreign or provider request`,
@@ -5140,6 +5292,9 @@ async function consentPhase(base) {
     }
     // `UNO-WO-126 / R01`: the Chromium dimension is the features-specific reading that passed at both viewports.
     featuresClosureEvidence.browser = featuresBrowserProven;
+    // `UNO-WO-128 / R06`: the D row's Chromium dimensions are the per-viewport readings accumulated above.
+    actionsClosureEvidence.browser = actionsBrowserProven;
+    contactFormClosureEvidence.browser = contactBrowserProven;
     // `UNO-WO-069 / R01`: the same separator invariants under `prefers-color-scheme: dark` and
     // `prefers-reduced-motion: reduce`, at both viewports, then the regular media settings are restored.
     for (const width of [390, 1280]) {
@@ -7510,7 +7665,7 @@ async function consentPhase(base) {
         http: featuresClosureEvidence.http,
         browser: featuresClosureEvidence.browser,
         refusal: featuresClosureEvidence.refusal,
-        rights: /licen[cs]e|rights|MIT|attribution/iu.test(featuresRow),
+        rights: /page-document\.ts/u.test(featuresRow) && /Apache-2\.0/u.test(featuresLedgerRow),
       });
       const closureC2 = evaluateU04FamilyClosure({
         families: { ...closureEvidence, features: featuresClosure },
@@ -7540,7 +7695,53 @@ async function consentPhase(base) {
           ? `${closureC2.parity}/17 ${closureC2.proxy}/59 ${closureC2.credited.join(",")} features=${JSON.stringify(featuresClosure)}`
           : `${String(closureC2.reason)} features=${JSON.stringify(featuresClosure)}`,
       );
+      // `UNO-WO-128 / R07`: the D row. The two remaining families are credited only from the evidence this run executed — the
+      // refusal probes, the composed nodes, the reader round-trip, the served markup and the per-viewport Chromium readings —
+      // plus the ledger row's own source identity under the ledger's declared Apache-2.0 donor licence. The unchanged oracle
+      // must then return exactly 17/17 and 59/59 with the D checkpoint selector; a missing dimension refuses rather than
+      // printing a claim, and the C2 row above stays reproduced as history.
+      const actionsRow = featuresLedgerRow.split("\n").find((line) => line.startsWith("| `actions`")) ?? "";
+      const contactRow = featuresLedgerRow.split("\n").find((line) => line.startsWith("| `contactForm`")) ?? "";
+      const donorLicenceDeclared = /Apache-2\.0/u.test(featuresLedgerRow);
+      const actionsClosure = Object.freeze({
+        ...actionsClosureEvidence,
+        rights: actionsRow.includes("page-document.ts") && donorLicenceDeclared,
+      });
+      const contactClosure = Object.freeze({
+        ...contactFormClosureEvidence,
+        rights: contactRow.includes("page-document.ts") && donorLicenceDeclared,
+      });
+      const closureD = evaluateU04FamilyClosure({
+        families: { ...closureEvidence, features: featuresClosure, actions: actionsClosure, contactForm: contactClosure },
+        modules: UNO_RENDERABLE_MODULES.length,
+        zones: UNO_OWNED_MEDIA_ZONES.length,
+        browserMatrix: matrixCases.length,
+        checkpoint: "D",
+      });
+      check(
+        "U04_CLOSURE_ORACLE the unchanged oracle credits the D row at 17/17 and 59/59, closing the seventeen-family campaign on evidence",
+        closureD.ok === true
+          && JSON.stringify(closureD.credited)
+            === JSON.stringify([
+              "prose", "callout", "table", "list", "hero", "stats", "steps", "quote", "faq", "columns", "media", "gallery", "cards", "features", "actions", "contactForm", "divider",
+            ])
+          && closureD.parity === 17
+          && closureD.proxy === 59
+          && closureD.labels.includes("PARITY_ACTIONS=PASS")
+          && closureD.labels.includes("PARITY_CONTACTFORM=PASS")
+          && closureD.labels.includes("PARITY_FEATURES=PASS")
+          && closureD.labels.includes("PARITY_CARDS=PASS")
+          && closureD.labels.includes("U04_PARITY=17/17")
+          && closureD.labels.includes("U04_PROXY=59/59")
+          && familyOk
+          && dividerOk,
+        closureD.ok
+          ? `${closureD.parity}/17 ${closureD.proxy}/59 ${closureD.credited.join(",")} actions=${JSON.stringify(actionsClosure)} contact=${JSON.stringify(contactClosure)}`
+          : `${String(closureD.reason)} actions=${JSON.stringify(actionsClosure)} contact=${JSON.stringify(contactClosure)}`,
+      );
+
       const creditedNames = new Set((closureC1.credited ?? []).map((family) => `PARITY_${family.toUpperCase()}`));
+
       const pendingNames = new Set((closureC1.pending ?? []).map((family) => `PARITY_${family.toUpperCase()}`));
       for (const label of closureC1.labels ?? []) {
         const equals = label.lastIndexOf("=");

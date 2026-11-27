@@ -726,3 +726,32 @@ With the Features increment, the same unchanged oracle, still fed only executed 
 - **rights** — the donor source and licence recorded in this ledger's `features` row.
 
 The fourteen-family Cards interim stays reproduced as closed history, and the earlier A1, A2, B1, B2 and C1 rows keep exactly the scores they declared. This row is parity evidence for a bounded adoption, never a claim of full semantic parity for the donor feature list, and U04 remains **OPEN**: only `actions` and `contactForm` are uncredited, and the stage's shell, accessibility, asset-rights and responsive exit criteria are separate obligations.
+
+## Earned closure row — all seventeen families (**D**)
+
+The D increment closes the family campaign. The same unchanged oracle, fed only evidence this run executed, credits every
+one of the seventeen families and reports `U04_PARITY=17/17` with `U04_PROXY=59/59` under the declared **D** checkpoint,
+whose target families are `actions` and `contactForm`. The C2 row stays reproduced as history, and every earlier row keeps
+exactly the score it declared.
+
+`actions` earns its seven dimensions from the composed `content.actions` node with its two authored same-document targets
+and its frozen props; the strict reader re-accepting those targets from the serialized Page; the served
+`<ul class="uno-json-actions">` of two `<li class="uno-json-action-item">` and two native `<a class="uno-json-action">`;
+the accepted production response that delivered it; the per-viewport Chromium reading of exactly two reachable links; seven
+closed refusals — external, mail and site-route destinations, a fragment naming no composed section, a fragment naming a
+nested child, an unknown action field and an empty label — each refusing the whole Page with no partial document; and this
+ledger's own source and licence provenance.
+
+`contactForm` earns its seven dimensions from the composed `interaction.contact` node whose props are exactly `{}` and whose
+donor reference has been validated, acknowledged and discarded; the strict reader re-accepting that empty node; the served
+`<section class="uno-json-contact">` whose only content is the fixed delivery-OFF line, with no form, control, handler or
+echoed reference; the accepted production response; the per-viewport Chromium reading of a visible inert notice and the
+same-document navigation that reaches it; six closed refusals — a missing acknowledgement, a mismatched reference, a
+non-`delivery-off` mode, an unacknowledged reference, a donor delivery field and an invalid reference grammar; and this
+ledger's provenance.
+
+Family parity is not stage closure. Delivery stays switched off and no provider, recipient or credential exists in this
+tree, so the contact family is presentation-only by contract. U04 remains **OPEN** on its separate obligations: one coherent
+presentation shell, accessible responsive navigation and locale behaviour, keyboard access and visible focus, semantic
+markup, contrast and dark-mode and reduced-motion behaviour, the 320/390/768/1280 matrix, owned-asset licensing boundaries,
+validated configuration, fail-closed behaviour and the absence of unauthorised publication or data exposure.

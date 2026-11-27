@@ -2,32 +2,28 @@
 
 Planning snapshot: November 27, 2026. This file records proposed work, not permission to publish, close a stage, or deploy.
 
-## Current status after the deployment-integrity repair
+## Current status after checkpoint D
 
 The per-task work-order system and the exact-byte prose freeze are retired. An Owner request now authorizes one local outcome; push, release and deployment still need separate authorization. The WIP folder accepts additional planning files, and every Markdown file there is still scanned for credentials and machine-specific paths.
 
-Verified in this checkout after the repair:
+Verified in this checkout after the D increment:
 
-- The hosted failure is fixed at its cause: the durable Features wrapper and the composed native features node are proved equivalent clause by clause, never exempted. The production gate now reports **1005 passed, 0 failed** (it reported 68 passed / 1 failed before).
-- Bootstrap: 19 tests plus the scaffold verifier pass. Architecture: 47 pass. Unit: 1427 pass across 36 files. Lint and typecheck are clean with no suppressions.
-- Production build: succeeds with zero warnings; the trace inspector confirms only declared inputs ship.
-- Real HTTP: 105 pass. Deployment readiness: 131 checks pass. Deployment suites: **388 pass** (349 plus 38 mutation-sensitive equivalence assertions and one minimatch repair gate).
-- Dependencies: `pnpm audit` reports no known vulnerabilities on the unfiltered graph; no waiver, override or suppression was added.
-- U04 22-module consent gate, real production HTTP plus Chromium: 969 checks, 0 failed.
-- Parity is **15/17 families and 57/59**, earned by the unchanged closure oracle under the declared **C2** checkpoint. The fourteen-family Cards interim (14/17, 56/59) stays reproduced as closed history.
+- The hosted failure is fixed at its cause and the exact head `1485354` is green on Ubuntu 24.04 and Windows 2025.
+- The unchanged closure oracle now credits **all seventeen families**: `U04_PARITY=17/17`, `U04_PROXY=59/59`, `PARITY_ACTIONS=PASS`, `PARITY_CONTACTFORM=PASS`. C2 (15/17, 57/59) and the Cards interim (14/17, 56/59) stay reproduced.
+- Bootstrap 19, architecture 47, unit 1427, deployment suites 391, production gate 976 checks / 0 failed, published-Page gate 1005 / 0, build and trace clean, readiness PASS, `pnpm audit` clean.
+- Contact is presentation-only: delivery off, no provider, recipient or credential in the tree.
 
 ## Starting point and the open row
 
-Local main carries `58ac18c`, published to `origin/main`, plus this increment which is committed locally and **not pushed**. Push, hosted-CI observation, release and deployment each still need separate Owner authorization.
+Local main carries the pushed `1485354` plus this increment, which is local only; a further push needs separate Owner authorization.
 
-The composer emits one native Features node, its verification matches that representation, and Features is credited on all seven dimensions. C2 is earned, so only the **D** row remains: `actions` and `contactForm`, which together would take the oracle to `17/17` and `59/59`.
+Family parity is complete, but it is not stage closure. U04 stays **OPEN** on its shell, navigation and locale, keyboard and focus, semantics, contrast and dark-mode and reduced-motion, the 320/390/768/1280 matrix, owned-asset licensing, validated configuration and fail-closed behaviour, and the absence of unauthorised publication.
 
-## 1. Earn the D row (gated on exact-head CI)
+## 1. Finish U04
 
-0. Push the corrected SHA under Owner authorization and confirm every hosted job on Ubuntu and Windows, then keep D blocked until that evidence exists.
-1. Prove `actions` and `contactForm` across the same seven dimensions; keep contact presentation-only until delivery is separately authorized.
-2. Never pre-label or hard-code a credit; let the unchanged oracle return `17/17` and `59/59` before asserting it.
-3. Run every applicable gate before any authorized push, then verify the exact pushed SHA and every hosted job.
+1. Prove each remaining U04 obligation against the existing implementation at 320, 390, 768 and 1280.
+2. Reconcile the U03 record against what is already implemented and verified; do not rebuild routing.
+3. Submit the complete evidence for independent acceptance. Do not self-accept.
 
 ## 2. Finish U04 and settle the U03 record
 
