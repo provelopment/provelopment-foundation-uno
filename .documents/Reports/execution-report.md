@@ -54,3 +54,38 @@ C1, the twenty-two modules, the four zones, the browser matrix, the fourteen cre
 ## Disposition
 
 STOP for independent review. `origin/main` is green and unchanged; the adoption waits on its ledger reconciliation in one local commit, which is the whole of the remaining product work before evidence.
+
+## Ledger line map, measured at this local head
+
+The two features blocks interleave **passing** cards tests with the failing features tests, so the reconciliation is fourteen individual replacements, not two block rewrites. Line numbers are the `it(` lines in `tests/unit/uno-foundation-families.test.ts` at this commit; each block runs to the next `it(` or the closing `});` of its describe.
+
+`describe("... cards and features authored heading")`, opened at 4325:
+
+| Line | Test | Why it fails |
+| --- | --- | --- |
+| 4409 | keeps the heading-less features node byte-identical to the pre-WO-070 committed output | the node is now native `features`, not a list grid of stacks |
+| 4448 | composes the headed features source with the same stack, h2 and level-3 item outline | no wrapper stack; the heading and level live on the one node |
+| 4465 | accepts a standalone headed family as the first Page section and keeps the h2-before-h3 order honest | same, in first-position form |
+| 4500 | resets the authored heading order across a mixed two-family Page in both orders | the features half changes shape |
+| 4545 | renders the headed regions with one authored h2, one h3 per item and no invented markup | markup is the features list, not grid-plus-stacks |
+| 4568 | invents no section heading and keeps level-2 item titles for an unheaded source | an unheaded node invents no heading and its units are level two |
+| 4582 | accepts exactly 160 code points, counting astral characters once each | title bound unchanged; the assertion reads the old tree |
+| 4653 | still refuses every out-of-subset cards and features donor field, headed or not | `columns` is now optional and `icon` is now representable |
+
+`describe("... cards and features authored lede")`, opened at 4720:
+
+| Line | Test | Why it fails |
+| --- | --- | --- |
+| 4743 | keeps all four pre-WO-071 baselines byte-identical when no lede is authored | two of the four baselines are features trees |
+| 4784 | composes heading+lede for features with the same three ordered children | one node, not heading-plus-lede-plus-grid |
+| 4800 | composes lede-only for both families with level-2 item titles and no synthetic heading | the features half changes shape |
+| 4846 | keeps authored order and ids for lede-bearing families mixed with the divider in either order | the features half changes shape |
+| 4882 | renders lede-only as one paragraph before the list with level-2 item titles and no invented heading | markup is the features list |
+| 4897 | accepts 4000 code points, including astral characters, and refuses 4001 | lede bound unchanged; the assertion reads the old tree |
+| 4923 | refuses every malformed lede with the closed reason that matches its cause | the features half's reasons are unchanged, its shape is not |
+| 4999 | refuses markup, control characters, unpaired surrogates and an accessor lede with zero getter runs | same |
+| 5043 | keeps the lede subset recorded in the ledger without claiming a second parity family | ledger prose still says Features composes no lede |
+
+Outside those blocks: `bounded cards and features` (node count and source order), `cards and features React markup`, the two refusal tests naming feature fields, both 64 KiB probes, `media donor-shape refusals`, `gallery target refusals`, `the committed durable family Page`, `the three donor heading outlines`, and `tests/unit/u04-verification-modules.test.mjs`. The old Features selectors in the extracted fixture sit near lines 3293 and 4716 of that file.
+
+Every replacement is smaller than what it replaces: assert the single node's native props, its authored order, what it deliberately omits, and the unchanged closed refusals — including the two bounds and the icon refusals — then keep `tests/unit/u04-features-representation.test.ts` as the representation's own proof rather than duplicating it.
