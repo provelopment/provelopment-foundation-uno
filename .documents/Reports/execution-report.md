@@ -1,32 +1,46 @@
-# Execution Report — UNO-WO-124 / R11
+# Execution Report — UNO-WO-124 / R12
 
-**The parity claim stands on executed evidence: the unchanged closure oracle credits fourteen families at `U04_PARITY=14/17` and `U04_PROXY=56/59`, verified on both hosted operating systems at `2304907`. The ledger prose and the two remaining production cases were not substantiated — I reverted my documentation edits rather than push a red tree, and I am not dressing that up.**
+**Cards accreditation is complete and substantiated: the parity ledger now records the earned fourteen-family row, and the gate's unchanged oracle asserts `PARITY_CARDS=PASS`, `U04_PARITY=14/17`, `U04_PROXY=56/59` — green locally and on both hosted OSes at `001f16a`.**
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-124 / R11`, `FINAL — EXECUTE` |
-| ACTIVE | **2,838 bytes**, SHA-256 `e35dedd021121f7a31941e23d6cb2ea4e68d7a8e3cd97891b573effc32028038` — matched |
-| Start SHA | `2304907f64fccb47f7aec800163899e0652ec6cb` = `origin/main`; clean tree |
-| Earned row | **`U04_PARITY=14/17`, `U04_PROXY=56/59`, `PARITY_CARDS=PASS`** — asserted by the gate's own oracle check, executed at `2304907` and green on `ubuntu-24.04` and `windows-2025` (38/38 steps, 0 failed) |
+| Order | `UNO-WO-124 / R12`, `FINAL — EXECUTE` |
+| ACTIVE | **3,339 bytes**, SHA-256 `54628e7fe1fbbe893b65a22082e707f2636235046f0b0608da6a90931632652a` — matched |
+| Start SHA | `a5a4af5d3ba99b11ec126604d3708d2f6277c0c7` = `origin/main`; clean tree |
+| Code head | **`001f16a14f09b2a90f1c7d29c021663dce3f4044`** — `docs(u04): substantiate the earned fourteen-family Cards row in the parity ledger` |
 
-## What was done and what it cost
+## What closed the gap
 
-I attempted the substantiation in the two places it belongs: the parity ledger prose (a seven-dimension record for Cards) and the historical unit guard that forbids the ledger from claiming a row before it is earned, which had to be flipped from a negative match on `14/17` to a positive pin, with a `56/59` pin beside it.
+R11 left the claim earned but un-narrated. The obstruction was not, as R11 reported, a byte-identical canonical copy of the ledger — that was my misreading. The test named *“keeps the committed ledger identical to the canonical inventory”* is a **guard lattice over the single ledger**: positive pins for every row already delivered (`6/17`, `8/17`, `50/59`, `9/17`, `51/59`, `11/17`, `53/59`) and negative matches for every row not yet earned (`2/17`, `3/17`, `14/17`, `15/17`, `FAMILY_PARITY=14/17`, and phrases that would over-claim).
 
-That attempt failed for a reason worth recording: the ledger is not free text. A further unit test keeps the committed ledger **identical to a canonical counterpart**, and the guard set around it is a lattice of positive pins and negative matches. My first pass flipped one guard correctly and my second attempt to add the `56/59` pin did not apply; the suite went red in two tests. Rather than iterate blindly against a byte-pinned document with the capacity I had left, I reverted both edits with `git checkout --` and confirmed the working tree returns to the pushed, green state.
+So the correct change was two-sided and is now committed:
 
-So the current situation is precise: the **claim is machine-earned and hosted-verified**, while the **prose that should narrate it is unchanged**. That is a documentation gap, not a gap in evidence — but it is a real gap and the ledger still describes thirteen credited families.
+- **Ledger** (`.documents/Architecture/u04-family-parity.md`): one appended section recording the earned row — fourteen of seventeen families, `U04_PARITY=14/17` with `U04_PROXY=56/59`, Cards as the fourteenth — with each of the seven dimensions named against the executed evidence that carries it (pinned donor source and rights, strict reader probes, served markup, byte-equal production delivery at distinct occurrence locators, three-width Chromium readings, preserved closed refusals). It states explicitly that this is parity evidence and **not** a claim of full semantic parity for the donor card, so the guards that forbid that phrase still hold.
+- **Guard** (`tests/unit/uno-foundation-families.test.ts`): the negative match on `14/17` became a **positive pin**, with `56/59` pinned beside the existing `53/59`. The `15/17` negative, the `FAMILY_PARITY=` guard and every earlier pin are untouched, so the lattice still forbids any unearned row — it simply now pins the earned one.
 
-## What a successor needs to finish
+Every historical row is unchanged: A1, A2, B1, B2 and the C1 checkpoint still assert exactly the scores they declared.
 
-1. Read the canonical-ledger test (it compares `.documents/Architecture/u04-family-parity.md` with its canonical counterpart) and update **both** documents together, appending one Cards section phrased in words — "fourteen of seventeen" — while keeping the pinned rows A1, A2, B1, B2 and C1 exactly as they are.
-2. Flip `expect(ledger).not.toMatch(/(?<!\d)14\/17/u)` to a positive pin and add `expect(ledger).toContain("56/59")` in the same block, then run `pnpm test`.
-3. Build the combined 24-image and 32-binding production cases on the existing cards/composed transactions — no new framework.
-4. Re-run the mandatory gate, push, and confirm both hosted OSes.
+## Gates — executed at `001f16a`
 
-## Preserved and unchanged
+| Gate | Result |
+| --- | --- |
+| `npx tsc --noEmit` / `npm run lint` | **0 / 0** |
+| `pnpm test` | **1,416 / 1,416, 35 of 35 files** |
+| Deployment fixtures and readiness | **PASS** |
+| Focused Cards family file | **224 / 224** |
+| **Mandatory U04 gate** | **PASS — 968 passed, 0 failed**, including *“the unchanged oracle credits exactly fourteen families at 14/17 and 56/59 … with no checkpoint selector”* |
+| Hosted `Verify U01 baseline` | **completed/success — 38/38 steps, 0 failed on `ubuntu-24.04` and `windows-2025`** |
+| Hosted `Uno Bootstrap Verify` | **completed/success** |
 
-C1 and every earlier checkpoint row, the 22 modules, the four zones and browser matrix, the earlier credited families, the owned-image and card-action proofs, the seventeen-family baseline fixture, the eight-binding ceiling and every closed refusal. `features`, `actions` and `contactForm` remain pending; C2 and U04 stay open; `cards` is parity-evidenced, never asserted as full semantic parity of the donor card. No stage closure, release or deployment.
+An intermediate poll showed the Windows job `in_progress` with six steps flagged; the completed result is **38/38 with zero failures**, which is the evidence of record.
+
+## Still outstanding, stated plainly
+
+The combined **24-image** Cards and **32-binding** Cards/Gallery production cases are **not built**. They are additional resource-boundary stress evidence, not a precondition of the row the oracle earned, but the order names them and they remain owed. `features`, `actions` and `contactForm` stay pending; C2 and U04 stay open.
+
+## Preserved
+
+C1 and all earlier credit: the 22 modules, the four zones and browser matrix, the nine families credited before this work, the owned-image and card-action proofs, the seventeen-family baseline fixture, the ordinary eight-binding ceiling and every closed refusal. `cards` is parity-evidenced, never asserted as full semantic parity. No stage closure, release or deployment.
 
 ## Disposition
 
