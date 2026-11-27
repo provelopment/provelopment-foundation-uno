@@ -1693,6 +1693,91 @@ main {
   }
 }
 
+/*
+ * `UNO-WO-125 / R02`: the native features list. Icon-led, border-free units in one authored order — deliberately not the bordered
+ * card treatment — with the donor's three/two/one default and its explicit 2/3/4 column intent, and the same closed section surfaces
+ * every other family uses.
+ */
+.uno-json-features-section {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.uno-json-features-section[data-uno-surface="muted"] {
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  background: var(--uno-surface-muted, rgba(127, 127, 127, 0.08));
+}
+
+.uno-json-features-section[data-uno-surface="bordered"] {
+  padding: 1.5rem;
+  border: 1px solid var(--uno-border, rgba(127, 127, 127, 0.3));
+  border-radius: 0.75rem;
+}
+
+.uno-json-features {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uno-json-feature {
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+  min-width: 0;
+}
+
+.uno-json-feature-icon {
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+}
+
+.uno-json-feature-title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.uno-json-feature-body {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+@media (min-width: 640px) {
+  .uno-json-features,
+  .uno-json-features[data-uno-columns="2"],
+  .uno-json-features[data-uno-columns="3"],
+  .uno-json-features[data-uno-columns="4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .uno-json-features {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .uno-json-features[data-uno-columns="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .uno-json-features[data-uno-columns="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .uno-json-features[data-uno-columns="4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 @media (min-width: 640px) {
   .uno-json-cards,
   .uno-json-cards[data-uno-columns="2"],

@@ -266,8 +266,61 @@ export interface UnoLayoutGridCardsProps {
   readonly surface?: UnoSectionSurface;
 }
 
-/** `layout.grid` props: the ordinary native grid, or the native closed opt-in text-only cards representation. */
-export type UnoLayoutGridAlternative = UnoLayoutGridProps | UnoLayoutGridCardsProps;
+/** `layout.grid` props: the ordinary native grid, the cards representation, or the features representation. */
+export type UnoLayoutGridAlternative =
+  | UnoLayoutGridProps
+  | UnoLayoutGridCardsProps
+  | UnoLayoutGridFeaturesProps;
+
+/**
+ * `UNO-WO-125 / R02`: one item of the native, closed opt-in **features** list.
+ *
+ * The donor feature is an icon-led unit: a required plain title, an optional Markdown-capable body and an optional **decorative**
+ * owned icon. The icon never carries the meaning on its own — the title states it — so the representation has no `alt` key at all
+ * and the renderer emits the exactly empty alternative a decorative image requires. An external, provider or unowned icon is not
+ * representable, and an icon library name is not an asset identity.
+ */
+export interface UnoLayoutFeature {
+  readonly title: string;
+  readonly body?: string;
+  /** Only ever the literal `true`, for a body that has been read by the shared Markdown reader. */
+  readonly bodyMarkdown?: true;
+  /** The donor's authored icon, resolved to an owned asset of this Page and always rendered decoratively. */
+  readonly icon?: UnoOwnedAssetRef;
+}
+
+/**
+ * `layout.grid` in its native, closed opt-in **features** representation (`UNO-WO-125 / R02`).
+ *
+ * One native list of one to twenty-four icon-led feature units beneath an optional authored heading and Markdown lede, inside a
+ * whole-section closed surface, with an optional column intent that otherwise resolves to three columns at a wide viewport, two at
+ * an intermediate one and one at a narrow one. Opt-in through the presence of `features`, so the ordinary native grid **and** the
+ * cards representation keep their exact previous props, children, markup and acceptance.
+ *
+ * A features grid carries **no children**: its content is its own closed item shape, and the reader refuses a node that declares
+ * both — including an explicitly empty `children` array, which is a crossed shape and never an ordinary grid.
+ */
+export interface UnoLayoutGridFeaturesProps {
+  readonly features: readonly UnoLayoutFeature[];
+  readonly columns?: 2 | 3 | 4;
+  readonly heading?: string;
+  readonly level?: 2 | 3 | 4 | 5 | 6;
+  readonly lede?: string;
+  readonly ledeMarkdown?: true;
+  readonly surface?: UnoSectionSurface;
+}
+
+/**
+ * Narrow a validated `layout.grid` to its native features representation.
+ *
+ * Identified by the presence of the own `features` key, which neither the ordinary grid nor the cards representation ever carries,
+ * so callers narrow on structure rather than on a value they would have to trust.
+ */
+export function isUnoLayoutGridFeatures(
+  props: UnoLayoutGridAlternative,
+): props is UnoLayoutGridFeaturesProps {
+  return Object.prototype.hasOwnProperty.call(props, "features");
+}
 
 /**
  * Narrow a validated `layout.grid` to its native cards representation.
@@ -780,6 +833,18 @@ export type UnoSectionNode =
        * renderer returns before reading this list. It exists so the validated node stays compatible with the existing grid
        * contract, whose consumers read `children` directly.
        */
+      readonly children: readonly [];
+    }
+  | {
+      /**
+       * `UNO-WO-125 / R02`: the native closed opt-in features grid. It owns its content in `props.features` and therefore has **no**
+       * `children` key at all — the validator never reads one for this shape and refuses a node that declares one, even an explicitly
+       * empty array.
+       */
+      readonly id: string;
+      readonly module: "layout.grid";
+      readonly props: UnoLayoutGridFeaturesProps;
+      /** Always empty, and never authored, for the same reason the cards node carries it. */
       readonly children: readonly [];
     }
   | {
@@ -2413,6 +2478,45 @@ function declaresCardsGrid(record: DataRecord): boolean {
 }
 
 /**
+ * `UNO-WO-125 / R02`: one closed features list — bounded, ordered, and each unit's own plain title, optional Markdown body and
+ * optional decorative owned icon. Nothing is manufactured: an absent body stays absent, an absent icon stays absent, and the icon
+ * carries no authored alternative because it is decorative by contract.
+ */
+function readLayoutFeatures(value: unknown): UnoLayoutFeature[] {
+  if (!Array.isArray(value)) throw new RefusedDocument("document:invalid-props");
+  if (value.length < 1 || value.length > UNO_PAGE_DOCUMENT_LIMITS.cardItems) {
+    throw new RefusedDocument("document:invalid-props");
+  }
+  const features: UnoLayoutFeature[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    if (!(index in value)) throw new RefusedDocument("document:invalid-props");
+    const item = readPlainData(value[index]);
+    if (item === null) throw new RefusedDocument("document:invalid-props");
+    if (!hasExactlyKeys(item, ["title"], ["body", "bodyMarkdown", "icon"])) {
+      throw new RefusedDocument("document:invalid-props");
+    }
+    // A feature title is literal well-formed plain text, read at the same bound the card title uses.
+    const title = readMarkdownCapableText(item["title"], UNO_PAGE_DOCUMENT_LIMITS.cardTitleCodePoints, false);
+    const bodyMarkdown = optionalProseMarkdown(item["bodyMarkdown"]);
+    if (bodyMarkdown === true && item["body"] === undefined) throw new RefusedDocument("document:invalid-props");
+    const body = item["body"] === undefined
+      ? undefined
+      : bodyMarkdown === true
+      ? requireFamilyMarkdown(item["body"], UNO_PAGE_DOCUMENT_LIMITS.cardTextCodePoints)
+      : optionalMarkdownCapableText(item["body"], UNO_PAGE_DOCUMENT_LIMITS.cardTextCodePoints, true);
+    // The icon is an owned asset of this Page and nothing else: an external, provider or unowned identity refuses.
+    const icon = item["icon"] === undefined ? undefined : readOwnedAsset(item["icon"], "image");
+    features.push({
+      title,
+      ...(body === undefined ? {} : { body }),
+      ...(bodyMarkdown === undefined ? {} : { bodyMarkdown }),
+      ...(icon === undefined ? {} : { icon }),
+    });
+  }
+  return features;
+}
+
+/**
  * The bounded ordered card list of the native text-only cards grid (`UNO-WO-122 / R03`).
  *
  * Every card is a strict object: a required plain title at the donor's 160 points, an optional plain meta line at 120, and an
@@ -2543,6 +2647,37 @@ function readNode(value: unknown, depth: number, state: WalkState, seen: WeakSet
   }
 
   if (moduleName === "layout.grid") {
+    // `UNO-WO-125 / R02`: the native closed opt-in **features** representation is a separate, explicit shape too. Its absence
+    // keeps both the ordinary native grid and the cards representation byte-identical.
+    if (props["features"] !== undefined) {
+      if (!hasExactlyKeys(props, ["features"], ["columns", "heading", "level", "lede", "ledeMarkdown", "surface"])) {
+        throw new RefusedDocument("document:invalid-props");
+      }
+      // A features grid owns its content and never declares children; an explicitly empty array is the same crossed shape.
+      if (record["children"] !== undefined) throw new RefusedDocument("document:invalid-children");
+      const columns = optionalGalleryColumns(props["columns"]);
+      const { heading, level } = readOptionalHeading(props, state);
+      const ledeMarkdown = optionalProseMarkdown(props["ledeMarkdown"]);
+      if (ledeMarkdown === true && props["lede"] === undefined) throw new RefusedDocument("document:invalid-props");
+      const lede =
+        ledeMarkdown === true
+          ? requireFamilyMarkdown(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.cardTextCodePoints)
+          : optionalMarkdownCapableText(props["lede"], UNO_PAGE_DOCUMENT_LIMITS.cardTextCodePoints, true);
+      const surface = optionalSurface(props["surface"]);
+      const features = readLayoutFeatures(props["features"]);
+      const featuresProps: UnoLayoutGridFeaturesProps = {
+        features,
+        ...(columns === undefined ? {} : { columns }),
+        ...(heading === undefined ? {} : { heading }),
+        ...(level === undefined ? {} : { level }),
+        ...(lede === undefined ? {} : { lede }),
+        ...(ledeMarkdown === undefined ? {} : { ledeMarkdown }),
+        ...(surface === undefined ? {} : { surface }),
+      };
+      const node = { id, module: "layout.grid" as const, props: featuresProps };
+      Object.defineProperty(node, "children", { value: Object.freeze([]), enumerable: false, writable: false });
+      return node as typeof node & { readonly children: readonly [] };
+    }
     // `UNO-WO-122 / R03`: the native closed opt-in **text-only** cards representation is a separate, explicit shape. Its absence
     // keeps the ordinary native grid byte-identical — required `columns`, optional item semantics and ratio, typed children.
     if (props["cards"] !== undefined) {

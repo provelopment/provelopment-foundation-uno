@@ -28,7 +28,7 @@
 import Image from "next/image";
 
 import type { UnoPageMedia, UnoResolvedImage, UnoSectionMedia } from "../core/assets/uno-owned-media";
-import { readUnoFamilyMarkdown, readUnoPageDocument, isUnoExternalVideoProps, isUnoLayoutGridCards, type UnoContentProseBody, type UnoPageDocument, type UnoSectionNode } from "../core/page-document";
+import { readUnoFamilyMarkdown, readUnoPageDocument, isUnoExternalVideoProps, isUnoLayoutGridCards, isUnoLayoutGridFeatures, type UnoContentProseBody, type UnoPageDocument, type UnoSectionNode } from "../core/page-document";
 import { readUnoVideoEmbed } from "../core/video/uno-video-embeds";
 import { UnoFamilyMarkdown } from "./uno-family-markdown";
 import { UnoCarouselIsland, UnoExternalVideoIsland, UnoModalIsland, UnoTabsIsland } from "./uno-interaction-island";
@@ -229,6 +229,60 @@ function SectionNode({
       // title and body in the authored order, beneath only the authored heading and lede. Nothing is manufactured: an absent
       // field emits no element, and the deferred image/action capabilities have no key, so nothing can be drawn that the
       // document did not author.
+      // `UNO-WO-125 / R02`: the native features representation is its own presentation — icon-led, border-free units in one list —
+      // never a bordered card. The icon is decorative by contract, so it is rendered with the exactly empty alternative and is
+      // hidden from assistive technology; the title states the item and its own heading level follows the authored section outline.
+      if (isUnoLayoutGridFeatures(node.props)) {
+        const { features, columns, heading, level, lede, ledeMarkdown, surface } = node.props;
+        const Tag = level === undefined ? null : HEADING_TAGS[level];
+        const itemLevel = (level === undefined ? 2 : Math.min(level + 1, 6)) as 2 | 3 | 4 | 5 | 6;
+        const ItemTag = HEADING_TAGS[itemLevel];
+        const ledeParsed = ledeMarkdown === true ? parseFamilyMarkdown(lede) : null;
+        // `UNO-WO-125 / R02`: this section's own server-resolved icon projection, indexed by feature position. A feature without an
+        // authored icon has no entry and therefore emits no image element at all.
+        const images = mediaOf(media, node.id).items;
+        return (
+          <div className="uno-json-features-section" data-uno-surface={surface} id={node.id}>
+            {Tag === null || heading === undefined ? null : (
+              <Tag className="uno-json-heading" id={`${node.id}-heading`}>
+                {heading}
+              </Tag>
+            )}
+            {lede === undefined ? null : ledeParsed === null ? (
+              <p className="uno-json-features-lede">{lede}</p>
+            ) : (
+              <UnoFamilyMarkdown blocks={ledeParsed} className="uno-json-features-lede" />
+            )}
+            <ul className="uno-json-features" data-uno-columns={columns} id={`${node.id}-list`} role="list">
+              {features.map((feature, index) => {
+                const bodyParsed = feature.bodyMarkdown === true ? parseFamilyMarkdown(feature.body) : null;
+                const icon = images?.[index];
+                return (
+                  <li className="uno-json-feature" key={`${feature.title}:${index}`}>
+                    {icon === undefined ? null : (
+                      <Image
+                        alt=""
+                        aria-hidden="true"
+                        className="uno-json-feature-icon"
+                        height={icon.height}
+                        src={icon.src}
+                        unoptimized
+                        width={icon.width}
+                      />
+                    )}
+                    <ItemTag className="uno-json-feature-title">{feature.title}</ItemTag>
+                    {feature.body === undefined ? null : bodyParsed !== null ? (
+                      <UnoFamilyMarkdown blocks={bodyParsed} className="uno-json-feature-body" />
+                    ) : (
+                      <p className="uno-json-feature-body">{feature.body}</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      }
       if (isUnoLayoutGridCards(node.props)) {
         const { cards, columns, heading, level, lede, ledeMarkdown, surface } = node.props;
         const Tag = level === undefined ? null : HEADING_TAGS[level];

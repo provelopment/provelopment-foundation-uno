@@ -20,7 +20,7 @@ import type { UnoPublishedPageAccepted } from "./plan-uno-published-page";
 import type { UnoOwnedAssetRef, UnoOwnedMediaPurpose } from "../core/assets/uno-owned-media";
 import { UNO_OWNED_MEDIA_LIMITS } from "../core/assets/uno-owned-media";
 import type { UnoSectionNode } from "../core/page-document";
-import { isUnoExternalVideoProps, isUnoLayoutGridCards } from "../core/page-document";
+import { isUnoExternalVideoProps, isUnoLayoutGridCards, isUnoLayoutGridFeatures } from "../core/page-document";
 
 /** The closed refusal vocabulary of this plan. One literal per failure family. */
 export type UnoPageAssetRefusal =
@@ -135,6 +135,15 @@ function collect(nodes: readonly UnoSectionNode[], out: PendingOccurrence[]): vo
       node.props.cards.forEach((card, itemIndex) => {
         if (card.asset === undefined) return;
         out.push({ sectionId: node.id, slot: "image", purpose: "image", itemIndex, ref: card.asset });
+      });
+      continue;
+    }
+    // `UNO-WO-125 / R02`: a native features grid contributes one icon occurrence per feature that authored an owned icon, indexed by
+    // the feature's own position, so an iconless feature contributes nothing and can never shift an icon onto a neighbour.
+    if (node.module === "layout.grid" && isUnoLayoutGridFeatures(node.props)) {
+      node.props.features.forEach((feature, itemIndex) => {
+        if (feature.icon === undefined) return;
+        out.push({ sectionId: node.id, slot: "image", purpose: "image", itemIndex, ref: feature.icon });
       });
       continue;
     }
