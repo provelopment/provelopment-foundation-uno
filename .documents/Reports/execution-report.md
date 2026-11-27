@@ -1,49 +1,48 @@
-# Execution Report — UNO-WO-125 / R01
+# Execution Report — UNO-WO-125 / R02
 
-**Delivered: the Cards closure dimensions are now evidence-derived rather than declared, verified locally and on Ubuntu. Not delivered: Features parity and C2. `PARITY_FEATURES=PENDING`, `U04_PARITY=14/17`, `U04_PROXY=56/59`.**
+**Delivered: the native Features representation with owned decorative icons, its own presentation and its own stylesheet, green through every local gate. Not delivered: the composer adoption that actually earns Features, and therefore C2.** `PARITY_FEATURES=PENDING`, `U04_PARITY=14/17`, `U04_PROXY=56/59`.
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-125 / R01`, `FINAL — EXECUTE` |
-| ACTIVE | **3,548 bytes**, SHA-256 `f8b1d92c77fd7f72cb9ec4372ba2124dcea1515cc71b8ee0ed2a768bbd815e46` — matched |
-| Start SHA | `96e56d9ac9482529845944e40ae897d3a4e66cfe` = `origin/main`; clean tree |
-| Code head | **`7ffb35b76c27b5e0c64266166cdef07519ec1609`** — `test(u04): derive the Cards source, reader and rights dimensions from recorded evidence` |
+| Order | `UNO-WO-125 / R02`, `FINAL — EXECUTE` |
+| ACTIVE | **3,543 bytes**, SHA-256 `9be801fb74347ec5c9c36acfc7475299ce2e4cda51d0bd6132c9a0035fa0b136` — matched |
+| Start SHA | `0982811fa2a9c0135abfb3c461747b8e4dc22536` = `origin/main`; clean tree |
+| Code head | **`d7a883a301d2b668e14323db545f7c4031e3f1b8`** — `feat(u04): add the native features representation with owned decorative icons` |
 
-## What was delivered
+## What landed
 
-The order asked for evidence-backed source, reader and rights results instead of unconditional `true` assignments. That is now true in the mandatory gate: `cardsClosureEvidence` reads the pinned provenance and licence rows the ledger already carries for `cards` (`cardsSourceRow`, `cardsRightsRow`) and takes `reader` from the strict reader's own accepted and refused probes executed by the mandatory native transaction. `renderer`, `http`, `browser` and `refusal` continue to come from the composed and native transactions' own outcomes. No dimension is declared any more.
+The donor Features contract now has a native target, built the way Cards was built so nothing existing moved.
 
-The fourteen-family row still holds on those stricter inputs: the unchanged oracle, with no checkpoint selector, reports `U04_PARITY=14/17` and `U04_PROXY=56/59`.
+- **Reader** (`src/core/page-document.ts`): `UnoLayoutFeature` — a plain title, an optional Markdown-capable body and an optional owned decorative icon; `UnoLayoutGridFeaturesProps` — one to twenty-four ordered features under an optional authored heading and Markdown lede, an optional closed surface and an optional 2/3/4 column intent; `isUnoLayoutGridFeatures` narrows on the own `features` key exactly as `isUnoLayoutGridCards` does. The grid branch reads it as a separate explicit shape that refuses `children` — including an explicitly empty array — and the validated node carries the same non-enumerable empty `children` the cards node carries, so the existing grid contract keeps working. `readLayoutFeatures` bounds the list at the donor twenty-four, reads the title at the card-title bound, takes the body through the shared Markdown reader (declared only by the literal `true`) and resolves the icon through the existing owned-asset reader; an external, provider or unowned icon refuses.
+- **Planner** (`src/application/plan-uno-page-assets.ts`): each authored icon contributes one image occurrence indexed by the feature's own position, so an iconless feature contributes nothing and can never shift an asset onto a neighbour.
+- **Renderer** (`src/components/uno-page-sections.tsx`): a distinct presentation — the features section with its authored surface, heading at the authored level, Markdown or plain lede, then one border-free list item per feature, the icon rendered decoratively (`alt=""`, `aria-hidden="true"`), the title at the outline level the heading implies, the body as Markdown or plain text. Deliberately not the bordered card treatment.
+- **Stylesheet** (`src/app/globals.css`): the donor default of three columns wide, two intermediate, one narrow, honouring explicit 2/3/4, plus the closed muted and bordered surfaces and the icon-led unit layout.
 
-## What was not delivered, and why
-
-**Features parity and C2 were not implemented.** The mapping I read in the composer (`case "features"`, lines 1339–1404) shows how far the current subset is from the donor contract the order specifies: it requires `columns` explicitly, bounds items to **8**, composes neither Markdown lede nor Markdown item bodies, has **no section surface**, and — decisively — **no icon at all**. Icons are the donor feature's whole visual identity and, per the order, must arrive as *owned asset identities rendered decoratively*, which means a native representation extension: reader support for an owned icon on a list item, planner involvement, renderer markup and stylesheet, refusal coverage, and only then composer wiring, plus the 24-item bound and the absent-column default.
-
-That is a larger contract change than the Cards action, and it cannot be done honestly in the capacity this run had left. I did not start it, because a half-added icon contract would have left the tree red or the feature unverifiable — and I will not push either.
-
-Also still owed from WO-124: the real **24-image Cards** and **combined 32-distinct-binding Cards/Gallery** production cases. These need a generalised multi-plate fixture installer and the identity-ceiling interaction to be evidenced deliberately (an over-bound refusal is one of the cases), which is its own contained piece of work.
-
-## Gates executed at `7ffb35b`
+## Gates executed at `d7a883a`
 
 | Gate | Result |
 | --- | --- |
-| `pnpm test` | **1,416 / 1,416, 35 files** |
-| **Mandatory U04 gate** | **PASS — 968 passed, 0 failed**, including the fourteen-family oracle row at `14/17` and `56/59` |
-| Hosted `Verify U01 baseline` — `ubuntu-24.04` | **completed/success, 38/38 steps, 0 failed** |
-| Hosted `Verify U01 baseline` — `windows-2025` | **in progress when this report was written**; earlier polls of the same job shape resolved to success, but it is not yet evidence and is not claimed |
-| Hosted `Uno Bootstrap Verify` | **completed/success** |
+| `npx tsc --noEmit` | **0 errors** |
+| `npm run lint` | **0 problems** |
+| `pnpm test` | **1,416 / 1,416, 35 of 35 files** — no existing family changed shape |
+| **Mandatory U04 gate** | **PASS — 968 passed, 0 failed**; fourteen-family oracle row still `14/17` and `56/59` |
 
-## Exact next steps for Features
+## What is still missing — the part that earns the credit
 
-1. Extend the native list-item representation with an optional owned icon (`asset`, decorative alt = `""`, `decorative: true`), read with the existing owned-asset reader, and render it as a decorative image before the title; keep the feature presentation distinct from bordered cards (no card border, icon-led layout).
-2. Add the donor's optional section `surface` to the features wrapper, the Markdown lede, Markdown item bodies (via `content.prose { markdown: true }` as Hero does) and the absent-column default, then raise the item bound to the donor's 24 with the aggregate ceiling preserved.
-3. Prove it the way Cards was proved: reader positives and refusals, composer ownership and binding consumption, served markup, byte-equal icon delivery over production HTTP, three-width Chromium readings, and the omission case.
-4. Then feed `features` into the unchanged oracle for the fifteenth family and C2 at `15/17` and `57/59`, updating the ledger and its historical pins together, with guards against overclaiming retained.
+The representation is a target, not a delivery. Features is not credited because **the composer still emits the old bounded mapping** (`case "features"`: columns required, at most eight items, no Markdown, no surface, no icons). Until the composer adopts the contract, the oracle has no Features evidence to read, and I will not hand it a declaration.
+
+In order:
+
+1. **Composer adoption** — emit the features grid from the donor source: Markdown lede and item bodies, authored surface, absent-column default, the donor twenty-four item bound, and icons resolved through the migration bindings so each identity is consumed exactly once (the cards arm is the precedent). Update the composer unit expectations, which pin the current stack/grid byte shape.
+2. **Unit coverage** for the new representation: accepted features with and without icons, decorative-icon rendering, Markdown lede and body, surface, absent and explicit columns, twenty-four items, and the refusals (declared children, crossed shapes, unowned icon, twenty-five items).
+3. **Production evidence** — reuse the composed transaction machinery: a features section with an icon, an iconless feature and a repeated icon over real HTTP and Chromium at three widths.
+4. **Closure** — feed `features` into the unchanged oracle for the fifteenth family, earning `15/17`, `57/59` and C2, with the ledger and its historical pins updated together and the overclaim guards retained.
+5. **Cards assurance still owed from WO-124** — the 24-image and combined 32-binding Cards/Gallery production cases.
 
 ## Preserved
 
-Every earlier credit: C1, the twenty-two modules, four zones and browser matrix, the fourteen credited families including Cards, the owned-image and card-action proofs, the seventeen-family baseline fixture, the ordinary eight-binding ceiling and every closed refusal. `actions` and `contactForm` remain pending; C2 and U04 stay open; no stage closure, release or deployment.
+C1, the twenty-two modules, the four zones and browser matrix, the fourteen credited families, the owned-image and card-action proofs, the seventeen-family baseline fixture, the eight-binding ceiling and every closed refusal. No existing family's props, markup or acceptance moved: the features shape is opt-in, and the ordinary grid and cards grid are byte-identical to before.
 
 ## Disposition
 
-STOP for independent review.
+STOP for independent review. The next activation should begin at composer adoption.
