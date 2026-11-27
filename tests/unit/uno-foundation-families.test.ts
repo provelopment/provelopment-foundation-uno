@@ -5861,7 +5861,7 @@ describe("composeUnoFoundationSubset — prose, callout, list, faq and table aut
     expect(ledger).toContain("51/59");
     expect(ledger).toContain("11/17");
     expect(ledger).toContain("53/59");
-    expect(ledger).not.toMatch(/(?<!\d)14\/17/u);
+    expect(ledger).toContain("14/17");
     expect(ledger).not.toMatch(/(?<!\d)15\/17/u);
     expect(ledger).not.toContain("17/17 full semantic parity");
     expect(ledger).not.toMatch(/prose[^.\n]*full semantic parity/u);

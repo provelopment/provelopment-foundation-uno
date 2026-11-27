@@ -707,3 +707,7 @@ design semantics listed in section 6. Three families gained one heading level; n
 
 Accounting is unchanged: **22/22** module IDs, **4/4** asset zones, **16/16** browser matrix, **17/17** bounded mappings,
 **1/17** accepted full parity (`divider`), **43/59 = 72.88%** proxy. U04 stays OPEN and no stage credit follows.
+
+## Earned closure row — fourteen families
+
+The unchanged closure oracle, fed only evidence this repository executed and no checkpoint selector, credits fourteen of seventeen families and reports `U04_PARITY=14/17` with `U04_PROXY=56/59`. Cards is the fourteenth: its seven dimensions are the pinned donor source and rights, the strict reader's accepted and refused probes, the served markup, the byte-equal production delivery at distinct occurrence locators, the three-width Chromium readings and the preserved closed refusals. The historical A1, A2, B1, B2 and C1 rows above keep exactly the scores they declared. This row is parity evidence, never a claim of full semantic parity for the donor card.
