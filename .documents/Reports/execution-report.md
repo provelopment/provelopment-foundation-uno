@@ -1,46 +1,50 @@
-# Execution Report — UNO-WO-124 / R06
+# Execution Report — UNO-WO-124 / R07
 
-**Disposition: CHECKPOINT, not delivery.** The session reached its usable execution capacity during contract mapping, before any ledger edit was made. No parity claim is made: `PARITY_CARDS` remains **PENDING**, `U04_PARITY` **13/17**, `U04_PROXY` **55/59**. Nothing was pushed as implementation, no gate was skipped, nothing was weakened, and the tree is clean at the authorised start.
+**Disposition: CHECKPOINT at M1, mid-implementation. No implementation was committed or pushed.** M1's card action is implemented across the reader, composer, renderer and stylesheet; `tsc` and `lint` are clean and 1,414 of 1,416 unit tests pass. Two obsolete action-refusal assertions still need updating to prove the new closed contract, so the mandatory U04 gate, U03, push and hosted verification have not run. `PARITY_CARDS=PENDING`, `U04_PARITY=13/17`, `U04_PROXY=55/59`.
 
 | | |
 | --- | --- |
-| Order | `UNO-WO-124 / R06`, `FINAL — EXECUTE` |
-| ACTIVE | **5,915 bytes**, SHA-256 `e68a1f3b2340b16c6c865da8bfe375bb31875ba835b2ba386e1d7eadd00cbf31` — matched byte-for-byte; private, ignored, untracked |
-| Start SHA | `2020da5a33eea90adf26f3621ce9b7d745d0545a` = `origin/main`; empty index; clean tree |
-| Code head | unchanged at `2020da5` (no implementation commit in this run) |
-| Transient fixtures | none created; the Cards capsule zone, the family fixture and every declared source were never swapped, so nothing needed restoration |
-| Ledger edits preserved unstaged | none — no edit was started, so there is nothing to carry forward or discard |
+| Order | `UNO-WO-124 / R07`, `FINAL — EXECUTE` |
+| ACTIVE | **6,113 bytes**, SHA-256 `c1867486997607088e35360bcfc13cd4bbbce5a0252a87ac04e8f78db1068b27` — matched byte-for-byte; private, ignored, untracked |
+| Start SHA | `5a6b2e17650bb434eb12c8aa10e86878c15e6372` = `origin/main`; empty index; clean tree |
+| HEAD | no implementation commit this run; the only commit is this report |
+| Transient fixtures | none created; no fixture transaction ran, so nothing needed restoration |
 
-## What this run actually established (executed evidence, no credit)
+## M1 implemented (preserved unstaged)
 
-Preflight verified and the R06 contract surface was located and pinned, so the successor can implement without re-deriving it:
+`src/core/page-document.ts` — the card allow-list admits `action`; `UnoLayoutCard.action` is typed as the static outbound anchor with the closed optional variant; `readCardAction` reads exactly `{label, href, variant?}`, classifies the destination with the unchanged `classifyAuthorDestination` and admits only `https`/`mailto` (otherwise `document:unsafe-link`), while `targetId`/`linkId`/`routeTarget` are shape refusals; the card builder emits `action` only when authored.
 
-1. **The Cards action is the one missing contract.** `src/core/page-document.ts` describes the donor card's image and action as deliberately deferred (lines 208–238); the image landed in `UNO-WO-124 / R01` (`asset`/`alt`/`decorative`), the action still has no key and is refused by the allow-list at **line 2396–2402**: required `title`, allowed `meta`, `body`, `bodyMarkdown`, `asset`, `alt`, `decorative` — `action` must be added there and read in the block that builds the card at **line 2448** onward.
-2. **The approved classifier already exists and is the boundary.** `page-document.ts` line 42 imports `classifyAuthorDestination` from `./safe-author-url`; the Hero arm of the composer (`compose-uno-foundation-families.ts` lines 942–962) is the exact precedent: `requireExactKeys(entry, ["label"], ["href","route","link","variant"])`, exactly one destination, `href` forwarded to the strict reader's classifier, `variant` copied as an authored closed literal, `route`/`link` refused.
-3. **The composer's Cards card allow-list** is at `compose-uno-foundation-families.ts` line 1255 (`["title"]` + `["meta","body","image"]`), with the image arm at 1270–1299 already emitting `asset`/`alt`/`decorative` and consuming the binding. The action arm belongs beside it, reusing the Hero shape and adding **no** destination authority.
-4. **The renderer** emits card order image, meta, title, body inside `<li className="uno-json-card">` (`uno-page-sections.tsx` lines 258–284); the action anchor is the one missing element there, plus its `globals.css` treatment.
-5. **Two donor-contract facts** confirmed while mapping, which cost two mandatory-gate runs to discover in R05 and must not be rediscovered: the donor Cards section key is **`items`** (never `cards`), and its allow-list carries **no `ledeMarkdown`** flag because the lede is Markdown-capable by contract.
-6. **The closure ledger still emits the interim row**: `tests/deployment/u04-family-closure.test.mjs` pins `U04_PARITY=3/17` and `U04_PROXY=45/59` as historical assertions (lines 88–89) and must only be extended with evidence, never weakened; the 14/17 and 56/59 outcome has to come from the unchanged evaluator run without a selector.
+`src/application/compose-uno-foundation-families.ts` — the Cards donor card allow-list admits `action`, and a new arm adopts Hero's static outbound shape (one plain label, one `href`, closed `variant`), refusing `route`/`link` with `family:unsupported-feature` so no destination is ever resolved or invented.
 
-## Gates — state at checkpoint
+`src/components/uno-page-sections.tsx` — one ordinary anchor after the body: `class="uno-json-card-action"`, `data-uno-variant` for primary/secondary/link, `rel="noreferrer noopener"`, the label as its own text; never a button, fragment, inline handler or request.
 
-| Gate | State |
+`src/app/globals.css` — the three closed presentations of that anchor, a visible `:focus-visible` ring, hover opacity and a reduced-motion guard.
+
+## Tests already run
+
+| Command | Result |
 | --- | --- |
-| Focused `verify-u04-cards-native.mjs` | last green at `1607cfb` (12/0); not re-run, no code changed |
-| Mandatory U04 gate | last green at `1607cfb` (966/0); not re-run, no code changed |
-| Unit / Typecheck / Lint | last green at `1607cfb` (35 files, 0, 0); not re-run |
-| Architecture / Deployment / Governance | green at `1607cfb`; unaffected |
-| U03 published Pages | **not run in this session** |
-| Hosted `2020da5` | **success** on `ubuntu-24.04` and `windows-2025` (`38/38` steps; bootstrap green) |
+| `npx tsc --noEmit` | **0 errors** |
+| `npm run lint` | **0 problems** |
+| `pnpm test` | **1,414 / 1,416 passed across 35 files** — 2 failures, both obsolete action-refusal assertions |
 
-## Exact successor requirement
+Exact next executable test: `pnpm test`, after these two ledger updates.
 
-A new Owner activation resuming `UNO-WO-124 / R06` at `2020da5` with the same objective: complete the card action end to end (reader allow-list and card builder, composer arm reusing the Hero classifier and refusing `route`/`link`, renderer anchor, CSS, refusal/positive coverage in the four unit ledgers and `u04-verification-modules.test.mjs`), extend the composed transaction to the full donor surface including action refusals, close the 24-image and 32-binding production cases, then update the source/parity ledger with donor blobs and rights and run the unchanged evaluator for `14/17` and `56/59`. The order remains the authority; this report only records where the work stands.
+1. `tests/unit/page-document.test.ts > native cards (UNO-WO-122) > refuses every closed native Cards probe…` — `NATIVE_CARDS_REFUSALS` still carries a probe labelled *a deferred card action*, which now correctly accepts. Replace it with probes proving the new refusals (`{label,targetId}` → `document:invalid-props`; `href: "javascript:…"` and `tel:…` → `document:unsafe-link`) and add one positive probe asserting the accepted `{label, href, variant}` with `rel`, class and label.
+2. `tests/unit/uno-foundation-families.test.ts > … still refuses every out-of-subset cards and features donor field` — the `action` entry of the extras loop now yields `family:target-refused` where the helper expects `family:unsupported-feature`; drop `action` from that loop and assert the new arm's own refusals (`route`/`link` destinations) plus one composed positive.
 
-## Preserved
+After those: the focused native proof, the mandatory U04 gate (which also runs the real composed transaction and the production HTTP/Chromium proof), U03 published Pages, then both hosted operating systems.
 
-C1, the 22 modules, the four zones, the browser matrix, all nine previously credited families, the native and composed owned-image proof (12/0 and 966/0 at `1607cfb`), the seventeen-family baseline fixture, the 24 closed refusals and every accepted bound. C2 and U04 remain open; Features follows independent review; no release or deployment authority is claimed.
+## Preserved implementation digests
+| `src/app/globals.css` | 48190 B | c862bbdb417e9f1d... |
+| `src/application/compose-uno-foundation-families.ts` | 99076 B | b0ed5159f419564f... |
+| `src/components/uno-page-sections.tsx` | 47231 B | 5ab17c37c08e36f2... |
+| `src/core/page-document.ts` | 164602 B | fe8c0ea81f764742... |
 
-## 6. Disposition
+## Not claimed
 
-STOP for independent Architect review.
+No parity credit. Cards' action dimension is implemented but not yet evidenced, so the unchanged closure evaluator has not been run and `14/17` and `56/59` are **not** emitted. Features, Actions and ContactForm remain pending; C2 and U04 stay open; no release or deployment authority is claimed. Every earlier credit is untouched: C1, the 22 modules, the four zones and their browser matrix, the nine credited families, the native and composed owned-image proofs at `1607cfb` (12/0 and 966/0), the seventeen-family baseline fixture and all 24 closed refusals.
+
+## Disposition
+
+STOP for independent review. A fresh Owner activation at the actual HEAD, with these preserved edits, is required to finish M1 verification and then M2.
