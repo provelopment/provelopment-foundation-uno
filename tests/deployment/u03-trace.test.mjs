@@ -441,6 +441,11 @@ test('the next config scopes its includes to the routes that read the declaratio
   ].map((match) => match[1]);
   assert.deepEqual(keys.sort(), [
     "/[...segments]",
+    // The operational health check reads the same declarations, so it is declared the same bounded way.
+    "/api/uno-health",
+    // The refusal responder and its bundler name make the same decision as the Page and are bundled separately from it.
+    "/middleware",
+    "/proxy",
     "/robots.txt",
     "/sitemap.xml",
     "/uno-media/[...segments]",

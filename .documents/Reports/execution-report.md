@@ -458,3 +458,24 @@ same decision, same refusals.
 
 **U07 is NOT accepted, and the live Site does not yet serve its Pages.** Family parity 17/17, proxy 59/59, 22/22 module IDs, 195/195
 distribution assertions, enabled-state 57/0 and the full local pipeline remain green at this head; the live installation does not.
+
+**Reproduced at the cause, and what remains.** Removing the declarations locally reproduces the live failure exactly: `/en-001` renders
+Next's error shell on a 404 and `/api/uno-health` answers `503 serving:authority-unavailable`. Comparing the emitted bundles shows the
+asymmetry: the `route.js` bundles (`/robots.txt`, `/sitemap.xml`, `/api/uno-health`) carry the declarations, while the `page.js` bundle and
+the refusal responder bundle carry the authored content but **not** the declarations — an exact-file `outputFileTracingIncludes` entry is
+honoured for a route handler and silently dropped for a page bundle in this build. Three bounded attempts were made and measured, none of
+which closed it: an exact-file entry under the group-qualified, page-qualified and app-path keys; the same set expressed as bounded globs;
+and `vercel.json` `functions[].includeFiles`. The declaration reads were also rebuilt from literal path components, mirroring the trick the
+content reader already uses; this is a genuine improvement in traceability and changed no measured bundle.
+
+**Recommendation for the next increment, in order of cost.** (a) Read the deployment's function log for `GET /en-001`: the throwing frame
+settles whether the failure is the missing declarations or a render-time throw, and this session's Vercel MCP connection returned
+`Unauthorized`, so it could not be read here. (b) If the declarations are confirmed absent, carry them into the page bundle by importing
+`deployment/efs/manifest.json`, `deployment/uno.config.json` and `deployment/site.config.json` as build inputs for a *verification-only*
+module, so the bundler includes them by construction rather than by a tracing hint; the runtime reads stay as they are, so the fixture
+gates keep working. (c) Only if both fail, replace the two-root-layout structure with a single root layout that resolves the document
+language from the same decision.
+
+**Current live state, measured.** `/` 200; `/robots.txt` 200 on the production origin; `/sitemap.xml` 200 listing all three Pages with
+`hreflang`; `/api/uno-health` 200 `serving`; `/en-001`, `/en-001/about`, `/en-001/components`, `/en` and `/en-001/no-such-page` return Next's
+error shell with 404. The demonstration and every discovery surface are correct; the three authored Pages are not yet served.
