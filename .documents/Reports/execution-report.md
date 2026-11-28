@@ -379,6 +379,12 @@ same digest twice.
 **Blocking pipeline.** `pnpm test:distribution` runs the gate, and `.github/workflows/verify-u01.yml` runs that script as a blocking
 step on both hosts, after the readiness step. The clean-room proof is no longer an optional local exercise.
 
+**A Linux-only gate defect, found by that step and corrected.** The first hosted run of the distribution step did not finish on
+Ubuntu: the gate's readiness loop swallowed every error and retried until its two-minute bound, so a defect in the harness looked
+like a slow installation, and a killed launcher left its server running on POSIX. The gate now starts the installation server in its
+own process group, kills the group on shutdown, retries only genuinely transient connection errors and rethrows anything else at
+once, and every child command the installer runs is bounded. After that correction `fb83169` passes the step on both hosts.
+
 **Not claimed.** No public release, tag, deployment or domain activation was performed, and none is claimed.
 
 ## U07 — release-candidate readiness: requirement-to-evidence matrix
@@ -393,7 +399,7 @@ requirement, the evidence and the result; it is submitted for independent accept
 | Architecture and ownership integrity | `tests/architecture` **47/0**; confined reads, zero proprietary TSX, adapters enumerated | PASS |
 | Source provenance and licensing | `LICENSE`, `NOTICE.md` generated from the real runtime dependency licences, no donor code; release contents asserted | PASS |
 | Dependency and application security | `pnpm audit` no known vulnerabilities; security-exception guard PASS; readiness guard **132 checks, 0 failed** | PASS |
-| Exact-head hosted CI | both hosts at the pushed SHA, recorded in the delivery note for this increment | PASS |
+| Exact-head hosted CI | `fb83169` — `verify (ubuntu-24.04)` **success**, `verify (windows-2025)` **success**, both bootstrap runs **success**; the clean-room distribution step runs inside that job on both hosts | PASS |
 | Production HTTP and Chromium | published gate **1381/0**; U04 gate **996/0** with the closure oracle at **17/17** and **59/59** | PASS |
 | SEO and publication behaviour | sitemap, robots, canonical and `hreflang` assertions in the published gate and the distribution gate | PASS |
 | Accessibility | U04 shell readings (landmark, first Tab stop, 3px token ring, Enter lands, WCAG AA ratios light and dark at four widths) plus the contact keyboard and focus assertions | PASS |
