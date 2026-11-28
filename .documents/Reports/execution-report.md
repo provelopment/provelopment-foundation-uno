@@ -466,7 +466,8 @@ the refusal responder bundle carry the authored content but **not** the declarat
 honoured for a route handler and silently dropped for a page bundle in this build. Three bounded attempts were made and measured, none of
 which closed it: an exact-file entry under the group-qualified, page-qualified and app-path keys; the same set expressed as bounded globs;
 and `vercel.json` `functions[].includeFiles`. The declaration reads were also rebuilt from literal path components, mirroring the trick the
-content reader already uses; this is a genuine improvement in traceability and changed no measured bundle.
+content reader already uses; that changed no measured bundle and crossed an architectural boundary (the configuration layer must not
+carry the literal `deployment/` path), so it was reverted rather than kept for its intent.
 
 **Recommendation for the next increment, in order of cost.** (a) Read the deployment's function log for `GET /en-001`: the throwing frame
 settles whether the failure is the missing declarations or a render-time throw, and this session's Vercel MCP connection returned

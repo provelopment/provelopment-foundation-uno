@@ -20,10 +20,12 @@ import { planUnoPublicDiscovery, type UnoPublicDiscoveryEntry } from "../applica
 import { planUnoPublishedPage, type UnoPublishedPageAccepted } from "../application/plan-uno-published-page";
 import { resolveUnoCommittedBase } from "../application/resolve-uno-committed-base";
 import { readUnoDeployEnvironment } from "../adapters/deploy/uno-deploy-environment";
-import { resolveUnoDeployOrigin } from "./uno-deploy-origin";
+import { resolveUnoDeployOrigin, UNO_DEPLOY_PROFILE_PATH } from "./uno-deploy-origin";
 import { resolveUnoCommittedLocales } from "../application/resolve-uno-committed-locales";
 import {
+  UNO_MANIFEST_PATH,
   UNO_PRESENTATION_PATH,
+  UNO_SELECTION_PATH,
   UNO_SOURCE_LIMITS,
   loadUnoCandidateSource,
 } from "../adapters/efs/uno-confined-source-reader";
@@ -122,37 +124,6 @@ type ServingAuthority =
 /** The qualified branch, named so helpers need no narrowing gymnastics. */
 type QualifiedAuthority = Extract<ServingAuthority, { mode: "qualified" }>;
 
-/** The declaration files this authority reads, named as a closed union. */
-type UnoDeclarationKind = "selection" | "manifest" | "presentation" | "profile";
-
-/**
- * The bounded reader for one fixed declaration file, or `null` when it is absent, oversized or not JSON.
- *
- * WHY LITERAL COMPONENTS. A build-time file trace follows *literal* path components and cannot see a path assembled from a constant.
- * A page bundle and the refusal responder bundle are traced separately from a route handler, and an exact-file
- * `outputFileTracingIncludes` entry is not honoured for them, so a declaration read through a computed path is present locally and
- * absent on a host — which is exactly how a published Site came to refuse on the platform while the same decision succeeded in a
- * route handler. Building the path here from literal components keeps the declaration discoverable by the tracer, and the shape
- * mirrors the one the authored content reader already relies on.
- */
-function readDeclarationJson(root: string, kind: UnoDeclarationKind, maxBytes: number): unknown | null {
-  try {
-    const path =
-      kind === "manifest"
-        ? resolve(root, "deployment", "efs", "manifest.json")
-        : kind === "presentation"
-          ? resolve(root, "deployment", "site.config.json")
-          : kind === "profile"
-            ? resolve(root, "deployment", "uno.deploy.json")
-            : resolve(root, "deployment", "uno.config.json");
-    const stats = statSync(path);
-    if (!stats.isFile() || stats.size > maxBytes) return null;
-    return JSON.parse(readFileSync(path, "utf8")) as unknown;
-  } catch {
-    return null;
-  }
-}
-
 /** The bounded reader for one fixed declaration file, or `null` when it is absent, oversized or not JSON. */
 function readFixedJson(root: string, relativePath: string, maxBytes: number): unknown | null {
   try {
@@ -180,8 +151,8 @@ function declaredVersion(value: unknown): number | null {
  */
 function readAuthority(): ServingAuthority {
   const root = process.cwd();
-  const manifest = readDeclarationJson(root, "manifest", UNO_SOURCE_LIMITS.manifestBytes);
-  const selection = readDeclarationJson(root, "selection", UNO_SOURCE_LIMITS.configBytes);
+  const manifest = readFixedJson(root, UNO_MANIFEST_PATH, UNO_SOURCE_LIMITS.manifestBytes);
+  const selection = readFixedJson(root, UNO_SELECTION_PATH, UNO_SOURCE_LIMITS.configBytes);
   if (manifest === null || selection === null) {
     return { mode: "refused", reason: "serving:authority-unavailable" };
   }
@@ -200,7 +171,7 @@ function readAuthority(): ServingAuthority {
   const deployed = resolveUnoDeployOrigin({
     statement: readUnoDeployEnvironment(),
     committedCanonical: committed.base.canonical,
-    profile: readDeclarationJson(root, "profile", UNO_SOURCE_LIMITS.configBytes),
+    profile: readFixedJson(root, UNO_DEPLOY_PROFILE_PATH, UNO_SOURCE_LIMITS.configBytes),
   });
   if (deployed.mode === "refused") return { mode: "refused", reason: "serving:deploy-origin-invalid" };
 

@@ -706,7 +706,10 @@ test('README and AGENTS describe the current technical baseline truthfully', () 
   }
   // The local policy files state the real authority boundary, not a frozen historical status line.
   assert.match(agents, /Owner request authorizes/i);
-  assert.match(agents, /Push, release and deployment/i);
+  // Standing Owner direction: routine pushes and their automatic production deployment are authorized; release tagging, provider
+  // activation, expenditure and unrelated infrastructure keep their own boundary.
+  assert.match(agents, /Routine pushes of stable, verified work/i);
+  assert.match(agents, /public release tagging, live provider activation, expenditure and unrelated infrastructure/i);
   assert.match(doc('.documents/SOP/sop-implementation.md'), /not authorization/i);
 
   // The README must point progress at GitHub instead of freezing a stage or a commit.
