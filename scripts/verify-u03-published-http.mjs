@@ -478,12 +478,15 @@ async function checkContactEndpoints(base) {
 
   const valid = { name: "Ada Lovelace", email: "ada@example.com", message: "A message for the fixture." };
 
-  // --- Contact: unconfigured is the shipped state, and it is honest about it -----------------------
+  // --- Contact: an unverified submission is refused before any transport exists ---------------------
+  // `U05` strengthened: the endpoint re-establishes the publication, the Page's declared form and the operator's explicit
+  // enablement *before* it validates a field or selects a transport. A request that names no served Page/form is therefore
+  // refused as unauthorised, and that refusal is itself the proof that no transport can be reached by a stranger.
   const accepted = await postJson("/api/contact", valid, { "x-forwarded-for": "198.51.100.1" });
   const acceptedBody = await accepted.json();
   check(
-    "CONTACT an unconfigured installation answers not-configured and claims no delivery",
-    accepted.status === 503 && acceptedBody.status === "not-configured",
+    "CONTACT an unverified submission is refused before any transport and claims nothing",
+    accepted.status === 403 && acceptedBody.status === "unauthorized" && /^contact:/u.test(String(acceptedBody.reason)),
     `status ${accepted.status} ${JSON.stringify(acceptedBody)}`,
   );
   check(
@@ -498,16 +501,35 @@ async function checkContactEndpoints(base) {
     !JSON.stringify(acceptedBody).includes("ada@example.com") && !JSON.stringify(acceptedBody).includes("Ada Lovelace"),
   );
 
-  for (const [name, payload, expected] of [
-    ["an invalid mailbox", { ...valid, email: "ada" }, "contact:email-invalid"],
-    ["a missing field", { name: "", email: "ada@example.com", message: "x" }, "contact:empty"],
-    ["an unknown field", { ...valid, admin: true }, "contact:unknown-field"],
-    ["a filled honeypot", { ...valid, website: "https://spam.example" }, "contact:honeypot-filled"],
+  // A claim for a Page that is served but declares no contact form is a deliberate `off`, not a failure: nothing was sent
+  // and the answer says so. This is the shipped state of the starter.
+  const declaredNothing = await postJson(
+    "/api/contact",
+    { ...valid, page: "/en-001", formRef: "home", siteId: "main" },
+    { "x-forwarded-for": "198.51.100.2" },
+  );
+  const declaredBody = await declaredNothing.json();
+  check(
+    "CONTACT a Page that declares no form answers off and sends nothing",
+    declaredNothing.status === 409 && declaredBody.status === "off" && declaredBody.reason === "contact:form-undeclared",
+    `status ${declaredNothing.status} ${JSON.stringify(declaredBody)}`,
+  );
+
+  // Every field-shaped attack is refused *before* validation, because none of them carries a verified claim. The field
+  // contract itself is proved exhaustively by the unit suite; what this server-side case proves is the ordering.
+  for (const [name, payload] of [
+    ["an invalid mailbox", { ...valid, email: "ada" }],
+    ["a missing field", { name: "", email: "ada@example.com", message: "x" }],
+    ["an unknown field", { ...valid, admin: true }],
+    ["a filled honeypot", { ...valid, website: "https://spam.example" }],
   ]) {
     const response = await postJson("/api/contact", payload, { "x-forwarded-for": `198.51.100.${String(Math.floor(Math.random() * 200) + 2)}` });
     const body = await response.json();
-    check(`CONTACT ${name} is refused by name`, response.status === 400 && body.reason === expected,
-      `status ${response.status} ${JSON.stringify(body)}`);
+    check(
+      `CONTACT ${name} never reaches validation without a verified claim`,
+      response.status === 403 && body.status === "unauthorized",
+      `status ${response.status} ${JSON.stringify(body)}`,
+    );
   }
 
   const malformed = await postJson("/api/contact", "{not json", { "x-forwarded-for": "198.51.100.30" });
@@ -544,7 +566,7 @@ async function checkContactEndpoints(base) {
   }
   const statuses = limited.map((response) => response.status);
   check("CONTACT the sixth rapid submission from one caller is refused with retry-after",
-    statuses.slice(0, 5).every((status) => status === 503) && statuses[5] === 429
+    statuses.slice(0, 5).every((status) => status === 403) && statuses[5] === 429
       && limited[5].headers.get("retry-after") !== null,
     JSON.stringify(statuses));
 
@@ -554,10 +576,17 @@ async function checkContactEndpoints(base) {
     const response = await request(`${base}${pathname}`);
     served.push({ pathname, body: response.body });
   }
+  // `U05`: the Site authors one public contact address and exposes it, so exactly one authorised `mailto:` appears on the
+  // Page that asks for it — and nowhere else. No form, no `tel:`, no second destination and no invented address.
+  const mailtoPages = served.filter((page) => /mailto:/iu.test(page.body)).map((page) => page.pathname);
+  const homeMailto = (served[0]?.body.match(/<a[^>]+href="mailto:[^"]+"/gu) ?? []).length;
   check(
-    "CONTACT no served Page carries a contact transport",
-    served.every((page) => !/mailto:|tel:/iu.test(page.body)),
-    served.filter((page) => /mailto:|tel:/iu.test(page.body)).map((page) => page.pathname).join(", "),
+    "CONTACT exactly one authorised public destination is served, and no form or invented number",
+    mailtoPages.length === 1 &&
+      mailtoPages[0] === "/en-001" &&
+      homeMailto === 1 &&
+      served.every((page) => !/<form/iu.test(page.body) && !/tel:/iu.test(page.body)),
+    JSON.stringify({ mailtoPages, homeMailto }),
   );
 
   // --- Analytics: accepted and stored nowhere, refusing everything else -----------------------------
