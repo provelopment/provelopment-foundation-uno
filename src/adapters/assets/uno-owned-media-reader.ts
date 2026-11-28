@@ -19,7 +19,7 @@
  */
 import { createHash } from "node:crypto";
 import { closeSync, fstatSync, lstatSync, openSync, readSync, realpathSync } from "node:fs";
-import { resolve, sep } from "node:path";
+import { join, resolve, sep } from "node:path";
 import {
   UNO_OWNED_MEDIA_LIMITS,
   unoOwnedMediaByteCap,
@@ -94,8 +94,20 @@ function resolveContainedPath(
   }
   components.push(...ref.path.split("/"));
 
+  // The zone root is selected with literal components, because a hosting platform decides what a function carries from the build's file
+  // trace and a trace follows literal components only. `unoOwnedMediaZoneRoot` stays the single authority for the declared root, and the
+  // literal selection is required to agree with it before anything is read.
+  const literalRoot =
+    ref.zone === "page"
+      ? join(repoRoot, "deployment", "efs", "capsule")
+      : ref.zone === "theme"
+        ? join(repoRoot, "deployment", "content", "assets")
+        : ref.zone === "platform"
+          ? join(repoRoot, "public", "platform")
+          : join(repoRoot, "public", "_uno-generated");
   const rootAbsolute = resolve(repoRoot, ...rootComponents);
-  const absolute = resolve(repoRoot, ...components);
+  if (resolve(literalRoot) !== rootAbsolute) return { ok: false, reason: "media:escape" };
+  const absolute = join(literalRoot, ...components.slice(rootComponents.length));
   // Lexical containment first: a resolved path must still sit under its own zone root.
   if (!isContained(rootAbsolute, absolute)) return { ok: false, reason: "media:escape" };
 
@@ -181,4 +193,3 @@ export function readUnoOwnedMedia(request: UnoOwnedMediaReadRequest): UnoOwnedMe
     return refuse(classifyFsError(error));
   }
 }
-

@@ -36,15 +36,15 @@ const REQUEST_TIMEOUT_MS = 10_000;
 const SOURCE_URL = "https://github.com/provelopment/provelopment-foundation-uno";
 const EXPECTED_TITLE = "Foundation Uno | One organisation. One connected digital presence.";
 const EXPECTED_DESCRIPTION =
-  "Foundation Uno by Provelopment will give organisations clear ownership, structured content, reliable publishing and intentionally authored regional editions. Explore the live single-page example.";
+  "Foundation Uno by Provelopment gives organisations clear ownership, structured content, reliable publishing and intentionally authored regional editions. Explore the live single-page example.";
 const EYEBROW = "A Provelopment initiative · Open source · Next.js + TypeScript";
 const HERO_HEADING = "One organisation. One connected digital presence.";
 const HERO_LEAD =
-  "Foundation Uno will bring an organisation's websites, information and regional editions into one coherent publishing foundation.";
-const HERO_NOTE = "This is the live single-page introduction to Foundation Uno.";
+  "Foundation Uno brings an organisation's websites, information and regional editions into one coherent publishing foundation.";
+const HERO_NOTE = "This is the non-indexable introduction to Foundation Uno.";
 const APPROACH_HEADING = "A clear structure. Less duplication. Better decisions.";
-const APPROACH_INTRO = "Every part of the web presence will belong to one accountable organisation.";
-const EXAMPLES_HEADING = "What this will mean in practice";
+const APPROACH_INTRO = "Every part of the web presence belongs to one accountable organisation.";
+const EXAMPLES_HEADING = "What this means in practice";
 const EXAMPLES_INTRO = "Foundation Uno is designed for organisations that want clear communication,";
 const EXAMPLE_LABELS = Object.freeze([
   "Example: a community organisation",
@@ -64,12 +64,12 @@ const LEVEL_HEADINGS = Object.freeze([
   "Thoughtful regional editions",
 ]);
 const EXAMPLE_BULLETS = Object.freeze([
-  "Members will find the right service faster through clear organisation.",
-  "Editors will maintain one accountable source for each page.",
-  "The organisation will keep a consistent identity across its programmes.",
-  "Visitors will receive relevant wording and guidance by region.",
-  "Editors will control each edition instead of relying on automatic guesses.",
-  "Teams will review changes with predictable, testable publishing rules.",
+  "Members find the right service faster through clear organisation.",
+  "Editors maintain one accountable source for each page.",
+  "The organisation keeps a consistent identity across its programmes.",
+  "Visitors receive relevant wording and guidance by region.",
+  "Editors control each edition instead of relying on automatic guesses.",
+  "Teams review changes with predictable, testable publishing rules.",
 ]);
 const OBSOLETE_PHRASES = Object.freeze([
   "A1",
@@ -231,9 +231,10 @@ function checkHomePage(home) {
   );
   check("the eyebrow is the approved copy", text.includes(EYEBROW));
   check("the hero lead is the approved copy", text.includes(HERO_LEAD));
-  check("the hero lead uses forward-looking language", /will bring/i.test(text));
+  check("the hero lead is stated in the present tense", /brings an organisation/i.test(text) && !/will bring/i.test(text));
   check("the primary call to action is the approved copy", text.includes("Explore the open-source project"));
-  check("the secondary call to action is the approved copy", text.includes("See how it will work"));
+  check("the secondary call to action is the approved copy", text.includes("Explore the open-source project"));
+  check("the primary call to action opens the published Site", text.includes('href="/en-001"'));
   check("the hero note states this is the live single-page introduction", text.includes(HERO_NOTE));
 
   check("the approach heading is the approved copy", text.includes(APPROACH_HEADING));
@@ -242,15 +243,15 @@ function checkHomePage(home) {
     check("the " + heading + " feature is described", text.includes(heading), heading);
   }
   check(
-    "all five feature-benefit descriptions are forward-looking",
-    ["will own the entire foundation", "will have distinct places", "will serve a defined purpose",
-      "will draw from explicitly authored content sources", "will be written and maintained deliberately"]
+    "all five feature-benefit descriptions are stated in the present tense",
+    ["owns the entire foundation", "have distinct places", "serves a defined purpose",
+      "are drawn from explicitly authored content sources", "are written and maintained deliberately"]
       .every((phrase) => text.includes(phrase)),
   );
   check(
     "each described layer connects a capability to a benefit",
-    ["without competing owners", "without\\s+losing the connection", "clear, intentional experience",
-      "transparent record", "without\\s+the site guessing"]
+    ["without competing owners", "without\\s+losing the connection", "visitor only ever sees the Site",
+      "not published for an address is refused", "never one guessed from a device or location"]
       .every((pattern) => new RegExp(pattern).test(text)),
   );
 

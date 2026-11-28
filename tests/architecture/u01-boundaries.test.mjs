@@ -1607,8 +1607,11 @@ test('the U03 fixture transaction is used only by the sanctioned test runner', (
   }
   assert.deepEqual(
     [...fsModules].sort(),
-    ['src/adapters/assets/uno-owned-media-reader.ts', 'src/adapters/efs/uno-confined-source-reader.ts', 'src/config/uno-serving.ts'],
-    'only the confined reader, the owned-media reader and the fixed-declaration serving composition may touch the filesystem',
+    // `U07` tightened this: the serving composition reads its declarations through the confined reader too, so the two adapters are the
+    // only modules in the product that open a file. A declaration read that bypassed them would also be invisible to the build file
+    // trace, which is how a packaged function lost its inputs.
+    ['src/adapters/assets/uno-owned-media-reader.ts', 'src/adapters/efs/uno-confined-source-reader.ts'],
+    'only the confined reader and the owned-media reader may touch the filesystem',
   );
   for (const [path, content] of Object.entries(appSources)) {
     assert.equal(

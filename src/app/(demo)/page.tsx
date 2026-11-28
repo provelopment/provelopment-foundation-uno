@@ -46,22 +46,32 @@ export default function Page() {
               One organisation. One connected digital presence.
             </h1>
             <p className="uno-hero__lede">
-              Foundation Uno will bring an organisation&apos;s websites, information and regional
+              Foundation Uno brings an organisation&apos;s websites, information and regional
               editions into one coherent publishing foundation. Clear ownership and reusable
-              content will make updates simpler, keep messages consistent and give visitors a
-              dependable experience across every page.
+              content keep updates simple, messages consistent and the experience dependable
+              across every page.
             </p>
             <div className="uno-actions">
-              <a className="uno-button" href={SOURCE_URL} rel="noreferrer">
-                Explore the open-source project
+              {/* A document navigation is correct here: the published Site has its own root layout. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a className="uno-button" href="/en-001">
+                Open the published Site
               </a>
-              <a className="uno-button uno-button--quiet" href="#status">
-                See how it will work
+              <a className="uno-button uno-button--quiet" href={SOURCE_URL} rel="noreferrer">
+                Explore the open-source project
               </a>
             </div>
             <p className="uno-note">
-              This is the live single-page introduction to Foundation Uno. The examples below
-              illustrate the experience its complete publishing foundation will deliver.
+              This is the non-indexable introduction to Foundation Uno. The pages below describe the
+              publishing foundation as it works today; {' '}
+              {/* A document navigation is correct here: the published Site has its own root layout. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/en-001">Home</a>,{" "}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/en-001/about">About</a> and{" "}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/en-001/components">Components</a> are published by the same authoring and
+              validation rules this page describes.
             </p>
           </div>
         </section>
@@ -70,15 +80,15 @@ export default function Page() {
           <div className="uno-shell">
             <h2 id="organized-title">A clear structure. Less duplication. Better decisions.</h2>
             <p className="uno-section__lede">
-              Every part of the web presence will belong to one accountable organisation.
-              Five connected layers will keep information organised while giving each audience
+              Every part of the web presence belongs to one accountable organisation.
+              Five connected layers keep information organised while giving each audience
               the clarity and relevance it needs.
             </p>
             <ol className="uno-stack">
               <li>
                 <h3>One Entity</h3>
                 <p>
-                  One organisation will own the entire foundation. Teams will know who is
+                  One organisation owns the entire foundation. Teams know who is
                   responsible for every publication decision, without competing owners or
                   duplicated governance.
                 </p>
@@ -86,38 +96,38 @@ export default function Page() {
               <li>
                 <h3>Purposeful Facets</h3>
                 <p>
-                  Services, programmes and other areas of work will have distinct places within
-                  that organisation. Visitors will find the information relevant to them without
+                  Services, programmes and other areas of work have distinct places within
+                  that organisation. Visitors find the information relevant to them without
                   losing the connection to the wider brand.
                 </p>
               </li>
               <li>
                 <h3>Deliberate Sites</h3>
                 <p>
-                  Each Site will serve a defined purpose. Publication will select one public
-                  Site at a time, providing a clear, intentional experience instead of
-                  competing versions of the same presence.
+                  Each Site serves a defined purpose, and several Sites can be published side by
+                  side — each on its own address, each with its own authored Pages. Nothing is
+                  duplicated silently: a visitor only ever sees the Site that address belongs to.
                 </p>
               </li>
               <li>
                 <h3>Reliable Pages</h3>
                 <p>
-                  Pages will draw from explicitly authored content sources, including Markdown
-                  and JSON. Editors will review changes before publication, and teams will
-                  retain a transparent record of what was changed and why.
+                  Pages are drawn from explicitly authored content sources, including Markdown
+                  and JSON, and each one is validated before it can be published. A Page that is
+                  not published for an address is refused there rather than guessed at.
                 </p>
               </li>
               <li>
                 <h3>Thoughtful regional editions</h3>
                 <p>
-                  Language-and-region editions will be written and maintained deliberately.
-                  International and regional visitors will receive relevant information without
-                  the site guessing their language from a device or location.
+                  Language-and-region editions are written and maintained deliberately, and
+                  several can be published at once. International and regional visitors receive
+                  the edition that address declares, never one guessed from a device or location.
                 </p>
               </li>
             </ol>
             <p className="uno-note uno-note--inline">
-              The result will be a more understandable content structure for teams and a more
+              The result is a more understandable content structure for teams and a more
               consistent, trustworthy experience for their audiences.
             </p>
           </div>
@@ -125,39 +135,39 @@ export default function Page() {
 
         <section id="status" className="uno-section" aria-labelledby="status-title">
           <div className="uno-shell">
-            <h2 id="status-title">What this will mean in practice</h2>
+            <h2 id="status-title">What this means in practice</h2>
             <p className="uno-section__lede">
               Foundation Uno is designed for organisations that want clear communication,
-              reliable publishing and room to grow. These illustrative examples show the
-              practical benefits of the finished system.
+              reliable publishing and room to grow. These examples describe what the foundation
+              delivers today, and how an organisation uses it.
             </p>
             <div className="uno-grid">
               <article className="uno-card">
                 <h3>Example: a community organisation</h3>
                 <p>
                   A community organisation delivering training, outreach and membership
-                  services will present each programme in a dedicated area of one coherent
-                  website. Staff will publish reviewed updates without rebuilding the same
+                  services presents each programme in a dedicated area of one coherent
+                  website. Staff publish reviewed updates without rebuilding the same
                   information in several places.
                 </p>
                 <ul>
-                  <li>Members will find the right service faster through clear organisation.</li>
-                  <li>Editors will maintain one accountable source for each page.</li>
-                  <li>The organisation will keep a consistent identity across its programmes.</li>
+                  <li>Members find the right service faster through clear organisation.</li>
+                  <li>Editors maintain one accountable source for each page.</li>
+                  <li>The organisation keeps a consistent identity across its programmes.</li>
                 </ul>
               </article>
               <article className="uno-card">
                 <h3>Example: a service provider with regional audiences</h3>
                 <p>
-                  A service provider working with local and international clients will publish
+                  A service provider working with local and international clients publishes
                   separately authored regional editions of its key pages. Each audience will
                   receive information written for its needs, with explicit page addresses and
                   deliberate publication choices.
                 </p>
                 <ul>
-                  <li>Visitors will receive relevant wording and guidance by region.</li>
-                  <li>Editors will control each edition instead of relying on automatic guesses.</li>
-                  <li>Teams will review changes with predictable, testable publishing rules.</li>
+                  <li>Visitors receive relevant wording and guidance by region.</li>
+                  <li>Editors control each edition instead of relying on automatic guesses.</li>
+                  <li>Teams review changes with predictable, testable publishing rules.</li>
                 </ul>
               </article>
             </div>

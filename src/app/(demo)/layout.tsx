@@ -28,7 +28,7 @@ import '../globals.css';
 export const metadata: Metadata = {
   title: 'Foundation Uno | One organisation. One connected digital presence.',
   description:
-    'Foundation Uno by Provelopment will give organisations clear ownership, structured content, reliable publishing and intentionally authored regional editions. Explore the live single-page example.',
+    'Foundation Uno by Provelopment gives organisations clear ownership, structured content, reliable publishing and intentionally authored regional editions. Explore the live single-page example.',
   robots: {
     index: false,
     follow: false,

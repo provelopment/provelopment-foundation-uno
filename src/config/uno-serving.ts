@@ -12,20 +12,16 @@
  * matches nothing. This module reads no request header itself: only the thin document edge does, and it passes the value
  * here as an argument.
  */
-import { readFileSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { readUnoDeclarationValue } from "../adapters/efs/uno-confined-source-reader";
 import { readUnoOwnedMedia, type UnoOwnedMediaOwner } from "../adapters/assets/uno-owned-media-reader";
 import { planUnoPageAssets, readUnoPageAssetOccurrence, type UnoPageAssetPlan } from "../application/plan-uno-page-assets";
 import { planUnoPublicDiscovery, type UnoPublicDiscoveryEntry } from "../application/plan-uno-public-discovery";
 import { planUnoPublishedPage, type UnoPublishedPageAccepted } from "../application/plan-uno-published-page";
 import { resolveUnoCommittedBase } from "../application/resolve-uno-committed-base";
 import { readUnoDeployEnvironment } from "../adapters/deploy/uno-deploy-environment";
-import { resolveUnoDeployOrigin, UNO_DEPLOY_PROFILE_PATH } from "./uno-deploy-origin";
+import { resolveUnoDeployOrigin } from "./uno-deploy-origin";
 import { resolveUnoCommittedLocales } from "../application/resolve-uno-committed-locales";
 import {
-  UNO_MANIFEST_PATH,
-  UNO_PRESENTATION_PATH,
-  UNO_SELECTION_PATH,
   UNO_SOURCE_LIMITS,
   loadUnoCandidateSource,
 } from "../adapters/efs/uno-confined-source-reader";
@@ -124,18 +120,6 @@ type ServingAuthority =
 /** The qualified branch, named so helpers need no narrowing gymnastics. */
 type QualifiedAuthority = Extract<ServingAuthority, { mode: "qualified" }>;
 
-/** The bounded reader for one fixed declaration file, or `null` when it is absent, oversized or not JSON. */
-function readFixedJson(root: string, relativePath: string, maxBytes: number): unknown | null {
-  try {
-    const path = resolve(root, relativePath);
-    const stats = statSync(path);
-    if (!stats.isFile() || stats.size > maxBytes) return null;
-    return JSON.parse(readFileSync(path, "utf8")) as unknown;
-  } catch {
-    return null;
-  }
-}
-
 /** The declared version of an untrusted declaration record, or `null` when it states none. */
 function declaredVersion(value: unknown): number | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
@@ -151,8 +135,8 @@ function declaredVersion(value: unknown): number | null {
  */
 function readAuthority(): ServingAuthority {
   const root = process.cwd();
-  const manifest = readFixedJson(root, UNO_MANIFEST_PATH, UNO_SOURCE_LIMITS.manifestBytes);
-  const selection = readFixedJson(root, UNO_SELECTION_PATH, UNO_SOURCE_LIMITS.configBytes);
+  const manifest = readUnoDeclarationValue(root, "manifest", UNO_SOURCE_LIMITS.manifestBytes);
+  const selection = readUnoDeclarationValue(root, "selection", UNO_SOURCE_LIMITS.configBytes);
   if (manifest === null || selection === null) {
     return { mode: "refused", reason: "serving:authority-unavailable" };
   }
@@ -171,7 +155,7 @@ function readAuthority(): ServingAuthority {
   const deployed = resolveUnoDeployOrigin({
     statement: readUnoDeployEnvironment(),
     committedCanonical: committed.base.canonical,
-    profile: readFixedJson(root, UNO_DEPLOY_PROFILE_PATH, UNO_SOURCE_LIMITS.configBytes),
+    profile: readUnoDeclarationValue(root, "deployment-profile", UNO_SOURCE_LIMITS.configBytes),
   });
   if (deployed.mode === "refused") return { mode: "refused", reason: "serving:deploy-origin-invalid" };
 
@@ -1290,11 +1274,11 @@ export type UnoServingPresentation =
 /** Read and validate the fixed presentation file. Never throws, never falls back to another Site's entry. */
 function readPresentation(root: string): UnoServingPresentation {
   try {
-    if (!statSync(resolve(root, UNO_PRESENTATION_PATH)).isFile()) return { status: "absent" };
+    if (readUnoDeclarationValue(root, "presentation", UNO_SOURCE_LIMITS.configBytes) === null) return { status: "absent" };
   } catch {
     return { status: "absent" };
   }
-  const parsed = readFixedJson(root, UNO_PRESENTATION_PATH, UNO_SOURCE_LIMITS.configBytes);
+  const parsed = readUnoDeclarationValue(root, "presentation", UNO_SOURCE_LIMITS.configBytes);
   if (parsed === null) return { status: "invalid", reason: "presentation:not-object" };
   const validated = validateUnoPresentationConfig(parsed);
   return validated.accepted

@@ -688,12 +688,9 @@ type FixedJsonResult =
  * `deployment/efs/manifest.json` and `deployment/uno.config.json`. A confinement failure, an oversize
  * file, malformed UTF-8 or invalid JSON is a refusal — never an absence and never a fallback.
  */
-function readFixedJson(root: string, relativePath: string, cap: number): FixedJsonResult {
-  const segments = relativePath.split("/");
-  const walkIssue = componentIssue(root, segments);
-  if (walkIssue !== null) return { ok: false, code: walkIssue };
-
-  const read = readBoundedFile(join(root, ...segments), cap);
+/** One bounded read of an already-resolved path: size, UTF-8 and JSON in that order, one closed code per failure. */
+function parseBoundedJson(path: string, cap: number): FixedJsonResult {
+  const read = readBoundedFile(path, cap);
   if (!read.ok) return { ok: false, code: read.code };
 
   const decoded = decodeUtf8(read.bytes);
@@ -704,6 +701,45 @@ function readFixedJson(root: string, relativePath: string, cap: number): FixedJs
   } catch {
     return { ok: false, code: "content:json-parse" };
   }
+}
+
+/**
+ * The fixed declaration files a committed installation ships, by closed kind.
+ *
+ * WHY LITERAL COMPONENTS. A hosting platform packages each server route separately, and it decides what a function carries from the
+ * build's file trace. A trace follows *literal* path components; a path assembled from a constant is invisible to it. A declaration
+ * read through such a path is therefore present in the development checkout and absent from an independently packaged function, which
+ * is exactly how a published Page came to refuse its own address on the platform while the same decision succeeded in a route handler.
+ * Each `join` below is spelled with literal components for that reason, and `scripts/verify-u07-function-inputs.mjs` fails the build if
+ * a consuming bundle does not physically carry the file.
+ */
+export type UnoDeclarationFile = "manifest" | "selection" | "presentation" | "deployment-profile";
+
+/** Read one fixed declaration file through a literal, traceable path. */
+/** The same read, reduced to the parsed value or `null`, for a caller that needs no refusal code. */
+export function readUnoDeclarationValue(root: string, kind: UnoDeclarationFile, cap: number): unknown | null {
+  const read = readUnoDeclarationJson(root, kind, cap);
+  return read.ok ? read.data : null;
+}
+
+export function readUnoDeclarationJson(root: string, kind: UnoDeclarationFile, cap: number): FixedJsonResult {
+  const path =
+    kind === "manifest"
+      ? join(root, "deployment", "efs", "manifest.json")
+      : kind === "selection"
+        ? join(root, "deployment", "uno.config.json")
+        : kind === "presentation"
+          ? join(root, "deployment", "site.config.json")
+          : join(root, "deployment", "uno.deploy.json");
+  const components: Record<UnoDeclarationFile, readonly string[]> = {
+    manifest: ["deployment", "efs", "manifest.json"],
+    selection: ["deployment", "uno.config.json"],
+    presentation: ["deployment", "site.config.json"],
+    "deployment-profile": ["deployment", "uno.deploy.json"],
+  };
+  const walkIssue = componentIssue(root, components[kind]);
+  if (walkIssue !== null) return { ok: false, code: walkIssue };
+  return parseBoundedJson(path, cap);
 }
 
 /** Closed reason codes for the fixed declaration reads, kept distinct from a source refusal. */
@@ -773,10 +809,10 @@ async function analyzeLoad(
   const root = resolveTrustedRoot(request["repoRoot"]);
   if (!root.ok) return refuseLoad("source:root-invalid");
 
-  const manifest = readFixedJson(root.root, UNO_MANIFEST_PATH, UNO_SOURCE_LIMITS.manifestBytes);
+  const manifest = readUnoDeclarationJson(root.root, "manifest", UNO_SOURCE_LIMITS.manifestBytes);
   if (!manifest.ok) return refuseLoad(declarationRefusal(manifest.code));
 
-  const selection = readFixedJson(root.root, UNO_SELECTION_PATH, UNO_SOURCE_LIMITS.configBytes);
+  const selection = readUnoDeclarationJson(root.root, "selection", UNO_SOURCE_LIMITS.configBytes);
   if (!selection.ok) return refuseLoad(declarationRefusal(selection.code));
 
   const matched = qualified

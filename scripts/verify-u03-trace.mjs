@@ -44,6 +44,9 @@ const ALLOWED_PROJECT_PREFIXES = Object.freeze([
   "deployment/efs/manifest.json",
   "deployment/uno.config.json",
   "deployment/site.config.json",
+  // The hosting repository's own deployment profile (`U07`): a bounded declaration the Page reads to learn the origin it is served on.
+  // It is never shipped in the distributable artefact; it exists in this build because this repository is also a hosting repository.
+  "deployment/uno.deploy.json",
   `${CONTENT_ROOT}/`,
 ]);
 

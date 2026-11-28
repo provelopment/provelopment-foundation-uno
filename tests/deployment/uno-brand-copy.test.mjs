@@ -18,25 +18,25 @@ const read = (relative) => readFileSync(`${ROOT}/${relative}`, 'utf8');
 const COPY = Object.freeze({
   eyebrow: 'A Provelopment initiative · Open source · Next.js + TypeScript',
   heading: 'One organisation. One connected digital presence.',
-  lead: 'Foundation Uno will bring an organisation',
-  note: 'This is the live single-page introduction to Foundation Uno.',
+  lead: 'Foundation Uno brings an organisation',
+  note: 'This is the non-indexable introduction to Foundation Uno.',
   approach: 'A clear structure. Less duplication. Better decisions.',
-  examples: 'What this will mean in practice',
+  examples: 'What this means in practice',
   source: 'Built in the open. Designed for long-term ownership.',
   sourceLink: 'View Foundation Uno on GitHub',
   licence: 'The source is available under the Apache-2.0 licence.',
   footer: '© 2026 Provelopment. Foundation Uno is an open-source website foundation and a',
   title: 'Foundation Uno | One organisation. One connected digital presence.',
   description:
-    'Foundation Uno by Provelopment will give organisations clear ownership, structured content, reliable publishing and intentionally authored regional editions.',
+    'Foundation Uno by Provelopment gives organisations clear ownership, structured content, reliable publishing and intentionally authored regional editions.',
 });
 
 const LEVELS = Object.freeze([
-  ['One Entity', 'One organisation will own the entire foundation.'],
-  ['Purposeful Facets', 'Services, programmes and other areas of work will have distinct places within'],
-  ['Deliberate Sites', 'Each Site will serve a defined purpose.'],
-  ['Reliable Pages', 'Pages will draw from explicitly authored content sources, including Markdown'],
-  ['Thoughtful regional editions', 'Language-and-region editions will be written and maintained deliberately.'],
+  ['One Entity', 'One organisation owns the entire foundation.'],
+  ['Purposeful Facets', 'Services, programmes and other areas of work have distinct places within'],
+  ['Deliberate Sites', 'Each Site serves a defined purpose, and several Sites can be published side by'],
+  ['Reliable Pages', 'Pages are drawn from explicitly authored content sources, including Markdown'],
+  ['Thoughtful regional editions', 'Language-and-region editions are written and maintained deliberately, and'],
 ]);
 
 const EXAMPLE_LABELS = Object.freeze([
@@ -45,12 +45,12 @@ const EXAMPLE_LABELS = Object.freeze([
 ]);
 
 const EXAMPLE_BULLETS = Object.freeze([
-  'Members will find the right service faster through clear organisation.',
-  'Editors will maintain one accountable source for each page.',
-  'The organisation will keep a consistent identity across its programmes.',
-  'Visitors will receive relevant wording and guidance by region.',
-  'Editors will control each edition instead of relying on automatic guesses.',
-  'Teams will review changes with predictable, testable publishing rules.',
+  'Members find the right service faster through clear organisation.',
+  'Editors maintain one accountable source for each page.',
+  'The organisation keeps a consistent identity across its programmes.',
+  'Visitors receive relevant wording and guidance by region.',
+  'Editors control each edition instead of relying on automatic guesses.',
+  'Teams review changes with predictable, testable publishing rules.',
 ]);
 
 const RETIRED = Object.freeze([
@@ -63,6 +63,10 @@ const RETIRED = Object.freeze([
   'only the smallest pure primitives',
   'not a finished website',
   'no publication',
+  // Retired claim: publication never selects one public Site at a time. Uno publishes concurrent Sites.
+  'select one public Site',
+  'one public Site at a time',
+  'will bring an organisation',
 ]);
 
 const ACTIVE_SVG = /<script|<foreignObject|<image|xlink:href|\son[a-z]+\s*=|<!ENTITY|base64,/i;
@@ -188,13 +192,16 @@ test('the committed copy, official vector and design tokens satisfy the contract
   assert.deepEqual(auditBrandCopy(realFixture()), []);
 });
 
-test('the hero states the product promise in forward-looking language', () => {
+// The promise is stated in the present tense: the published Site exists, so the hero describes what Foundation Uno is
+// rather than what it will become.
+test('the hero states the product promise in the present tense', () => {
   const page = flat(read('src/app/(demo)/page.tsx'));
   assert.equal(page.includes(COPY.eyebrow), true);
   assert.equal(page.includes(COPY.heading), true);
   assert.equal(page.includes(COPY.lead), true);
   assert.equal(page.includes(COPY.note), true);
-  assert.equal(/will bring an organisation's websites/.test(page), true);
+  assert.equal(/brings an organisation's websites/.test(page), true);
+  assert.equal(/will bring an organisation's websites/.test(page), false);
 });
 
 test('all five features pair a capability with a user benefit', () => {

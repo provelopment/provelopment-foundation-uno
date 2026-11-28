@@ -156,6 +156,14 @@ jobs:
         run: node scripts/verify-u03-trace.mjs --expect committed
         shell: bash
 
+      # Blocking function-input contract gate (U07). The trace gate above proves the payload is *bounded*; this one proves every
+      # consuming bundle physically *carries* the declarations and authored sources it reads at request time. A platform packages each
+      # route separately, and a declaration read through a computed path is present in this checkout and absent from a packaged function;
+      # that is how a published Page came to refuse its own address on the live domain while this checkout served it.
+      - name: Function-input contract (packaged bundles carry what they read)
+        run: node scripts/verify-u07-function-inputs.mjs --self-test && node scripts/verify-u07-function-inputs.mjs
+        shell: bash
+
       - name: Run production HTTP (English demonstration)
         run: pnpm test:http
         shell: bash
