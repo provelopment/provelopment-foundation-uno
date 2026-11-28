@@ -730,3 +730,13 @@ previous 90-file tree).
 - **No independent audit has occurred.** This report is the Implementation Agent’s statement of what was built and
   measured; the Architect prepares the audit, and the auditor inspects the codebase rather than this narrative.
 
+**8. Live production verification of this candidate.** Candidate `179da66` was pushed (`ca90989..179da66`) and deployed by
+the existing Git-to-Vercel integration. The deployment marker is behavioural: `/en-001` began serving the newly
+authorised `mailto:hello@example.com`, which no earlier candidate could produce. Live HTTP: **17 of 17** checks pass
+(three Pages, discovery, health, the `/en` redirect, the undeclared 404, production-origin canonicals, exactly one
+public contact anchor in the markup with no invented `tel:`, an unverified submission refused `403` before any
+transport, a form-less Page refused `409 off`, and an extra field never reaching composition). Live browser: **24 of 24**
+combinations pass (two colour schemes, 320/390/768/1280 px, three Pages) with no overflow, broken image, console error or
+failed request, the skip link still the first keyboard stop, and the contact anchor visible and focusable at 320 px.
+Detailed evidence: `.documents/Reports/evidence/u08-live/findings.md`.
+
