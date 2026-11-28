@@ -1,23 +1,14 @@
 # Foundation Uno — Roadmap
 
-Unfinished stages and their exit gates, nothing more. **No stage in this file is
-accepted.** A stage closes only when the independent Chief Master Architect records
-`ACCEPT` against a published execution report, and the Owner authorises the next stage
-separately.
+This file is a public planning summary; the single execution report records executed results and independent acceptance. The Owner's 2026-11-28 completion direction at the end of this file is the controlling remaining scope, aligned with the canonical Google Drive PLAN.md. Historical stage entries are retained as evidence and context, not proof that the newly approved requirements are complete.
 
-This file is a public planning summary. It is not an authorisation, not an acceptance
-record, and not a substitute for an Owner instruction. **No implementation permission may
-be inferred from this file or from any other planning slot: planning describes intended
-stages, and only an Owner request authorises a local outcome.** Push, release and
-deployment each require their own separate Owner authorization.
+Owner requests authorize local implementation and verification. Stable, sufficiently verified pushes and their existing automatic Vercel deployments are standing-authorized; no repeated activation or per-push approval. No force-push, speculative build or report-only deployment. Final release/tag and live provider activation remain separate Owner decisions. Independent acceptance is required; no self-closure.
 
 ---
 
 ## Stage sequence
 
-Each stage depends on the previous stage's exit gate. Work may not start on a stage
-whose predecessor is still open. The stage names below are the canonical Foundation Uno
-sequence and must not be re-scoped by an implementation agent.
+The historical U00–U07 sequence remains. The Owner-approved completion direction below strengthens U02–U07 requirements and authorizes coordinated implementation across them without another administrative activation cycle. The agent must preserve all prior evidence and prove the new requirements before final closure.
 
 ### U00 — Safe foundation, independent repository and extraction contract
 
@@ -232,5 +223,46 @@ keep their own authorisation boundary and were not performed.
 U00 → U01 → U02 → U03 → U04 → U05 → U06 → U07
 ```
 
-There is no parallel track. A stage that cannot meet its exit gate stays open; it is
-never marked complete because unrelated checks passed.
+A requirement that cannot meet its exit gate stays open; it is never marked complete because unrelated checks passed. The final integrated completion and independent Cline audit gate below applies across the existing stages.
+
+---
+
+## Owner-approved completion direction — 2026-11-28
+
+This direction strengthens the U02–U07 exit criteria; it does not introduce a new U08 stage or erase earned historical evidence. The operational Uno baseline at `ca90989532e452467867bcad011dcaee477c5594` is not complete Foundation functional parity. Compare the pinned Foundation `main` at `fa599973a88ff77f6a8e012f3266c3c139b52c17` and inspect the actual current Uno checkout, preserving local assurance commits `11dff19` and `b8927b8` if present. Complete all applicable single-Entity functionality and every approved BLUEPRINT requirement. Exactly one Entity; concurrent independently publishable Facets/Sites; explicitly authored full locales; no multi-Entity Hub/Spoke runtime. No silent deferrals or acceptance based on scaffolding.
+
+### 1. Complete Foundation single-Entity functional parity
+
+Inventory each applicable Foundation contract, source, behavior and test: identity/publication; authored JSON/Markdown and source precedence; locales, dictionaries and switching; shell, navigation, footer, branding and asset roles; properties and public facts; application links and safe actions; assets/media; SEO and visibility; section families and modules; maps/directions/booking; contact; analytics; installation, configuration, release, upgrade, rollback and recovery. Include every approved Uno-specific BLUEPRINT obligation. For each, identify the exact reference, Uno implementation, executed positive/refusal evidence and disposition: verified equivalent, deliberate Uno adaptation, gap to close, or demonstrably outside Uno's single-Entity scope. Resolve every applicable gap. In particular, reconcile BLUEPRINT §5's additive inheritance, provenance, suppression and explicit exposure (including contact.phone/contact.email) with Uno's existing scalar nearest-wins implementation; do not assume they are equivalent. Reconcile schema decisions against source evidence and Owner-approved direction; never silently substitute a weaker contract. Preserve historical 17/17 family parity, 59/59 proxy and the existing 22 module identities, without claiming that these measure full functionality.
+
+### 2. Strict hexagonal architecture and real module extensibility
+
+Enforce inward dependencies: framework-free domain invariants; application use cases and inward-owned ports; driving UI/HTTP/CLI adapters; driven filesystem/environment/network/mail/provider adapters; thin composition roots. Keep publication, identity, ownership, visibility and privacy authority independent of capabilities. Move independent validation, execution, rendering and configuration out of centralized dispatch and move business orchestration out of HTTP handlers and configuration. Prefer clear bounded contracts and simple, maintainable implementations over abstraction for its own sake. Use deterministic typed/versioned compile-time registration, explicit dependencies and capability checks, bounded configuration and fail-closed unknown, duplicate, incompatible or unavailable registrations. No arbitrary executable authored code, dynamic third-party plugin loading or unnecessary microservices. Prove an additional synthetic module can be registered, validated, invoked/rendered, disabled and removed without editing unrelated modules or EFS/routing policy. Enforce resolved dependency edges (imports, type imports, re-exports, aliases, dynamic imports and transitive paths), cycles, server/client boundaries and mutation sensitivity. Preserve accepted authoring compatibility and physically packaged runtime inputs. Review the entire codebase, not just paths previously guarded.
+
+### 3. Connect ownership and unified licensing
+
+Owner direction of 2026-11-28: the Owner confirms ownership of Connect and expressly authorizes incorporation of Owner-owned Connect source into Foundation Uno under Uno's main Apache-2.0 license. Connect is an integral Uno module, not a separately licensed product or mandatory external runtime dependency. This supersedes previous Uno exclusions and separate-license assumptions for Connect. Select and pin the applicable source and contracts from the Foundation-integrated Connect and/or Owner-authorized upstream source; inspect their dependencies, security and provenance. Apply Uno's main LICENSE to the incorporated Owner-owned source, update affected rights records and retire conflicting separate Connect licence restrictions within Uno. Retain copyright attribution and third-party notices where legally required; the Owner grant does not relicense unrelated third-party IP. Do not publish unrelated private repository contents, real recipient settings, credentials or proprietary assets. Foundation and upstream references remain read-only; no ADVANCED durable delivery is implied by SIMPLE.
+
+### 4. Complete Connect contact: public mailto and SIMPLE
+
+Implement public contact projection and SIMPLE enquiries as independent capabilities behind module/application ports, based on the actual Foundation behavior. Public contact facts may reach explicit authorized references only, never inferred from private delivery policy. Support literal safe mailto and applicationLink resolution in applicable prose, action and list surfaces. Absent, disabled, revoked, suppressed, invalid or unauthorized public facts must produce inert text or a closed refusal, never an unauthorized address. Preserve qualified ancestry, explicit fact selection and Site/locale isolation. Public email and private recipients are independent.
+
+For every SIMPLE submission, server-side re-establish validated Entity/Facet/Site/Page/representation/publication and form identity; never trust a client-posted path, hidden field or claimed Site as authority. Use one shared render/submission authorization policy, with current facts rechecked on submission. Explicit Site/form enablement, stable form reference, authorized placement, localized name/email/subject/message and transactional acknowledgement, unique DOM IDs, consistent client/server schema, accessible validation and status, bounded streamed request input and time, honeypot, origin/request integrity and proportionate abuse/concurrency limits. Server-only recipient, sender and Reply-To policy; no visitor-controlled recipient or From, no header injection, arbitrary attachments or HTML. Exactly one authorized direct transport attempt; no queue, persistence or automatic retry in SIMPLE. Distinguish OFF, unavailable, invalid, offline accepted (not sent), provider accepted (not delivered), known refusal/not sent, and ambiguous outcomes. Resolve confirmed global enablement, unverified POST, section-derived Page path, mismatched fields, duplicate IDs and whole-body buffering. Retain pinned connection-level HTTPS/SSRF protections and fail-closed provider selection.
+
+### 5. Optional Resend adapter and secure operator setup
+
+Implement a server-only Resend driven adapter behind the mail transport port, optional and OFF by default. Use the fixed documented HTTPS API endpoint, TLS verification, bounded streaming/response and request deadlines, no redirects, explicit credential and recipient scope, safe plain text or escaped templates, no provider secrets/body in logs or responses, and honest safe error mapping. Use a non-PII opaque idempotency key per authorized attempt to prevent accidental duplicates without claiming cross-instance exactly-once delivery; never automatically retry SIMPLE. Test with injected transport and deterministic faults, without a live key or actual send.
+
+Ship a complete operator guide in the distribution and a placeholder-only environment/configuration example whose exact names match the implementation (e.g. RESEND_API_KEY=FILL_IN, private verified sender and recipient settings, provider OFF/Resend selection; no real login/password/token). Document: create a Resend account and enable MFA; use a dedicated verified sending subdomain; enter the exact SPF/DKIM DNS records supplied by the dashboard and verify DMARC alignment/rollout without breaking existing mail; generate a dedicated domain-restricted sending-only API key, separate development/staging/production keys; place credentials only in the hosting secret store or ignored local environment, never Git, client bundle, authored content or screenshots. Use a verified fixed From, server-allowlisted private To/CC, and validated visitor Reply-To, never send to arbitrary visitor-selected addresses. Describe key rotation/revocation, least privilege, quota and cost monitoring, distributed abuse protection for multi-instance production (do not claim in-memory protection is distributed), failure/timeout/ambiguous outcomes, consent/privacy and retention including provider logs, controlled smoke testing, disable/rollback and incident response. Link official documentation: https://resend.com/docs, https://resend.com/security, https://resend.com/changelog/new-api-key-permissions, https://resend.com/changelog/idempotency-keys. No live key, DNS modification, provider activation or real send until explicitly authorized. A real provider is not required to prove OFF/offline/mocked functionality.
+
+### 6. Integrated verification and deployment
+
+Run the full existing pipeline plus new module/architecture tests, parity evidence, public/internal fact tests, mailto and form authorization equivalence, cross-Site/locale/form/refusal tests, abuse/concurrency/body limits, Resend contract and fault tests, client/server secret leakage checks, accessibility, localized UI, real production HTTP/Chromium, emitted function-input/asset contracts, dependency/security and licensing scans, two independent clean rooms, upgrade/rollback/recovery. Verify exact candidate CI on Ubuntu and Windows, then the actual HTTPS production installation at https://uno.provelopment.com using the existing Git-to-Vercel pipeline and available Vercel MCP. Perform real visual and interaction verification at 320/390/768/1280, including safe non-transmitting contact demonstrations. No speculative or report-only deployments; preserve operational production. Local evidence, clean-room packaging and live deployment are all required, not interchangeable. No fake pass or unapproved provider activation.
+
+### 7. Independent Cline Plan-mode audit and final release gate
+
+After all implementation and verification are complete, the Architect prepares a standalone audit prompt for a fresh independent Cline Plan-mode agent against the exact candidate, canonical PLAN/BLUEPRINT, Foundation reference and executed evidence. The auditor remains read-only: independently inspect architecture/dependency boundaries, module extension, functional completeness, Connect rights, contact/Resend authorization and security, supply chain, secrets/privacy, packaging, accessibility and live evidence. Provide an audit report with severity, exact source location, reproducible evidence, impact, remediation and verification; distinguish confirmed defects from hypotheses and untested claims. The Implementation Agent remediates findings, reruns affected/full gates and submits for independent re-review. No final acceptance with unresolved applicable functionality or material architecture/security findings. The Architect's final acceptance and Owner's first-release/tag decision follow the independent audit and remediation. Live provider activation remains a separate Owner decision.
+
+### Governance and reporting
+
+The Owner request authorizes implementation and local verification. Standing authorization applies to stable, sufficiently verified pushes and their established automatic Vercel deployments; no per-task ACTIVE/work order or per-push approval, force-push, speculative resource use or unrelated infrastructure/provider action. Preserve unrelated local work. The sole repository execution report records actual results, exact SHA, artifact digest, production deployment and limitations; the Drive plan is direction, not a chronological execution log. Align README, AGENTS, architecture, roadmap, rights and operator docs with this Owner direction. The implementation agent owns engineering design and execution, not self-acceptance. Final completion requires all seven outcomes, the Cline audit and remediation/re-review, not just green CI or an accepted presentation slice.
