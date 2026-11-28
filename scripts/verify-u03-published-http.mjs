@@ -1827,7 +1827,9 @@ function preflight() {
  */
 function fixturePlan() {
   return {
-    declarations: [...PINNED_DECLARATIONS].map(([path, digest]) => ({ path, digest })),
+    // Both replaced declarations are listed with the digest observed at process start, so the transaction can prove it
+    // restores exactly what it found — including the manifest, whose historical pin was retired.
+    declarations: [MANIFEST, SELECTION].map((path) => ({ path, digest: DECLARATION_BASELINE.get(path) })),
     replacements: [
       { path: MANIFEST, bytes: Buffer.from(`${JSON.stringify(FIXTURE_MANIFEST, null, 2)}\n`, "utf8") },
       { path: SELECTION, bytes: Buffer.from(`${JSON.stringify(FIXTURE_SELECTION, null, 2)}\n`, "utf8") },
@@ -2014,8 +2016,8 @@ async function main() {
       // install() attempted its own rollback; the outer finally verifies it and keeps any recovery copy it needed.
       return 1;
     }
-    check("the fixture manifest is installed", sha256Of(MANIFEST) !== PINNED_DECLARATIONS.get(MANIFEST));
-    check("the fixture declaration is installed", sha256Of(SELECTION) !== PINNED_DECLARATIONS.get(SELECTION));
+    check("the fixture manifest is installed", sha256Of(MANIFEST) !== DECLARATION_BASELINE.get(MANIFEST));
+    check("the fixture declaration is installed", sha256Of(SELECTION) !== DECLARATION_BASELINE.get(SELECTION));
 
     await validateFixtureInProcess();
     if (failures.length > 0) {
@@ -2128,8 +2130,8 @@ const outcome = await main();
 // Step 4: the final `.next` must correspond to the ORIGINAL unpublished sources, so the committed configuration is
 // rebuilt and the two existing fail-closed gates are re-run against it. Nothing here can succeed on a stale fixture.
 const declarationsRestored =
-  sha256Of(MANIFEST) === PINNED_DECLARATIONS.get(MANIFEST) &&
-  sha256Of(SELECTION) === PINNED_DECLARATIONS.get(SELECTION);
+  sha256Of(MANIFEST) === DECLARATION_BASELINE.get(MANIFEST) &&
+  sha256Of(SELECTION) === DECLARATION_BASELINE.get(SELECTION);
 
 if (outcome === 0 && declarationsRestored) {
   process.stdout.write("\nverify-u03-published-http: rebuilding the committed unpublished configuration\n");
