@@ -1667,6 +1667,11 @@ async function main() {
     acceptedMutations.map((entry) => entry.rule).join("; "),
   );
   check("preflight the committed declaration matches its pin", configBefore === CONFIG_SHA, String(configBefore));
+  // Recorded, not asserted: the retired manifest digest is evidence of what changed, not a gate that blocks it.
+  process.stdout.write(
+    `  INFO  the manifest historical digest ${HISTORICAL_MANIFEST_SHA.slice(0, 12)}… was retired by the authorised ` +
+      `public-contact declaration; now ${manifestBefore.slice(0, 12)}…\n`,
+  );
   check("preflight the sample plate exists", existsSync(resolve(ROOT, PLATE_PATH)));
   const nextBin = nextBinPath();
   check("preflight the pinned Next CLI is installed", nextBin !== null);

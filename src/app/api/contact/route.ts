@@ -25,9 +25,9 @@ import {
 import { createUnoContactRateLimiter } from "../../../core/contact/uno-contact-rate-limit";
 import { authorizeUnoContactSubmission } from "../../../core/contact/uno-contact-authorization";
 import { composeUnoContactMessage } from "../../../core/contact/uno-contact-message";
-import { isUnoMailAddress } from "../../../core/contact/uno-contact-address";
 import { planUnoServingPage, readUnoServingContactFacts } from "../../../config/uno-serving";
 import { selectUnoMailTransport } from "../../../adapters/mail/uno-mail-transport-selection";
+import { readUnoContactPolicy } from "../../../adapters/mail/uno-contact-delivery-environment";
 
 /** Nothing about this route may be cached, prerendered or shared between visitors. */
 export const dynamic = "force-dynamic";
@@ -209,6 +209,7 @@ export async function POST(request: Request): Promise<Response> {
     canonicalUrl: page.delivery.canonicalUrl,
     publicPage: page.delivery.public,
     routePath: claimedPage,
+    pageId: page.identity.pageId,
     sections,
   });
 
@@ -223,8 +224,9 @@ export async function POST(request: Request): Promise<Response> {
     },
     declaration: { declared: facts.formRef !== null, formRef: facts.formRef },
     enablement: {
-      site: facts.siteEnabled ? "enabled" : "undeclared",
+      site: facts.formEnabled ? "enabled" : "undeclared",
       form: facts.formRef === null ? "undeclared" : "enabled",
+      placement: facts.placement,
       transport: facts.transport,
     },
     submission: { formRef: claimedForm, page: claimedPage, siteId: claimedSite },
@@ -253,16 +255,18 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // The recipient is server policy: the Site's own authored private address, never the visitor's choice.
-  const recipient = facts.privateRecipient;
-  if (recipient === null || !isUnoMailAddress(recipient)) {
-    return answer({ status: "unavailable", reason: "contact:recipient-unavailable" }, 503);
+  // The delivery policy is server configuration, independent of every public contact fact: the recipient, the sender
+  // and whether a Reply-To is used are decided here and nowhere else.
+  const policyResult = readUnoContactPolicy();
+  if (!policyResult.ok) {
+    return answer({ status: "unavailable", reason: policyResult.reason }, 503);
   }
+  const policy = policyResult.policy;
 
   const outcome = await selection.transport.send({
-    to: [recipient],
-    from: recipient,
-    replyTo: validated.submission.email,
+    to: policy.recipients,
+    from: policy.sender,
+    ...(policy.replyTo === "visitor" ? { replyTo: validated.submission.email } : {}),
     subject: composed.message.subject,
     text: composed.message.text,
     idempotencyKey: composed.message.idempotencyKey,

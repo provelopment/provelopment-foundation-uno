@@ -129,7 +129,7 @@ function composeBody(config: UnoResendConfig, message: UnoMailMessage): string {
     to: [...message.to],
     subject: message.subject,
     text: message.text,
-    reply_to: message.replyTo,
+    ...(message.replyTo === undefined ? {} : { reply_to: message.replyTo }),
   });
 }
 
@@ -186,7 +186,9 @@ export function createUnoResendMailTransport(options: {
       if (!isUnoMailAddress(message.from) || message.from !== config.sender.address) {
         return { kind: "refused", reason: "mail:unauthorized-sender" };
       }
-      if (!isUnoMailAddress(message.replyTo)) return { kind: "refused", reason: "mail:invalid-message" };
+      if (message.replyTo !== undefined && !isUnoMailAddress(message.replyTo)) {
+        return { kind: "refused", reason: "mail:invalid-message" };
+      }
       if (/[\r\n]/u.test(message.subject) || message.subject.length === 0) {
         return { kind: "refused", reason: "mail:invalid-message" };
       }

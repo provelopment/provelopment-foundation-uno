@@ -430,8 +430,19 @@ export interface UnoOutboundActionItem {
   readonly href: string;
 }
 
-/** One entry of a stand-alone `content.actions` list: a same-document fragment or a static outbound link. */
-export type UnoContentActionEntry = UnoActionItem | UnoOutboundActionItem;
+/**
+ * One authored application reference: an opaque key the document declares locally, never a URL and never a resolver.
+ *
+ * `UNO-WO-103 / R01` introduced this shape for prose list items; the stand-alone action list now shares it, so an
+author can point an action at a governed destination without embedding one.
+ */
+export interface UnoApplicationActionItem {
+  readonly label: string;
+  readonly linkId: string;
+}
+
+/** One entry of a stand-alone `content.actions` list: a fragment, a static outbound link, or an application reference. */
+export type UnoContentActionEntry = UnoActionItem | UnoOutboundActionItem | UnoApplicationActionItem;
 
 /**
  * `UNO-WO-112 / R01`: the three closed hero-action variants the donor authors, adopted as values.
@@ -1487,9 +1498,12 @@ function readContentActions(value: unknown, state: WalkState): UnoContentActionE
     if (item === null) throw new RefusedDocument("document:invalid-props");
     const isFragment = hasExactlyKeys(item, ["label", "targetId"], []);
     const isOutbound = hasExactlyKeys(item, ["label", "href"], []);
-    // Exactly one shape, never both and never neither: a mixed or superset entry is a props refusal before any label or
-    // destination is read, so a malformed entry can never be reinterpreted as the other form.
-    if (isFragment === isOutbound) throw new RefusedDocument("document:invalid-props");
+    const isReference = hasExactlyKeys(item, ["label", "linkId"], []);
+    // Exactly one shape, never two and never none: a mixed or superset entry is a props refusal before any label or
+    // destination is read, so a malformed entry can never be reinterpreted as another form.
+    if (Number(isFragment) + Number(isOutbound) + Number(isReference) !== 1) {
+      throw new RefusedDocument("document:invalid-props");
+    }
     const label = readBoundedText(
       item["label"],
       UNO_PAGE_DOCUMENT_LIMITS.labelCodePoints,
@@ -1504,6 +1518,12 @@ function readContentActions(value: unknown, state: WalkState): UnoContentActionE
       }
       items.push({ label, targetId });
       state.targets.push(targetId);
+      continue;
+    }
+    if (isReference) {
+      const linkId = readListItemLinkId(item["linkId"]);
+      state.linkIds.push(linkId);
+      items.push({ label, linkId });
       continue;
     }
     // A destination that is not even a string is a *shape* refusal; only a string can be a link refusal. This keeps

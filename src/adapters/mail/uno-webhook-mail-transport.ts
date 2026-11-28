@@ -38,7 +38,8 @@ export function createUnoWebhookMailTransport(
       const delivery = await deliverUnoContactSubmission(
         {
           page: message.idempotencyKey,
-          submission: { name: message.subject, email: message.replyTo, message: message.text },
+          // The receiver gets the composed envelope; the reply address is only present when the private policy allows one.
+          submission: { name: message.subject, email: message.replyTo ?? "", message: message.text },
         },
         transport,
       );

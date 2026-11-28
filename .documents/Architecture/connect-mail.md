@@ -10,6 +10,8 @@ on. Nothing here is required to run Foundation Uno.
 | Public contact facts (`mailto:` / `tel:` projection) | publishes only what a Site authors and explicitly exposes | `contact.email` / `contact.phone` with `public: true` **and** `expose: ["publicContact"]` |
 | SIMPLE contact form | inert notice | an authored `interaction.contact` section, a Site-authored contact fact, and a selected transport |
 | Mail transport | none | `UNO_CONTACT_TRANSPORT` (`offline` or `resend`), or a previously configured webhook |
+| Contact form | absent | explicit `UNO_CONTACT_FORM_ENABLED`, `UNO_CONTACT_FORM_SITE`, `UNO_CONTACT_FORM_PAGE` **and** a private delivery policy |
+| Private delivery policy | unset | `UNO_CONTACT_RECIPIENT`, `UNO_CONTACT_SENDER`, `UNO_CONTACT_SENDER_DOMAINS`, `UNO_CONTACT_REPLY_TO` |
 | Analytics | off | an authored analytics declaration **and** an operator destination |
 
 Publication, identity, ownership and privacy authority are decided outside these capabilities. Turning a transport on
@@ -58,6 +60,13 @@ Copy `deployment/uno.env.example` and fill it in a secret store. The names are e
 | `UNO_CONTACT_FROM` | the verified sender: `Name <noreply@mail.example.com>` |
 | `UNO_CONTACT_TO` | comma-separated server-allowlisted recipients (maximum 5) |
 | `UNO_CONTACT_FROM_DOMAINS` | comma-separated domains the sender must belong to |
+| `UNO_CONTACT_RECIPIENT` | the private recipient list (maximum 5). Never rendered, never returned |
+| `UNO_CONTACT_SENDER` | the private sender. Must belong to a listed domain |
+| `UNO_CONTACT_SENDER_DOMAINS` | the domains a sender may belong to |
+| `UNO_CONTACT_REPLY_TO` | `visitor` (default) or `none` |
+| `UNO_CONTACT_FORM_ENABLED` | `1`/`true` to allow a form at all |
+| `UNO_CONTACT_FORM_SITE` | the exact `facetId/siteId` the form may serve |
+| `UNO_CONTACT_FORM_PAGE` | the exact Page id whose declared form may submit |
 
 The adapter refuses a delivery when any of these is missing, malformed, or names a sender outside the listed
 domains. It refuses rather than falling back.

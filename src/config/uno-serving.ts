@@ -13,8 +13,6 @@
  * here as an argument.
  */
 import { readUnoDeclarationValue } from "../adapters/efs/uno-confined-source-reader";
-import { validateUnoManifestGraph } from "../core/efs/manifest-graph";
-import { resolveUnoProperties } from "../core/efs/properties";
 import { readUnoOwnedMedia, type UnoOwnedMediaOwner } from "../adapters/assets/uno-owned-media-reader";
 import { planUnoPageAssets, readUnoPageAssetOccurrence, type UnoPageAssetPlan } from "../application/plan-uno-page-assets";
 import { planUnoPublicDiscovery, type UnoPublicDiscoveryEntry } from "../application/plan-uno-public-discovery";
@@ -52,7 +50,9 @@ import { planUnoSiteNavigation, type UnoSiteNavigationOutcome } from "../applica
 import { resolveUnoContactWebhookConfig } from "../adapters/contact/uno-contact-webhook";
 import { projectUnoPublicContact } from "../application/project-uno-public-contact";
 import { selectUnoMailTransport } from "../adapters/mail/uno-mail-transport-selection";
-import { primaryPublicContactHref } from "../connect";
+import { readUnoContactFormEnablement } from "../adapters/mail/uno-contact-delivery-environment";
+import { resolveUnoApplicationLinks } from "../core/links/uno-application-link";
+import { createUnoApplicationLinkResolvers } from "../composition/uno-application-links";
 import { unoPageModulesAdmitted } from "../composition/uno-composition";
 import { resolveUnoAnalyticsForward } from "../adapters/analytics/uno-analytics-forward";
 import {
@@ -1319,14 +1319,17 @@ export interface UnoServingNavigationRequest {
 export interface UnoServingContactFacts {
   /** The served Page's own route path. The form posts this, never a section-derived guess. */
   readonly routePath: string;
-  /** The authored label of the public destination, or `null`. */
-  readonly publicContactLabel: string | null;
-  readonly publicContactHref: string | null;
+  /**
+   * Declaration id -> destination, resolved through the generic application-link boundary. The renderer only ever reads
+   * this table: it has no knowledge of any application key, and an unresolved declaration is simply absent.
+   */
+  readonly applicationLinks: ReadonlyMap<string, string>;
   readonly publicContactStatus: "available" | "absent" | "unavailable";
   readonly formRef: string | null;
-  readonly siteEnabled: boolean;
-  /** The Site-authored private recipient. Never rendered, never returned to a visitor. */
-  readonly privateRecipient: string | null;
+  /** True only when an operator explicitly enabled a form for THIS Site. A contact fact never enables one. */
+  readonly formEnabled: boolean;
+  /** True only when that declaration names THIS Page as the form's placement. */
+  readonly placement: "authorized" | "unauthorized" | "undeclared";
   readonly transport: "offline" | "provider" | "none";
 }
 
@@ -1350,42 +1353,6 @@ export function readUnoContactFormRef(sections: unknown): string | null {
   return ids.length === 1 ? (ids[0] ?? null) : null;
 }
 
-/** The authored contact facts of one Site: whether it declares any, and the private recipient it declares. */
-function readSiteContactFacts(
-  manifest: unknown,
-  facetId: string,
-  siteId: string,
-): { readonly authors: boolean; readonly recipient: string | null } {
-  try {
-    const graph = validateUnoManifestGraph(manifest);
-    if (!graph.accepted || graph.graph.entities.length !== 1) return { authors: false, recipient: null };
-    const entity = graph.graph.entities[0];
-    if (entity === undefined) return { authors: false, recipient: null };
-    const facet = entity.facets.find((candidate) => candidate.id === facetId);
-    const site = facet?.sites.find((candidate) => candidate.id === siteId);
-    const bags = [entity.properties, facet?.properties, site?.properties];
-    let authors = false;
-    for (const bag of bags) {
-      if (bag === undefined) continue;
-      if (bag["contact.email"] !== undefined || bag["contact.phone"] !== undefined) authors = true;
-    }
-    if (!authors || facet === undefined || site === undefined) return { authors, recipient: null };
-
-    const resolved = resolveUnoProperties([
-      { level: "entity", id: entity.id, ...(entity.properties === undefined ? {} : { properties: entity.properties }) },
-      { level: "facet", id: facet.id, ...(facet.properties === undefined ? {} : { properties: facet.properties }) },
-      { level: "site", id: site.id, ...(site.properties === undefined ? {} : { properties: site.properties }) },
-    ]);
-    if (!resolved.accepted) return { authors: true, recipient: null };
-    const email = resolved.resolved.properties["contact.email"];
-    const recipient =
-      email === undefined || email.status === "suppressed" || email.value === null ? null : email.value;
-    return { authors: true, recipient };
-  } catch {
-    return { authors: false, recipient: null };
-  }
-}
-
 /** Resolve the U05 contact facts for one served Page. Never throws; any failure means "nothing published, no form". */
 export function readUnoServingContactFacts(input: {
   readonly facetId: string;
@@ -1394,16 +1361,26 @@ export function readUnoServingContactFacts(input: {
   readonly canonicalUrl: string;
   readonly publicPage: boolean;
   readonly routePath: string;
+  /** The served Page's own id, the only placement an explicit form declaration may authorise. */
+  readonly pageId: string;
   readonly sections: unknown;
+  /** The served document's own application-link declarations, if it made any. */
+  readonly links?: Readonly<Record<string, { readonly key: string }>>;
 }): UnoServingContactFacts {
   const selection = selectUnoMailTransport();
   const transport: "offline" | "provider" | "none" = selection.status === "selected" ? selection.kind : "none";
 
-  let publicContactHref: string | null = null;
-  let publicContactLabel: string | null = null;
   let publicContactStatus: UnoServingContactFacts["publicContactStatus"] = "absent";
-  let siteEnabled = false;
-  let privateRecipient: string | null = null;
+  // `U05` strengthened: enablement is an explicit operator declaration naming this Site and this Page. A public or
+  // private contact fact never enables a form, which is why nothing below reads a property for it.
+  const formDeclaration = readUnoContactFormEnablement();
+  const formEnabled = formDeclaration.declared && formDeclaration.site === `${input.facetId}/${input.siteId}`;
+  const placement: UnoServingContactFacts["placement"] = !formEnabled
+    ? "undeclared"
+    : formDeclaration.page === input.pageId
+      ? "authorized"
+      : "unauthorized";
+  let applicationLinks: ReadonlyMap<string, string> = new Map<string, string>();
   try {
     const authority = readAuthority();
     if (authority.mode !== "refused") {
@@ -1416,31 +1393,26 @@ export function readUnoServingContactFacts(input: {
         publicationPublic: input.publicPage,
       });
       publicContactStatus = projection.kind;
-      publicContactHref = primaryPublicContactHref(projection, "email");
-      publicContactLabel =
-        projection.kind === "available"
-          ? (projection.methods.find((method) => method.channel === "email")?.label ?? null)
-          : null;
-      const authored = readSiteContactFacts(authority.manifest, input.facetId, input.siteId);
-      siteEnabled = authored.authors;
-      privateRecipient = authored.recipient;
+      // Generic resolution: the document's declarations are resolved through the composed resolvers. The renderer never
+      // learns an application key, and the Connect module never learns a declaration id.
+      applicationLinks = resolveUnoApplicationLinks(
+        input.links,
+        createUnoApplicationLinkResolvers({ publicContact: projection }),
+      );
+
     }
   } catch {
-    publicContactHref = null;
-    publicContactLabel = null;
     publicContactStatus = "unavailable";
-    siteEnabled = false;
-    privateRecipient = null;
+    applicationLinks = new Map<string, string>();
   }
 
   return Object.freeze({
     routePath: input.routePath,
-    publicContactLabel,
-    publicContactHref,
     publicContactStatus,
+    applicationLinks,
     formRef: readUnoContactFormRef(input.sections),
-    siteEnabled,
-    privateRecipient,
+    formEnabled,
+    placement,
     transport,
   });
 }

@@ -59,17 +59,20 @@ const CONTACT_FIELD_LABELS = Object.freeze({
  */
 export interface UnoSectionContact {
   readonly siteId: string;
-  readonly publicContactHref: string | null;
-  readonly publicContactLabel: string | null;
+  /**
+   * Declaration id -> destination, already resolved by the generic application-link boundary. This component holds no
+   * application key and no knowledge of which capability answered; an unresolved id is simply absent.
+   */
+  readonly applicationLinks: ReadonlyMap<string, string>;
   readonly formRef: string | null;
-  readonly siteEnabled: boolean;
+  /** True only when an operator explicitly enabled a form for this Site. A contact fact never enables one. */
+  readonly formEnabled: boolean;
+  /** True only when that declaration names this Page as the form's placement. */
+  readonly placement: "authorized" | "unauthorized" | "undeclared";
   readonly transport: "offline" | "provider" | "none";
   readonly routePath: string;
   readonly localeTag: string;
 }
-
-/** The reserved `linkId` a page document uses to ask for the Site's public contact destination. */
-const PUBLIC_CONTACT_LINK = "public-contact-email";
 
 /** One validated document plus the server-resolved media its sections declared. */
 export interface UnoPageSectionsProps {
@@ -554,15 +557,14 @@ function SectionNode({
               const href = "href" in item ? item.href : undefined;
               // `UNO-WO-104 / R01`: render a route anchor only through a server-proven projection.
               const routeHref = "routeTarget" in item ? routeHrefs?.get(`${node.id}:${itemIndex}`) : undefined;
-              // `U05`: the one reserved application reference resolves to the destination the Connect module
-              // authorised for THIS Site and Page. When it is absent, the label stays inert text.
-              const publicHref =
-                "linkId" in item && item.linkId === PUBLIC_CONTACT_LINK
-                  ? (contact?.publicContactHref ?? undefined)
-                  : undefined;
-              const resolvedHref = href ?? routeHref ?? publicHref;
+              // `U05`: any declared application reference resolves through the generic table. When it is absent the
+              // label stays inert text — no fallback destination is invented.
+              const applicationHref =
+                "linkId" in item ? (contact?.applicationLinks.get(item.linkId) ?? undefined) : undefined;
+              const resolvedHref = href ?? routeHref ?? applicationHref;
               const inert =
-                ("linkId" in item && publicHref === undefined) || ("routeTarget" in item && routeHref === undefined);
+                ("linkId" in item && applicationHref === undefined) ||
+                ("routeTarget" in item && routeHref === undefined);
               return (
                 <li key={itemIndex}>
                   {resolvedHref === undefined ? (
@@ -628,30 +630,47 @@ function SectionNode({
     case "content.actions":
       return (
         <ul className="uno-json-actions" id={node.id}>
-          {node.props.items.map((item, index) => (
-            <li
-              className="uno-json-action-item"
-              key={`${"targetId" in item ? item.targetId : item.href}:${index}`}
-            >
-              {/* `UNO-WO-081 / R01`: a fragment entry keeps its exact previous anchor; an outbound entry is an ordinary
-                  inert server-rendered link. No target, no script, no prefetch, no probe — the Visitor decides. */}
-              {"targetId" in item ? (
-                <a className="uno-json-action" href={`#${item.targetId}`}>
-                  {item.label}
-                </a>
-              ) : (
-                <a
-                  className="uno-json-action"
-                  href={item.href}
-                  {...(/^https:/iu.test(item.href)
-                    ? { rel: "noopener noreferrer", referrerPolicy: "no-referrer" as const }
-                    : {})}
-                >
-                  {item.label}
-                </a>
-              )}
-            </li>
-          ))}
+          {node.props.items.map((item, index) => {
+            // `UNO-WO-081 / R01` + `U05`: a fragment keeps its exact anchor, an outbound entry is an ordinary inert
+            // link, and an application reference resolves only through the generic table. An unresolved reference is
+            // inert text, never a guessed destination.
+            const applicationHref =
+              "linkId" in item ? (contact?.applicationLinks.get(item.linkId) ?? undefined) : undefined;
+            const key = "targetId" in item ? item.targetId : "linkId" in item ? item.linkId : item.href;
+            return (
+              <li className="uno-json-action-item" key={`${key}:${index}`}>
+                {"targetId" in item ? (
+                  <a className="uno-json-action" href={`#${item.targetId}`}>
+                    {item.label}
+                  </a>
+                ) : "linkId" in item ? (
+                  applicationHref === undefined ? (
+                    <span className="uno-json-action-application-label">{item.label}</span>
+                  ) : (
+                    <a
+                      className="uno-json-action"
+                      href={applicationHref}
+                      {...(/^https:/iu.test(applicationHref)
+                        ? { rel: "noopener noreferrer", referrerPolicy: "no-referrer" as const }
+                        : {})}
+                    >
+                      {item.label}
+                    </a>
+                  )
+                ) : (
+                  <a
+                    className="uno-json-action"
+                    href={item.href}
+                    {...(/^https:/iu.test(item.href)
+                      ? { rel: "noopener noreferrer", referrerPolicy: "no-referrer" as const }
+                      : {})}
+                  >
+                    {item.label}
+                  </a>
+                )}
+              </li>
+            );
+          })}
         </ul>
       );
 
@@ -1101,7 +1120,8 @@ function SectionNode({
         liveFormRef !== null &&
         liveFormRef === node.id &&
         livePath !== "" &&
-        contact?.siteEnabled === true &&
+        contact?.formEnabled === true &&
+        contact.placement === "authorized" &&
         contact.transport !== "none";
       return (
         <section

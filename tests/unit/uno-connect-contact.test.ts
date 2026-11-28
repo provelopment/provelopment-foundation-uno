@@ -151,7 +151,7 @@ describe("the shared contact authorization policy", () => {
     localeTag: "en-001",
   };
   const declaration = { declared: true, formRef: "contact-form" };
-  const enabled = { site: "enabled", form: "enabled", transport: "provider" } as const;
+  const enabled = { site: "enabled", form: "enabled", placement: "authorized", transport: "provider" } as const;
   const submission = { formRef: "contact-form", page: "/en-001/contact", siteId: SITE };
 
   it("allows exactly the submission the served Page declared, and binds the server identity", () => {

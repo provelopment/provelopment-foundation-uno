@@ -121,16 +121,19 @@ async function renderPage(
       canonicalUrl: page.delivery.canonicalUrl,
       publicPage: page.delivery.public,
       routePath: page.identity.pathname,
+      pageId: page.identity.pageId,
       sections: page.document.pageDocument.sections,
+      // The Page's own declarations: the generic resolver turns each application key into a destination, or nothing.
+      ...(page.document.pageDocument.links === undefined ? {} : { links: page.document.pageDocument.links }),
     });
     body = (
       <UnoPageSections
         contact={{
           siteId: page.identity.siteId,
-          publicContactHref: contact.publicContactHref,
-          publicContactLabel: contact.publicContactLabel,
+          applicationLinks: contact.applicationLinks,
           formRef: contact.formRef,
-          siteEnabled: contact.siteEnabled,
+          formEnabled: contact.formEnabled,
+          placement: contact.placement,
           transport: contact.transport,
           routePath: contact.routePath,
           localeTag: page.identity.localeTag,

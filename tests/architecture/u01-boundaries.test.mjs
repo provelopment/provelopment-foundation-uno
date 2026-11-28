@@ -191,6 +191,7 @@ export const ADAPTER_AUTHORED_FILES = Object.freeze([
   'src/adapters/analytics/uno-analytics-forward.ts',
   // `U07`: the deployment environment adapter is the one place that reads the three environment facts a deployment may state about
   // itself. Outside-world access belongs in an adapter, so the configuration layer that composes a serving decision stays free of it.
+  'src/adapters/mail/uno-contact-delivery-environment.ts',
   'src/adapters/deploy/uno-deploy-environment.ts',
   'src/adapters/mail/uno-mail-transport-selection.ts',
   'src/adapters/mail/uno-offline-mail-transport.ts',
@@ -260,6 +261,8 @@ export const CORE_AUTHORED_FILES = Object.freeze([
   'src/core/ports/uno-mail-transport.ts',
   'src/core/contact/uno-contact-rate-limit.ts',
   'src/core/efs/uno-locales.ts',
+  'src/core/links/uno-application-link.ts',
+  'src/core/contact/uno-contact-delivery-policy.ts',
   'src/core/modules/capability-registry.ts',
   'src/core/page-authoring-policy.ts',
   'src/core/page-content.ts',

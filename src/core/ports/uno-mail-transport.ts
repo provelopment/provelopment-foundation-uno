@@ -20,7 +20,7 @@ export interface UnoMailMessage {
   /** The verified sender identity an operator configured. */
   readonly from: string;
   /** The visitor's validated address, used only as `Reply-To`. */
-  readonly replyTo: string;
+  readonly replyTo?: string;
   /** A server-composed subject line. Bounded, single-line, no header separators. */
   readonly subject: string;
   /** The plain-text body. No HTML, no attachments, no headers. */

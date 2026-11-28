@@ -23,6 +23,7 @@ export type UnoContactRefusalReason =
   | "contact:page-mismatch"
   | "contact:site-disabled"
   | "contact:form-disabled"
+  | "contact:form-placement"
   | "contact:transport-unavailable";
 
 /** The closed vocabulary as data, so a caller can enumerate it without copying literals. */
@@ -33,6 +34,7 @@ export const UNO_CONTACT_REFUSAL_REASONS: readonly UnoContactRefusalReason[] = O
   "contact:page-mismatch",
   "contact:site-disabled",
   "contact:form-disabled",
+  "contact:form-placement",
   "contact:transport-unavailable",
 ] as const);
 
@@ -64,6 +66,11 @@ export interface UnoContactFormDeclaration {
 export interface UnoContactEnablement {
   readonly site: "enabled" | "disabled" | "undeclared";
   readonly form: "enabled" | "disabled" | "undeclared";
+  /**
+   * Placement authorisation: the explicit declaration must name this Page as the one whose form may submit. An enabled
+   * form that is not placed here is not a form this Page may offer, and it is not one it may accept a submission from.
+   */
+  readonly placement: "authorized" | "unauthorized" | "undeclared";
   /** `none` means no transport is configured, so the honest answer is `unavailable`, never a fake success. */
   readonly transport: "offline" | "provider" | "none";
 }
@@ -128,6 +135,7 @@ export function authorizeUnoContactRender(input: {
   if (declaration.declared !== true) return refuse("off", "contact:form-undeclared");
   if (enablement.site !== "enabled") return refuse("off", "contact:site-disabled");
   if (enablement.form !== "enabled") return refuse("off", "contact:form-disabled");
+  if (enablement.placement !== "authorized") return refuse("off", "contact:form-placement");
   return allowed({ publication, declaration, enablement });
 }
 
@@ -165,5 +173,6 @@ export function authorizeUnoContactSubmission(input: {
   }
   if (enablement.site !== "enabled") return refuse("off", "contact:site-disabled");
   if (enablement.form !== "enabled") return refuse("off", "contact:form-disabled");
+  if (enablement.placement !== "authorized") return refuse("unauthorized", "contact:form-placement");
   return allowed({ publication, declaration, enablement });
 }
