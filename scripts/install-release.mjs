@@ -91,6 +91,9 @@ function run(command, args, cwd) {
     encoding: "utf8",
     shell: process.platform === "win32",
     env: { ...process.env, CI: "1" },
+    // A bounded command can fail; it can never hang the installer or the gate that drives it.
+    timeout: 900_000,
+    killSignal: "SIGKILL",
   });
   return { ok: result.status === 0, output: `${result.stdout ?? ""}${result.stderr ?? ""}`.slice(-4000) };
 }

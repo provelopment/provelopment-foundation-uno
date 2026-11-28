@@ -79,8 +79,22 @@ async function startInstalled(target) {
     cwd: target,
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, NODE_ENV: "production" },
+    // A process group makes shutdown deterministic on POSIX: the launcher and the server it spawns die together.
+    detached: process.platform !== "win32",
     windowsHide: true,
   });
+  const stop = () => {
+    try {
+      if (process.platform !== "win32") process.kill(-child.pid, "SIGKILL");
+      else child.kill();
+    } catch {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        // Already gone.
+      }
+    }
+  };
   let output = "";
   child.stdout.on("data", (chunk) => {
     output += String(chunk);
@@ -93,9 +107,13 @@ async function startInstalled(target) {
     if (Date.now() - started > READY_TIMEOUT_MS) throw new Error(`installed release did not start: ${output.slice(-2000)}`);
     try {
       const response = await fetch(`http://${HOST}:${port}/`, { redirect: "manual", signal: AbortSignal.timeout(10_000) });
-      if (response.status === 200) return { port, base, stop: () => child.kill() };
-    } catch {
-      // Not listening yet.
+      if (response.status === 200) return { port, base, stop };
+    } catch (error) {
+      // Only "not listening yet" is retried. Anything else is a defect in this gate and must surface at once, not after two minutes.
+      const code = typeof error === "object" && error !== null ? String(error.cause?.code ?? error.code ?? "") : "";
+      const transient = ["ECONNREFUSED", "ECONNRESET", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET", "EAI_AGAIN", "TimeoutError"].includes(code)
+        || String(error?.name ?? "") === "AbortError";
+      if (!transient) throw error;
     }
     await delay(250);
   }
@@ -487,11 +505,16 @@ export async function main() {
   const interrupted = spawn(
     process.execPath,
     [resolve(ROOT, "scripts/install-release.mjs"), join(transferred, "release"), cleanA, "upgrade"],
-    { cwd: ROOT, stdio: "ignore", windowsHide: true },
+    { cwd: ROOT, stdio: "ignore", detached: process.platform !== "win32", windowsHide: true },
   );
   await delay(1500);
-  interrupted.kill();
-  await delay(800);
+  try {
+    if (process.platform !== "win32") process.kill(-interrupted.pid, "SIGKILL");
+    else interrupted.kill();
+  } catch {
+    interrupted.kill("SIGKILL");
+  }
+  await delay(1200);
   const afterInterrupt = JSON.parse(readFileSync(join(cleanA, "installation.json"), "utf8"));
   report.check("U06_RECOVERY an interrupted install leaves the live installation recorded and intact", afterInterrupt.digest === packaged.digest);
   report.check(
