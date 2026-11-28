@@ -88,14 +88,16 @@ describe("the approved authored actions are supported as authored", () => {
   });
 });
 
-describe("the contact facts exist as authored keys and none of them is public", () => {
+describe("the contact facts exist as authored keys, and publication needs an explicit grant", () => {
   it("declares the canonical contact keys in the closed property vocabulary", () => {
     for (const key of ["contact.name", "contact.email", "contact.phone"]) {
       expect(UNO_PROPERTY_KEYS).toContain(key);
     }
   });
 
-  it("keeps every declared contact property non-public in the committed manifest", () => {
+  it("keeps every contact property private unless it names the one exposure surface", () => {
+    // The strengthened contract: `public: true` is necessary but never sufficient. A contact fact reaches a public
+    // surface only when it also carries `expose: ["publicContact"]`, and only the two contact addresses can carry it.
     const manifest = JSON.parse(readFileSync("deployment/efs/manifest.json", "utf8"));
     const entries: { key: string; value: unknown }[] = [];
     const walk = (value: unknown): void => {
@@ -111,11 +113,16 @@ describe("the contact facts exist as authored keys and none of them is public", 
     };
     walk(manifest);
     for (const entry of entries) {
-      expect(entry.value, entry.key).toMatchObject({ public: false });
+      const declaration = entry.value as { readonly public?: unknown; readonly expose?: unknown };
+      if (declaration.public === false) continue;
+      expect(declaration.public, entry.key).toBe(true);
+      expect(["contact.email", "contact.phone"], entry.key).toContain(entry.key);
+      expect(declaration.expose, entry.key).toEqual(["publicContact"]);
     }
   });
 
   it("never builds a contact destination in the renderer", () => {
+    // The destination is decided by the Connect module and arrives as a server fact; neither component may spell one.
     const renderer = readFileSync("src/components/uno-page-sections.tsx", "utf8");
     expect(renderer.includes("mailto:")).toBe(false);
     expect(renderer.includes("tel:")).toBe(false);

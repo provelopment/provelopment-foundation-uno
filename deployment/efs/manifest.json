@@ -6,6 +6,13 @@
         "brand.name": {
           "value": "Foundation Uno",
           "public": false
+        },
+        "contact.email": {
+          "value": "hello@example.com",
+          "public": true,
+          "expose": [
+            "publicContact"
+          ]
         }
       },
       "facets": [
@@ -15,13 +22,17 @@
             {
               "id": "main",
               "locales": {
-                "supportedLocales": ["en-001"],
+                "supportedLocales": [
+                  "en-001"
+                ],
                 "defaultLocale": "en-001"
               },
               "pages": [
                 {
                   "id": "home",
-                  "route": ["home"],
+                  "route": [
+                    "home"
+                  ],
                   "publication": "published",
                   "representations": [
                     {
@@ -37,7 +48,9 @@
                 },
                 {
                   "id": "about",
-                  "route": ["about"],
+                  "route": [
+                    "about"
+                  ],
                   "publication": "published",
                   "representations": [
                     {
@@ -53,7 +66,9 @@
                 },
                 {
                   "id": "components",
-                  "route": ["components"],
+                  "route": [
+                    "components"
+                  ],
                   "publication": "published",
                   "representations": [
                     {

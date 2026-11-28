@@ -622,3 +622,111 @@ is spent publishing a report. They ride with the next meaningful, verified repos
 
 **Open items for the Owner.** One: the U05 projection decision above (recommended Option B). Everything else in Foundation Uno is verified and
 operational.
+
+## Completion pass — Owner-directed parity, hexagonal architecture, Connect, contact and Resend
+
+**Applied direction.** The prepared roadmap amendment `1d91c09` was cherry-picked onto the local assurance history as
+`e0f3685`, so `11dff19` and `b8927b8` are preserved. The Foundation reference is pinned at `fa599973` and `ca90989`
+remains the last deployment. Nothing here is self-accepted; it is submitted for the independent audit.
+
+**1. Modular hexagonal architecture, enforced rather than arranged.** Layers are now proven by a resolved-edge gate
+(`scripts/verify-uno-module-boundaries.mjs`): **78 files, 169 resolved edges, 0 violations**, covering static imports,
+type-only imports, `export … from`, side-effect imports and dynamic `import()`. Its `--self-test` builds a temporary
+tree with one violation of each kind — a Node import in the framework-free core, an inward layer escaping outward, an
+unresolved specifier, a client component importing a server adapter, and a cycle — and fails unless all five are
+reported.
+
+Responsibilities were moved, not renamed:
+
+| Responsibility | Before | After |
+| --- | --- | --- |
+| Whether a form may render or submit | the route and a boolean prop | `src/core/contact/uno-contact-authorization.ts`, one policy for both |
+| The message a provider receives | the route | `src/core/contact/uno-contact-message.ts` |
+| Which transport exists | the route | `src/adapters/mail/uno-mail-transport-selection.ts` behind `src/core/ports/uno-mail-transport.ts` |
+| Which modules this build enables | implicit | `src/composition/uno-composition.ts`, consulted by the serving path |
+| Deployment environment names | `src/config` (reached by an adapter) | `src/core/deploy/uno-deploy-environment-names.ts` — a real violation the new gate found and this pass fixed |
+
+**2. Module extensibility, proved by exercise.** `src/core/modules/module-registry.ts` is a typed, versioned,
+fail-closed registry; `src/components/uno-module-host.tsx` is the only bridge to React. `tests/unit/uno-module-registry.test.ts`
+registers an additional synthetic module, validates its props through its own reader, invokes and renders it, disables it
+(render and validate both refuse), then removes it — and separately proves the refusals for an unknown capability, an
+incompatible version, a duplicate, a missing dependency and a removal another module still requires. No unrelated
+module, Page-document rule, routing policy or EFS declaration was edited to achieve it.
+
+**3. Connect incorporated; licensing reconciled.** `src/connect/` is an adapted subset of the Owner-owned Connect
+module (`modules/connect/src` at `fa599973`), incorporated under Uno’s Apache-2.0 `LICENSE` by the Owner’s direction of
+2026-11-28. `src/connect/PROVENANCE.md` records the exact upstream contracts, the adaptation and the boundaries; the
+distribution notice now states the incorporation instead of claiming no donor source ships. There is no external
+Connect runtime, package dependency or submodule, and no earlier exclusion survives.
+
+**4. Public contact and SIMPLE enquiries.** Publication and delivery are now independent, and neither is inferred.
+
+- **Exposure is explicit.** `src/core/efs/properties.ts` gained one exposure token, `publicContact`, admissible only on
+  `contact.email`/`contact.phone`, only with `public: true`, and never with a suppressed (`null`) value. `public` alone
+  still publishes nothing.
+- **Connect decides.** `projectPublicContact` answers `available`, `absent` or `unavailable` — three outcomes, never a
+  boolean — keyed by the verified Site, checked against the verified authorisation reference and the Page’s own
+  publicity, and it builds the finished `mailto:`/`tel:` itself. A mailbox that could carry a header, a parameter or a
+  second recipient is refused.
+- **Provenance survives.** `src/application/project-uno-public-contact.ts` carries the declaring level and identifier
+  into the projection, so an inherited fact is published with the ancestry that authorised it.
+- **One slot, resolved.** A Page asks with a declared `linkId` of `public-contact-email`; an unresolvable reference
+  renders inert text. The demonstration now declares `contact.email` publicly and exposes it, and Home renders the live
+  `mailto:hello@example.com`.
+- **Submission re-establishes everything.** The handler re-plans the claimed Page through the same publication
+  authority, reads the form reference from that Page’s own validated document, and refuses a claim that disagrees with
+  what it proved. Render and submit share one policy, so they cannot disagree.
+- **Bounded and closed.** The body is read as a bounded stream (8 KiB, reading stops at the bound), the origin must
+  agree with the host when present, the honeypot is checked first, exactly one transport attempt is made, and there is
+  no queue, retry, scheduler or store.
+- **Truthful outcomes.** `off`, `unavailable`, `unauthorized`, `invalid`, `accepted`, `accepted-not-sent`, `refused`
+  and `ambiguous` each render their own sentence, from localized copy (English and Spanish, with an English fallback).
+
+**Findings from the earlier source audit, resolved:** the section-derived Page path (`page="/${node.id}"`) is gone —
+the form posts the served route path; an unverified POST now re-plans the Page; whole-body buffering is replaced by a
+bounded stream; duplicate DOM ids cannot occur because one Page declares at most one form reference; and global
+enablement is replaced by three independent facts (a Site-authored contact fact, a Page-declared form, an
+operator-selected transport).
+
+**5. Optional Resend adapter.** `src/adapters/mail/uno-resend-mail-transport.ts` sits behind the mail port: one fixed
+HTTPS destination, pinned resolution with private answers refused, no redirects, bounded request/response/exchange,
+a sending-only key read at call time, a domain-restricted sender, server-allowlisted recipients, a validated visitor
+`Reply-To`, plain-text-only messages, an opaque idempotency key, and closed redacted diagnostics. It ships with
+`deployment/uno.env.example` (placeholders only) and `.documents/Architecture/connect-mail.md` (account security,
+dedicated subdomain, SPF/DKIM/DMARC, key creation and least privilege, secret storage, environment separation, testing,
+monitoring, rotation, revocation, disable and incident response). No key exists, no DNS record was touched, no provider
+was activated and no real message was sent.
+
+**6. Verification at this candidate.**
+
+| Gate | Result |
+| --- | --- |
+| Unit (vitest) | **1513 pass, 0 fail** across 44 files |
+| Architecture (`u01-boundaries`) | **47 pass, 0 fail** |
+| Resolved dependency boundaries | **78 files, 169 edges, 0 violations**; self-test reports all 5 injected kinds |
+| Lint / typecheck | clean |
+| Production build | succeeds; `/`, the three Pages, `robots.txt`, `sitemap.xml`, `/api/contact`, `/api/analytics`, `/api/uno-health`, owned media and the proxy all emit |
+| Function-input contract (`verify-u07-function-inputs`) | **6 pass, 0 fail** (named inputs per consuming bundle) |
+| Packaging trace (`verify-u03-trace`) | only the declared inputs and authored sources ship |
+| Distribution (`verify-u06-distribution`) | **195 pass, 0 fail** — two independent clean rooms, upgrade, rollback, recovery, reproducibility, contact OFF |
+| Bootstrap | **19 pass, 0 fail** |
+
+**Distribution identity at this candidate:** 108 files, tree digest
+`73291436b0645a8b32fe09614ff3c58314ffbf4721cbf9d221f3c7fe210418e0` (it supersedes `604e191a…`, which described the
+previous 90-file tree).
+
+**7. What this pass did not do — stated, not hidden.**
+
+- **Full Foundation parity is not claimed.** The family inventory (17/17), proxy parity (59/59) and module identities
+  (22/22) measured slices, not the whole product. Remaining applicable gaps, carried forward explicitly: maps and
+  directions adapters, a booking adapter, the OpenGraph image route, the contact-inquiry webhook provider variants and
+  the video provider adapters. Each is a deliberate deferral chosen to keep this pass verifiable, and none is described
+  as done.
+- **Abuse protection is per instance.** The in-process limiter is not distributed, and the operator guide says so.
+- **Connect is an adapted subset.** The upstream runtime, Hub/Spoke registry and durable delivery are not part of Uno and
+  are not implied by SIMPLE.
+- **No live provider.** Resend is proved with deterministic mocked responses only; contact delivery and analytics remain
+  OFF in production.
+- **No independent audit has occurred.** This report is the Implementation Agent’s statement of what was built and
+  measured; the Architect prepares the audit, and the auditor inspects the codebase rather than this narrative.
+

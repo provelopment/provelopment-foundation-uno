@@ -170,6 +170,11 @@ indexed.
 
 Both optional capabilities are **OFF by default**, and neither can be switched on by authored copy.
 
+**Public contact facts.** A Site publishes an address only when it authors `contact.email` or `contact.phone` with
+`"public": true` **and** `"expose": ["publicContact"]`. `public` alone publishes nothing, a `null` value or `"public": false`
+suppresses an inherited fact, and the destination is built by the Connect module (`src/connect/`), never by a renderer or by authored
+copy. A Page asks for it with a declared `linkId` of `public-contact-email`; an unresolvable reference stays inert text.
+
 **Contact delivery.** Unset, nothing is sent and the interface says so: the fields are read-only, there is no form, and no request
 leaves the server. To enable it, set server-only environment variables:
 
@@ -178,6 +183,11 @@ leaves the server. To enable it, set server-only environment variables:
 | `UNO_CONTACT_WEBHOOK_URL` | public `https` endpoint that receives one validated submission |
 | `UNO_CONTACT_WEBHOOK_HOSTS` | comma-separated allowlist; the destination host must match an entry or a subdomain of one |
 | `UNO_CONTACT_WEBHOOK_TOKEN` | optional bearer token sent to that endpoint |
+| `UNO_CONTACT_TRANSPORT` | `offline` (non-transmitting demonstration) or `resend` (one direct provider attempt). Absent means no transport |
+
+The Resend adapter and the full operator runbook (account security, subdomain, SPF/DKIM/DMARC, key creation, secret storage,
+environment separation, rotation, revocation and incident response) are documented in `.documents/Architecture/connect-mail.md`;
+placeholder configuration is in `deployment/uno.env.example`. No key is shipped and delivery stays off until an operator sets one.
 
 The destination is resolved before it is dialled, every resolved address is classified, and any private, loopback, link-local,
 reserved, multicast, documentation or IPv4-mapped answer refuses the send. The address that was validated is the address that is

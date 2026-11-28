@@ -81,6 +81,7 @@ export type UnoPropertyRefusal =
   | "property:invalid-declaration"
   | "property:invalid-value"
   | "property:invalid-public"
+  | "property:invalid-exposure"
   | "property:invalid-id"
   | "property:invalid-ancestry";
 
@@ -93,18 +94,33 @@ export const PROPERTY_REFUSAL_REASONS: readonly UnoPropertyRefusal[] = Object.fr
   "property:invalid-declaration",
   "property:invalid-value",
   "property:invalid-public",
+  "property:invalid-exposure",
   "property:invalid-id",
   "property:invalid-ancestry",
 ]);
 
 /**
  * One authored declaration: a bounded string, or literal `null` as an explicit suppression of an
- * inherited value. `public` is authorship metadata only — in U02 it never projects anywhere.
+ * inherited value.
+ *
+ * `public` is authorship metadata only. `expose` is the separate, explicit grant that lets one public fact reach
+ * one named surface: a declaration that says `public: true` without naming a surface still projects nowhere, so an
+ * owner cannot publish a contact address by accident.
  */
 export interface UnoPropertyDeclaration {
   readonly value: string | null;
   readonly public: boolean;
+  /** The named surfaces this fact may reach. Only `publicContact` exists, and only for contact facts. */
+  readonly expose?: readonly UnoPropertyExposure[];
 }
+
+/** The one admissible exposure token. A closed list, so a misspelt surface publishes nothing. */
+export const UNO_PROPERTY_EXPOSURES = Object.freeze(["publicContact"] as const);
+export type UnoPropertyExposure = (typeof UNO_PROPERTY_EXPOSURES)[number];
+
+/** The two keys a `publicContact` exposure can apply to. Anything else is refused rather than ignored. */
+const EXPOSABLE_KEYS: readonly UnoPropertyKey[] = Object.freeze(["contact.email", "contact.phone"]);
+
 
 /** One validated property bag. An absent bag is valid; a present bag is bounded and closed. */
 export type UnoPropertyBag = Readonly<Partial<Record<UnoPropertyKey, UnoPropertyDeclaration>>>;
@@ -123,6 +139,8 @@ export interface UnoPropertyResolution {
   readonly status: UnoPropertyStatus;
   readonly value: string | null;
   readonly public: boolean;
+  /** The exposure grant the declaring level authored, when it authored one. */
+  readonly expose?: readonly UnoPropertyExposure[];
   readonly origin: UnoPropertyOrigin;
 }
 
@@ -235,7 +253,7 @@ function analyzeBag(input: unknown): UnoPropertyBagResult {
   const bag = Object.create(null) as Record<string, UnoPropertyDeclaration>;
   for (const key of keys) {
     if (!isUnoPropertyKey(key)) return refuseBag("property:unknown-key");
-    const declaration = readDeclaration(record[key]);
+    const declaration = readDeclaration(key, record[key]);
     if (!declaration.ok) return refuseBag(declaration.reason);
     bag[key] = declaration.value;
   }
@@ -243,16 +261,22 @@ function analyzeBag(input: unknown): UnoPropertyBagResult {
 }
 
 /**
- * Validate one declaration: exactly one `value` of a bounded, non-blank string or literal `null`,
- * plus an optional boolean `public`. An unknown descriptor field is refused rather than ignored, so
- * a misspelt `isPublic` cannot silently mean "private".
+ * Validate one declaration: exactly one `value` of a bounded, non-blank string or literal `null`, an optional
+ * boolean `public`, and an optional `expose` grant.
+ *
+ * An unknown descriptor field is refused rather than ignored, so a misspelt `isPublic` cannot silently mean
+ * "private" and a misspelt `exposed` cannot silently mean "published". An exposure is a publication grant, so it
+ * is refused unless it names a known surface, applies to a contact key, and accompanies a public, non-suppressed
+ * value — three conditions that make "public" necessary but never sufficient.
  */
-function readDeclaration(raw: unknown): Step<UnoPropertyDeclaration> {
+function readDeclaration(key: UnoPropertyKey, raw: unknown): Step<UnoPropertyDeclaration> {
   const record = readOwnData(raw);
   if (record === null) return { ok: false, reason: "property:invalid-declaration" };
 
-  for (const key of Object.keys(record)) {
-    if (key !== "value" && key !== "public") return { ok: false, reason: "property:invalid-declaration" };
+  for (const field of Object.keys(record)) {
+    if (field !== "value" && field !== "public" && field !== "expose") {
+      return { ok: false, reason: "property:invalid-declaration" };
+    }
   }
   if (!Object.prototype.hasOwnProperty.call(record, "value")) {
     return { ok: false, reason: "property:invalid-declaration" };
@@ -265,17 +289,45 @@ function readDeclaration(raw: unknown): Step<UnoPropertyDeclaration> {
   }
 
   const value = record.value;
-  if (value === null) {
-    return { ok: true, value: Object.freeze({ value: null, public: declaredPublic }) };
+  if (value !== null) {
+    if (typeof value !== "string") return { ok: false, reason: "property:invalid-value" };
+    if (value.length === 0 || value.length > UNO_PROPERTY_LIMITS.valueLength) {
+      return { ok: false, reason: "property:invalid-value" };
+    }
+    if (value.trim().length === 0) return { ok: false, reason: "property:invalid-value" };
   }
-  if (typeof value !== "string") return { ok: false, reason: "property:invalid-value" };
-  if (value.length === 0 || value.length > UNO_PROPERTY_LIMITS.valueLength) {
-    return { ok: false, reason: "property:invalid-value" };
-  }
-  if (value.trim().length === 0) return { ok: false, reason: "property:invalid-value" };
 
-  return { ok: true, value: Object.freeze({ value, public: declaredPublic }) };
+  let expose: UnoPropertyExposure[] | undefined;
+  if (Object.prototype.hasOwnProperty.call(record, "expose")) {
+    const declared = record.expose;
+    if (!Array.isArray(declared) || declared.length === 0 || declared.length > UNO_PROPERTY_EXPOSURES.length) {
+      return { ok: false, reason: "property:invalid-exposure" };
+    }
+    const tokens: UnoPropertyExposure[] = [];
+    for (const token of declared) {
+      if (typeof token !== "string") return { ok: false, reason: "property:invalid-exposure" };
+      if (!(UNO_PROPERTY_EXPOSURES as readonly string[]).includes(token)) {
+        return { ok: false, reason: "property:invalid-exposure" };
+      }
+      if (tokens.includes(token as UnoPropertyExposure)) return { ok: false, reason: "property:invalid-exposure" };
+      tokens.push(token as UnoPropertyExposure);
+    }
+    if (!EXPOSABLE_KEYS.includes(key)) return { ok: false, reason: "property:invalid-exposure" };
+    if (!declaredPublic) return { ok: false, reason: "property:invalid-exposure" };
+    if (value === null) return { ok: false, reason: "property:invalid-exposure" };
+    expose = tokens;
+  }
+
+  return {
+    ok: true,
+    value: Object.freeze({
+      value: value === null ? null : (value as string),
+      public: declaredPublic,
+      ...(expose === undefined ? {} : { expose: Object.freeze(expose) }),
+    }),
+  };
 }
+
 
 
 /**
@@ -378,6 +430,7 @@ function analyzeAncestry(input: unknown): UnoPropertyResolutionResult {
         status,
         value: declaration.value,
         public: declaration.public,
+        ...(declaration.expose === undefined ? {} : { expose: declaration.expose }),
         origin: Object.freeze({ level, id }),
       });
       break;

@@ -24,7 +24,12 @@ import type { UnoPageMedia } from '../../../core/assets/uno-owned-media';
 import { UnoAnalyticsBeacon } from '../../../components/uno-interaction-island';
 import { UnoPageSections } from '../../../components/uno-page-sections';
 import { UnoSafeMarkdownPage, parseUnoSafeMarkdown } from '../../../components/uno-safe-markdown-page';
-import { planUnoServingDiscovery, planUnoServingNavigation, readUnoServingPresentationFacts } from '../../../config/uno-serving';
+import {
+  planUnoServingDiscovery,
+  planUnoServingNavigation,
+  readUnoServingContactFacts,
+  readUnoServingPresentationFacts,
+} from '../../../config/uno-serving';
 import { readSiteRequest, resolveSiteRequest } from './layout';
 
 /** Every request is decided from the committed authority on its own terms. */
@@ -107,9 +112,29 @@ async function renderPage(
   let body: ReactNode;
   if (page.document.kind === 'json') {
     if (page.document.pageDocument === undefined) notFound();
+    // `U05`: the contact facts come from the same served plan this Page was built from, so the form posts the real
+    // route path and the Page's own form reference rather than a section-derived guess.
+    const contact = readUnoServingContactFacts({
+      facetId: page.identity.facetId,
+      siteId: page.identity.siteId,
+      host,
+      canonicalUrl: page.delivery.canonicalUrl,
+      publicPage: page.delivery.public,
+      routePath: page.identity.pathname,
+      sections: page.document.pageDocument.sections,
+    });
     body = (
       <UnoPageSections
-        contactDelivery={facts.contactDelivery}
+        contact={{
+          siteId: page.identity.siteId,
+          publicContactHref: contact.publicContactHref,
+          publicContactLabel: contact.publicContactLabel,
+          formRef: contact.formRef,
+          siteEnabled: contact.siteEnabled,
+          transport: contact.transport,
+          routePath: contact.routePath,
+          localeTag: page.identity.localeTag,
+        }}
         document={page.document.pageDocument}
         media={media}
         routeHrefs={routeHrefs}

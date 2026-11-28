@@ -13,6 +13,8 @@
  * here as an argument.
  */
 import { readUnoDeclarationValue } from "../adapters/efs/uno-confined-source-reader";
+import { validateUnoManifestGraph } from "../core/efs/manifest-graph";
+import { resolveUnoProperties } from "../core/efs/properties";
 import { readUnoOwnedMedia, type UnoOwnedMediaOwner } from "../adapters/assets/uno-owned-media-reader";
 import { planUnoPageAssets, readUnoPageAssetOccurrence, type UnoPageAssetPlan } from "../application/plan-uno-page-assets";
 import { planUnoPublicDiscovery, type UnoPublicDiscoveryEntry } from "../application/plan-uno-public-discovery";
@@ -48,6 +50,10 @@ import {
 } from "../core/efs/uno-presentation";
 import { planUnoSiteNavigation, type UnoSiteNavigationOutcome } from "../application/plan-uno-site-navigation";
 import { resolveUnoContactWebhookConfig } from "../adapters/contact/uno-contact-webhook";
+import { projectUnoPublicContact } from "../application/project-uno-public-contact";
+import { selectUnoMailTransport } from "../adapters/mail/uno-mail-transport-selection";
+import { primaryPublicContactHref } from "../connect";
+import { unoPageModulesAdmitted } from "../composition/uno-composition";
 import { resolveUnoAnalyticsForward } from "../adapters/analytics/uno-analytics-forward";
 import {
   buildUnoCandidateRouteIndex,
@@ -457,6 +463,11 @@ function finishPage(
 ): UnoServingPageOutcome {
   if (planned.document.kind !== "json") return { status: "served", page: planned };
   if (planned.document.pageDocument === undefined) {
+    return { status: "not-served", reason: "serving:renderer-unavailable" };
+  }
+  // The composition root is the one authority on which modules this build enables. A document naming a module it
+  // does not enable is refused rather than rendered partially.
+  if (!unoPageModulesAdmitted(planned.document.pageDocument.sections)) {
     return { status: "not-served", reason: "serving:renderer-unavailable" };
   }
   const assets = planUnoPageAssets(planned);
@@ -1293,6 +1304,145 @@ export interface UnoServingNavigationRequest {
   readonly localeTag: string;
   readonly pageId: string;
   readonly pathname: string;
+}
+
+/**
+ * The contact facts one served Page needs (`U05`, strengthened): the public destination the Connect module
+ * authorised, the form reference the Page itself declares, whether the Site authors a governed contact fact, and
+ * which transport an operator selected.
+ *
+ * Every value is server-derived. `publicContactHref` comes from the authored property ancestry through Connect;
+ * `formRef` is the validated section id of the one contact module the Page declares; `siteEnabled` is true only
+ * when the authored ancestry declares a contact fact; and `transport` is the operator's selection, never authored
+ * copy. A visitor can influence none of them.
+ */
+export interface UnoServingContactFacts {
+  /** The served Page's own route path. The form posts this, never a section-derived guess. */
+  readonly routePath: string;
+  /** The authored label of the public destination, or `null`. */
+  readonly publicContactLabel: string | null;
+  readonly publicContactHref: string | null;
+  readonly publicContactStatus: "available" | "absent" | "unavailable";
+  readonly formRef: string | null;
+  readonly siteEnabled: boolean;
+  /** The Site-authored private recipient. Never rendered, never returned to a visitor. */
+  readonly privateRecipient: string | null;
+  readonly transport: "offline" | "provider" | "none";
+}
+
+/** Collect every declared contact module id in one validated document, in document order. */
+function collectContactFormIds(node: unknown, into: string[]): void {
+  if (typeof node !== "object" || node === null) return;
+  const record = node as { readonly module?: unknown; readonly id?: unknown; readonly children?: unknown };
+  if (record.module === "interaction.contact" && typeof record.id === "string") into.push(record.id);
+  if (Array.isArray(record.children)) {
+    for (const child of record.children) collectContactFormIds(child, into);
+  }
+}
+
+/** The one stable form reference a Page declares, or `null` when it declares none or more than one. */
+export function readUnoContactFormRef(sections: unknown): string | null {
+  if (!Array.isArray(sections)) return null;
+  const ids: string[] = [];
+  for (const section of sections) collectContactFormIds(section, ids);
+  // Two contact modules on one Page have no unambiguous identity, so the form stays unavailable rather than
+  // guessing which one a submission meant.
+  return ids.length === 1 ? (ids[0] ?? null) : null;
+}
+
+/** The authored contact facts of one Site: whether it declares any, and the private recipient it declares. */
+function readSiteContactFacts(
+  manifest: unknown,
+  facetId: string,
+  siteId: string,
+): { readonly authors: boolean; readonly recipient: string | null } {
+  try {
+    const graph = validateUnoManifestGraph(manifest);
+    if (!graph.accepted || graph.graph.entities.length !== 1) return { authors: false, recipient: null };
+    const entity = graph.graph.entities[0];
+    if (entity === undefined) return { authors: false, recipient: null };
+    const facet = entity.facets.find((candidate) => candidate.id === facetId);
+    const site = facet?.sites.find((candidate) => candidate.id === siteId);
+    const bags = [entity.properties, facet?.properties, site?.properties];
+    let authors = false;
+    for (const bag of bags) {
+      if (bag === undefined) continue;
+      if (bag["contact.email"] !== undefined || bag["contact.phone"] !== undefined) authors = true;
+    }
+    if (!authors || facet === undefined || site === undefined) return { authors, recipient: null };
+
+    const resolved = resolveUnoProperties([
+      { level: "entity", id: entity.id, ...(entity.properties === undefined ? {} : { properties: entity.properties }) },
+      { level: "facet", id: facet.id, ...(facet.properties === undefined ? {} : { properties: facet.properties }) },
+      { level: "site", id: site.id, ...(site.properties === undefined ? {} : { properties: site.properties }) },
+    ]);
+    if (!resolved.accepted) return { authors: true, recipient: null };
+    const email = resolved.resolved.properties["contact.email"];
+    const recipient =
+      email === undefined || email.status === "suppressed" || email.value === null ? null : email.value;
+    return { authors: true, recipient };
+  } catch {
+    return { authors: false, recipient: null };
+  }
+}
+
+/** Resolve the U05 contact facts for one served Page. Never throws; any failure means "nothing published, no form". */
+export function readUnoServingContactFacts(input: {
+  readonly facetId: string;
+  readonly siteId: string;
+  readonly host: string;
+  readonly canonicalUrl: string;
+  readonly publicPage: boolean;
+  readonly routePath: string;
+  readonly sections: unknown;
+}): UnoServingContactFacts {
+  const selection = selectUnoMailTransport();
+  const transport: "offline" | "provider" | "none" = selection.status === "selected" ? selection.kind : "none";
+
+  let publicContactHref: string | null = null;
+  let publicContactLabel: string | null = null;
+  let publicContactStatus: UnoServingContactFacts["publicContactStatus"] = "absent";
+  let siteEnabled = false;
+  let privateRecipient: string | null = null;
+  try {
+    const authority = readAuthority();
+    if (authority.mode !== "refused") {
+      const projection = projectUnoPublicContact({
+        manifest: authority.manifest,
+        facetId: input.facetId,
+        siteId: input.siteId,
+        host: input.host,
+        canonicalUrl: input.canonicalUrl,
+        publicationPublic: input.publicPage,
+      });
+      publicContactStatus = projection.kind;
+      publicContactHref = primaryPublicContactHref(projection, "email");
+      publicContactLabel =
+        projection.kind === "available"
+          ? (projection.methods.find((method) => method.channel === "email")?.label ?? null)
+          : null;
+      const authored = readSiteContactFacts(authority.manifest, input.facetId, input.siteId);
+      siteEnabled = authored.authors;
+      privateRecipient = authored.recipient;
+    }
+  } catch {
+    publicContactHref = null;
+    publicContactLabel = null;
+    publicContactStatus = "unavailable";
+    siteEnabled = false;
+    privateRecipient = null;
+  }
+
+  return Object.freeze({
+    routePath: input.routePath,
+    publicContactLabel,
+    publicContactHref,
+    publicContactStatus,
+    formRef: readUnoContactFormRef(input.sections),
+    siteEnabled,
+    privateRecipient,
+    transport,
+  });
 }
 
 /**

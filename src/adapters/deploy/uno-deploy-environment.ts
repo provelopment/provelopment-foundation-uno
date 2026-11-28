@@ -12,7 +12,11 @@
  *
  * PROVENANCE. Original **Uno-owned** implementation, class **NEW**. No provider SDK and no dependency.
  */
-import { UNO_DEPLOY_ORIGIN_ENV, UNO_VERCEL_ENV, UNO_VERCEL_PRODUCTION_URL } from "../../config/uno-deploy-origin";
+import {
+  UNO_DEPLOY_ORIGIN_ENV,
+  UNO_VERCEL_ENV,
+  UNO_VERCEL_PRODUCTION_URL,
+} from "../../core/deploy/uno-deploy-environment-names";
 
 /** The environment facts a deployment may state, as plain strings with absent values made explicit. */
 export interface UnoDeployEnvironment {

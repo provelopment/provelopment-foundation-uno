@@ -211,10 +211,13 @@ pipeline on both hosts. Operator documentation ships in the artefact.
 
 ### U07 — Full independent review and Owner-controlled first release
 
-**ACCEPTED AND OPERATIONAL.** The Architect independently verified the production installation at `ca90989` (GitHub and Vercel identical,
-both workflows successful) and accepted operational production readiness. One Owner decision remains open: whether the validated public
-contact-property projection is completed under an approved contract or formally deferred from `0.1.0` (recommended: defer; authored content
-already publishes a contact fact and the property layer stays closed). Release tagging, publication, provider activation and domain changes each
+**COMPLETION PASS IN PROGRESS — submitted for independent audit.** The Owner-approved completion direction of 2026-11-28 is
+implemented against the pinned Foundation reference `fa599973`: a resolved-edge dependency gate and a module registry with a
+proved synthetic-module exercise, the Owner-owned Connect module incorporated under Uno's Apache-2.0 licence, explicit
+public-contact exposure with a three-outcome projection, a re-established SIMPLE submission policy with bounded streamed
+input, and an optional server-only Resend adapter with placeholder configuration and an operator runbook. Remaining
+deferrals (maps/directions, booking, OpenGraph image, video providers, inquiry webhook variants) are recorded in the
+execution report; none is described as done. Release tagging, publication, live provider activation and domain changes each
 keep their own authorisation boundary and were not performed.
 
 ## Dependency summary

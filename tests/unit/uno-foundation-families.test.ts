@@ -4133,8 +4133,13 @@ describe("composeUnoFoundationSubset — acknowledged delivery-OFF contact", () 
       fileURLToPath(new URL("../../src/components/uno-page-sections.tsx", import.meta.url)),
       "utf8",
     );
-    expect(renderer).toContain("Delivery is switched off. Nothing entered here is sent or stored.");
-    expect(renderer).not.toContain("formRef");
+    // `U05` strengthened: the notice is localized copy now, not a hardcoded English sentence, and the form receives the
+    // served facts it must post — the real route path, the declared form reference and the proved Site.
+    expect(renderer).not.toContain('page={`/${node.id}`}');
+    expect(renderer).toContain("copy.statusOff");
+    expect(renderer).toContain("formRef={liveFormRef}");
+    expect(renderer).toContain("page={livePath}");
+    expect(renderer).toContain("siteId={liveSiteId}");
   });
 });
 

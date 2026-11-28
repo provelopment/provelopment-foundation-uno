@@ -192,6 +192,10 @@ export const ADAPTER_AUTHORED_FILES = Object.freeze([
   // `U07`: the deployment environment adapter is the one place that reads the three environment facts a deployment may state about
   // itself. Outside-world access belongs in an adapter, so the configuration layer that composes a serving decision stays free of it.
   'src/adapters/deploy/uno-deploy-environment.ts',
+  'src/adapters/mail/uno-mail-transport-selection.ts',
+  'src/adapters/mail/uno-offline-mail-transport.ts',
+  'src/adapters/mail/uno-resend-mail-transport.ts',
+  'src/adapters/mail/uno-webhook-mail-transport.ts',
 ]);
 
 /** Modules a concrete Node adapter must never import. */
@@ -235,6 +239,7 @@ export function scanAdapters(files) {
 export const CORE_AUTHORED_FILES = Object.freeze([
   'src/core/assets/uno-owned-media.ts',
   'src/core/video/uno-video-embeds.ts',
+  'src/core/deploy/uno-deploy-environment-names.ts',
   'src/core/efs/identity.ts',
   'src/core/efs/manifest-graph.ts',
   'src/core/efs/properties.ts',
@@ -247,6 +252,12 @@ export const CORE_AUTHORED_FILES = Object.freeze([
   'src/core/efs/uno-public-destination.ts',
   'src/core/analytics/uno-analytics.ts',
   'src/core/contact/uno-contact-submission.ts',
+  'src/core/contact/uno-contact-address.ts',
+  'src/core/contact/uno-contact-authorization.ts',
+  'src/core/contact/uno-contact-copy.ts',
+  'src/core/contact/uno-contact-message.ts',
+  'src/core/modules/module-registry.ts',
+  'src/core/ports/uno-mail-transport.ts',
   'src/core/contact/uno-contact-rate-limit.ts',
   'src/core/efs/uno-locales.ts',
   'src/core/modules/capability-registry.ts',

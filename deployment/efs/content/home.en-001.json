@@ -16,7 +16,10 @@
     {
       "id": "home-intro",
       "module": "content.heading",
-      "props": { "text": "A deliberately small starting point", "level": 2 }
+      "props": {
+        "text": "A deliberately small starting point",
+        "level": 2
+      }
     },
     {
       "id": "home-copy",
@@ -30,11 +33,47 @@
       "module": "content.stats",
       "props": {
         "items": [
-          { "value": "3", "label": "Published sample Pages" },
-          { "value": "1", "label": "Selected Site" },
-          { "value": "en-001", "label": "Authored locale" }
+          {
+            "value": "3",
+            "label": "Published sample Pages"
+          },
+          {
+            "value": "1",
+            "label": "Selected Site"
+          },
+          {
+            "value": "en-001",
+            "label": "Authored locale"
+          }
+        ]
+      }
+    },
+    {
+      "id": "home-contact",
+      "module": "content.heading",
+      "props": {
+        "text": "Contact",
+        "level": 2
+      }
+    },
+    {
+      "id": "home-contact-links",
+      "module": "content.prose",
+      "props": {
+        "variant": "list",
+        "items": [
+          {
+            "label": "Email the team",
+            "linkId": "public-contact-email"
+          }
         ]
       }
     }
-  ]
+  ],
+  "links": {
+    "public-contact-email": {
+      "reference": "applicationLink",
+      "key": "public-contact-email"
+    }
+  }
 }

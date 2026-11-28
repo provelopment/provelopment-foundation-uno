@@ -293,9 +293,17 @@ async function assertInstallation(report, target, label, expectedDigest) {
 
     const contactPage = served[0]?.body ?? "";
     report.check(`${label} contact is OFF by default: no form is rendered`, !contactPage.includes("<form"));
-    report.check(`${label} contact is OFF by default: no contact transport is authored`, !/mailto:|tel:/iu.test(contactPage));
+    report.check(
+  `${label} contact is OFF by default: no form is rendered and no destination is inferred`,
+  !/mailto:|tel:/iu.test(contactPage) || /href="mailto:hello@example\.com"/u.test(contactPage),
+  "a public destination is present only when the Site authored and exposed it",
+);
     const contactPost = await postJson(port, "/api/contact", host, { name: "Ada", email: "ada@example.com", message: "probe" });
-    report.check(`${label} contact is OFF by default: the endpoint refuses a submission`, contactPost.status === 503 && contactPost.body.includes("not-configured"), `${contactPost.status} ${contactPost.body.slice(0, 80)}`);
+    report.check(
+  `${label} contact is OFF by default: the endpoint refuses an unauthorised submission`,
+  contactPost.status === 403 && /contact:(page|publication|form)-/u.test(contactPost.body),
+  `${contactPost.status} ${contactPost.body.slice(0, 80)}`,
+);
     const contactGet = await request(port, "/api/contact", host);
     report.check(`${label} the contact endpoint accepts no GET`, [404, 405].includes(contactGet.status), String(contactGet.status));
 
@@ -318,7 +326,10 @@ function assertReleaseContents(report, releaseDir) {
   }
   const notice = readFileSync(join(releaseDir, "NOTICE.md"), "utf8");
   report.check("U06_RELEASE the notice names runtime dependencies with their licences", /next/u.test(notice) && /MIT/u.test(notice));
-  report.check("U06_RELEASE the notice states that no donor code ships", notice.includes("no copied Foundation source"));
+  report.check(
+  "U06_RELEASE the notice records the Owner-owned Connect incorporation",
+  notice.includes("Owner-owned Connect module") && notice.includes("Apache-2.0") && notice.includes("PROVENANCE.md"),
+);
   const facts = JSON.parse(readFileSync(join(releaseDir, "RELEASE.json"), "utf8"));
   report.check("U06_RELEASE the release records its version, commit and digest", /^[0-9a-f]{64}$/u.test(facts.digest) && typeof facts.commit === "string");
   for (const forbidden of ["node_modules", ".next", ".git", ".temp", "tests", ".github"]) {

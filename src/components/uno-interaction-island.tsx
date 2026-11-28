@@ -346,13 +346,7 @@ export function UnoExternalVideoIsland({
 
 
 import type { UnoContactField } from "../core/page-document";
-
-/** The readable label of each closed contact field. Fixed Uno chrome, never authored copy. */
-const FIELD_LABELS: Readonly<Record<UnoContactField, string>> = Object.freeze({
-  name: "Name",
-  email: "Email",
-  message: "Message",
-});
+import { unoContactLengthHint, type UnoContactCopy } from "../core/contact/uno-contact-copy";
 
 /** The declared client bounds, matching the contract the endpoint enforces. */
 const FIELD_LIMITS: Readonly<Record<UnoContactField, number>> = Object.freeze({
@@ -361,30 +355,52 @@ const FIELD_LIMITS: Readonly<Record<UnoContactField, number>> = Object.freeze({
   message: 4000,
 });
 
-/** What the visitor is told, and only what actually happened. */
+/** The readable label of one field, from the active localized copy set. */
+function fieldLabel(copy: UnoContactCopy, field: UnoContactField): string {
+  return field === "name" ? copy.labelName : field === "email" ? copy.labelEmail : copy.labelMessage;
+}
+
+/**
+ * What the visitor is told, and only what actually happened.
+ *
+ * Every state below corresponds to one closed answer the endpoint can give. There is deliberately no generic
+ * "sent" state: `accepted` and `accepted-not-sent` are different facts, and `ambiguous` never renders as success.
+ */
 type Outcome =
   | { readonly kind: "idle" }
   | { readonly kind: "sending" }
   | { readonly kind: "accepted" }
+  | { readonly kind: "accepted-not-sent" }
   | { readonly kind: "invalid"; readonly message: string }
-  | { readonly kind: "not-delivered" }
-  | { readonly kind: "unavailable" };
+  | { readonly kind: "off" }
+  | { readonly kind: "unauthorized" }
+  | { readonly kind: "unavailable" }
+  | { readonly kind: "refused" }
+  | { readonly kind: "ambiguous" };
 
 export interface UnoContactFormProps {
   readonly fields: readonly UnoContactField[];
   readonly submitLabel: string;
-  /** The Page path the submission names; a bounded, non-authoritative hint for the receiving endpoint. */
+  /** The served Page's own route path. The endpoint re-plans it and refuses a claim that disagrees. */
   readonly page: string;
+  /** The form reference the served Page declares. The endpoint reads it from the Page, not from this value. */
+  readonly formRef: string;
+  /** The Site whose publication was proved; sent only so the endpoint can compare it with its own proof. */
+  readonly siteId: string;
+  /** The localized copy set for the Page's proven locale. */
+  readonly copy: UnoContactCopy;
 }
+
 
 /** Render one form control with its label, hint and error wiring. */
 function Field(props: {
   readonly field: UnoContactField;
   readonly value: string;
   readonly invalid: boolean;
+  readonly copy: UnoContactCopy;
   readonly onChange: (value: string) => void;
 }) {
-  const { field, value, invalid, onChange } = props;
+  const { field, value, invalid, copy, onChange } = props;
   const id = `uno-contact-${field}`;
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
@@ -402,12 +418,12 @@ function Field(props: {
     <div className="uno-contact-field">
       {field === "message" ? (
         <>
-          <label htmlFor={id}>{FIELD_LABELS[field]}</label>
+          <label htmlFor={id}>{fieldLabel(copy, field)}</label>
           <textarea {...shared} maxLength={FIELD_LIMITS[field]} rows={6} />
         </>
       ) : (
         <>
-          <label htmlFor={id}>{FIELD_LABELS[field]}</label>
+          <label htmlFor={id}>{fieldLabel(copy, field)}</label>
           <input
             {...shared}
             autoComplete={field === "name" ? "name" : "email"}
@@ -417,11 +433,11 @@ function Field(props: {
         </>
       )}
       <p className="uno-contact-hint" id={hintId}>
-        {field === "message" ? `Up to ${FIELD_LIMITS[field]} characters.` : "Required."}
+        {field === "message" ? unoContactLengthHint(copy, FIELD_LIMITS[field]) : copy.requiredHint}
       </p>
       {invalid ? (
         <p className="uno-contact-error" id={errorId}>
-          {FIELD_LABELS[field]} needs a value{field === "email" ? " in the form name@example.com" : ""}.
+          {fieldLabel(copy, field)} {field === "email" ? copy.fieldEmailInvalid : copy.fieldRequired}.
         </p>
       ) : null}
     </div>
@@ -429,11 +445,13 @@ function Field(props: {
 }
 
 /** The form itself: three fields, one submit control, one status region and one honest outcome. */
-export function UnoContactForm({ fields, submitLabel, page }: UnoContactFormProps) {
+export function UnoContactForm({ fields, submitLabel, page, formRef, siteId, copy }: UnoContactFormProps) {
   const [values, setValues] = useState<Record<UnoContactField, string>>({ name: "", email: "", message: "" });
   const [invalid, setInvalid] = useState<readonly UnoContactField[]>([]);
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
+  const [honeypot, setHoneypot] = useState("");
   const summaryRef = useRef<HTMLDivElement | null>(null);
+  const formId = `uno-contact-form-${formRef}`;
 
   const sending = outcome.kind === "sending";
 
@@ -447,13 +465,36 @@ export function UnoContactForm({ fields, submitLabel, page }: UnoContactFormProp
     return problems;
   }
 
+  function statusText(): string {
+    switch (outcome.kind) {
+      case "sending":
+        return copy.sending;
+      case "accepted":
+        return copy.statusProviderAccepted;
+      case "accepted-not-sent":
+        return copy.statusOfflineAccepted;
+      case "off":
+        return copy.statusOff;
+      case "unauthorized":
+        return copy.statusNotSent;
+      case "unavailable":
+        return copy.statusUnavailable;
+      case "refused":
+        return copy.statusRefused;
+      case "ambiguous":
+        return copy.statusAmbiguous;
+      default:
+        return "";
+    }
+  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const problems = localProblems();
     setInvalid(problems);
     if (problems.length > 0) {
       // The summary is rendered by this very update, so focus moves once it exists rather than pointing at nothing.
-      setOutcome({ kind: "invalid", message: "Some fields need attention before this can be sent." });
+      setOutcome({ kind: "invalid", message: copy.statusInvalid });
       requestAnimationFrame(() => summaryRef.current?.focus());
       return;
     }
@@ -467,31 +508,36 @@ export function UnoContactForm({ fields, submitLabel, page }: UnoContactFormProp
           name: values.name,
           email: values.email,
           message: values.message,
+          website: honeypot,
           page,
+          formRef,
+          siteId,
         }),
         cache: "no-store",
         credentials: "omit",
         redirect: "manual",
       });
-      const body = (await response.json()) as { readonly status?: unknown };
+      const body = (await response.json().catch(() => ({}))) as { readonly status?: unknown };
       const status = typeof body.status === "string" ? body.status : "unknown";
       if (response.status === 202 && status === "accepted") setOutcome({ kind: "accepted" });
-      else if (response.status === 400) setOutcome({ kind: "invalid", message: "The form was refused. Check every field." });
-      else if (response.status === 503) setOutcome({ kind: "unavailable" });
-      else setOutcome({ kind: "not-delivered" });
+      else if (response.status === 202 && status === "accepted-not-sent") setOutcome({ kind: "accepted-not-sent" });
+      else if (response.status === 400 || response.status === 413) {
+        setOutcome({ kind: "invalid", message: copy.statusInvalid });
+      } else if (response.status === 403) setOutcome({ kind: "unauthorized" });
+      else if (response.status === 409) setOutcome({ kind: "off" });
+      else if (response.status === 502) setOutcome({ kind: "refused" });
+      else if (response.status === 504) setOutcome({ kind: "ambiguous" });
+      else setOutcome({ kind: "unavailable" });
     } catch {
-      // A transport failure is "not delivered" — never a success and never a retry loop.
-      setOutcome({ kind: "not-delivered" });
+      // A transport failure is ambiguous — never a success and never a retry loop.
+      setOutcome({ kind: "ambiguous" });
     }
   }
 
   return (
-    <form className="uno-contact-form" noValidate onSubmit={submit}>
+    <form className="uno-contact-form" id={formId} noValidate onSubmit={submit}>
       <div aria-live="polite" className="uno-contact-status" role="status">
-        {outcome.kind === "sending" ? "Sending this message now." : null}
-        {outcome.kind === "accepted" ? "This message reached the configured receiving endpoint." : null}
-        {outcome.kind === "not-delivered" ? "This message was not delivered. Nothing has been stored." : null}
-        {outcome.kind === "unavailable" ? "Messaging is not available right now. Nothing was sent." : null}
+        {statusText()}
       </div>
 
       {outcome.kind === "invalid" ? (
@@ -502,6 +548,7 @@ export function UnoContactForm({ fields, submitLabel, page }: UnoContactFormProp
 
       {fields.map((field) => (
         <Field
+          copy={copy}
           field={field}
           invalid={invalid.includes(field)}
           key={field}
@@ -510,8 +557,21 @@ export function UnoContactForm({ fields, submitLabel, page }: UnoContactFormProp
         />
       ))}
 
+      {/* The trap a person never fills in. It is hidden from assistive technology and taken out of the tab order. */}
+      <div aria-hidden="true" className="uno-contact-honeypot">
+        <label htmlFor={`${formId}-website`}>Website</label>
+        <input
+          autoComplete="off"
+          id={`${formId}-website`}
+          name="website"
+          onChange={(event) => setHoneypot(event.target.value)}
+          tabIndex={-1}
+          value={honeypot}
+        />
+      </div>
+
       <button aria-busy={sending ? true : undefined} className="uno-contact-submit" disabled={sending} type="submit">
-        {sending ? "Sending…" : submitLabel}
+        {sending ? copy.sending : submitLabel}
       </button>
     </form>
   );

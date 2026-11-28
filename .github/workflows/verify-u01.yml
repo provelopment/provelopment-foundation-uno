@@ -121,6 +121,9 @@ jobs:
 
       - name: Architecture boundaries
         run: pnpm test:architecture
+
+      - name: Resolved dependency boundaries and module extensibility
+        run: pnpm test:boundaries
         shell: bash
 
       - name: Lint

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Foundation Uno — independent single-Entity Next.js / TypeScript website foundation. U01 technical baseline only.",
+  "description": "Foundation Uno \u2014 independent single-Entity Next.js / TypeScript website foundation. U01 technical baseline only.",
   "packageManager": "pnpm@11.6.0",
   "engines": {
     "node": "26.x"
@@ -18,7 +18,8 @@
     "test:bootstrap": "node --test tests/bootstrap.test.mjs && node scripts/verify-bootstrap.mjs",
     "test:http": "node scripts/verify-u01-http.mjs",
     "test:architecture": "node --test tests/architecture/u01-boundaries.test.mjs",
-    "test:distribution": "node scripts/verify-u06-distribution.mjs"
+    "test:distribution": "node scripts/verify-u06-distribution.mjs",
+    "test:boundaries": "node scripts/verify-uno-module-boundaries.mjs --self-test && node scripts/verify-uno-module-boundaries.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "2.0.1",

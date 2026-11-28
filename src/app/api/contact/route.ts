@@ -1,48 +1,51 @@
 /**
- * Foundation Uno — the contact submission endpoint (`U05`).
+ * Foundation Uno — the contact submission endpoint (`U05`, strengthened).
  *
- * WHAT THIS IS. One server-only App Router handler that accepts a bounded JSON submission, validates it with the closed contact
- * contract, applies a bounded abuse limiter, and — only when an operator has configured a validated `https` webhook — forwards
- * it once. It is the single place in the product that can transmit a visitor's words, and it is off in a default installation.
+ * WHAT THIS IS. One server-only App Router handler. It re-establishes the publication for the Page the visitor
+ * says it used, reads the form reference from that Page's own validated document, applies the shared authorization
+ * policy, validates the bounded submission, composes one plain-text message and hands it to exactly one transport
+ * adapter — once.
  *
- * HONESTY. The response never claims more than happened. `accepted` means the configured endpoint answered 2xx for this
- * submission; it does not claim the message was read, delivered to an inbox or stored. With no configuration the answer is
- * `not-configured` and nothing left the process. A peer refusal, a redirect, a timeout and a transport failure each answer their
- * own closed status, so a caller can never display a fabricated success.
+ * THE CLIENT IS NEVER THE AUTHORITY. The posted page path, form reference and Site are *claims*. The handler plans
+ * the Page through the same publication authority that served it, refuses a claim that disagrees with what the
+ * server proved, and reads the form identity from the Page itself instead of trusting a hidden field.
  *
- * PRIVACY. Nothing is logged: not the body, not a field, not the caller's address, not even on failure. The forwarded payload is
- * exactly the three validated fields plus a bounded Page path — no IP, no user agent, no cookie, no clock, no identifier. The
- * response is `no-store` and carries no cookies.
+ * HONESTY. `accepted` means a provider accepted the message; `accepted-not-sent` means the offline demonstration
+ * took it and nothing left the process; `refused` means a known refusal; `ambiguous` means the result is unknown.
+ * There is no retry, no queue, no store and no fallback adapter: one authorised attempt, one outcome.
  *
- * WHAT IT IS NOT. It is not a mail server, a queue, a CRM, a provider SDK, a retry engine or an analytics sink. It stores nothing
- * and holds no credential: the optional bearer token is read from the environment at call time and sent only to the already
- * allowlisted endpoint.
+ * PRIVACY. Nothing is logged — not the body, a field, the caller's address, the recipient or the key. The response
+ * is `no-store`, carries no cookie and echoes no value.
  */
 import {
   isUnoContactSubmissionWithinBodyBound,
+  UNO_CONTACT_LIMITS,
   validateUnoContactSubmission,
 } from "../../../core/contact/uno-contact-submission";
 import { createUnoContactRateLimiter } from "../../../core/contact/uno-contact-rate-limit";
-import {
-  deliverUnoContactSubmission,
-  resolveUnoContactWebhookConfig,
-  unoContactTransport,
-} from "../../../adapters/contact/uno-contact-webhook";
+import { authorizeUnoContactSubmission } from "../../../core/contact/uno-contact-authorization";
+import { composeUnoContactMessage } from "../../../core/contact/uno-contact-message";
+import { isUnoMailAddress } from "../../../core/contact/uno-contact-address";
+import { planUnoServingPage, readUnoServingContactFacts } from "../../../config/uno-serving";
+import { selectUnoMailTransport } from "../../../adapters/mail/uno-mail-transport-selection";
 
 /** Nothing about this route may be cached, prerendered or shared between visitors. */
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** One bounded limiter for the process; the caller key is never stored beyond the bucket map. */
+/** One bounded limiter for the process. The caller key is never stored beyond the bucket map. */
 const takeToken = createUnoContactRateLimiter();
 
 /** The closed response vocabulary of the endpoint. */
 type UnoContactResponse =
   | { readonly status: "accepted" }
+  | { readonly status: "accepted-not-sent" }
   | { readonly status: "invalid"; readonly reason: string }
-  | { readonly status: "not-configured" }
+  | { readonly status: "off"; readonly reason: string }
+  | { readonly status: "unauthorized"; readonly reason: string }
   | { readonly status: "unavailable"; readonly reason: string }
-  | { readonly status: "not-delivered"; readonly reason: string }
+  | { readonly status: "refused"; readonly reason: string }
+  | { readonly status: "ambiguous"; readonly reason: string }
   | { readonly status: "too-many-requests"; readonly retryAfterSeconds: number }
   | { readonly status: "unsupported-media-type" }
   | { readonly status: "too-large" }
@@ -73,26 +76,92 @@ function callerKey(request: Request): string {
   }
 }
 
-/** The Page path the form reported, bounded and shape-checked; anything else becomes `unknown`. */
-function pagePath(input: unknown): string {
-  return typeof input === "string" && /^\/[A-Za-z0-9/_-]{0,120}$/u.test(input) ? input : "unknown";
+/** The verified request host, preferring the platform's forwarded host over the internal address. */
+function requestHost(request: Request): string {
+  try {
+    const forwarded = request.headers.get("x-forwarded-host");
+    if (forwarded !== null) {
+      const first = forwarded.split(",")[0]?.trim() ?? "";
+      if (first.length > 0 && first.length <= 255) return first;
+    }
+    return new URL(request.url).host;
+  } catch {
+    return "";
+  }
 }
 
-/** Read the request body with the declared bound, or the refusal that stops the request. */
-async function readBody(request: Request): Promise<string | "too-large" | "not-text"> {
+/**
+ * Request integrity: when a browser sends `Origin`, its host must be the host this request arrived on.
+ *
+ * An absent `Origin` is not refused — a non-browser client legitimately sends none, and the only effect of this
+ * endpoint is one message to the Site's own recipient.
+ */
+function originAgrees(request: Request, host: string): boolean {
+  try {
+    const origin = request.headers.get("origin");
+    if (origin === null) return true;
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
+
+/** Read the body as a bounded stream: stop reading the moment the declared bound is exceeded. */
+async function readBoundedBody(
+  request: Request,
+): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly reason: "too-large" | "unreadable" }> {
+  const body = request.body;
+  if (body === null) return { ok: false, reason: "unreadable" };
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value === undefined) continue;
+      total += value.byteLength;
+      if (total > UNO_CONTACT_LIMITS.bodyBytes) {
+        await reader.cancel().catch(() => undefined);
+        return { ok: false, reason: "too-large" };
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  }
+
+  const buffer = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buffer.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   let text: string;
   try {
-    text = await request.text();
+    text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
   } catch {
-    return "not-text";
+    return { ok: false, reason: "unreadable" };
   }
-  return isUnoContactSubmissionWithinBodyBound(text) ? text : "too-large";
+  if (!isUnoContactSubmissionWithinBodyBound(text)) return { ok: false, reason: "too-large" };
+  return { ok: true, text };
 }
+
+/** One bounded claim from the body: a string of at most `limit` characters matching `pattern`, or `null`. */
+function claim(value: unknown, limit: number, pattern: RegExp): string | null {
+  return typeof value === "string" && value.length > 0 && value.length <= limit && pattern.test(value) ? value : null;
+}
+
 
 /** Accept one submission. The only side effect in the product that can reach a third party. */
 export async function POST(request: Request): Promise<Response> {
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().startsWith("application/json")) return answer({ status: "unsupported-media-type" }, 415);
+
+  const host = requestHost(request);
+  if (host.length === 0) return answer({ status: "unauthorized", reason: "contact:publication-unproven" }, 403);
+  if (!originAgrees(request, host)) return answer({ status: "unauthorized", reason: "contact:origin-refused" }, 403);
 
   const verdict = takeToken(callerKey(request));
   if (!verdict.allowed) {
@@ -100,55 +169,119 @@ export async function POST(request: Request): Promise<Response> {
     return answer({ status: "too-many-requests", retryAfterSeconds }, 429, { "retry-after": String(retryAfterSeconds) });
   }
 
-  const body = await readBody(request);
-  if (body === "too-large") return answer({ status: "too-large" }, 413);
-  if (body === "not-text") return answer({ status: "invalid", reason: "contact:not-an-object" }, 400);
+  const body = await readBoundedBody(request);
+  if (!body.ok) {
+    return body.reason === "too-large"
+      ? answer({ status: "too-large" }, 413)
+      : answer({ status: "invalid", reason: "contact:not-an-object" }, 400);
+  }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(body) as unknown;
+    parsed = JSON.parse(body.text) as unknown;
   } catch {
     return answer({ status: "invalid", reason: "contact:not-an-object" }, 400);
   }
+  const record =
+    typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  if (record === null) return answer({ status: "invalid", reason: "contact:not-an-object" }, 400);
 
-  const record = typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : null;
-  // The form declares the Page it was authored on; every other key must be one of the closed fields, so the contract still refuses
-  // an unexpected member rather than passing it downstream.
-  const submissionInput = record === null
-    ? null
-    : Object.fromEntries(Object.entries(record).filter(([key]) => key !== "page"));
+  // The three routing claims, bounded and shape-checked before anything is planned.
+  const claimedPage = claim(record["page"], 160, /^\/[A-Za-z0-9/_-]{0,120}$/u);
+  const claimedForm = claim(record["formRef"], 64, /^[a-z0-9][a-z0-9-]{0,63}$/u);
+  const claimedSite =
+    record["siteId"] === undefined ? null : claim(record["siteId"], 64, /^[a-z0-9][a-z0-9-]{0,63}$/u);
+  if (claimedPage === null) return answer({ status: "unauthorized", reason: "contact:page-mismatch" }, 403);
+
+  // Re-establish the publication the visitor claims to have used. A refusal here ends the request.
+  const planned = await planUnoServingPage({ host, pathname: claimedPage });
+  if (planned.status !== "served") {
+    return answer({ status: "unauthorized", reason: "contact:publication-unproven" }, 403);
+  }
+  const page = planned.page;
+  const sections = page.document.kind === "json" ? page.document.pageDocument?.sections : undefined;
+  const facts = readUnoServingContactFacts({
+    facetId: page.identity.facetId,
+    siteId: page.identity.siteId,
+    host,
+    canonicalUrl: page.delivery.canonicalUrl,
+    publicPage: page.delivery.public,
+    routePath: claimedPage,
+    sections,
+  });
+
+  const authorization = authorizeUnoContactSubmission({
+    publication: {
+      served: true,
+      public: page.delivery.public,
+      siteId: page.identity.siteId,
+      facetId: page.identity.facetId,
+      routePath: claimedPage,
+      localeTag: page.identity.localeTag,
+    },
+    declaration: { declared: facts.formRef !== null, formRef: facts.formRef },
+    enablement: {
+      site: facts.siteEnabled ? "enabled" : "undeclared",
+      form: facts.formRef === null ? "undeclared" : "enabled",
+      transport: facts.transport,
+    },
+    submission: { formRef: claimedForm, page: claimedPage, siteId: claimedSite },
+  });
+  if (authorization.kind === "refused") {
+    const status = authorization.outcome === "unavailable" ? 503 : authorization.outcome === "off" ? 409 : 403;
+    return answer({ status: authorization.outcome, reason: authorization.reason }, status);
+  }
+  const identity = authorization.identity;
+
+  // The closed field contract still owns shape: the routing claims are removed and every other key must be known.
+  const submissionInput = Object.fromEntries(
+    Object.entries(record).filter(([key]) => key !== "page" && key !== "formRef" && key !== "siteId"),
+  );
   const validated = validateUnoContactSubmission(submissionInput);
   if (!validated.accepted) return answer({ status: "invalid", reason: validated.reason }, 400);
 
-  const configuration = resolveUnoContactWebhookConfig();
-  if (configuration.status === "not-configured") return answer({ status: "not-configured" }, 503);
-  if (configuration.status !== "configured") {
-    // A present but refused configuration is an operator error, not a visitor error: nothing is sent, the reason stays bounded.
-    return answer({ status: "unavailable", reason: configuration.reason ?? "contact:configuration-invalid" }, 503);
+  const composed = composeUnoContactMessage({ identity, submission: validated.submission, siteName: null });
+  if (!composed.ok) return answer({ status: "invalid", reason: composed.reason }, 413);
+
+  const selection = selectUnoMailTransport();
+  if (selection.status !== "selected") {
+    return answer(
+      { status: "unavailable", reason: selection.status === "invalid" ? selection.reason : "mail:not-configured" },
+      503,
+    );
   }
 
-  const delivery = await deliverUnoContactSubmission(
-    { page: pagePath(record?.["page"]), submission: validated.submission },
-    unoContactTransport,
-  );
+  // The recipient is server policy: the Site's own authored private address, never the visitor's choice.
+  const recipient = facts.privateRecipient;
+  if (recipient === null || !isUnoMailAddress(recipient)) {
+    return answer({ status: "unavailable", reason: "contact:recipient-unavailable" }, 503);
+  }
 
-  switch (delivery.status) {
+  const outcome = await selection.transport.send({
+    to: [recipient],
+    from: recipient,
+    replyTo: validated.submission.email,
+    subject: composed.message.subject,
+    text: composed.message.text,
+    idempotencyKey: composed.message.idempotencyKey,
+  });
+
+  switch (outcome.kind) {
     case "accepted":
-      // Accepted by the configured endpoint — never "delivered to an inbox", which this endpoint cannot know.
       return answer({ status: "accepted" }, 202);
-    case "timeout":
-      return answer({ status: "not-delivered", reason: "contact:timeout" }, 504);
-    case "refused-destination":
-      // A destination the connector refused after resolution: nothing was sent, and the reason names the refusal class only.
-      return answer({ status: "not-delivered", reason: delivery.reason ?? "destination:private-address" }, 502);
-    case "configuration-invalid":
-      return answer({ status: "unavailable", reason: delivery.reason ?? "contact:configuration-invalid" }, 503);
+    case "offline-accepted":
+      return answer({ status: "accepted-not-sent" }, 202);
+    case "refused":
+      return answer({ status: "refused", reason: outcome.reason }, 502);
+    case "unavailable":
+      return answer({ status: "unavailable", reason: outcome.reason }, 503);
     default:
-      return answer({ status: "not-delivered", reason: `contact:${delivery.status}` }, 502);
+      return answer({ status: "ambiguous", reason: outcome.reason }, 504);
   }
 }
+
 
 /** Every other method is refused by name, with the one method this endpoint implements. */
 function refuseMethod(): Response {
@@ -179,3 +312,4 @@ export function DELETE(): Response {
 export function OPTIONS(): Response {
   return refuseMethod();
 }
+

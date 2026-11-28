@@ -145,7 +145,7 @@ describe("the committed Home through the real confined loader", () => {
     expect(result.document.title).toBe("Foundation Uno");
     expect(result.document.visibility).toBe("public");
     expect(result.document.markdownBody).toBeUndefined();
-    expect(result.document.pageDocument?.sections.length).toBe(4);
+    expect(result.document.pageDocument?.sections.length).toBe(6);
     expect(result.ifServed.canonicalUrl).toBe("http://localhost:3000/en-001");
     expect(result.ifServed.robots).toBeNull();
     expect(Object.keys(result).sort()).toEqual(["accepted", "document", "identity", "ifServed"]);

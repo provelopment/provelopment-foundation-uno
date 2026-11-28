@@ -26,9 +26,14 @@ import { validateUnoCanonicalBase } from "../core/efs/uno-canonical-base";
 export const UNO_DEPLOY_PROFILE_PATH = "deployment/uno.deploy.json";
 
 /** The operator's explicit origin, and the two platform facts the resolver may consult. */
-export const UNO_DEPLOY_ORIGIN_ENV = "UNO_CANONICAL_ORIGIN";
-export const UNO_VERCEL_ENV = "VERCEL_ENV";
-export const UNO_VERCEL_PRODUCTION_URL = "VERCEL_PROJECT_PRODUCTION_URL";
+import { UNO_NEUTRAL_BASE_CANONICAL } from "../core/deploy/uno-deploy-environment-names";
+
+export {
+  UNO_DEPLOY_ORIGIN_ENV,
+  UNO_NEUTRAL_BASE_CANONICAL,
+  UNO_VERCEL_ENV,
+  UNO_VERCEL_PRODUCTION_URL,
+} from "../core/deploy/uno-deploy-environment-names";
 
 /** The facts a deployment may state about itself, as plain values. The adapter reads them; this module only judges them. */
 export interface UnoDeployStatement {
@@ -59,7 +64,6 @@ export const UNO_DEPLOY_PROFILE_VERSION = 1;
  * It is the one value a deployment statement may replace. A committed base that states any other origin is a deliberate
  * declaration by the adopter, and a hosting profile must never quietly overwrite it.
  */
-export const UNO_NEUTRAL_BASE_CANONICAL = "https://uno-starter.example";
 
 /**
  * Accept one candidate origin, or `null`.
