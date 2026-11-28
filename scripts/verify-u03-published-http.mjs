@@ -576,13 +576,15 @@ async function checkContactEndpoints(base) {
     const response = await request(`${base}${pathname}`);
     served.push({ pathname, body: response.body });
   }
-  // The fixture manifest declares no contact fact at all, so the fixture Pages must expose no destination and no form. That
-  // is the isolation proof for this phase; the committed starter’s single authorised destination is asserted in its own
-  // phase, against the real declaration, before any fixture is installed.
+  // The fixture extends the same Entity, so its Site inherits the one exposed contact fact: exactly one authorised
+  // destination on the Page that asks for it, no form, and no invented number. That is the inheritance proof for this
+  // phase; the committed starter is asserted separately, before any fixture is installed.
   const mailtoPages = served.filter((page) => /mailto:/iu.test(page.body)).map((page) => page.pathname);
   check(
-    "CONTACT the fixture graph exposes no public destination and no form",
-    mailtoPages.length === 0 && served.every((page) => !/<form/iu.test(page.body) && !/tel:/iu.test(page.body)),
+    "CONTACT the fixture Site inherits exactly one authorised public destination and no form",
+    mailtoPages.length === 1 &&
+      mailtoPages[0] === "/en-001" &&
+      served.every((page) => !/<form/iu.test(page.body) && !/tel:/iu.test(page.body)),
     JSON.stringify({ mailtoPages }),
   );
 
