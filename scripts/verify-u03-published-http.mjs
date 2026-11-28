@@ -576,17 +576,14 @@ async function checkContactEndpoints(base) {
     const response = await request(`${base}${pathname}`);
     served.push({ pathname, body: response.body });
   }
-  // `U05`: the Site authors one public contact address and exposes it, so exactly one authorised `mailto:` appears on the
-  // Page that asks for it — and nowhere else. No form, no `tel:`, no second destination and no invented address.
+  // The fixture manifest declares no contact fact at all, so the fixture Pages must expose no destination and no form. That
+  // is the isolation proof for this phase; the committed starter’s single authorised destination is asserted in its own
+  // phase, against the real declaration, before any fixture is installed.
   const mailtoPages = served.filter((page) => /mailto:/iu.test(page.body)).map((page) => page.pathname);
-  const homeMailto = (served[0]?.body.match(/<a[^>]+href="mailto:[^"]+"/gu) ?? []).length;
   check(
-    "CONTACT exactly one authorised public destination is served, and no form or invented number",
-    mailtoPages.length === 1 &&
-      mailtoPages[0] === "/en-001" &&
-      homeMailto === 1 &&
-      served.every((page) => !/<form/iu.test(page.body) && !/tel:/iu.test(page.body)),
-    JSON.stringify({ mailtoPages, homeMailto }),
+    "CONTACT the fixture graph exposes no public destination and no form",
+    mailtoPages.length === 0 && served.every((page) => !/<form/iu.test(page.body) && !/tel:/iu.test(page.body)),
+    JSON.stringify({ mailtoPages }),
   );
 
   // --- Analytics: accepted and stored nowhere, refusing everything else -----------------------------
@@ -1658,6 +1655,33 @@ async function committedStarterPhase(nextBin) {
       }
     }
     if (!check("the committed starter server reached readiness", ready, serverOutput.slice(-500))) return;
+
+    // `U05`: against the REAL committed declaration, the Site’s one exposed contact fact becomes exactly one authorised
+    // destination, no form exists, and an unverified submission is refused before any transport.
+    const committedHome = await request(`${base}/en-001`);
+    const committedMailto = (committedHome.body.match(/<a[^>]+href="mailto:[^"]+"/gu) ?? []).length;
+    check(
+      "CONTACT the committed starter serves exactly one authorised public destination",
+      committedHome.status === 200 &&
+        committedMailto === 1 &&
+        committedHome.body.includes("mailto:hello@example.com") &&
+        !/<form/iu.test(committedHome.body) &&
+        !/tel:/iu.test(committedHome.body),
+      JSON.stringify({ status: committedHome.status, committedMailto }),
+    );
+    const committedSubmission = await fetch(`${base}/api/contact`, {
+      method: "POST",
+      redirect: "manual",
+      headers: { "content-type": "application/json", "x-forwarded-for": "198.51.100.200" },
+      body: JSON.stringify({ name: "Ada", email: "ada@example.com", message: "x" }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    const committedBody = await committedSubmission.json();
+    check(
+      "CONTACT the committed starter refuses an unverified submission before any transport",
+      committedSubmission.status === 403 && committedBody.status === "unauthorized",
+      `${committedSubmission.status} ${JSON.stringify(committedBody)}`,
+    );
 
     const alternates = new Map();
     for (const page of COMMITTED_PAGES) {
