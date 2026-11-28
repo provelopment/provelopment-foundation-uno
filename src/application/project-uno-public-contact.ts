@@ -20,7 +20,7 @@ import {
   type PublicContactConfiguration,
   type PublicContactMethodDeclaration,
   type PublicContactProjection,
-} from "../connect";
+} from "../connect/public-contact";
 
 /** Everything the projection needs, all of it already proved by the caller. */
 export interface UnoPublicContactInput {

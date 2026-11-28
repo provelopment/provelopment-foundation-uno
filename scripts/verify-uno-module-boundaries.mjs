@@ -129,6 +129,16 @@ function analyze(root) {
         violations.push({ path, kind: "core-framework", detail: specifier });
       }
       const target = resolveSpecifier(join(root, path), specifier, root);
+      // A directory import resolves under TypeScript but NOT under the Node ESM loader the gates use, so the same source
+      // can work in a build and crash a verification runner. File-level specifiers are required everywhere.
+      if (
+        target !== null &&
+        target !== "unresolved" &&
+        /(^|\/)index\.(ts|tsx|mts)$/u.test(target) &&
+        !/\/index(\.(ts|tsx|mts))?$/u.test(specifier)
+      ) {
+        violations.push({ path, kind: "directory-import", detail: `${specifier} -> ${target}` });
+      }
       if (target === "unresolved") {
         violations.push({ path, kind: "unresolved", detail: specifier });
         continue;
@@ -184,10 +194,12 @@ function selfTest() {
     write("src/components/probe.tsx", 'import { w } from "../config/probe";\nexport const z = w;\n');
     write("src/config/probe.ts", 'import { y } from "../core/modules/probe";\nexport const w = y;\n');
     write("src/app/probe.ts", '"use client";\nimport { x } from "../adapters/mail/probe";\nexport const c = x;\n');
+    write("src/connect/index.ts", "export const connectProbe = 1;\n");
+    write("src/core/ports/directory.ts", 'import { connectProbe } from "../../connect";\nexport const d = connectProbe;\n');
 
     const { violations } = analyze(root);
     const kinds = new Set(violations.map((violation) => violation.kind));
-    const expected = ["core-framework", "layer", "unresolved", "client-server", "cycle"];
+    const expected = ["core-framework", "layer", "unresolved", "client-server", "cycle", "directory-import"];
     const missing = expected.filter((kind) => !kinds.has(kind));
     if (missing.length > 0) {
       console.error(`boundary self-test: the scanner missed ${missing.join(", ")}`);

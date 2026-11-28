@@ -9,7 +9,7 @@
  * `public-contact-email` exists, and no way to reach a Site it did not render. Connect receives a verified authority and
  * an authored declaration; it never learns which page asked. Composition is the only layer allowed to know both.
  */
-import type { PublicContactProjection } from "../connect";
+import type { PublicContactProjection } from "../connect/public-contact";
 import type { UnoApplicationLinkResolver } from "../core/links/uno-application-link";
 
 /** The application keys this build answers. Each is a product capability, not an author's declaration id. */
