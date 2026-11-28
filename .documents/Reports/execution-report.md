@@ -502,8 +502,11 @@ consuming bundle â€” Page, responder, health, robots, sitemap and owned media â€
 consumes, and fails unless each consuming bundle carries its inputs; `--self-test` proves sensitivity by omitting each input in turn. It is a
 blocking CI step after the build, and it fails against the previous head.
 
-**Live installation, verified at `6376965`** (deployment produced by the repository's Git integration; the deployed tree is proven to be this
-commit by copy that exists only in it):
+**Live installation, verified at `6376965`** (deployment produced by the repository's Git integration; the deployed tree is proven to be that
+commit by copy that exists only in it, and the same behaviour was re-verified after the two gate-only commits that follow it. Final head is
+`ca90989`, green on both hosts and on both bootstrap runs; it changes only test gates, copy contracts and evidence, so the served product
+is identical to what was verified. Distribution at that head: 90 files, digest
+`604e191ab0f4f4f1a11c00e779d43bf8dfa34999fdff48fd608937825fd37075`.
 
 | Address | Result |
 | --- | --- |
@@ -530,3 +533,9 @@ return, and the non-indexable policy is unchanged.
 
 **U07 evidence is complete and submitted for independent acceptance.** Contact and analytics remain OFF on the live installation and no
 provider, credential, tag or release was activated.
+
+**One environment-only failure, corrected honestly.** The published-Pages step failed on the hosted Ubuntu runner while passing on Windows and on
+Linux in a clean container with a real clone, a real build and the pinned Chromium (1381/0). Its cause class was a `networkidle` navigation:
+network silence is a convenience, never a correctness condition, and a streamed RSC response or a keep-alive connection can keep one open on a
+slower runner. Every navigation in the browser gate now waits for `load`, attempts quiet for a bounded five seconds and proceeds; the assertions
+are unchanged, and both hosts are green at `ca90989`.
