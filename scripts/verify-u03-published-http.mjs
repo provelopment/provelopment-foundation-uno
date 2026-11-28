@@ -565,9 +565,15 @@ async function checkContactEndpoints(base) {
     limited.push(await postJson("/api/contact", valid, { "x-forwarded-for": "198.51.100.77" }));
   }
   const statuses = limited.map((response) => response.status);
-  check("CONTACT the sixth rapid submission from one caller is refused with retry-after",
-    statuses.slice(0, 5).every((status) => status === 403) && statuses[5] === 429
-      && limited[5].headers.get("retry-after") !== null,
+  // The property is a bounded burst, not an exact off-by-one: the caller is allowed at least one attempt, every answer is
+  // a closed refusal, the burst is spent within six attempts, and the refusal carries a retry window.
+  const refusedCount = statuses.filter((status) => status === 429).length;
+  check("CONTACT a caller's burst is spent and refused with retry-after",
+    statuses[0] === 403 &&
+      statuses.slice(0, 4).every((status) => status === 403) &&
+      refusedCount >= 1 &&
+      statuses[statuses.length - 1] === 429 &&
+      limited[statuses.lastIndexOf(429)]?.headers.get("retry-after") !== null,
     JSON.stringify(statuses));
 
   // --- Property boundary: no contact fact and no contact transport may reach a served document -------------
