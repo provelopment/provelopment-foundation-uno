@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/app/(site)/[...segments]/page.tsx": {
+      "includeFiles": "deployment/**"
+    },
+    "src/app/(site)/[...segments]/layout.tsx": {
+      "includeFiles": "deployment/**"
+    },
+    "src/app/api/uno-health/route.ts": {
+      "includeFiles": "deployment/**"
+    }
+  }
+}

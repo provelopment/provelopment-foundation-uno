@@ -132,6 +132,15 @@ The printed digest must equal `RELEASE.json.digest`. The installer performs the 
 (`install:file-mismatch:<path>`), a file the manifest does not name (`install:unexpected-file:<path>`) or a digest that disagrees with
 `RELEASE.json` (`install:digest-mismatch`) **before it writes anything**.
 
+### Hosting platform packaging
+
+A hosting platform bundles each server route separately. If a route reads the declarations at request time — this product's routes do —
+the platform must carry those files into that route's bundle. `vercel.json` declares exactly that, for exactly the routes that read
+them: `includeFiles: "deployment/**"` on the Site document, its layout and the health route, and nothing else. Uno's own
+`outputFileTracingIncludes` states the same bounded set for a build it performs itself; the platform declaration is the same intent in
+the platform's own vocabulary, and it is why a Vercel installation serves its Pages. Omit it and every Site address answers 404 while the
+demonstration root still serves — `/api/uno-health` then reports `serving:authority-unavailable`.
+
 ### Health check
 
 `GET /api/uno-health` answers a small JSON document and is the first thing to read when an address that should be published is not:
