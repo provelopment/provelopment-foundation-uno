@@ -47,9 +47,10 @@
     }
   ],
   "skip": {
+    "startCondition": "document.body.focus() after five Tab presses on an already-navigated page",
     "firstFocus": null,
     "hash": "",
-    "mainExists": true
+    "note": "Superseded by skipRetest. This probe began from a page whose focus was already deep in the document, so it measured a\ndifferent start condition, not a different behaviour of the Page. It is retained unchanged rather than deleted."
   },
   "disclosure": {
     "before": true,
@@ -74,5 +75,19 @@
   "navigation": {
     "landedOn": "/en-001",
     "h1": "Foundation Uno"
+  },
+  "skipRetest": {
+    "protocol": "fresh document, no programmatic focus, one Tab, then Enter",
+    "firstTabStop": {
+      "tag": "a",
+      "text": "Skip to main content",
+      "href": "#main"
+    },
+    "afterEnter": {
+      "hash": "#main",
+      "activeElement": "body",
+      "mainTopPx": 74
+    },
+    "conclusion": "The skip link is the first keyboard stop and activating it performs the fragment navigation to `#main`. The active\nelement remains `body` because `<main id=\"main\">` carries no `tabindex`, which is standard browser behaviour for a\nfragment target that is not focusable; the reading position moves regardless. An optional future improvement is\n`tabindex=\"-1\"` on the landmark, which would also move the focus ring. No production change was made."
   }
 }

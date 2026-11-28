@@ -220,12 +220,11 @@ pipeline on both hosts. Operator documentation ships in the artefact.
 
 ### U07 — Full independent review and Owner-controlled first release
 
-**EVIDENCE COMPLETE — submitted for independent U07 acceptance.** The packaged-function defect that made the live Page refuse is fixed at
-its cause (declarations and owned-media roots are read through traceable literal paths, and the composition no longer touches the
-filesystem), a blocking gate now inspects the emitted traces for exactly this defect, and the live installation serves `/`, the three authored
-Pages, the locale alias, both discovery surfaces, owned media, genuine refusals and a health reading that agrees with the Page. Visual and
-interaction evidence at four widths in both themes is recorded in `.documents/Reports/evidence/u07-live/`. Tagging, publication and domain
-activation remain the Owner's separate decisions.
+**ACCEPTED AND OPERATIONAL.** The Architect independently verified the production installation at `ca90989` (GitHub and Vercel identical,
+both workflows successful) and accepted operational production readiness. One Owner decision remains open: whether the validated public
+contact-property projection is completed under an approved contract or formally deferred from `0.1.0` (recommended: defer; authored content
+already publishes a contact fact and the property layer stays closed). Release tagging, publication, provider activation and domain changes each
+keep their own authorisation boundary and were not performed.
 
 ## Dependency summary
 

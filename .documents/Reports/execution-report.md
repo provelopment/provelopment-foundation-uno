@@ -539,3 +539,86 @@ Linux in a clean container with a real clone, a real build and the pinned Chromi
 network silence is a convenience, never a correctness condition, and a streamed RSC response or a keep-alive connection can keep one open on a
 slower runner. Every navigation in the browser gate now waits for `load`, attempts quiet for a bounded five seconds and proceeds; the assertions
 are unchanged, and both hosts are green at `ca90989`.
+
+## Assurance concluded — independent acceptance, evidence reconciled, one scope decision open
+
+**Independent verification and acceptance, recorded.** The Architect confirmed GitHub and Vercel production HEAD both at `ca90989`, both hosted
+verification workflows successful, the demonstration and the three authored Pages serving, the production canonical URLs and locale declarations
+correct, discovery, health, owned media and not-found responses correct, and the committed visual evidence sufficient to accept the responsive
+starter. Operational production readiness is accepted. The production serving defect is closed. Nothing in this section is a self-assessment:
+the acceptance is the Architect’s.
+
+**Provenance, stated plainly.** Two kinds of statement appear above and they are not interchangeable.
+
+- **Measured by the repository's own gates and evidence runs** — statuses, headers, languages, canonicals, robots directives, media types,
+  overflow, broken images, console and request failures, focus order, disclosure state, structure counts, and the timing table (TTFB 61-62 ms,
+  LCP 412/432 ms, nine resources). These come from the pinned Chromium and plain HTTPS requests, are reproducible, and are reported as measured
+  values rather than certified performance.
+- **Inspected independently** — the Architect’s review of the committed screenshots and of the live installation. That inspection is what the
+  acceptance rests on; the measurements support it and do not substitute for it.
+
+**Skip navigation, reconciled by a targeted re-test (no deployment).** The stored interaction JSON showed `firstFocus: null` and an empty hash for
+one probe while the narrative reported a working skip link, so the reading was re-taken. From a fresh document, with no programmatic focus, one
+Tab then Enter: the first keyboard stop is the skip link (`href="#main"`), activating it performs the fragment navigation and the reading
+position moves to the landmark. `document.activeElement` remains `body`, because `<main id="main">` carries no `tabindex` — standard browser
+behaviour for a fragment target that is not focusable. The earlier probe began from a page whose focus was already deep in the document, so it
+measured a different start condition rather than different behaviour; the record is retained and labelled, and `skipRetest` in the same file is
+now authoritative. An optional future improvement — `tabindex="-1"` on the landmark, which would also move the focus ring — is noted for the
+next meaningful update and is **not** treated as a release defect, so no production change was made for it.
+
+**Function-input gate, stated for what it is.** `scripts/verify-u07-function-inputs.mjs` enforces a **named** list of required inputs per
+consuming bundle (the three declarations, the starter Home source and the owned-media zone for the Page; the declarations for the responder,
+health, robots, sitemap and media bundles). It detects the defect class that broke production — a bundle that reads an input it does not carry —
+for those named inputs. It does **not** discover new authored sources or assets by itself: a future input must be added to the contract by hand,
+and `--self-test` proves only that the named requirements are enforced rather than merely reported.
+
+## Open decision — U05 validated public contact-property projection
+
+One decision remains. It is a scope decision, not a defect, and it is the only thing between the current release candidate and a clean release
+statement.
+
+**What exists today.** Publishing a contact fact is supported by authoring it: a Page whose `content.actions` authors `mailto:` or `tel:` renders
+that destination character for character as a live anchor, and a Page that does not author it carries nothing. The closed property layer’s
+`public` boolean is authorship metadata only and projects nowhere; every declared `contact.*` property is `public: false`, the renderer and the
+island never construct `mailto:`/`tel:`, and the published gates assert no served Page carries a contact transport.
+
+**Option A — complete the canonical projection.** Define an approved contract for how a validated `public` contact property is named, escaped and
+placed in a Page, implement it, and gate it. Cost: an EFS schema decision plus renderer, presentation and publication-gate changes across the
+property boundary — a contract change on the release path, with new canonical decisions (naming, escaping, placement, precedence against authored
+content) that the Owner would have to approve before implementation.
+
+**Option B — formally defer it from `0.1.0`.** Record that projection is out of scope for the first release, keep authored content as the
+sanctioned way to publish a contact fact, and keep the property layer closed.
+
+**Recommendation: Option B.** The user-visible capability already exists through the authored-content path and is proven in both directions; the
+property layer is private and closed, which is the safer default. Deferring is explicit rather than silent, and it moves no contract onto the
+release path for no new user-visible capability.
+
+**Exact consequence of deferring.** For `0.1.0`, an adopter who marks `contact.email` public and authors no action sees **no** contact address
+rendered: the flag has no rendering effect, and nothing leaks either. To publish a contact address, the adopter authors it in Page content. If the
+Owner later approves Option A, that is a normal, separately gated increment rather than a correction.
+
+## Release handoff
+
+| Item | Value |
+| --- | --- |
+| Product | `provelopment-foundation-uno@0.1.0` |
+| Git HEAD | `ca90989` (GitHub and Vercel production identical) |
+| Hosted verification | both workflows successful on both hosts and both bootstrap runs |
+| Distribution | 90 files, tree digest `604e191ab0f4f4f1a11c00e779d43bf8dfa34999fdff48fd608937825fd37075` |
+| Production | `https://uno.provelopment.com` |
+| Contact delivery | OFF |
+| Analytics | OFF |
+
+**Preserved and unchanged by this assurance pass.** The two independent clean-room installations, upgrade, rollback and recovery, the
+security and privacy controls, licensing, the accessibility and responsive evidence, the 17/17 family parity, the 59/59 proxy parity, the 22/22
+module identities, and the hosted cross-platform verification at `ca90989`.
+
+**Not done, and not authorised here:** no release tag, no published package, no provider activation, no credential, no domain change, and no
+deployment for this report. The stable production installation at `ca90989` was preserved exactly as the Architect verified it.
+
+**Where this record lives.** These assurance notes are committed locally on top of `ca90989` and are deliberately **not** pushed, so that no build
+is spent publishing a report. They ride with the next meaningful, verified repository update, as directed.
+
+**Open items for the Owner.** One: the U05 projection decision above (recommended Option B). Everything else in Foundation Uno is verified and
+operational.

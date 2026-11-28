@@ -1,7 +1,9 @@
 # U07 live evidence — uno.provelopment.com
 
 Captured with the repository's pinned Chromium against the public HTTPS installation. These are evidence artifacts, not a gate: the gate is
-`scripts/verify-u07-function-inputs.mjs`, which runs in CI against the build's own packaging traces.
+`scripts/verify-u07-function-inputs.mjs`, which runs in CI against the build's own packaging traces. That gate enforces a **named** list of
+required inputs per consuming bundle; it does not discover new authored sources or assets by itself, so a future input must be added to the
+contract by hand.
 
 ## Addresses
 
@@ -28,7 +30,11 @@ image, no console error, no uncaught exception and no failed request.
 
 - Light surface `rgb(255,255,255)` on `rgb(16,22,32)`; dark surface `rgb(12,17,24)` on `rgb(238,242,248)`; `prefers-reduced-motion: reduce` is
   honoured (`matchMedia` true under the reduced-motion context).
-- First keyboard stop is "Skip to main content" (`href="#main"`) with a visible 3 px focus ring; activating it moves the document to `#main`.
+- First keyboard stop is "Skip to main content" (`href="#main"`) with a visible 3 px focus ring. Re-tested from a fresh document with no
+  programmatic focus, one Tab then Enter: the fragment navigation to `#main` occurs and the reading position moves. `document.activeElement`
+  remains `body` because the landmark carries no `tabindex`, which is standard browser behaviour for a fragment target that is not focusable.
+  An earlier reading in `interaction-findings.json` began from a page whose focus was already deep in the document and therefore measured a
+  different start condition; it is retained and labelled, and `skipRetest` is the authoritative record.
 - Focus order then follows the header links: brand, About, Components; every stop shows the same visible ring.
 - The four native disclosures open and close (first `<details>` toggled closed and reported `open: false`), with no script involved.
 - Structure on the Components Page: 4 `<figure>`, 3 `<figcaption>`, a table whose `<th>` cells all carry `scope`, 4 `<details>` with summaries.
@@ -40,6 +46,14 @@ image, no console error, no uncaught exception and no failed request.
 | --- | --- | --- | --- | --- |
 | `/en-001` | 62 ms | 408 ms | 412 ms | 9 |
 | `/en-001/components` | 61 ms | 363 ms | 432 ms | 9 |
+
+## Provenance of each statement
+
+- **Measured here** — statuses, headers, languages, canonicals, robots directives, media types, overflow, broken images, console and request
+  failures, focus order, disclosure state, structure counts, and the timing table above. These are readings from the pinned Chromium and plain
+  HTTP requests, reproducible by re-running the scripts described in the report.
+- **Inspected independently** — the Architect's own review of the committed screenshots and of the live installation, which is the basis of the
+  acceptance recorded in the execution report. The measurements above support that review; they do not replace it.
 
 ## Artifacts
 
