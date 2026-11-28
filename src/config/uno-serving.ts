@@ -19,6 +19,8 @@ import { planUnoPageAssets, readUnoPageAssetOccurrence, type UnoPageAssetPlan } 
 import { planUnoPublicDiscovery, type UnoPublicDiscoveryEntry } from "../application/plan-uno-public-discovery";
 import { planUnoPublishedPage, type UnoPublishedPageAccepted } from "../application/plan-uno-published-page";
 import { resolveUnoCommittedBase } from "../application/resolve-uno-committed-base";
+import { readUnoDeployEnvironment } from "../adapters/deploy/uno-deploy-environment";
+import { resolveUnoDeployOrigin, UNO_DEPLOY_PROFILE_PATH } from "./uno-deploy-origin";
 import { resolveUnoCommittedLocales } from "../application/resolve-uno-committed-locales";
 import {
   UNO_MANIFEST_PATH,
@@ -65,6 +67,7 @@ import type { UnoSectionNode } from "../core/page-document";
 export type UnoServingRefusal =
   | "serving:input-invalid"
   | "serving:authority-unavailable"
+  | "serving:deploy-origin-invalid"
   | "serving:publication-refused"
   | "serving:renderer-unavailable"
   | "serving:media-unavailable"
@@ -162,12 +165,22 @@ function readAuthority(): ServingAuthority {
 
   const committed = resolveUnoCommittedBase({ manifest, selection });
   if (!committed.accepted) return { mode: "refused", reason: "serving:authority-unavailable" };
+  // A deployment states the origin it is actually served on. The neutral declaration stands when no statement exists; a
+  // statement that is present and invalid refuses, because serving the reserved example origin as if it were real would
+  // publish canonical metadata no visitor can reach.
+  const deployed = resolveUnoDeployOrigin({
+    statement: readUnoDeployEnvironment(),
+    committedCanonical: committed.base.canonical,
+    profile: readFixedJson(root, UNO_DEPLOY_PROFILE_PATH, UNO_SOURCE_LIMITS.configBytes),
+  });
+  if (deployed.mode === "refused") return { mode: "refused", reason: "serving:deploy-origin-invalid" };
+
   return {
     mode: "legacy",
     root,
     manifest,
     selection,
-    canonical: committed.base.canonical,
+    canonical: deployed.mode === "declared" ? deployed.origin : committed.base.canonical,
     aliases: committed.base.aliases,
   };
 }

@@ -40,6 +40,10 @@ const INCLUDE = Object.freeze([
 
 /** Workspace material an installation must never ship. */
 const EXCLUDE_NAMES = Object.freeze([".DS_Store", "Thumbs.db", "tsconfig.tsbuildinfo"]);
+
+// The hosting repository declares the origin it is served on in this profile. It is a deployment fact, never part of the
+// distributable: an adopter states its own origin, and the neutral declaration must not be silently overwritten by ours.
+const EXCLUDE_PATHS = Object.freeze(["deployment/uno.deploy.json"]);
 const EXCLUDE_SEGMENTS = Object.freeze(["node_modules", ".next", ".git", ".temp", ".vercel", ".pnpm-store"]);
 
 /** Every file under one path, in sorted order, skipping the excluded material. */
@@ -51,7 +55,10 @@ function collect(path) {
   } catch {
     return [];
   }
-  if (stats.isFile()) return EXCLUDE_NAMES.includes(path) ? [] : [path.replaceAll("\\", "/")];
+  if (stats.isFile()) {
+      const relative = path.replaceAll("\\", "/");
+      return EXCLUDE_NAMES.includes(path) || EXCLUDE_PATHS.includes(relative) ? [] : [relative];
+    }
   const found = [];
   for (const entry of readdirSync(absolute, { withFileTypes: true }).sort((left, right) => (left.name < right.name ? -1 : 1))) {
     if (EXCLUDE_SEGMENTS.includes(entry.name) || EXCLUDE_NAMES.includes(entry.name)) continue;

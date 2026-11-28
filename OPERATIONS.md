@@ -48,6 +48,22 @@ product's back. The installer creates real directories; a link in the path is a 
    `robots.txt` reference is built from, and an `http` or malformed value is refused rather than repaired: the installation answers
    `404` rather than publish an untruthful canonical address.
 
+**A hosted deployment states its own origin.** The neutral distribution ships the reserved, non-routable
+`https://uno-starter.example`, which a real installation replaces. Three statements are honoured, strongest first:
+
+1. `UNO_CANONICAL_ORIGIN` — a server-only environment variable naming the exact origin the installation is served on
+   (`https://www.example.org`).
+2. `deployment/uno.deploy.json` — an optional committed profile `{ "version": 1, "canonical": "https://www.example.org" }`.
+   It belongs to the hosting repository and is **never shipped** in the distributable artefact.
+3. `VERCEL_PROJECT_PRODUCTION_URL` — the platform's statement of the production host, consulted only when `VERCEL_ENV` is
+   `production`. A preview never claims the production canonical address.
+
+Every candidate is judged by the same canonical validator as `base.canonical`, and the profile and platform statements apply
+**only while the committed base is still the reserved example origin** — a committed base that names a real origin is your own
+deliberate declaration and is never overwritten. An origin is never inferred from a request, a `Host` header or a forwarded
+header, and a statement that is present and invalid refuses the whole Site rather than quietly falling back.
+
+
 5. Edit the three starter Pages in `deployment/efs/content/` (`home.en-001.json`, `about.en-001.md`, `components.en-001.json`) and
    the Site presentation in `deployment/site.config.json`. They are neutral placeholders: an illustrative foundation, not a real
    organisation.

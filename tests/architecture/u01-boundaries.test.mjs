@@ -189,6 +189,9 @@ export const ADAPTER_AUTHORED_FILES = Object.freeze([
   // `U05`: the pinned connector resolves, refuses and dials, and the analytics forwarder is the product's one measuring sender.
   'src/adapters/net/uno-pinned-https-transport.ts',
   'src/adapters/analytics/uno-analytics-forward.ts',
+  // `U07`: the deployment environment adapter is the one place that reads the three environment facts a deployment may state about
+  // itself. Outside-world access belongs in an adapter, so the configuration layer that composes a serving decision stays free of it.
+  'src/adapters/deploy/uno-deploy-environment.ts',
 ]);
 
 /** Modules a concrete Node adapter must never import. */
