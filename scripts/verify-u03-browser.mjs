@@ -18,6 +18,19 @@
 const ALLOWED_HOSTS = new Set(["127.0.0.1", "localhost"]);
 const LOAD_TIMEOUT_MS = 30_000;
 const ASSERTION_TIMEOUT_MS = 10_000;
+
+/**
+ * Navigate and wait for the document to load.
+ *
+ * `networkidle` is deliberately not the condition: a streamed RSC response, a prefetch or a keep-alive connection can keep a connection open
+ * on a slower runner, and a gate that demands silence then fails for a reason that has nothing to do with the Page under test. The load event
+ * plus the caller's own `h1` wait is what the assertions actually need, so network quiet is attempted for a bounded time and ignored.
+ */
+async function gotoLoaded(page, url, options = {}) {
+  const response = await page.goto(url, { waitUntil: "load", timeout: options.timeout ?? LOAD_TIMEOUT_MS });
+  await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => undefined);
+  return response;
+}
 const VIEWPORT_TOLERANCE_PX = 2;
 
 /** Only a loopback origin is ever visited; anything else is refused before a browser is launched. */
@@ -174,7 +187,7 @@ async function assertDurableFamily(context, base, pageCase, ids, viewportName, c
   const tab = await context.newPage();
   const record = watchPage(tab, base);
   try {
-    await tab.goto(`${base}${pageCase.pathname}`, { waitUntil: "networkidle", timeout: LOAD_TIMEOUT_MS });
+    await gotoLoaded(tab, `${base}${pageCase.pathname}`);
     await tab.waitForSelector("h1", { timeout: ASSERTION_TIMEOUT_MS });
 
     const observed = await tab.evaluate((expectedIds) => {
@@ -587,10 +600,7 @@ export async function verifyUnoU03Browser({
           const tab = await context.newPage();
           const record = watchPage(tab, base);
           try {
-            const response = await tab.goto(`${base}${page.pathname}`, {
-              waitUntil: "networkidle",
-              timeout: LOAD_TIMEOUT_MS,
-            });
+            const response = await gotoLoaded(tab, `${base}${page.pathname}`);
             await tab.waitForSelector("h1", { timeout: ASSERTION_TIMEOUT_MS });
             const observation = assertPage(await observe(tab), response, page, viewport, record, report);
             if (page.pathname === "/en-001/about") {
@@ -633,7 +643,7 @@ export async function verifyUnoU03Browser({
       for (const page of pages.slice(0, 2)) {
         const tab = await reducedContext.newPage();
         try {
-          await tab.goto(`${base}${page.pathname}`, { waitUntil: "networkidle", timeout: LOAD_TIMEOUT_MS });
+          await gotoLoaded(tab, `${base}${page.pathname}`);
           const observation = await observe(tab);
           check(
             `${page.pathname} stays visible with reduced motion`,
@@ -652,7 +662,7 @@ export async function verifyUnoU03Browser({
     try {
       const demo = await keyboardContext.newPage();
       try {
-        await demo.goto(`${base}/`, { waitUntil: "networkidle", timeout: LOAD_TIMEOUT_MS });
+        await gotoLoaded(demo, `${base}/`);
         await demo.keyboard.press("Tab");
         const focused = await demo.evaluate(() => {
           const element = document.activeElement;
@@ -676,7 +686,7 @@ export async function verifyUnoU03Browser({
         const starter = await keyboardContext.newPage();
         const starterRecord = watchPage(starter, base);
         try {
-          await starter.goto(`${base}${keyboardPage.pathname}`, { waitUntil: "networkidle", timeout: LOAD_TIMEOUT_MS });
+          await gotoLoaded(starter, `${base}${keyboardPage.pathname}`);
           await starter.keyboard.press("Tab");
           const focusable = await starter.evaluate(() => {
             const element = document.activeElement;
@@ -728,10 +738,7 @@ export async function verifyUnoU03Browser({
       const missing = await keyboardContext.newPage();
       const missingRecord = watchPage(missing, base);
       try {
-        const response = await missing.goto(`${base}${refusedPaths[0]}`, {
-          waitUntil: "networkidle",
-          timeout: LOAD_TIMEOUT_MS,
-        });
+        const response = await gotoLoaded(missing, `${base}${refusedPaths[0]}`);
         const observation = await observe(missing);
         check("the global refusal is a real 404 document", response !== null && response.status() === 404);
         check("the refusal renders exactly one h1", observation.h1Count === 1, `${observation.h1Count}`);
