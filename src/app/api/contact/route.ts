@@ -26,7 +26,7 @@ import { createUnoContactRateLimiter } from "../../../core/contact/uno-contact-r
 import {
   deliverUnoContactSubmission,
   resolveUnoContactWebhookConfig,
-  unoContactFetchTransport,
+  unoContactTransport,
 } from "../../../adapters/contact/uno-contact-webhook";
 
 /** Nothing about this route may be cached, prerendered or shared between visitors. */
@@ -114,7 +114,12 @@ export async function POST(request: Request): Promise<Response> {
   const record = typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
     ? (parsed as Record<string, unknown>)
     : null;
-  const validated = validateUnoContactSubmission(record);
+  // The form declares the Page it was authored on; every other key must be one of the closed fields, so the contract still refuses
+  // an unexpected member rather than passing it downstream.
+  const submissionInput = record === null
+    ? null
+    : Object.fromEntries(Object.entries(record).filter(([key]) => key !== "page"));
+  const validated = validateUnoContactSubmission(submissionInput);
   if (!validated.accepted) return answer({ status: "invalid", reason: validated.reason }, 400);
 
   const configuration = resolveUnoContactWebhookConfig();
@@ -126,7 +131,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const delivery = await deliverUnoContactSubmission(
     { page: pagePath(record?.["page"]), submission: validated.submission },
-    unoContactFetchTransport,
+    unoContactTransport,
   );
 
   switch (delivery.status) {
@@ -135,6 +140,9 @@ export async function POST(request: Request): Promise<Response> {
       return answer({ status: "accepted" }, 202);
     case "timeout":
       return answer({ status: "not-delivered", reason: "contact:timeout" }, 504);
+    case "refused-destination":
+      // A destination the connector refused after resolution: nothing was sent, and the reason names the refusal class only.
+      return answer({ status: "not-delivered", reason: delivery.reason ?? "destination:private-address" }, 502);
     case "configuration-invalid":
       return answer({ status: "unavailable", reason: delivery.reason ?? "contact:configuration-invalid" }, 503);
     default:
@@ -171,4 +179,3 @@ export function DELETE(): Response {
 export function OPTIONS(): Response {
   return refuseMethod();
 }
-

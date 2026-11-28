@@ -13,8 +13,6 @@
  * not depend on an analytics provider: with the declaration absent — the shipped state — no beacon component is rendered, no
  * request is made and no storage is touched.
  */
-import { classifyPublicHttpsDestination, type UnoPublicDestinationRefusal } from "../efs/uno-public-destination";
-
 /** The one event name this contract admits. */
 export const UNO_ANALYTICS_EVENTS = Object.freeze(["page-view"] as const);
 export type UnoAnalyticsEventName = (typeof UNO_ANALYTICS_EVENTS)[number];
@@ -30,17 +28,17 @@ export type UnoAnalyticsRefusal =
   | "analytics:not-object"
   | "analytics:unknown-key"
   | "analytics:enabled-not-boolean"
-  | "analytics:endpoint-missing"
   | "analytics:event-invalid"
   | "analytics:path-invalid"
-  | "analytics:too-large"
-  | UnoPublicDestinationRefusal;
+  | "analytics:too-large";
 
-/** A validated, enabled declaration: the allowlisted public endpoint the server may forward to. */
+/**
+ * A validated, enabled declaration. It names no destination: the endpoint is a server-only secret, so authored copy can never point
+ * measurement at a host of its choosing. Enabling requires the operator's environment to carry the destination as well, and
+ * without it no beacon is rendered at all.
+ */
 export interface UnoAnalyticsPlan {
   readonly enabled: true;
-  readonly endpoint: string;
-  readonly host: string;
 }
 
 /** A validated declaration that is switched off, with the reason it is off. */
@@ -63,29 +61,25 @@ const PATH_PATTERN = /^\/[A-Za-z0-9/_.~-]{0,119}$/u;
 /**
  * Validate one Site's `analytics` declaration.
  *
- * `undefined` (absent) is the shipped, off state. `{enabled: false}` is an explicit off. `{enabled: true}` requires an endpoint
- * that passes the public-destination policy; anything else refuses the declaration, and a refused declaration is treated as
- * off — never as "enabled but unvalidated".
+ * `undefined` (absent) is the shipped, off state. `{enabled: false}` is an explicit off. `{enabled: true}` is an opt-in that still
+ * cannot do anything on its own: the beacon is rendered only when the server also holds an allowlisted destination, so this
+ * declaration is permission, never capability. Anything beyond the one boolean refuses the declaration, and a refused declaration
+ * refuses the presentation rather than being quietly treated as off.
  */
-export function validateUnoAnalyticsDeclaration(value: unknown): UnoAnalyticsVerdict | { readonly enabled: false; readonly reason: UnoAnalyticsRefusal } {
+export function validateUnoAnalyticsDeclaration(
+  value: unknown,
+): UnoAnalyticsVerdict | { readonly enabled: false; readonly reason: UnoAnalyticsRefusal } {
   if (value === undefined) return { enabled: false, reason: "analytics:not-declared" };
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return { enabled: false, reason: "analytics:not-object" };
   }
   const record = value as Record<string, unknown>;
   for (const key of Object.keys(record)) {
-    if (key !== "enabled" && key !== "endpoint") return { enabled: false, reason: "analytics:unknown-key" };
+    if (key !== "enabled") return { enabled: false, reason: "analytics:unknown-key" };
   }
   if (typeof record["enabled"] !== "boolean") return { enabled: false, reason: "analytics:enabled-not-boolean" };
   if (record["enabled"] === false) return { enabled: false, reason: "analytics:disabled" };
-
-  const endpoint = record["endpoint"];
-  if (typeof endpoint !== "string" || endpoint.length === 0) {
-    return { enabled: false, reason: "analytics:endpoint-missing" };
-  }
-  const destination = classifyPublicHttpsDestination(endpoint);
-  if (!destination.accepted) return { enabled: false, reason: destination.reason };
-  return { enabled: true, endpoint: destination.href, host: destination.host };
+  return { enabled: true };
 }
 
 /** Validate one received analytics event, refusing anything beyond the declared shape. */

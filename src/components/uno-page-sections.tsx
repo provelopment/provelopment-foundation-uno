@@ -1061,6 +1061,7 @@ function SectionNode({
     case "interaction.contact": {
       const { heading, description, fields, submitLabel } = node.props;
       const headingId = `${node.id}-title`;
+      const deliveryNoticeId = `${node.id}-delivery`;
       const selected = fields ?? [];
       return (
         <section
@@ -1084,7 +1085,9 @@ function SectionNode({
           {contactDelivery && selected.length > 0 ? (
             <UnoContactForm fields={selected} page={`/${node.id}`} submitLabel={submitLabel ?? "Send message"} />
           ) : (
-            <p className="uno-json-contact-status">Delivery is switched off. Nothing entered here is sent or stored.</p>
+            <p className="uno-json-contact-status" id={selected.length > 0 ? deliveryNoticeId : undefined}>
+              Delivery is switched off. Nothing entered here is sent or stored.
+            </p>
           )}
           {contactDelivery && selected.length > 0 ? null : (
             <>
@@ -1115,7 +1118,7 @@ function SectionNode({
               </div>
             )}
             {submitLabel === undefined ? null : (
-              <button className="uno-json-contact-submit" disabled type="button">
+              <button aria-describedby={deliveryNoticeId} aria-disabled className="uno-json-contact-submit" disabled type="button">
                 {submitLabel}
               </button>
             )}

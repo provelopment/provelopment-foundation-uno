@@ -13,17 +13,13 @@
  * not allowlisted. Every refusal is a status code with no detail about the caller.
  */
 import { UNO_ANALYTICS_LIMITS, validateUnoAnalyticsEvent } from "../../../core/analytics/uno-analytics";
-import { classifyPublicHttpsDestination, isUnoAllowlistedHost } from "../../../core/efs/uno-public-destination";
+import { createUnoAnalyticsTransport, forwardUnoAnalyticsEvent } from "../../../adapters/analytics/uno-analytics-forward";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** The exact environment names the optional forward reads. */
-const FORWARD_URL_ENV = "UNO_ANALYTICS_FORWARD_URL";
-const FORWARD_HOSTS_ENV = "UNO_ANALYTICS_FORWARD_HOSTS";
-
-/** The declared forward bound: short, because no visitor is waiting on it. */
-const FORWARD_TIMEOUT_MS = 2000;
+/** The production forwarder: the pinned connector, no injected seam. */
+const forward = createUnoAnalyticsTransport();
 
 /** An empty, uncached answer. Analytics never writes a body a visitor can see. */
 function quiet(status: number, extra: Record<string, string> = {}): Response {
@@ -31,42 +27,6 @@ function quiet(status: number, extra: Record<string, string> = {}): Response {
     status,
     headers: { "cache-control": "no-store", "x-content-type-options": "nosniff", ...extra },
   });
-}
-
-/** Read one environment value without letting a hostile environment throw. */
-function readEnv(name: string): string | null {
-  try {
-    const value = process.env[name];
-    return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Forward one validated event to an operator-configured endpoint, if — and only if — that endpoint is public HTTPS and its host
- * is allowlisted. The forward is best-effort and silent: its outcome is never reported to the visitor and never stored.
- */
-async function forwardEvent(body: string): Promise<void> {
-  const url = readEnv(FORWARD_URL_ENV);
-  const hosts = readEnv(FORWARD_HOSTS_ENV);
-  if (url === null || hosts === null) return;
-  const destination = classifyPublicHttpsDestination(url);
-  if (!destination.accepted) return;
-  const allowlist = hosts.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0);
-  if (!isUnoAllowlistedHost(destination.host, allowlist)) return;
-  try {
-    await fetch(destination.href, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body,
-      cache: "no-store",
-      redirect: "manual",
-      signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
-    });
-  } catch {
-    // Deliberately swallowed: measurement must never surface an error, retry or queue.
-  }
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -91,8 +51,17 @@ export async function POST(request: Request): Promise<Response> {
   const event = validateUnoAnalyticsEvent(parsed);
   if ("refused" in event) return quiet(400);
 
-  await forwardEvent(JSON.stringify(event));
-  return quiet(204);
+  const outcome = await forwardUnoAnalyticsEvent(JSON.stringify(event), forward);
+  switch (outcome.status) {
+    case "forwarded":
+      // Accepted by the operator's endpoint: the event exists for them, and Uno stores nothing.
+      return quiet(204);
+    case "not-enabled":
+      // No destination is configured, so the product is not an analytics service and accepts nothing.
+      return quiet(503);
+    default:
+      return quiet(502);
+  }
 }
 
 /** Every other method is refused by name. */

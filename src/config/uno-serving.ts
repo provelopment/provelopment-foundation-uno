@@ -50,6 +50,7 @@ import {
 } from "../core/efs/uno-presentation";
 import { planUnoSiteNavigation, type UnoSiteNavigationOutcome } from "../application/plan-uno-site-navigation";
 import { resolveUnoContactWebhookConfig } from "../adapters/contact/uno-contact-webhook";
+import { resolveUnoAnalyticsForward } from "../adapters/analytics/uno-analytics-forward";
 import {
   buildUnoCandidateRouteIndex,
   buildUnoSiteRouteIndex,
@@ -1324,7 +1325,10 @@ export function readUnoServingPresentationFacts(
       const presentation = readPresentation(authority.root);
       if (presentation.status === "accepted") {
         const declared = selectUnoPresentationSite(presentation.config, site);
-        if (declared?.analytics?.enabled === true) analyticsPath = pathname;
+        // Both halves must be present: the Site declares the opt-in, and the operator configured the destination.
+        if (declared?.analytics?.enabled === true && resolveUnoAnalyticsForward().status === "enabled") {
+          analyticsPath = pathname;
+        }
       }
     }
   } catch {
@@ -1411,5 +1415,3 @@ export async function planUnoServingNavigation(
     presentation: presentation.config,
   });
 }
-
-

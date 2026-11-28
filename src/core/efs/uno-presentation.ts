@@ -223,8 +223,8 @@ function readSite(value: unknown): UnoPresentationSite | UnoPresentationRefusal 
   let analytics: UnoAnalyticsVerdict | null = null;
   if (value.analytics !== undefined) {
     const declared = validateUnoAnalyticsDeclaration(value.analytics);
-    if ("endpoint" in declared === false && declared.enabled === false
-      && declared.reason !== "analytics:disabled" && declared.reason !== "analytics:not-declared") {
+    if (declared.enabled === false && declared.reason !== "analytics:disabled"
+      && declared.reason !== "analytics:not-declared") {
       return "presentation:analytics-invalid";
     }
     analytics = declared;

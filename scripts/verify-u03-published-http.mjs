@@ -528,10 +528,23 @@ async function checkContactEndpoints(base) {
       && limited[5].headers.get("retry-after") !== null,
     JSON.stringify(statuses));
 
+  // --- Property boundary: no contact fact and no contact transport may reach a served document -------------
+  const served = [];
+  for (const pathname of ["/en-001", "/en-001/about", "/en-001/components"]) {
+    const response = await request(`${base}${pathname}`);
+    served.push({ pathname, body: response.body });
+  }
+  check(
+    "CONTACT no served Page carries a contact transport",
+    served.every((page) => !/mailto:|tel:/iu.test(page.body)),
+    served.filter((page) => /mailto:|tel:/iu.test(page.body)).map((page) => page.pathname).join(", "),
+  );
+
   // --- Analytics: accepted and stored nowhere, refusing everything else -----------------------------
   const beacon = await postJson("/api/analytics", { event: "page-view", path: "/en-001/about" }, { "x-forwarded-for": "198.51.100.90" });
-  check("ANALYTICS one valid event is accepted with an empty 204 and no storage claim",
-    beacon.status === 204 && (await beacon.text()) === "");
+  // `U05`: with no destination configured the collector is not an analytics service at all, so it accepts nothing rather than
+  // discarding events. The enabled path is proven by scripts/verify-u05-enabled-states.mjs through the production build.
+  check("ANALYTICS an unconfigured collector accepts nothing", beacon.status === 503 && (await beacon.text()) === "");
   const identifying = await postJson("/api/analytics", { event: "page-view", path: "/en-001", id: "visitor-1" }, { "x-forwarded-for": "198.51.100.91" });
   check("ANALYTICS an identifying field is refused", identifying.status === 400);
   const unknownEvent = await postJson("/api/analytics", { event: "click", path: "/en-001" }, { "x-forwarded-for": "198.51.100.92" });

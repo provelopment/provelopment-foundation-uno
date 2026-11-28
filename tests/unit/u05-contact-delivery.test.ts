@@ -26,6 +26,7 @@ import {
 } from "../../src/core/analytics/uno-analytics";
 import {
   UNO_CONTACT_WEBHOOK_ENV,
+  UNO_CONTACT_WEBHOOK_LIMITS,
   deliverUnoContactSubmission,
   resolveUnoContactWebhookConfig,
   type UnoContactTransport,
@@ -218,7 +219,7 @@ describe("a server never opens a socket to a private address", () => {
 
 
 describe("delivery is off by default, and every transport outcome is closed", () => {
-  it("opens no transport at all when nothing is configured", async () => {
+  it("opens no connector at all when nothing is configured", async () => {
     const transport = vi.fn() as unknown as UnoContactTransport;
     const outcome = await deliverUnoContactSubmission(SUBMISSION, transport);
     expect(outcome).toEqual({ status: "not-configured" });
@@ -226,18 +227,18 @@ describe("delivery is off by default, and every transport outcome is closed", ()
     expect(resolveUnoContactWebhookConfig()).toEqual({ status: "not-configured" });
   });
 
-  it("refuses a configuration the destination policy rejects, without calling the transport", async () => {
+  it("refuses a configuration the policy rejects, without calling the connector", async () => {
     const transport = vi.fn() as unknown as UnoContactTransport;
+    // A loopback destination is refused while the documented test seam is off, which is the only way it can be reached.
     configure("https://127.0.0.1/collect", "127.0.0.1");
     expect(await deliverUnoContactSubmission(SUBMISSION, transport))
       .toMatchObject({ status: "configuration-invalid" });
-    expect(transport).not.toHaveBeenCalled();
-
+    configure("http://127.0.0.1:9000/collect", "127.0.0.1");
+    expect(await deliverUnoContactSubmission(SUBMISSION, transport))
+      .toEqual({ status: "configuration-invalid", reason: "destination:not-https" });
     configure("https://hooks.example.com/collect", "other.example.com");
     expect(await deliverUnoContactSubmission(SUBMISSION, transport))
       .toEqual({ status: "configuration-invalid", reason: "destination:not-allowlisted" });
-    expect(transport).not.toHaveBeenCalled();
-
     configure("https://hooks.example.com/collect", "");
     expect(await deliverUnoContactSubmission(SUBMISSION, transport))
       .toEqual({ status: "configuration-invalid", reason: "contact:allowlist-missing" });
@@ -247,13 +248,13 @@ describe("delivery is off by default, and every transport outcome is closed", ()
   it("accepts only a 2xx, and never follows a redirect", async () => {
     configure("https://hooks.example.com/collect", "hooks.example.com", "s3cret");
 
-    const accepted = vi.fn(async () => ({ status: 202, text: async () => "" }));
+    const accepted = vi.fn(async () => ({ kind: "response" as const, status: 202, bodyBytes: 0 }));
     expect(await deliverUnoContactSubmission(SUBMISSION, accepted)).toEqual({ status: "accepted", httpStatus: 202 });
     const [url, init] = accepted.mock.calls[0] as unknown as [string, Record<string, unknown>];
     expect(url).toBe("https://hooks.example.com/collect");
     expect(init["method"]).toBe("POST");
-    expect(init["redirect"]).toBe("manual");
-    expect(init["cache"]).toBe("no-store");
+    expect(init["allowLoopback"]).toBe(false);
+    expect(init["totalTimeoutMs"]).toBe(UNO_CONTACT_WEBHOOK_LIMITS.timeoutMs);
     expect((init["headers"] as Record<string, string>)["authorization"]).toBe("Bearer s3cret");
     expect(JSON.parse(String(init["body"]))).toEqual({
       source: "uno-contact",
@@ -261,40 +262,36 @@ describe("delivery is off by default, and every transport outcome is closed", ()
       submission: { name: "Ada", email: "ada@example.com", message: "Hello." },
     });
 
-    const redirect = vi.fn(async () => ({ status: 302, text: async () => "" }));
+    const redirect = vi.fn(async () => ({ kind: "response" as const, status: 302, bodyBytes: 0 }));
     expect(await deliverUnoContactSubmission(SUBMISSION, redirect))
       .toEqual({ status: "redirect-refused", httpStatus: 302 });
 
-    const rejected = vi.fn(async () => ({ status: 422, text: async () => "no" }));
+    const rejected = vi.fn(async () => ({ kind: "response" as const, status: 422, bodyBytes: 2 }));
     expect(await deliverUnoContactSubmission(SUBMISSION, rejected))
       .toEqual({ status: "provider-rejected", httpStatus: 422 });
   });
 
-  it("distinguishes a timeout from a network failure, and bounds the response it reads", async () => {
+  it("distinguishes a refusal, a timeout, a failure and an oversized answer", async () => {
     configure("https://hooks.example.com/collect", "hooks.example.com");
 
-    const timeout = vi.fn(async () => {
-      const error = new Error("aborted");
-      error.name = "TimeoutError";
-      throw error;
-    });
+    const refused = vi.fn(async () => ({ kind: "refused" as const, reason: "destination:private-address" }));
+    expect(await deliverUnoContactSubmission(SUBMISSION, refused))
+      .toEqual({ status: "refused-destination", reason: "destination:private-address" });
+
+    const timeout = vi.fn(async () => ({ kind: "timeout" as const }));
     expect(await deliverUnoContactSubmission(SUBMISSION, timeout)).toEqual({ status: "timeout" });
 
-    const failure = vi.fn(async () => {
-      throw new Error("ECONNREFUSED");
-    });
+    const failure = vi.fn(async () => ({ kind: "error" as const }));
     expect(await deliverUnoContactSubmission(SUBMISSION, failure)).toEqual({ status: "network-error" });
 
-    const oversized = vi.fn(async () => ({ status: 200, text: async () => "x".repeat(4096) }));
+    const oversized = vi.fn(async () => ({ kind: "response" as const, status: 200, bodyBytes: 4096 }));
     expect(await deliverUnoContactSubmission(SUBMISSION, oversized))
       .toEqual({ status: "response-too-large", httpStatus: 200 });
   });
 
   it("never puts the submission or the credential in an error path", async () => {
     configure("https://hooks.example.com/collect", "hooks.example.com", "s3cret");
-    const failure = vi.fn(async () => {
-      throw new Error("boom");
-    });
+    const failure = vi.fn(async () => ({ kind: "error" as const }));
     const outcome = await deliverUnoContactSubmission(SUBMISSION, failure);
     const serialized = JSON.stringify(outcome);
     expect(serialized).not.toContain("ada@example.com");
@@ -303,21 +300,17 @@ describe("delivery is off by default, and every transport outcome is closed", ()
   });
 });
 
-
 describe("analytics are opt-in, and off unless an operator authors them", () => {
-  it("is off when absent, explicitly off when disabled, and enabled only with a public HTTPS endpoint", () => {
+  it("is off when absent, off when disabled, and only ever permission when enabled", () => {
     expect(validateUnoAnalyticsDeclaration(undefined)).toEqual({ enabled: false, reason: "analytics:not-declared" });
     expect(validateUnoAnalyticsDeclaration({ enabled: false })).toEqual({ enabled: false, reason: "analytics:disabled" });
+    // Enabling is permission, never capability: the declaration carries no destination of its own.
+    expect(validateUnoAnalyticsDeclaration({ enabled: true })).toEqual({ enabled: true });
     expect(validateUnoAnalyticsDeclaration({ enabled: true, endpoint: "https://collect.example.com/e" }))
-      .toEqual({ enabled: true, endpoint: "https://collect.example.com/e", host: "collect.example.com" });
-    expect(validateUnoAnalyticsDeclaration({ enabled: true }))
-      .toEqual({ enabled: false, reason: "analytics:endpoint-missing" });
-    expect(validateUnoAnalyticsDeclaration({ enabled: true, endpoint: "http://collect.example.com/e" }))
-      .toMatchObject({ enabled: false, reason: "destination:not-https" });
-    expect(validateUnoAnalyticsDeclaration({ enabled: true, endpoint: "https://10.1.2.3/e" }))
-      .toMatchObject({ enabled: false, reason: "destination:private-address" });
-    expect(validateUnoAnalyticsDeclaration({ enabled: true, endpoint: "https://x.example.com/e", id: "v1" }))
       .toEqual({ enabled: false, reason: "analytics:unknown-key" });
+    expect(validateUnoAnalyticsDeclaration({ enabled: "yes" }))
+      .toEqual({ enabled: false, reason: "analytics:enabled-not-boolean" });
+    expect(validateUnoAnalyticsDeclaration([])).toEqual({ enabled: false, reason: "analytics:not-object" });
   });
 
   it("admits exactly one event name and one bounded Path, and nothing identifying", () => {

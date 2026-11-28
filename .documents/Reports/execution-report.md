@@ -246,3 +246,100 @@ limiter is per-process and in-memory, so several instances each hold their own b
 
 **Authorization status.** No provider, credential, DNS record, deployment, release, tag or external delivery was created, and
 analytics remain off. Both routes read `process.env` inside the request, so no value is baked into the build.
+
+## U05 — finalization against the canonical contract
+
+The Owner's five specific matters were resolved at their cause, and one of them changed the design rather than the wording.
+
+**A. Contact interface independence.** The interface no longer depends on delivery being available. With a validated webhook it
+renders the live form; without one it renders the same inert fields, its authored labels and its honest "delivery is switched off"
+notice, and the notice is now named (`id`) and referenced by the inert field group and the disabled submit through
+`aria-describedby` — so the OFF state is *described*, not merely disabled. Nothing is collected, persisted or transmitted: the
+fields are `readOnly`, there is no `<form>` in the OFF state, and the module renders no transport. The describing `id` is emitted
+**only when there are inert controls to describe**, so a contact node that authors no fields stays byte-identical to the earned U04
+evidence — the family suite and the closure oracle (`17/17`, `59/59`) are unchanged.
+
+**B. Outbound transport security — rebuilt around the connection, not the string.** Lexical validation alone cannot answer "where
+does this name go?", so the connector resolves first: `src/adapters/net/uno-pinned-https-transport.ts` asks the platform resolver
+for **every** address, classifies each one (`classifyResolvedAddress`: IPv4 loopback/RFC 1918/link-local/CGNAT/reserved/multicast/
+documentation, IPv6 loopback/ULA/link-local/multicast/documentation, and IPv4-mapped and NAT64 forms unwrapped), refuses the
+connection if **any** answer is private, and then dials **only the address it validated** by pinning the socket's resolver. DNS
+rebinding is therefore not a race: the value that was checked is the value that is connected to, and the socket's own
+`remoteAddress` is checked again against it. TLS verification uses the configured name (`servername`), not the address; the exchange
+has no pool (`agent: false`), a connect bound, a header bound, a response-body bound and a whole-exchange bound; and a `3xx` is a
+status the caller refuses, never a second request. The contact webhook and the analytics forwarder share this one connector, so the
+product has one outbound path.
+
+**Limiter, stated accurately.** The limiter is a bounded in-memory token bucket (burst 5 per 60 s, 2,048 keys, oldest-idle
+eviction) keyed by the first forwarded address. What it protects: one process against a naive flood, with memory bounded so a flood
+of distinct keys cannot grow it. What it does **not** do: it is not distributed, not persistent and not restart-surviving; several
+instances each hold their own budget. The gate proves both halves — five rapid submissions accepted, the sixth refused with
+`retry-after`, and the refused one never reaching the destination.
+
+**C. Analytics integrity — one policy, incoherence removed.** The demonstration route's approved `@vercel/analytics` integration
+fired on every view, which contradicted the canonical opt-in/OFF default; it now renders only when an operator sets
+`UNO_DEMO_ANALYTICS=1`, read at request time from an explicitly dynamic route. The product's Site analytics are a one-boolean
+declaration that is **permission, never capability**: it names no endpoint, the destination is a server-only environment value, and a
+beacon is rendered only when both are present. The collector is no longer an event-discarding endpoint: with no destination it
+answers `503` and accepts nothing; with one it forwards the single validated event through the same pinned connector, and Uno stores
+nothing. One policy, two opt-in switches, no unapproved provider, no new SDK, no storage.
+
+
+**D. Enabled-state production evidence.** `scripts/verify-u05-enabled-states.mjs` installs a temporary synthetic configuration, runs
+the **real production build** and real Chromium, and restores every byte. Proven: the OFF state (notice, no form, read-only
+controls, no request); the seam requirement (the same loopback destination is refused with the seam off, and reaches nothing); field
+labels and required/described controls; keyboard order name→email→message→submit; local validation refusing an empty and a malformed
+form before any request, with focus moved to the `role="alert"` summary and `aria-invalid` on each field; the endpoint refusing the
+same malformed mailbox independently; the observable pending state (`aria-busy`, disabled) and its announcement; acceptance
+described as "reached the configured endpoint" with exactly one request carrying the synthetic bearer token and the three fields
+only — no address, agent, cookie or clock; rejection, redirect refusal and an oversized answer each reported honestly with exactly
+one request and no acceptance wording; the redirect target never followed; a timeout reported honestly, once, never retried; five
+rapid submissions accepted and the sixth refused; analytics fired once per Page view only when opted in, forwarded once, with no
+cookie and no foreign host; and byte-exact restoration of both the Page and the presentation, after which the OFF state returns.
+**57 assertions, 0 failures.**
+
+**E. Action and property assurance.** The approved authored actions already work through the unchanged policy: `mailto:` for a
+contact address and `https:` for maps, directions and external booking are admitted; `tel:`, `javascript:`, `data:`, `http:`,
+protocol-relative, credentialed and relative forms are refused as `document:unsafe-link`; and the hero, card, list-item and
+stand-alone action readers all delegate to that one classifier, so no second destination rule was introduced. The contact facts exist
+as the canonical keys (`contact.name`, `contact.email`, `contact.phone`), every declared `contact.*` property is `public: false`, the
+renderer and the island never construct a `mailto:` or `tel:` value, and the published gate now asserts that no served Page carries a
+contact transport at all.
+
+**U05 result at this head.** Unit **1481**, deployment **405/0**, architecture **47/0**, bootstrap **19/0**, published HTTP +
+Chromium **1381/0**, U04 gate **996/0** with the closure oracle at **17/17** and **59/59**, enabled-state gate **57/0**; lint,
+typecheck, build and bounded trace clean; readiness PASS; `pnpm audit` no known vulnerabilities.
+
+**U05 status: implementation and evidence complete; submitted for independent acceptance and Owner closure.** Two limitations are
+stated rather than papered over: success, rejection, redirect and timeout are proven against a deterministic local receiver through
+the documented test seam (never a live provider), and the limiter is per-process as described above.
+
+## U06 — independent distribution: implemented, blocked on one defect
+
+`scripts/package-release.mjs` builds an identifiable release (84 files, per-file `MANIFEST.sha256`, tree digest, `RELEASE.json`
+with version/commit/digest, `NOTICE.md` generated from the real runtime dependency licences, and a convenience tarball);
+`scripts/install-release.mjs` verifies every file and the digest, materialises the release at its own permanent path, installs and
+builds **there**, carries the adopter's Pages, media, manifest and presentation forward, and only then moves the live link;
+`scripts/verify-u06-distribution.mjs` drives two clean-room installations outside the repository, then upgrade, integrity refusal,
+rollback and an interrupted install.
+
+That gate found a real defect, and the design was corrected for it: installing into a staging directory and renaming the tree broke
+every package-manager link, so the installer now builds at the release's final path and swaps a directory link instead of a tree.
+After that correction these are proven: the release verifies and refuses a modified file (`install:file-mismatch:…`) and an unlisted
+file (`install:unexpected-file:…`) by name; two independent installations succeed and record the same digest; an upgrade preserves the
+adopter's Page and presentation byte for byte and records what it preserved; a refused release changes nothing; rollback restores the
+release that was running and the adopter's Page with it; an interrupted install leaves a complete running release; and the same tree
+packages to the same digest twice.
+
+**Open defect, stated plainly.** In both clean-room installations the demonstration route at `/` answers 200 while every Site address
+(`/en-001`, and every address the installed manifest declares) answers **404** with the demonstration's not-found shell, whereas the
+same build in the development tree serves `/en-001` with 200. The release contains the site route, its layout, the authority
+declarations and every content source, and the build's path manifest lists the route; the cause is not yet identified. U06 is
+therefore **not accepted**: an adopter would receive an installation that serves no Page. Root-causing this is the next action, and
+no U06 or U07 claim is made until a clean-room installation serves its starter Pages.
+
+## U07 — not started
+
+U07 depends on an accepted U06. The release-candidate checks that already exist (architecture, security, licensing, exact-head CI,
+production HTTP and Chromium, SEO, accessibility, upgrade and rollback) are in place and will be run against the accepted artefact
+once the U06 defect is resolved; nothing in this stage is claimed today.

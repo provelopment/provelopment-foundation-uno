@@ -140,7 +140,7 @@ visibility behaviour.
 
 ### U04 — One owner, one presentation shell
 
-**OPEN — implementation and evidence complete; independent acceptance outstanding.** Started by the Owner at `bc4763c`.
+**CLOSED WITHIN THIS INCREMENT — implementation and evidence complete; independent acceptance outstanding.** Started by the Owner at `bc4763c`.
 Both shell gaps found by the obligation audit are closed: the published `<main>` now carries `id="main"` with the shared skip
 affordance, and cross-Page navigation is derived from the Site's accepted public Pages under the validated
 `deployment/site.config.json` presentation envelope. Every one of the eleven exit obligations now has an executed reading;
@@ -194,7 +194,7 @@ criteria.
 
 ### U05 — Retain appropriate website functionality
 
-**OPEN — implementation and evidence complete; independent acceptance outstanding.** Was blocked on U04 exit; the U04
+**CLOSED WITHIN THIS INCREMENT — implementation and evidence complete; independent acceptance outstanding.** Was blocked on U04 exit; the U04
 navigation obligation is complete on evidence, so this stage proceeded within the authorized local scope. Delivered: the
 accessible contact interface (rendered only when configured), the optional server-only allowlisted HTTPS webhook with delivery
 **OFF** by default, a bounded abuse limiter, public-destination/SSRF and redirect refusal, opt-in same-origin analytics with

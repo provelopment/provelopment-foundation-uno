@@ -3765,6 +3765,8 @@ describe("composeUnoFoundationSubset — acknowledged delivery-OFF contact", () 
     const document = composed(contactOnlySource(), contactBinding());
     const html = render(document);
     expect(html).toContain('<section class="uno-json-contact" id="family-0-contactform">');
+    // `U05`: the notice keeps its exact words. The describing id appears only when there are inert controls to describe, so this
+    // fixture — which authors no fields — is byte-identical to the earned U04 evidence.
     expect(html).toContain(
       '<p class="uno-json-contact-status">Delivery is switched off. Nothing entered here is sent or stored.</p>',
     );
@@ -6549,5 +6551,3 @@ describe("composeUnoFoundationSubset — faq groups, Markdown answers and the cl
     expect((twentyFour.match(/<details class="uno-json-disclosure">/gu) ?? []).length).toBe(24);
   });
 });
-
-

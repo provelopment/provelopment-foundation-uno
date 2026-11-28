@@ -452,8 +452,9 @@ export function UnoContactForm({ fields, submitLabel, page }: UnoContactFormProp
     const problems = localProblems();
     setInvalid(problems);
     if (problems.length > 0) {
+      // The summary is rendered by this very update, so focus moves once it exists rather than pointing at nothing.
       setOutcome({ kind: "invalid", message: "Some fields need attention before this can be sent." });
-      summaryRef.current?.focus();
+      requestAnimationFrame(() => summaryRef.current?.focus());
       return;
     }
 

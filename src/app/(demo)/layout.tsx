@@ -40,12 +40,28 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * `U05` — one analytics policy across the product: nothing is measured unless an operator asks for it.
+ *
+ * The approved `@vercel/analytics` integration remains the demonstration route's only collector, and it now renders **only** when
+ * `UNO_DEMO_ANALYTICS` is exactly `1`. Unset — which is the shipped state and the state every gate builds in — the component is
+ * not rendered at all, so the route loads no measurement script and records nothing. The flag is server-only, is read at request
+ * time, and cannot be set by authored copy, a Page, a property or a published Site.
+ *
+ * The published Site has its own opt-in declaration (`analytics.enabled`) and forwards to an operator-configured same-origin
+ * collector; neither mechanism can switch the other on.
+ */
+export const dynamic = "force-dynamic";
+
+/** True only when an operator explicitly opted the demonstration route into its approved collector. */
+const demoAnalyticsEnabled = (): boolean => process.env.UNO_DEMO_ANALYTICS === "1";
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
         {children}
-        <Analytics />
+        {demoAnalyticsEnabled() ? <Analytics /> : null}
       </body>
     </html>
   );

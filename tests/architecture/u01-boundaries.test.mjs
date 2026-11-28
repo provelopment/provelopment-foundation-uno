@@ -186,6 +186,9 @@ export const ADAPTER_AUTHORED_FILES = Object.freeze([
   // `U05`: the contact webhook adapter. It reads server-only environment values and performs one bounded, allowlisted HTTPS
   // request only when an operator configured it; no core contract and no application use case may import it.
   'src/adapters/contact/uno-contact-webhook.ts',
+  // `U05`: the pinned connector resolves, refuses and dials, and the analytics forwarder is the product's one measuring sender.
+  'src/adapters/net/uno-pinned-https-transport.ts',
+  'src/adapters/analytics/uno-analytics-forward.ts',
 ]);
 
 /** Modules a concrete Node adapter must never import. */
