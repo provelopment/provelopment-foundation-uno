@@ -56,3 +56,6 @@ ehthumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Local release-candidate output from `node scripts/package-release.mjs`; the artefact is identified by its digest, not committed.
+/release/

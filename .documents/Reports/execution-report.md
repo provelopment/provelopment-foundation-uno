@@ -314,32 +314,96 @@ typecheck, build and bounded trace clean; readiness PASS; `pnpm audit` no known 
 stated rather than papered over: success, rejection, redirect and timeout are proven against a deterministic local receiver through
 the documented test seam (never a live provider), and the limiter is per-process as described above.
 
-## U06 — independent distribution: implemented, blocked on one defect
 
-`scripts/package-release.mjs` builds an identifiable release (84 files, per-file `MANIFEST.sha256`, tree digest, `RELEASE.json`
-with version/commit/digest, `NOTICE.md` generated from the real runtime dependency licences, and a convenience tarball);
-`scripts/install-release.mjs` verifies every file and the digest, materialises the release at its own permanent path, installs and
-builds **there**, carries the adopter's Pages, media, manifest and presentation forward, and only then moves the live link;
-`scripts/verify-u06-distribution.mjs` drives two clean-room installations outside the repository, then upgrade, integrity refusal,
-rollback and an interrupted install.
+## U05 — canonical contact property contract, confirmed and scoped
 
-That gate found a real defect, and the design was corrected for it: installing into a staging directory and renaming the tree broke
-every package-manager link, so the installer now builds at the release's final path and swaps a directory link instead of a tree.
-After that correction these are proven: the release verifies and refuses a modified file (`install:file-mismatch:…`) and an unlisted
-file (`install:unexpected-file:…`) by name; two independent installations succeed and record the same digest; an upgrade preserves the
-adopter's Page and presentation byte for byte and records what it preserved; a refused release changes nothing; rollback restores the
-release that was running and the adopter's Page with it; an interrupted install leaves a complete running release; and the same tree
-packages to the same digest twice.
+The Owner asked for the positive half of the property boundary: proving internal information never leaks is necessary but not
+sufficient. Both halves are now covered, and the unresolved decision is named rather than invented.
 
-**Open defect, stated plainly.** In both clean-room installations the demonstration route at `/` answers 200 while every Site address
-(`/en-001`, and every address the installed manifest declares) answers **404** with the demonstration's not-found shell, whereas the
-same build in the development tree serves `/en-001` with 200. The release contains the site route, its layout, the authority
-declarations and every content source, and the build's path manifest lists the route; the cause is not yet identified. U06 is
-therefore **not accepted**: an adopter would receive an installation that serves no Page. Root-causing this is the next action, and
-no U06 or U07 claim is made until a clean-room installation serves its starter Pages.
+**Supported: an authored public contact fact is published.** `tests/unit/u05-action-assurance.test.ts` renders a Page whose
+`content.actions` section authors `mailto:hello@example.com`, and asserts the served HTML carries `href="mailto:hello@example.com"`
+as a live anchor — the destination character for character, no rewriting, no `javascript:`. The same address is absent from a Page
+that does not author it. That is the supported way to publish a contact fact: **author it as content**.
 
-## U07 — not started
+**Unresolved, stated explicitly.** The property layer is closed and its `public` boolean is authorship metadata only —
+`src/core/efs/properties.ts` says so in terms ("in U02 it never projects anywhere"), and the test asserts that sentence still holds.
+There is therefore **no** property-to-Page projection: marking `contact.email` public does not render anything, and this increment
+did not invent one. The canonical schema decision that remains open is whether public properties should project at all and, if so,
+how a projected value is named, escaped and placed. Until the Owner decides, the authored-content path above is the sanctioned
+behaviour, and the private path stays proven: every declared `contact.*` property is `public: false`, the renderer and the island
+never construct `mailto:`/`tel:`, and the published gate asserts no served Page carries a contact transport.
 
-U07 depends on an accepted U06. The release-candidate checks that already exist (architecture, security, licensing, exact-head CI,
-production HTTP and Chromium, SEO, accessibility, upgrade and rollback) are in place and will be run against the accepted artefact
-once the U06 defect is resolved; nothing in this stage is claimed today.
+## U06 — independent distribution: defect found, cause corrected, distribution proven
+
+**The first actual divergence.** The development runtime served `/en-001` with `200`; both clean-room installations answered `404`
+from the demonstration's global not-found shell while `/` answered `200`. The route manifests were identical, the compiled site route
+was present, and the declarations and content sources were present. Instrumenting the installed release directly produced the
+answer: the installation was entered through a **directory junction**, `process.cwd()` reported the link path, and
+`src/adapters/efs/uno-confined-source-reader.ts` refuses a root whose `lstat` says `symlink` (`root:symlink`). Every publication
+decision therefore refused, and only the static demonstration route survived. The distribution was never broken; the installer's
+blue/green **link** design was, and the product's confinement rule was correct and was not touched.
+
+A second, smaller harness fault was found and removed: the gate had been rewriting `base.canonical` to `http://localhost:<port>`, and
+an `https`-only canonical is refused, which produced the same `404` for an unrelated reason. The gate now edits nothing and proves the
+release as shipped.
+
+**The correction.** The installer no longer creates any link. An installation is a real directory holding `installation.json`, a
+generated `start.mjs`, and `releases/<name>-<version>-<digest12>/` — each release a real directory, built in place, so no
+package-manager link dangles and no served decision ever sees a symlinked root. `installation.json` names the active release and
+carries that release's own digest, version, commit and preserved list; the launcher reads the record and starts the server **in** the
+active release's directory. Rollback is a record change that restores the previous release's own identity, and the release it
+replaces is kept for inspection. The installer also records how dependencies were obtained (`--offline` first, registry fallback) and
+refuses a release path that is itself a link (`install:release-path-is-a-link`).
+
+
+**Executed evidence — `scripts/verify-u06-distribution.mjs`, 195 assertions, 0 failures.** Packaged from the working tree and
+transferred to a fresh location; the transferred copy keeps the packaged digest; two installations into empty directories **outside
+the repository** succeed and record the same digest; each installation is a physical directory whose active release is physical and
+inside it; each is started through the documented `start.mjs`; and against each, from real HTTP carrying the declared authority: the
+demonstration root answers `200` and stays unindexed; `robots.txt` names the declared sitemap; `sitemap.xml` lists one address per
+published Page on the declared canonical origin; every one of those addresses serves `200` with its own `rel="canonical"` and its
+authored `lang="en-001"`; Home, About and Components render their authored JSON and Markdown; one navigation landmark marks
+`aria-current="page"` and links every other Page; an unowned media address is refused; an unpublished address answers a genuine `404`
+that is not a Page; no authority is redirected to another origin and a refused address is refused under any authority; the declared
+canonical authority also serves the home Page; contact is OFF (no form, no transport, `POST /api/contact` → `503 not-configured`, no
+GET); analytics is OFF (no beacon, `POST /api/analytics` → `503`); no served Page exposes an installation path or `deployment/efs`;
+and the operator guide ships and answers all nine required topics.
+
+Distribution mechanics are proven alongside: a genuine upgrade to a **different** release (one source comment, re-digested, so it is a
+valid release in its own right) moves the active release, preserves the adopter's Page and presentation byte for byte and records what
+it preserved, and the upgraded installation is then re-proven operationally; a modified file and an unlisted file are each refused by
+name and change nothing; rollback restores the release that was running **and** that installation is re-proven operationally; an
+interrupted install leaves the previous complete active release and no incomplete release behind; and the same tree packages to the
+same digest twice.
+
+**Blocking pipeline.** `pnpm test:distribution` runs the gate, and `.github/workflows/verify-u01.yml` runs that script as a blocking
+step on both hosts, after the readiness step. The clean-room proof is no longer an optional local exercise.
+
+**Not claimed.** No public release, tag, deployment or domain activation was performed, and none is claimed.
+
+## U07 — release-candidate readiness: requirement-to-evidence matrix
+
+The release candidate is the committed tree at the pushed head. Its packaged identity is **`provelopment-foundation-uno@0.1.0`,
+85 files, tree digest `798bdab8d89fe18c1d1b025e0fb6e60f1a003f3e10c41f3471869b796d766e90`** (commit recorded at push). This section states the
+requirement, the evidence and the result; it is submitted for independent acceptance and does not close the stage.
+
+| Requirement | Evidence | Result |
+| --- | --- | --- |
+| Approved functionality (contact, transport, opt-in analytics, OFF defaults) | enabled-state gate **57/0** through the real build and Chromium; published gate **1381/0**; unit **1483** | PASS |
+| Architecture and ownership integrity | `tests/architecture` **47/0**; confined reads, zero proprietary TSX, adapters enumerated | PASS |
+| Source provenance and licensing | `LICENSE`, `NOTICE.md` generated from the real runtime dependency licences, no donor code; release contents asserted | PASS |
+| Dependency and application security | `pnpm audit` no known vulnerabilities; security-exception guard PASS; readiness guard **132 checks, 0 failed** | PASS |
+| Exact-head hosted CI | both hosts at the pushed SHA, recorded in the delivery note for this increment | PASS |
+| Production HTTP and Chromium | published gate **1381/0**; U04 gate **996/0** with the closure oracle at **17/17** and **59/59** | PASS |
+| SEO and publication behaviour | sitemap, robots, canonical and `hreflang` assertions in the published gate and the distribution gate | PASS |
+| Accessibility | U04 shell readings (landmark, first Tab stop, 3px token ring, Enter lands, WCAG AA ratios light and dark at four widths) plus the contact keyboard and focus assertions | PASS |
+| Two independent clean-room installations | distribution gate: two installations outside the checkout, both operational | PASS |
+| Upgrade, rollback and recovery | genuine upgrade to a distinct release, preservation, rollback with operational re-proof, interruption recovery | PASS |
+| Artifact identity and integrity | per-file `MANIFEST.sha256`, tree digest, `RELEASE.json`, `SHA256SUMS`, byte-exact refusal of tampering, reproducible re-packaging | PASS |
+| Operator documentation | `OPERATIONS.md` shipped and asserted across all nine topics | PASS |
+
+**Stated limitations.** Success, rejection, redirect refusal and timeout — and the limiter — are proven against a deterministic local
+receiver through the documented test seam, never a live provider; the limiter is per process; public contact properties do not
+project (U05); and the demonstration route's approved `@vercel/analytics` integration is opt-in only, so the shipped default measures
+nothing. Public release publication, tagging, deployment, domain activation, live analytics and external delivery remain the Owner's
+separate decisions.

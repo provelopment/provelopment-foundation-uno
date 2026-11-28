@@ -24,6 +24,7 @@ const ROOT = process.cwd();
 const INCLUDE = Object.freeze([
   "LICENSE",
   "README.md",
+  "OPERATIONS.md",
   "next.config.ts",
   "package.json",
   "pnpm-lock.yaml",

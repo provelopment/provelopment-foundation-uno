@@ -15,8 +15,8 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** The paths an adopter owns, and which an upgrade must therefore carry forward. */
@@ -107,81 +107,82 @@ function preserve(releaseDir, liveDir, preserved) {
   }
 }
 
-/** Remove a directory link without following it, so the release it names is never touched. */
-function removeLink(path) {
-  if (!existsSync(path) && !existsSync(dirname(path))) return;
-  try {
-    if (lstatSync(path).isSymbolicLink()) unlinkSync(path);
-    else rmSync(path, { recursive: true, force: true });
-  } catch {
-    // A missing path needs no removal.
-  }
+/**
+ * Write the operator launcher.
+ *
+ * WHY A LAUNCHER AND NOT A LINK. The product refuses a **symlinked source root** on purpose: a confined read whose root is a link could
+ * be repointed behind the product's back. An installation that was entered through a link therefore served nothing, which is how this
+ * design was found. The installation is a real directory, the active release is a real directory inside it, and the launcher reads the
+ * record and starts the server **in that directory**, so `process.cwd()` is always a physical path.
+ */
+function writeLauncher(root) {
+  const body = [
+    "#!/usr/bin/env node",
+    "/** Foundation Uno — the installation launcher. Starts the active release from its own physical directory. */",
+    'import { readFileSync } from "node:fs";',
+    'import { spawn } from "node:child_process";',
+    "import { dirname, join, resolve } from \"node:path\";",
+    "",
+    'import { fileURLToPath } from "node:url";',
+    "const root = dirname(fileURLToPath(import.meta.url));",
+    "const record = JSON.parse(readFileSync(join(root, \"installation.json\"), \"utf8\"));",
+    "const active = resolve(record.active);",
+    "const args = [join(active, \"node_modules/next/dist/bin/next\"), \"start\", ...process.argv.slice(2)];",
+    "const child = spawn(process.execPath, args, { cwd: active, stdio: \"inherit\", env: { ...process.env, NODE_ENV: \"production\" } });",
+    "child.on(\"exit\", (code) => { process.exitCode = code ?? 0; });",
+    "",
+  ];
+  writeFileSync(join(root, "start.mjs"), body.join("\n"), "utf8");
 }
 
-/** Point the live path at one physical release. A junction needs no elevation on Windows; a symlink is its POSIX peer. */
-function pointAt(target, releasePath) {
-  const pending = `${target}.next-${process.pid}`;
-  removeLink(pending);
-  symlinkSync(releasePath, pending, process.platform === "win32" ? "junction" : "dir");
-  // A directory link can be unlinked without touching the release it names, so this window cannot destroy data.
-  removeLink(target);
-  renameSync(pending, target);
+/** The record that names the active release, readable by an operator and by the launcher. */
+function writeRecord(root, active, digest, facts, preserved, mode) {
+  const record = {
+    name: facts.name,
+    version: facts.version,
+    commit: facts.commit,
+    digest,
+    mode,
+    active,
+    preserved,
+    installedAt: new Date().toISOString(),
+    start: "node start.mjs -H 127.0.0.1 -p 3000",
+    verify: "recompute MANIFEST.sha256 and compare it with RELEASE.json",
+  };
+  writeFileSync(join(root, "installation.json"), `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  writeFileSync(join(active, "installation.json"), `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  return record;
 }
 
-/** The release path the live link currently names, or `null` when nothing is installed. */
-function currentRelease(target) {
+/** The active release of an installation, or `null` when nothing is installed. */
+function activeRelease(root) {
   try {
-    return realpathSync(target);
+    const record = JSON.parse(readFileSync(join(root, "installation.json"), "utf8"));
+    const active = resolve(String(record.active ?? ""));
+    return existsSync(join(active, ".next/BUILD_ID")) ? active : null;
   } catch {
     return null;
   }
 }
 
-/** Write the record an operator reads: which release is installed, from where, and what was preserved. */
-function writeInstallation(releaseDir, digest, facts, preserved, mode) {
-  writeFileSync(
-    join(releaseDir, "installation.json"),
-    `${JSON.stringify(
-      {
-        name: facts.name,
-        version: facts.version,
-        commit: facts.commit,
-        digest,
-        mode,
-        preserved,
-        installedAt: new Date().toISOString(),
-        start: "node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000",
-        verify: "recompute MANIFEST.sha256 and compare it with RELEASE.json",
-      },
-      null,
-      2,
-    )}\n`,
-    "utf8",
-  );
-}
-
 /**
  * Install or upgrade one release.
  *
- * The release is materialised at its own permanent path, built there, and only then does the live link move. Module links created by
- * the package manager therefore never dangle, `pnpm start` never re-links a moved tree, and any failure before the link moves leaves the
- * running installation untouched.
+ * The release is materialised at its own permanent, **physical** path and built there, so no package-manager link ever dangles and no
+ * served decision ever sees a symlinked root. The record is the only thing that points at a release, and a rollback is a record change.
+ * A failure before the record is written leaves the running installation untouched.
  */
 export function installRelease({ releaseDir, target, mode = "fresh" }) {
   const verified = verifyRelease(releaseDir);
   if (!verified.ok) return { ok: false, reason: verified.reason };
 
-  const live = resolve(target);
-  // Each installation owns its release store, so two installations never share a build.
-  const releasesRoot = `${live}.releases`;
+  const root = resolve(target);
+  const releasesRoot = join(root, "releases");
   const releasePath = join(releasesRoot, `${verified.facts.name}-${verified.facts.version}-${verified.digest.slice(0, 12)}`);
-  const previous = currentRelease(live);
+  const previous = activeRelease(root);
   mkdirSync(releasesRoot, { recursive: true });
+  let preserved = [];
 
-  // A partial release from an interrupted run is discarded; a complete one is reused.
-  if (existsSync(releasePath) && !existsSync(join(releasePath, ".next/BUILD_ID"))) {
-    rmSync(releasePath, { recursive: true, force: true });
-  }
   if (!existsSync(join(releasePath, ".next/BUILD_ID"))) {
     rmSync(releasePath, { recursive: true, force: true });
     mkdirSync(releasePath, { recursive: true });
@@ -189,14 +190,22 @@ export function installRelease({ releaseDir, target, mode = "fresh" }) {
       recursive: true,
       filter: (source) => !source.endsWith("MANIFEST.sha256") && !source.endsWith("RELEASE.json"),
     });
-    const preserved = [];
     if (previous !== null) preserve(releasePath, previous, preserved);
 
-    const install = run("pnpm", ["install", "--offline", "--frozen-lockfile"], releasePath);
+    // Dependencies come from the lockfile. The offline attempt is preferred and is what a machine with a populated store uses; a
+    // machine without one falls back to the registry, and the record says which happened.
+    let install = run("pnpm", ["install", "--offline", "--frozen-lockfile"], releasePath);
+    let dependencyMode = "offline";
+    if (!install.ok) {
+      install = run("pnpm", ["install", "--frozen-lockfile"], releasePath);
+      dependencyMode = "registry";
+    }
     if (!install.ok) {
       rmSync(releasePath, { recursive: true, force: true });
       return { ok: false, reason: "install:dependency-install-failed", output: install.output };
     }
+    writeFileSync(join(releasePath, ".uno-dependencies"), `${dependencyMode}
+`, "utf8");
     const build = run("pnpm", ["build"], releasePath);
     if (!build.ok) {
       rmSync(releasePath, { recursive: true, force: true });
@@ -208,32 +217,41 @@ export function installRelease({ releaseDir, target, mode = "fresh" }) {
         return { ok: false, reason: `install:build-incomplete:${required}` };
       }
     }
-    writeInstallation(releasePath, verified.digest, verified.facts, preserved, mode);
+    // The release must be entered at a physical path: the product refuses a symlinked source root, so this is a product requirement.
+    if (lstatSync(releasePath).isSymbolicLink()) {
+      rmSync(releasePath, { recursive: true, force: true });
+      return { ok: false, reason: "install:release-path-is-a-link" };
+    }
   }
 
-  try {
-    pointAt(live, releasePath);
-  } catch (error) {
-    return { ok: false, reason: "install:link-failed", output: error instanceof Error ? error.message : "" };
-  }
-  return { ok: true, digest: verified.digest, facts: verified.facts, releasePath, previous, target: live };
+  writeLauncher(root);
+  const record = writeRecord(root, releasePath, verified.digest, verified.facts, preserved, mode);
+  return { ok: true, digest: verified.digest, facts: verified.facts, releasePath, previous, target: root, record };
 }
 
-/** Move the live link back to the release it pointed at before the last upgrade. */
+/** Point the installation at the most recent other complete release. */
 export function rollbackRelease({ target }) {
-  const live = resolve(target);
-  const current = currentRelease(live);
-  if (current === null) return { ok: false, reason: "rollback:nothing-installed" };
-  const releasesRoot = `${live}.releases`;
+  const root = resolve(target);
+  const releasesRoot = join(root, "releases");
   if (!existsSync(releasesRoot)) return { ok: false, reason: "rollback:nothing-to-restore" };
+  const current = activeRelease(root);
   const candidates = readdirSync(releasesRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && join(releasesRoot, entry.name) !== current)
-    .map((entry) => ({ name: entry.name, at: statSync(join(releasesRoot, entry.name)).mtimeMs }))
+    .filter((entry) => existsSync(join(releasesRoot, entry.name, ".next/BUILD_ID")))
+    .map((entry) => ({ path: join(releasesRoot, entry.name), at: statSync(join(releasesRoot, entry.name)).mtimeMs }))
     .sort((left, right) => right.at - left.at);
   const previous = candidates[0];
   if (previous === undefined) return { ok: false, reason: "rollback:nothing-to-restore" };
-  pointAt(live, join(releasesRoot, previous.name));
-  return { ok: true, restored: previous.name, kept: current };
+  // The restored release carries its own record, written when it was built, so a rollback restores that release's identity rather than
+  // inheriting the identity of the release it is replacing.
+  let own = { digest: "", name: "", version: "", commit: "", preserved: [] };
+  try {
+    own = JSON.parse(readFileSync(join(previous.path, "installation.json"), "utf8"));
+  } catch {
+    own = { digest: "", name: "", version: "", commit: "", preserved: [] };
+  }
+  const restored = writeRecord(root, previous.path, String(own.digest ?? ""), own, own.preserved ?? [], "rollback");
+  return { ok: true, restored: previous.path, kept: current, record: restored };
 }
 
 const SCRIPT = fileURLToPath(import.meta.url);

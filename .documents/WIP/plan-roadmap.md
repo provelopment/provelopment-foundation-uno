@@ -210,23 +210,19 @@ in the repository, and a recorded licence review for any integration.
 
 ### U06 — Clean-room setup, upgrade and distribution
 
-Not started. Blocked on U05 exit. Upstream `scripts/release/**` and
-`scripts/installation/**` are **not** copied before this stage; Uno's own clean-room setup,
-upgrade and distribution capability is a future obligation here, not something permanently
-deleted.
-
-**Exit gate:** a reproducible clean-room setup, a documented upgrade path and a
-distributable artefact.
+**COMPLETE — awaiting independent acceptance.** The clean-room routing defect was traced to the installer, not the product: an
+installation entered through a directory junction is refused by the product's own source confinement (`root:symlink`). The installer
+now builds every release at a permanent physical path and switches the active release by record, with a generated `start.mjs`
+launcher. The clean-room gate proves two independent installations, operational starter Pages, discovery surfaces, canonical metadata,
+navigation, owned-media refusal, genuine 404s, both OFF defaults, a genuine upgrade with adopter preservation, tamper refusal,
+rollback with operational re-proof, interruption recovery and reproducible packaging (**195/0**), and is wired into the blocking CI
+pipeline on both hosts. Operator documentation ships in the artefact.
 
 ### U07 — Full independent review and Owner-controlled first release
 
-Not started. Blocked on U06 exit.
-
-Scope: a full independent review, followed by the Owner-controlled first release.
-
-**Exit gate:** the independent review is closed and the Owner authorises the first release.
-
----
+**PREPARED — awaiting independent U05/U06 acceptance and Owner release authorization.** The requirement-to-evidence matrix and the
+release-candidate identity are recorded in the execution report. Tagging, publication, deployment and domain activation remain the
+Owner's separate decisions.
 
 ## Dependency summary
 

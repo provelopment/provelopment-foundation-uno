@@ -8,9 +8,12 @@
  * too: the contact facts exist as authored keys and none of them is public, so no contact value can reach a served Page.
  */
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { readUnoPageDocument } from "../../src/core/page-document";
+import { UnoPageSections } from "../../src/components/uno-page-sections";
 import { UNO_PROPERTY_KEYS } from "../../src/core/efs/properties";
 
 /** The four approved authored destinations, in the shape an author would write them. */
@@ -119,5 +122,35 @@ describe("the contact facts exist as authored keys and none of them is public", 
     const island = readFileSync("src/components/uno-interaction-island.tsx", "utf8");
     expect(island.includes("mailto:")).toBe(false);
     expect(island.includes("tel:")).toBe(false);
+  });
+});
+
+describe("an authored public contact fact is published because it is authored, not because a flag says so", () => {
+  it("renders an authored contact address as a real, publicly served link", () => {
+    const read = readUnoPageDocument(actionsDocument(["mailto:hello@example.com"]));
+    expect(read.accepted).toBe(true);
+    if (!read.accepted) return;
+    const html = renderToStaticMarkup(createElement(UnoPageSections, { document: read.document }));
+    // The destination is the authored one, character for character, and it is a live anchor a visitor can follow.
+    expect(html).toContain('href="mailto:hello@example.com"');
+    expect(html).toContain("<a ");
+    expect(html).not.toContain("javascript:");
+  });
+
+  it("publishes the same address only when an author puts it in content", () => {
+    // A property marked `public` is authorship metadata and projects nowhere: the property vocabulary is closed and the renderer reads
+    // sections, not properties. Publishing a contact fact therefore means authoring it as content, which is the supported behaviour this
+    // suite proves above. A property-to-Page projection would be a new canonical contract, and is deliberately not invented here.
+    const document = readUnoPageDocument({
+      version: 1,
+      title: "No actions",
+      sections: [{ id: "copy", module: "content.prose", props: { text: "A Page with no action of any kind." } }],
+    });
+    expect(document.accepted).toBe(true);
+    if (!document.accepted) return;
+    const html = renderToStaticMarkup(createElement(UnoPageSections, { document: document.document }));
+    expect(html).not.toContain("mailto:");
+    const properties = readFileSync("src/core/efs/properties.ts", "utf8");
+    expect(properties).toContain("authorship metadata only");
   });
 });

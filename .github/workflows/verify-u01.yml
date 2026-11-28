@@ -249,3 +249,15 @@ jobs:
       - name: Deployment readiness (offline; VERCEL_NOT_DEPLOYED_BY_AGENT)
         run: node scripts/verify-vercel-readiness.mjs
         shell: bash
+
+      # Blocking independent-distribution gate (U06). Packages the release, installs it twice into
+      # empty directories OUTSIDE this checkout, starts both installations and proves the starter
+      # Pages, discovery surfaces, canonical metadata, owned-media refusal, a genuine 404, the two OFF
+      # defaults, a genuine upgrade, adopter preservation, tamper refusal, rollback and interruption
+      # recovery — all from the distributed artefact, never from this checkout. No provider, no
+      # credential, no deployment and no publication is involved.
+      - name: Independent distribution (two clean-room installations, upgrade, rollback)
+        run: pnpm test:distribution
+        shell: bash
+        env:
+          CI: '1'
