@@ -36,6 +36,13 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { prepareUnoU03FixtureTransaction } from "./uno-u03-fixture-transaction.mjs";
 import {
+  HISTORICAL_DECLARATION_DIGESTS,
+  captureDeclarationDigests,
+  declarationDriftAfter,
+  manifestMutationProof,
+  manifestSemanticIssue,
+} from "./uno-published-baseline.mjs";
+import {
   FEATURES_SECTION_ID,
   featuresEquivalenceDelta,
   featuresEquivalenceHolds,
@@ -75,11 +82,20 @@ const CONTENT = "deployment/efs/content";
 const TEST_BASE = "http://localhost:3000";
 const ENTITY_ID = "e_7a3knkx60eacyhca7a0cr1k6e1";
 
-/** SHA-256 of the two committed declarations, asserted before and after the temporary substitution. */
+/**
+ * The committed declarations, proved in two different ways.
+ *
+ * `SELECTION` is still pinned byte-for-byte because nothing has legitimately altered it. `MANIFEST` is no longer pinned
+ * by digest: the authorised public-contact declaration changed its bytes, and an opaque hash cannot say whether such a
+ * change is authorised. It is proved semantically (`manifestSemanticIssue`) and its historical digest is retained as
+ * evidence, while byte-exactness after a fixture run is proved against a digest captured at process start.
+ */
 const PINNED_DECLARATIONS = new Map([
-  [MANIFEST, "b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925"],
-  [SELECTION, "58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952"],
+  [SELECTION, HISTORICAL_DECLARATION_DIGESTS[SELECTION]],
 ]);
+
+/** The digests observed before any stateful runner, so restoration is proved against reality, not a constant. */
+const DECLARATION_BASELINE = captureDeclarationDigests(ROOT, [MANIFEST, SELECTION]);
 
 /** The nine fixture sources: created only if absent, removed again in the same `finally`. */
 const FIXTURE_SOURCES = Object.freeze([
@@ -1709,6 +1725,39 @@ function preflight() {
       sha256Of(relativePath) === digest,
     );
   }
+
+  // The manifest is proved semantically, then the proof is proved sensitive. A baseline that accepts its own mutations
+  // would pass this gate while protecting nothing.
+  let parsedManifest = null;
+  try {
+    parsedManifest = JSON.parse(readFileSync(resolve(ROOT, MANIFEST), "utf8"));
+  } catch {
+    parsedManifest = null;
+  }
+  const semanticIssue = manifestSemanticIssue(parsedManifest);
+  check(
+    `${MANIFEST} declares exactly the authorised graph, locales, publications and exposed properties`,
+    semanticIssue === null,
+    semanticIssue === null ? undefined : semanticIssue,
+  );
+  if (parsedManifest !== null) {
+    const proof = manifestMutationProof(parsedManifest);
+    const accepted = proof.filter((entry) => entry.issue === null);
+    check(
+      `the semantic baseline refuses all ${proof.length} mutations it exists to refuse`,
+      accepted.length === 0,
+      accepted.map((entry) => entry.rule).join("; "),
+    );
+  } else {
+    check("the semantic baseline refuses all mutations it exists to refuse", false, "manifest unreadable");
+  }
+  // Recorded, not asserted: the retired digest is evidence of what changed, not a gate that blocks it.
+  const historical = HISTORICAL_DECLARATION_DIGESTS[MANIFEST];
+  process.stdout.write(
+    `  INFO  ${MANIFEST} historical digest ${historical.slice(0, 12)}… retired by the authorised public-contact ` +
+      `declaration; now ${sha256Of(MANIFEST).slice(0, 12)}…
+`,
+  );
   for (const relativePath of FIXTURE_SOURCES) {
     check(`the fixture source ${relativePath} is absent`, !existsSync(resolve(ROOT, relativePath)));
   }
@@ -2034,9 +2083,11 @@ async function main() {
       }
     }
     if (restored) {
+      const drift = declarationDriftAfter(ROOT, DECLARATION_BASELINE);
       check(
         "DURABLE_FAMILY_RESTORE the three-Page graph is unchanged after the fixture run",
-        sha256Of(MANIFEST) === PINNED_DECLARATIONS.get(MANIFEST) && sha256Of(SELECTION) === PINNED_DECLARATIONS.get(SELECTION),
+        drift.length === 0,
+        drift.map((entry) => `${entry.path}:${entry.before.slice(0, 8)}=>${entry.after.slice(0, 8)}`).join(", "),
       );
     }
   }

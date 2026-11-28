@@ -17,6 +17,7 @@
  * by the confined loader, the serving planner, real production HTTP and Chromium. It is a test fixture at a loopback
  * server — not a durable Page, not a deployment and not publication authority — and it is removed in the same `finally`.
  */
+import { captureDeclarationDigests, manifestFileIssue, manifestFileMutationProof } from "./uno-published-baseline.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, rmdirSync, writeFileSync } from "node:fs";
@@ -243,9 +244,11 @@ function createMedia(relativePath, bytes) {
 
 /** The committed declaration digests this gate requires before it will touch anything. */
 const PINNED_DECLARATIONS = new Map([
-  [MANIFEST, "b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925"],
   [SELECTION, "58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952"],
 ]);
+
+/** The digests observed before the fixture, so restoration is proved against reality, not a constant. */
+const DECLARATION_BASELINE = captureDeclarationDigests(ROOT, [MANIFEST, SELECTION]);
 
 const SOURCES = Object.freeze([
   `${CONTENT}/wo044-home.en-001.json`,
@@ -965,7 +968,7 @@ function fixtureSelection() {
 
 function fixturePlan(allModulesJsonBytes, badJsonBytes, familyJsonBytes) {
   return {
-    declarations: [MANIFEST, SELECTION].map((path) => ({ path, digest: PINNED_DECLARATIONS.get(path) })),
+    declarations: [MANIFEST, SELECTION].map((path) => ({ path, digest: DECLARATION_BASELINE.get(path) })),
     replacements: [
       { path: MANIFEST, bytes: Buffer.from(`${JSON.stringify(fixtureManifest(), null, 2)}\n`, "utf8") },
       { path: SELECTION, bytes: Buffer.from(`${JSON.stringify(fixtureSelection(), null, 2)}\n`, "utf8") },
@@ -1098,6 +1101,12 @@ async function main() {
   }
   const staged = spawnSync("git", ["diff", "--cached", "--name-only"], { cwd: ROOT, encoding: "utf8" });
   if (!check("nothing is staged before the fixture", (staged.stdout ?? "").trim() === "", (staged.stdout ?? "").trim())) return 1;
+  // The manifest is proved semantically, and the proof is proved sensitive; its historical digest is evidence, not a gate.
+  const manifestIssue = manifestFileIssue(ROOT, MANIFEST);
+  if (!check(`${MANIFEST} declares exactly the authorised graph, locales, publications and exposed properties`, manifestIssue === null, manifestIssue === null ? undefined : manifestIssue)) return 1;
+  const mutationProof = manifestFileMutationProof(ROOT, MANIFEST);
+  const acceptedMutations = mutationProof.filter((entry) => entry.issue === null);
+  if (!check(`the semantic baseline refuses all ${mutationProof.length} mutations it exists to refuse`, mutationProof.length > 0 && acceptedMutations.length === 0, acceptedMutations.map((entry) => entry.rule).join("; "))) return 1;
   for (const path of SOURCES) {
     if (!check(`the fixture source ${path} is absent`, !existsSync(resolve(ROOT, path)))) return 1;
   }

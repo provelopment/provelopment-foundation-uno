@@ -19,6 +19,7 @@
  * are restored and proved byte-for-byte in `finally`. A failing test never becomes a passing one: the first failure is
  * reported, the restoration result is recorded separately, and the process exits non-zero if either is not clean.
  */
+import { captureDeclarationDigests, manifestFileIssue, manifestFileMutationProof } from "./uno-published-baseline.mjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer, request as httpRequest } from "node:http";
@@ -55,7 +56,10 @@ const READY_TIMEOUT_MS = 120_000;
 /** The committed declarations this fixture replaces and must put back. */
 const MANIFEST_PATH = "deployment/efs/manifest.json";
 const CONFIG_PATH = "deployment/uno.config.json";
-const MANIFEST_SHA = "b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925";
+/** The retired manifest digest, kept as evidence: the authorised public-contact declaration replaced it at 179da66. */
+const HISTORICAL_MANIFEST_SHA = "b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925";
+/** The digests observed at process start, so restoration is proved against reality rather than a historical constant. */
+const DECLARATION_BASELINE = captureDeclarationDigests(process.cwd(), [MANIFEST_PATH, CONFIG_PATH]);
 const CONFIG_SHA = "58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952";
 
 /** The one synthetic Entity, and the three authorities the fixture binds. */
@@ -1623,7 +1627,7 @@ async function restoreAndVerify(transaction) {
   if (!restored.ok) return { ok: false, reason: String(restored.reason ?? "restore-refused") };
   const manifest = digestOfFile(MANIFEST_PATH);
   const config = digestOfFile(CONFIG_PATH);
-  if (manifest !== MANIFEST_SHA) return { ok: false, reason: `manifest:${String(manifest)}` };
+  if (manifest !== DECLARATION_BASELINE.get(MANIFEST_PATH)) return { ok: false, reason: `manifest:${String(manifest)}` };
   if (config !== CONFIG_SHA) return { ok: false, reason: `config:${String(config)}` };
   return { ok: true };
 }
@@ -1649,7 +1653,19 @@ async function main() {
 
   const manifestBefore = digestOfFile(MANIFEST_PATH);
   const configBefore = digestOfFile(CONFIG_PATH);
-  check("preflight the committed manifest matches its pin", manifestBefore === MANIFEST_SHA, String(manifestBefore));
+  const semanticIssue = manifestFileIssue(ROOT, MANIFEST_PATH);
+  check(
+    "preflight the committed manifest declares exactly the authorised graph, locales, publications and exposed properties",
+    semanticIssue === null,
+    semanticIssue === null ? String(manifestBefore) : semanticIssue,
+  );
+  const mutationProof = manifestFileMutationProof(ROOT, MANIFEST_PATH);
+  const acceptedMutations = mutationProof.filter((entry) => entry.issue === null);
+  check(
+    `preflight the semantic baseline refuses all ${mutationProof.length} mutations it exists to refuse`,
+    mutationProof.length > 0 && acceptedMutations.length === 0,
+    acceptedMutations.map((entry) => entry.rule).join("; "),
+  );
   check("preflight the committed declaration matches its pin", configBefore === CONFIG_SHA, String(configBefore));
   check("preflight the sample plate exists", existsSync(resolve(ROOT, PLATE_PATH)));
   const nextBin = nextBinPath();
@@ -1664,7 +1680,7 @@ async function main() {
   const sources = await buildFixtureSources();
   const buildBytes = (config) => `${JSON.stringify(config, null, 2)}\n`;
   const declarations = [
-    { path: MANIFEST_PATH, digest: MANIFEST_SHA },
+    { path: MANIFEST_PATH, digest: DECLARATION_BASELINE.get(MANIFEST_PATH) },
     { path: CONFIG_PATH, digest: CONFIG_SHA },
   ];
 

@@ -14,6 +14,7 @@
  * FAIL-CLOSED. A refused fixture, an unclean build, a missing browser, a failed assertion or an unproven
  * restoration is a failure of this gate — never a skip, never a silent pass.
  */
+import { captureDeclarationDigests, manifestFileIssue, manifestFileMutationProof } from "./uno-published-baseline.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
@@ -53,9 +54,11 @@ const ENTITY_ID = "e_7a3knkx60eacyhca7a0cr1k6e1";
 
 /** The committed declaration digests this gate requires before it will touch anything. */
 const PINNED_DECLARATIONS = new Map([
-  [MANIFEST, "b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925"],
   [SELECTION, "58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952"],
 ]);
+
+/** The digests observed before the fixture, so restoration is proved against reality, not a constant. */
+const DECLARATION_BASELINE = captureDeclarationDigests(ROOT, [MANIFEST, SELECTION]);
 
 /** The five authorized starter paths: the two declarations and the three authored starter sources. */
 const STARTER_PATHS = Object.freeze([
@@ -856,6 +859,21 @@ function preflight() {
       sha256Of(relativePath) === digest,
     );
   }
+  // `MANIFEST` is proved semantically, and the proof is proved sensitive. Its historical digest is retained as evidence
+  // rather than as a gate, because an opaque hash cannot distinguish an authorised declaration from drift.
+  const manifestIssue = manifestFileIssue(ROOT, MANIFEST);
+  check(
+    `${MANIFEST} declares exactly the authorised graph, locales, publications and exposed properties`,
+    manifestIssue === null,
+    manifestIssue === null ? undefined : manifestIssue,
+  );
+  const mutationProof = manifestFileMutationProof(ROOT, MANIFEST);
+  const acceptedMutations = mutationProof.filter((entry) => entry.issue === null);
+  check(
+    `the semantic baseline refuses all ${mutationProof.length} mutations it exists to refuse`,
+    mutationProof.length > 0 && acceptedMutations.length === 0,
+    acceptedMutations.map((entry) => entry.rule).join("; "),
+  );
   for (const relativePath of FIXTURE_SOURCES) {
     check(`the fixture source ${relativePath} is absent`, !existsSync(resolve(ROOT, relativePath)));
   }
@@ -1995,8 +2013,8 @@ async function main() {
     if (!check("the fixture installs without a write failure", installed.ok === true, installed.cause ?? "")) {
       return 1;
     }
-    check("the fixture manifest is installed", sha256Of(MANIFEST) !== PINNED_DECLARATIONS.get(MANIFEST));
-    check("the fixture declaration is installed", sha256Of(SELECTION) !== PINNED_DECLARATIONS.get(SELECTION));
+    check("the fixture manifest is installed", sha256Of(MANIFEST) !== DECLARATION_BASELINE.get(MANIFEST));
+    check("the fixture declaration is installed", sha256Of(SELECTION) !== DECLARATION_BASELINE.get(SELECTION));
 
     await validateFixtureInProcess();
     if (failures.length > 0) {
@@ -2087,8 +2105,8 @@ async function main() {
     check(
       "U05_STATIC_ACTIONS_RESTORE the declarations, committed Pages and temporary sources were restored with no static-link residue",
       restored &&
-        sha256Of(MANIFEST) === PINNED_DECLARATIONS.get(MANIFEST) &&
-        sha256Of(SELECTION) === PINNED_DECLARATIONS.get(SELECTION) &&
+        sha256Of(MANIFEST) === DECLARATION_BASELINE.get(MANIFEST) &&
+        sha256Of(SELECTION) === DECLARATION_BASELINE.get(SELECTION) &&
         !existsSync(resolve(ROOT, `${CONTENT}/wo035-home.en-001.json`)) &&
         !readFileSync(resolve(ROOT, `${CONTENT}/home.en-001.json`), "utf8").includes("example.invalid") &&
         !readFileSync(resolve(ROOT, `${CONTENT}/components.en-001.json`), "utf8").includes("example.invalid"),
@@ -2132,7 +2150,7 @@ function fixturePlan() {
     [`${CONTENT}/wo038-timelinemarkup.en-001.json`, JSON.stringify(JSON_DOCUMENTS.timelineMarkup, null, 2)],
   ];
   return {
-    declarations: [MANIFEST, SELECTION].map((path) => ({ path, digest: PINNED_DECLARATIONS.get(path) })),
+    declarations: [MANIFEST, SELECTION].map((path) => ({ path, digest: DECLARATION_BASELINE.get(path) })),
     replacements: [
       { path: MANIFEST, bytes: Buffer.from(`${JSON.stringify(fixtureManifest(), null, 2)}\n`, "utf8") },
       { path: SELECTION, bytes: Buffer.from(`${JSON.stringify(fixtureSelection(), null, 2)}\n`, "utf8") },
@@ -2146,8 +2164,8 @@ function fixturePlan() {
 const outcome = await main();
 
 const declarationsRestored =
-  sha256Of(MANIFEST) === PINNED_DECLARATIONS.get(MANIFEST) &&
-  sha256Of(SELECTION) === PINNED_DECLARATIONS.get(SELECTION);
+  sha256Of(MANIFEST) === DECLARATION_BASELINE.get(MANIFEST) &&
+  sha256Of(SELECTION) === DECLARATION_BASELINE.get(SELECTION);
 
 if (outcome === 0 && declarationsRestored) {
   process.stdout.write("\nverify-u04-json-slice: rebuilding the committed unpublished configuration\n");

@@ -123,9 +123,25 @@ const PHASE_B_REQUIRED = Object.freeze([
   "BROWSER_MATRIX=16/16",
 ]);
 
+/**
+ * The guard asserts the declaration contract the runner must keep, not a retired digest.
+ *
+ * The manifest digest `b6213ed6…` was retired when the authorised public-contact declaration changed the manifest at
+ * `179da66`; pinning it here would have made this guard protect a byte string instead of the published graph. The
+ * selection digest is still exact because nothing has legitimately altered it, and the manifest is guarded by the
+ * semantic baseline and its mutation proof.
+ */
 const PINNED = Object.freeze([
-  "b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925",
   "58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952",
+]);
+
+/** The semantic-baseline markers the runner must contain for the manifest to be proved rather than hashed. */
+const SEMANTIC_BASELINE_REQUIRED = Object.freeze([
+  "uno-published-baseline.mjs",
+  "manifestFileIssue(ROOT, MANIFEST)",
+  "manifestFileMutationProof(ROOT, MANIFEST)",
+  "captureDeclarationDigests",
+  "DECLARATION_BASELINE",
 ]);
 
 /**
@@ -709,6 +725,15 @@ describe("verify-u04-22-module-consent — hermetic guard", () => {
 
   it("the pinned declarations in the runner match the committed bytes", () => {
     for (const digest of PINNED) assert.ok(source.includes(digest));
+  // The manifest is proved by the shared semantic baseline and its mutation proof, not by a retired digest.
+  for (const marker of SEMANTIC_BASELINE_REQUIRED) {
+    assert.ok(source.includes(marker), `the runner must keep the semantic-baseline marker: ${marker}`);
+  }
+  // The baseline itself must actually state a semantic expectation and a mutation proof.
+  const baseline = readFileSync(resolve(ROOT, "scripts/uno-published-baseline.mjs"), "utf8");
+  assert.ok(baseline.includes("export function manifestSemanticIssue"));
+  assert.ok(baseline.includes("export function manifestMutationProof"));
+  assert.ok(baseline.includes("HISTORICAL_DECLARATION_DIGESTS"));
   });
 
   // `UNO-WO-053 / R01` §6: independent Phase A mutations. Each deletes one real gate and must change the audit.
@@ -1660,6 +1685,7 @@ describe("the hosted durable-family labels are connected to real predicates", ()
     'browserProof.passes.some((name) => name.startsWith("DURABLE_FAMILY_BROWSER"))',
     "DURABLE_FAMILY_RESTORE ${relativePath} is byte-identical after the fixture run",
     "DURABLE_FAMILY_RESTORE the three-Page graph is unchanged after the fixture run",
+    "declarationDriftAfter(ROOT, DECLARATION_BASELINE)",
     "durableFamilyPage: COMMITTED_PAGES[2]",
     "durableFamilyIds: DURABLE_FAMILY_IDS",
   ]);
