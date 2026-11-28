@@ -740,3 +740,50 @@ combinations pass (two colour schemes, 320/390/768/1280 px, three Pages) with no
 failed request, the skip link still the first keyboard stop, and the contact anchor visible and focusable at 320 px.
 Detailed evidence: `.documents/Reports/evidence/u08-live/findings.md`.
 
+## Exact-head verification integrity and the contact/architecture corrections — candidate `5ce6b23`
+
+**Why the hosted workflow failed, and what was actually wrong.** Both hosts failed at preflight because two gates compared
+`deployment/efs/manifest.json` against the digest it had *before* the authorised public-contact declaration. Refreshing that
+hash would have erased the only record of what changed; deleting the assertion would have removed the protection. The fix is
+`scripts/uno-published-baseline.mjs`: a **semantic** expectation of the Entity, Facet, Site, locales, Pages, publications,
+sources and governed properties; a **mutation proof** that applies nine mutations to a structured clone and reports what the
+baseline said about each (a baseline that accepts its own mutations now fails); and a **byte-exact restore proof** that
+captures digests at process start and compares against reality afterwards instead of a constant. The retired digest is kept
+as recorded evidence, and the selection digest stays byte-pinned because nothing altered it. The same reconciliation is
+applied to the published-HTTP, multisite, JSON-slice and 22-module gates, whose hermetic guard now asserts the semantic
+markers and the mutation proof.
+
+Three real defects surfaced while proving that fix, each fixed rather than worked around:
+
+1. **A self-inflicted verification regression.** Rewriting files with CRLF broke the 22-module guard, which compares
+   multi-line markers in the runner source. Authored text is now normalised to LF; the guard passes 60/60.
+2. **A local-only build artefact polluted the trace proof.** A `release/` directory left by the packager was traced into the
+   server payload, so the trace gate failed locally while CI would have passed. Removing the artefact restored a bounded
+   payload (10 project entries).
+3. **A directory import that built under Next and crashed a gate.** `src/connect` was imported as a directory, which
+   TypeScript resolves and the Node ESM loader the gates use does not. Every specifier is now file-level, and the
+   dependency gate reports `directory-import` as its own violation kind with a self-test case.
+
+**Corrections delivered in the same candidate.** Generic application links now resolve through an inward-owned boundary:
+`src/core/links/uno-application-link.ts` resolves a Page's declared `linkId` through injected resolvers keyed by the
+declaration's application key, composition owns the only key-to-capability mapping, prose lists and stand-alone actions both
+use it, an unresolved reference stays inert, and a `mailto:` that could carry a header or a second recipient is refused.
+Private delivery is separated from public facts: recipient, sender and Reply-To come from a server-only policy; a form exists
+only when an operator explicitly enables it and names the exact Site and Page; an enabled but unplaced form is refused for
+both render and submission; and a contact fact no longer activates anything.
+
+**Verified locally at this candidate:** unit 1518/1518; architecture 47/47; resolved boundaries 82 files / 174 edges / 0
+violations with a 6-kind self-test; lint and typecheck clean; production build clean; published-Page gate **1386 passed, 0
+failed** (the exact CI blocker); distribution **195 passed, 0 failed**, digest `8b5705fee36b349ac9d645a168844c383ec4cb34a2adc7fd7d85a4d819ccf825`.
+
+**Still incomplete, and not claimed:** the Page reader remains a capability switch, so the registry is populated but the
+production rendering path does not yet consume it and no genuinely new 23rd capability has been exercised end-to-end; the
+contact submission is not yet behind one application use case (validation, policy, composition and transport are extracted,
+the orchestration is not); page- and representation-level fact scopes are resolved by the property layer but not exercised by
+the contact projection, and fact-level duplicate/collision rules are unchanged; the enquiry has no `subject` field; copy is
+English and Spanish only; idempotency is an FNV digest rather than a high-entropy key; provider response classification has
+not been re-reviewed against the live API contract; there is no multi-instance abuse mechanism; and the maps, booking,
+OpenGraph image, video-provider, inquiry-webhook and localised-dictionary items remain deferred. The browser gates for the
+multisite, JSON-slice and 22-module surfaces were not re-run locally in this pass, and the hosted workflow result at this
+candidate was not yet observed when this section was written.
+
