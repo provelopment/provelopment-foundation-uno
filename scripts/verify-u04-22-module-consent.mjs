@@ -248,7 +248,8 @@ const PINNED_DECLARATIONS = new Map([
 ]);
 
 /** The digests observed before the fixture, so restoration is proved against reality, not a constant. */
-const DECLARATION_BASELINE = captureDeclarationDigests(ROOT, [MANIFEST, SELECTION]);
+/** Captured inside `main`, after the checkout root is proved, so a wrong working directory is refused first. */
+let DECLARATION_BASELINE = null;
 
 const SOURCES = Object.freeze([
   `${CONTENT}/wo044-home.en-001.json`,
@@ -1093,6 +1094,9 @@ let child = null;
 let browser = null;
 
 async function main() {
+  // Refuse before reading anything: a wrong working directory must produce one bounded refusal, not an unhandled read.
+  if (!check("the gate runs from the Uno checkout root", existsSync(resolve(ROOT, "package.json")))) return 1;
+  DECLARATION_BASELINE = captureDeclarationDigests(ROOT, [MANIFEST, SELECTION]);
   const nextBin = nextBinPath(ROOT);
   if (!check("the pinned local Next.js CLI is present", nextBin !== null)) return 1;
 

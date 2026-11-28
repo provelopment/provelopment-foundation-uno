@@ -37,7 +37,7 @@ const REQUIRED = Object.freeze([
   ["src/adapters/net/uno-pinned-https-transport.ts", "destination:address-mismatch"],
   ["src/adapters/contact/uno-contact-webhook.ts", 'return { status: "not-configured" };'],
   ["src/app/api/contact/route.ts", 'export const dynamic = "force-dynamic";'],
-  ["src/app/api/contact/route.ts", 'return answer({ status: "not-configured" }, 503);'],
+  ["src/app/api/contact/route.ts", 'return answer({ status: "unavailable", reason: policyResult.reason }, 503);'],
   ["src/app/api/contact/route.ts", '"cache-control": "no-store"'],
   ["src/app/api/contact/route.ts", 'contentType.toLowerCase().startsWith("application/json")'],
   ["src/app/api/contact/route.ts", "isUnoContactSubmissionWithinBodyBound(text)"],
@@ -55,7 +55,7 @@ const REQUIRED = Object.freeze([
   ["src/components/uno-interaction-island.tsx", 'role="status"'],
   ["src/app/(site)/[...segments]/page.tsx", "readUnoServingPresentationFacts("],
   ["src/app/(site)/[...segments]/page.tsx", "facts.analyticsPath === null ? null : <UnoAnalyticsBeacon"],
-  ["src/components/uno-page-sections.tsx", "contactDelivery && selected.length > 0 ?"],
+  ["src/components/uno-page-sections.tsx", "contact?.formEnabled === true &&"],
   ["src/config/uno-serving.ts", 'contactDelivery: resolveUnoContactWebhookConfig().status === "configured"'],
 ]);
 

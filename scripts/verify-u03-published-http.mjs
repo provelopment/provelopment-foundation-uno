@@ -95,7 +95,8 @@ const PINNED_DECLARATIONS = new Map([
 ]);
 
 /** The digests observed before any stateful runner, so restoration is proved against reality, not a constant. */
-const DECLARATION_BASELINE = captureDeclarationDigests(ROOT, [MANIFEST, SELECTION]);
+/** Captured inside `preflight`, after the checkout root is proved, so a wrong working directory is refused first. */
+let DECLARATION_BASELINE = null;
 
 /** The nine fixture sources: created only if absent, removed again in the same `finally`. */
 const FIXTURE_SOURCES = Object.freeze([
@@ -1775,6 +1776,9 @@ async function committedStarterPhase(nextBin) {
 /** Assert every precondition: pinned declarations, absent fixture sources, clean tracked tree. */
 function preflight() {
   check("the gate runs from the Uno checkout root", existsSync(resolve(ROOT, "package.json")));
+  // Refuse before reading anything: a wrong working directory must produce one bounded refusal, not an unhandled read.
+  if (!existsSync(resolve(ROOT, "package.json"))) return;
+  DECLARATION_BASELINE = captureDeclarationDigests(ROOT, [MANIFEST, SELECTION]);
 
   for (const [relativePath, digest] of PINNED_DECLARATIONS) {
     check(

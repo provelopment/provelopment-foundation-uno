@@ -59,7 +59,8 @@ const CONFIG_PATH = "deployment/uno.config.json";
 /** The retired manifest digest, kept as evidence: the authorised public-contact declaration replaced it at 179da66. */
 const HISTORICAL_MANIFEST_SHA = "b6213ed6ee2dfdf350acf98de969928b4fc61e51173a23ad35b55d0ff63c9925";
 /** The digests observed at process start, so restoration is proved against reality rather than a historical constant. */
-const DECLARATION_BASELINE = captureDeclarationDigests(process.cwd(), [MANIFEST_PATH, CONFIG_PATH]);
+/** Captured inside `main`, after the checkout root is proved, so a wrong working directory is refused first. */
+let DECLARATION_BASELINE = null;
 const CONFIG_SHA = "58011c4324f537414ed3a581fa832a2991cf94572a65cf693da4aad431e8c952";
 
 /** The one synthetic Entity, and the three authorities the fixture binds. */
@@ -1649,6 +1650,13 @@ function startServer(nextBin, port) {
 
 /** The whole run: preflight, fixture, real build, real server, G01–G05, permutation, restoration, verdict. */
 async function main() {
+  // Refuse before writing or reading anything: a wrong working directory must produce one bounded refusal.
+  if (!check("the gate runs from the Uno checkout root", existsSync(resolve(ROOT, "package.json")))) {
+    process.stderr.write("verify-u03-multisite-http: preflight refused; nothing was changed.\n");
+    process.exitCode = 1;
+    return;
+  }
+  DECLARATION_BASELINE = captureDeclarationDigests(ROOT, [MANIFEST_PATH, CONFIG_PATH]);
   mkdirSync(SCRATCH, { recursive: true });
 
   const manifestBefore = digestOfFile(MANIFEST_PATH);

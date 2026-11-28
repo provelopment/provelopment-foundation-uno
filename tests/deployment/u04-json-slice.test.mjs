@@ -201,12 +201,24 @@ describe("the U04 JSON-slice gate — refusal without residue", () => {
     assert.equal(check.status, 0, check.stderr);
 
     assert.match(SOURCE, /from "\.\/uno-u03-fixture-transaction\.mjs"/u);
+    // `REVIEWED_HELPERS` is the complete set of repository modules this runner may import. Each entry is a helper that has
+    // its own hermetic proof; anything else is refused, so the restriction still means something.
+    const REVIEWED_HELPERS = Object.freeze([
+      "./uno-u03-fixture-transaction.mjs",
+      "./uno-published-baseline.mjs",
+    ]);
     const imports = [...SOURCE.matchAll(/^import[^;]*?from "([^"]+)";$/gmu)].map((match) => match[1]);
     for (const specifier of imports) {
       assert.ok(
-        specifier.startsWith("node:") || specifier === "./uno-u03-fixture-transaction.mjs",
+        specifier.startsWith("node:") || REVIEWED_HELPERS.includes(specifier),
         `unexpected import: ${specifier}`,
       );
+    }
+    // The helper itself must stay dependency-free apart from Node built-ins.
+    const BASELINE = readFileSync(resolve(ROOT, "scripts/uno-published-baseline.mjs"), "utf8");
+    const helperImports = [...BASELINE.matchAll(/^import[^;]*?from "([^"]+)";$/gmu)].map((match) => match[1]);
+    for (const specifier of helperImports) {
+      assert.ok(specifier.startsWith("node:"), `unexpected baseline import: ${specifier}`);
     }
     const dynamic = [...SOURCE.matchAll(/await import\("([^"]+)"\)/gu)].map((match) => match[1]);
     for (const specifier of dynamic) {
