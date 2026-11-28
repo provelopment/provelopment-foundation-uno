@@ -27,6 +27,6 @@ A passing HTTP test of the current informational page does not establish public 
 
 ## Authority and rights
 
-Read [AGENTS.md](AGENTS.md) and the [Implementation SOP](.documents/SOP/sop-implementation.md). One Owner request authorizes work on the requested local outcome. Push, release and deployment require separate authorization. The Architect maintains the [seven canonical Drive documents](https://drive.google.com/drive/folders/1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0) as direction and guardrails, not status logs. The [source inventory](.documents/Architecture/source-inventory.md) retains source rights and the 17/22 capability mapping.
+Read [AGENTS.md](AGENTS.md) and the [Implementation SOP](.documents/SOP/sop-implementation.md). One Owner request authorizes work on the requested local outcome. Routine pushes of stable, verified work and the automatic production deployment they trigger are authorized by standing Owner direction; public release tagging, live provider activation, expenditure and unrelated infrastructure changes remain separately authorized. The Architect maintains the [seven canonical Drive documents](https://drive.google.com/drive/folders/1FhR56l6zVwl7To9S0v5-R4uA24jjkCj0) as direction and guardrails, not status logs. The [source inventory](.documents/Architecture/source-inventory.md) retains source rights and the 17/22 capability mapping.
 
 Apache-2.0 does not automatically license Provelopment trademarks, unreviewed imagery or separately licensed Connect code. Do not publish secrets, private authoring data or unapproved integrations.

@@ -413,3 +413,48 @@ receiver through the documented test seam, never a live provider; the limiter is
 project (U05); and the demonstration route's approved `@vercel/analytics` integration is opt-in only, so the shipped default measures
 nothing. Public release publication, tagging, deployment, domain activation, live analytics and external delivery remain the Owner's
 separate decisions.
+
+## U07 — live installation at uno.provelopment.com: state, corrections and the remaining blocker
+
+**Production identity reconciled.** The GitHub head and the Vercel production deployment are produced by the repository's own Git
+integration — not by an agent-initiated deployment — and `uno.provelopment.com` is assigned to that production deployment. Earlier
+statements in this report that “nothing is deployed” described the agent's own actions and were wrong about the product; they are
+corrected here.
+
+**Why every Site address was refused, and the configuration that fixes it.** The neutral distribution declares the reserved,
+non-routable `https://uno-starter.example`; the live installation is served on `uno.provelopment.com`. Uno does not infer publication
+authority from a `Host` header, so it refused — correctly. A deployment now states its own origin through three layered statements: the
+server-only `UNO_CANONICAL_ORIGIN`, the committed hosting profile `deployment/uno.deploy.json` (consulted only on a hosted deployment
+and excluded from the distributable), and the platform's `VERCEL_PROJECT_PRODUCTION_URL` (production only). Every candidate is judged
+by the same canonical validator, the profile may only replace the reserved example origin, and an invalid statement refuses rather
+than falling back. **Proven live:** `robots.txt` names `https://uno.provelopment.com/sitemap.xml`, the sitemap lists all three Pages on
+that origin with `hreflang`, and `/api/uno-health` answers `200 {"status":"serving","canonical":"https://uno.provelopment.com/en-001"}`.
+
+**Two genuine defects found on the live path and corrected at their cause.**
+
+1. The refusal responder (`src/proxy.ts`) makes the same serving decision as the Page, but a hosting platform bundles it separately and
+   its bundle carried the authored content **without** the three declaration files. Locally it read them from disk; in production it
+   could not, so it refused published addresses. The responder now distinguishes a decision it could not make
+   (`serving:authority-unavailable`) from one that refused an address and continues on a read failure — the Page, which owns the same
+   decision and has the declarations, remains the authority. A bundling omission can no longer become an outage.
+2. The responder also matched `/api/*`, so a route handler was answered by the responder instead of by itself. `/api` is now outside its
+   remit by prefix and by matcher; a handler owns its own method semantics, as it already did for writes.
+
+An operational `GET /api/uno-health` was added and documented: it reports the decision in a closed vocabulary, carries no content,
+path, environment or caller value, is `no-store` and `noindex`, and grants nothing.
+
+**Remaining blocker, stated exactly.** On the live deployment the three Site addresses return Next's error shell (`__next_error__`, 404)
+while the **same** build serves them `200` locally in three runtime shapes — webpack `next start`, Turbopack `next start`, and the
+standalone server (`output: 'standalone'`, `server.js`) — and while the platform itself proves the decision is correct
+(`/api/uno-health` = serving, correct canonical). The failure is therefore in **rendering** on the platform's function runtime, not in
+the publication decision, the authority, the canonical origin or the distribution. Locally it is not reproducible, and this session's
+Vercel MCP connection returned `Unauthorized`, so the deployment's function logs could not be read.
+
+**Next diagnostic, in order.** (a) Read the Vercel function log for `GET /en-001` on this deployment — the throwing frame and the error
+digest are the missing fact; (b) if logs stay unavailable, refactor the two-root-layout structure (`(demo)` + `(site)` with
+`experimental.globalNotFound`) into a single root layout that resolves the document language from the same decision, which removes the
+exact structure whose error fallback produces `__next_error__`. The second is a design change to routing shape only: same authority,
+same decision, same refusals.
+
+**U07 is NOT accepted, and the live Site does not yet serve its Pages.** Family parity 17/17, proxy 59/59, 22/22 module IDs, 195/195
+distribution assertions, enabled-state 57/0 and the full local pipeline remain green at this head; the live installation does not.

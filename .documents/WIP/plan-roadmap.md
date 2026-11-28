@@ -220,9 +220,11 @@ pipeline on both hosts. Operator documentation ships in the artefact.
 
 ### U07 — Full independent review and Owner-controlled first release
 
-**PREPARED — awaiting independent U05/U06 acceptance and Owner release authorization.** The requirement-to-evidence matrix and the
-release-candidate identity are recorded in the execution report. Tagging, publication, deployment and domain activation remain the
-Owner's separate decisions.
+**IN PROGRESS — live installation accepted as the reference installation; one render-level blocker remains.** The deployment-specific
+canonical origin is implemented and proven live (robots, sitemap, canonical and `/api/uno-health` all report `uno.provelopment.com`), and
+two genuine live defects were corrected at their cause (the refusal responder refusing on a bundle gap, and the responder owning
+`/api`). The three Site addresses still return Next's error shell on the platform while the same build renders them locally in three
+runtime shapes; the deployment's function log is the missing fact. U07 is not accepted and the live Site does not yet serve its Pages.
 
 ## Dependency summary
 
