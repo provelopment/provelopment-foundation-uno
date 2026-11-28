@@ -132,13 +132,28 @@ The printed digest must equal `RELEASE.json.digest`. The installer performs the 
 (`install:file-mismatch:<path>`), a file the manifest does not name (`install:unexpected-file:<path>`) or a digest that disagrees with
 `RELEASE.json` (`install:digest-mismatch`) **before it writes anything**.
 
+### Health check
+
+`GET /api/uno-health` answers a small JSON document and is the first thing to read when an address that should be published is not:
+
+```json
+{ "status": "serving", "address": "/en-001", "locale": "en-001", "canonical": "https://www.example.org/en-001", "origin": "declared" }
+```
+
+It answers `503` with a closed `reason` code when nothing is served (`serving:authority-unavailable` means the declarations could not be
+read; `serving:deploy-origin-invalid` means the stated origin was refused; `serving:publication-refused` means the authored Page is not
+published for that address). It carries no content, no path, no environment value and no caller value, is never cached and is never
+indexed.
+
 ## 7. Failure recovery
 
 - **A refused or interrupted install.** `installation.json` is not rewritten until the release has built successfully, so the running
   installation keeps running. A partial release directory is discarded or rebuilt by the next install; a complete release is reused.
 - **A failed upgrade.** Re-run the install, or roll back (section 5).
-- **Every Site address answers `404` while `/` answers `200`.** The canonical origin is being refused. Check that `base.canonical` is
-  a valid `https` origin, and that neither the installation path nor the release path is a symlink or junction.
+- **Every Site address answers `404` while `/` answers `200`.** Ask `/api/uno-health` first. `serving:authority-unavailable` means the
+  declarations were not readable (check that `deployment/` shipped and that the path holds no symlink); `serving:deploy-origin-invalid`
+  means the stated origin was refused (check `UNO_CANONICAL_ORIGIN`, the hosting profile and that `base.canonical` is a valid `https`
+  origin); `serving:publication-refused` means the Page is not published for that address.
 - **A dependency problem.** The installer prefers the local store (`pnpm install --offline --frozen-lockfile`) and falls back to the
   registry with the same frozen lockfile; the release records which happened in `.uno-dependencies`.
 

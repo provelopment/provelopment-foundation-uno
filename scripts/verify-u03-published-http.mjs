@@ -510,12 +510,16 @@ async function checkContactEndpoints(base) {
   });
   check("CONTACT a non-JSON media type is refused", wrongType.status === 415);
 
-  // The Site boundary owns every unmatched GET, so a non-POST request never reaches the endpoint: it answers the Site's own
-  // 404 (or the endpoint's own 405 should a future matcher reach it) and never the endpoint vocabulary.
+  // `/api` is a handler surface, so a non-POST request reaches the endpoint and is refused there by method: never a 2xx, never
+  // an acceptance and never a fabricated delivery state — only the handler's own closed `method-not-allowed` answer.
   const wrongMethod = await request(`${base}/api/contact`);
-  check("CONTACT every method but POST is refused before it can reach the endpoint",
-    [404, 405].includes(wrongMethod.status) && !wrongMethod.body.includes("\"status\""),
-    `status ${wrongMethod.status}`);
+  check(
+    "CONTACT every method but POST is refused before it can accept a submission",
+    [404, 405].includes(wrongMethod.status) &&
+      !wrongMethod.body.includes('"accepted"') &&
+      !wrongMethod.body.includes('"not-configured"'),
+    `status ${wrongMethod.status}`,
+  );
 
   // --- Contact: the bounded limiter refuses the sixth rapid submission from one caller --------------
   const limited = [];

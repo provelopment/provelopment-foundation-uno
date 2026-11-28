@@ -25,7 +25,9 @@ import { validateUnoSafeRedirectQuery } from './config/uno-safe-redirect-query';
 import { resolveUnoServingRequest } from './config/uno-serving';
 
 /** The exact prefixes this responder must never intercept. */
-const EXCLUDED_PREFIXES: readonly string[] = Object.freeze(['/_next', '/uno-media', '/.well-known']);
+// `/api` is a route-handler surface, not a Page surface: a handler answers its own GET with its own semantics, exactly as it
+// already answers a write. The responder must not stand between a handler and its caller.
+const EXCLUDED_PREFIXES: readonly string[] = Object.freeze(['/_next', '/uno-media', '/.well-known', '/api']);
 
 /** The exact paths this responder must never intercept. */
 const EXCLUDED_PATHS: readonly string[] = Object.freeze([
@@ -119,5 +121,5 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
 /** Skip the responder for everything it must not own, before it even runs. */
 export const config = {
-  matcher: ['/((?!_next/|uno-media/|robots\\.txt|sitemap\\.xml|icon\\.svg).*)'],
+  matcher: ['/((?!_next/|uno-media/|api/|robots\\.txt|sitemap\\.xml|icon\\.svg).*)'],
 };
