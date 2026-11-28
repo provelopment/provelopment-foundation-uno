@@ -87,6 +87,13 @@ jobs:
         run: node --test tests/deployment/uno-brand-copy.test.mjs
         shell: bash
 
+      # Blocking declaration-baseline guard: proves the published graph is asserted semantically, that the baseline
+      # refuses all nine mutations it exists to catch, and that the retired digest is retained as evidence rather than
+      # as a gate. It replaced an opaque manifest hash that could not tell an authorised declaration from drift.
+      - name: Published-declaration baseline (semantic, mutation-sensitive)
+        run: pnpm test:baseline
+        shell: bash
+
       # Blocking time-bounded dependency-advisory exception gate (UNO-WO-038 / R03). Exactly one
       # development-only advisory is excepted, by name, against an expiry this guard enforces in
       # code. The guard does not trust the filtered audit: it copies the manifest and lockfile into
