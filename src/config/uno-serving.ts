@@ -43,11 +43,13 @@ import {
 import { localePathKey } from "../core/efs/uno-locales";
 import {
   validateUnoPresentationConfig,
+  selectUnoPresentationSite,
   type UnoPresentationConfig,
   type UnoPresentationRefusal,
   type UnoPresentationSiteKey,
 } from "../core/efs/uno-presentation";
 import { planUnoSiteNavigation, type UnoSiteNavigationOutcome } from "../application/plan-uno-site-navigation";
+import { resolveUnoContactWebhookConfig } from "../adapters/contact/uno-contact-webhook";
 import {
   buildUnoCandidateRouteIndex,
   buildUnoSiteRouteIndex,
@@ -1294,6 +1296,43 @@ export interface UnoServingNavigationRequest {
   readonly pageId: string;
   readonly pathname: string;
 }
+
+/**
+ * The presentation facts one Page needs beyond navigation (`U05`).
+ *
+ * One read of the committed presentation file answers both authored questions, so navigation and analytics can never disagree
+ * about which Site is being served. The contact transport is deliberately **not** read from the presentation file: it is a
+ * server secret from the environment, so it cannot be enabled by authored copy and cannot appear in a repository.
+ */
+export interface UnoServingPresentationFacts {
+  /** The exact Page path an opt-in beacon may report, or `null` when analytics are off — which is the shipped state. */
+  readonly analyticsPath: string | null;
+  /** True only when a validated, allowlisted webhook configuration exists, so the form exists only when it can really send. */
+  readonly contactDelivery: boolean;
+}
+
+/** Resolve the U05 presentation facts for one served Page. Never throws; any failure means "off". */
+export function readUnoServingPresentationFacts(
+  site: UnoPresentationSiteKey,
+  pathname: string,
+): UnoServingPresentationFacts {
+  let analyticsPath: string | null = null;
+  try {
+    // The root comes from the committed authority, so this module still reads the working directory in exactly one place.
+    const authority = readAuthority();
+    if (authority.mode !== "refused") {
+      const presentation = readPresentation(authority.root);
+      if (presentation.status === "accepted") {
+        const declared = selectUnoPresentationSite(presentation.config, site);
+        if (declared?.analytics?.enabled === true) analyticsPath = pathname;
+      }
+    }
+  } catch {
+    analyticsPath = null;
+  }
+  return { analyticsPath, contactDelivery: resolveUnoContactWebhookConfig().status === "configured" };
+}
+
 
 /**
  * Plan the shell navigation for one served Page.

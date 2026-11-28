@@ -66,7 +66,7 @@ async function observe(page) {
 
 /** Collect one page's run: page errors, console errors and every request whose origin is not loopback. */
 function watchPage(page, base) {
-  const record = { pageErrors: [], consoleErrors: [], foreignRequests: [] };
+  const record = { pageErrors: [], consoleErrors: [], foreignRequests: [], telemetryRequests: [] };
   const baseOrigin = new URL(base).origin;
   page.on("pageerror", (error) => record.pageErrors.push(String(error.message ?? error)));
   page.on("console", (message) => {
@@ -83,6 +83,11 @@ function watchPage(page, base) {
       return;
     }
     if (origin !== baseOrigin) record.foreignRequests.push(origin);
+    // `U05`: a default installation must make no measurement or submission request of any kind. Both endpoints are recorded so
+    // the browser proof can refuse the request rather than trusting that the beacon component was absent.
+    if (/^\/api\/(?:analytics|contact)(?:[?#]|$)/u.test(new URL(url).pathname)) {
+      record.telemetryRequests.push(new URL(url).pathname);
+    }
   });
   return record;
 }
@@ -139,6 +144,12 @@ function assertPage(observation, response, page, viewport, record, report) {
     `${label} requests nothing outside loopback`,
     record.foreignRequests.length === 0,
     [...new Set(record.foreignRequests)].join(","),
+  );
+  // `U05`: analytics are off and contact delivery is off in the shipped state, so a Page view must call neither endpoint.
+  report.check(
+    `${label} makes no measurement or submission request`,
+    record.telemetryRequests.length === 0,
+    [...new Set(record.telemetryRequests)].join(", "),
   );
   return observation;
 }

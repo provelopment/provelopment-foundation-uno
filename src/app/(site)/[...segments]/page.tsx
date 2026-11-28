@@ -21,9 +21,10 @@ import type { ReactNode } from 'react';
 
 import type { UnoPublishedPageAccepted } from '../../../application/plan-uno-published-page';
 import type { UnoPageMedia } from '../../../core/assets/uno-owned-media';
+import { UnoAnalyticsBeacon } from '../../../components/uno-interaction-island';
 import { UnoPageSections } from '../../../components/uno-page-sections';
 import { UnoSafeMarkdownPage, parseUnoSafeMarkdown } from '../../../components/uno-safe-markdown-page';
-import { planUnoServingDiscovery, planUnoServingNavigation } from '../../../config/uno-serving';
+import { planUnoServingDiscovery, planUnoServingNavigation, readUnoServingPresentationFacts } from '../../../config/uno-serving';
 import { readSiteRequest, resolveSiteRequest } from './layout';
 
 /** Every request is decided from the committed authority on its own terms. */
@@ -86,16 +87,6 @@ async function renderPage(
   media: UnoPageMedia | undefined,
   routeHrefs?: ReadonlyMap<string, string>,
 ): Promise<ReactNode> {
-  let body: ReactNode;
-  if (page.document.kind === 'json') {
-    if (page.document.pageDocument === undefined) notFound();
-    body = <UnoPageSections document={page.document.pageDocument} media={media} routeHrefs={routeHrefs} />;
-  } else {
-    const parsed = parseUnoSafeMarkdown(page.document.markdownBody);
-    if (!parsed.ok) notFound();
-    body = <UnoSafeMarkdownPage blocks={parsed.blocks} />;
-  }
-
   // The shell navigation is derived, never declared: the Site's accepted public Pages in this Page's own locale, ordered by
   // the validated presentation configuration. An absent or malformed configuration simply renders no navigation.
   const navigation = await planUnoServingNavigation({
@@ -105,6 +96,30 @@ async function renderPage(
     pageId: page.identity.pageId,
     pathname: page.identity.pathname,
   });
+
+  // `U05`: both facts are resolved once, from the committed presentation plus the server-only transport state. Analytics stay
+  // off unless an operator authors the declaration; the contact form exists only when a validated webhook is configured.
+  const facts = readUnoServingPresentationFacts(
+    { facetId: page.identity.facetId, siteId: page.identity.siteId },
+    page.identity.pathname,
+  );
+
+  let body: ReactNode;
+  if (page.document.kind === 'json') {
+    if (page.document.pageDocument === undefined) notFound();
+    body = (
+      <UnoPageSections
+        contactDelivery={facts.contactDelivery}
+        document={page.document.pageDocument}
+        media={media}
+        routeHrefs={routeHrefs}
+      />
+    );
+  } else {
+    const parsed = parseUnoSafeMarkdown(page.document.markdownBody);
+    if (!parsed.ok) notFound();
+    body = <UnoSafeMarkdownPage blocks={parsed.blocks} />;
+  }
 
   return (
     <>
@@ -145,6 +160,9 @@ async function renderPage(
         {page.document.description !== undefined ? <p>{page.document.description}</p> : null}
         {body}
       </main>
+      {/* `U05`: rendered only when an operator authored an enabled analytics declaration, so a default installation emits no
+          beacon, no request and no storage at all. It carries no identifier and no cookie. */}
+      {facts.analyticsPath === null ? null : <UnoAnalyticsBeacon path={facts.analyticsPath} />}
     </>
   );
 }

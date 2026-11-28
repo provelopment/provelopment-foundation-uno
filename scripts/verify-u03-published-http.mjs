@@ -438,6 +438,110 @@ async function request(url, extraHeaders) {
 /** The reserved, illustrative sample origin. Never a deployment, a DNS record or an owned domain. */
 const SAMPLE_ORIGIN = "https://uno-starter.example";
 
+/**
+ * `U05`: the contact and analytics endpoints on the running production server.
+ *
+ * WHAT THIS PROVES. An unconfigured installation accepts a submission, answers `not-configured`, and sends nothing; every
+ * refusal — invalid JSON, invalid mailbox, oversized body, wrong media type, wrong method, a filled honeypot — is named by its
+ * status; the bounded limiter refuses the sixth rapid submission from one caller with `retry-after`; no response echoes a
+ * submitted value, sets a cookie or is cacheable; and the analytics collector answers `204` for one valid event and refuses
+ * everything else, storing nothing either way.
+ *
+ * WHAT IT DOES NOT PROVE. It never configures a real provider, never sends a real submission to a third party and never
+ * activates analytics: the configured-provider paths are proven with an injected transport in the unit suite.
+ */
+async function checkContactEndpoints(base) {
+  /** One JSON POST with the declared content type. */
+  const postJson = (pathname, payload, headers = {}) => fetch(`${base}${pathname}`, {
+    method: "POST",
+    redirect: "manual",
+    headers: { "content-type": "application/json", ...headers },
+    body: typeof payload === "string" ? payload : JSON.stringify(payload),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  const valid = { name: "Ada Lovelace", email: "ada@example.com", message: "A message for the fixture." };
+
+  // --- Contact: unconfigured is the shipped state, and it is honest about it -----------------------
+  const accepted = await postJson("/api/contact", valid, { "x-forwarded-for": "198.51.100.1" });
+  const acceptedBody = await accepted.json();
+  check(
+    "CONTACT an unconfigured installation answers not-configured and claims no delivery",
+    accepted.status === 503 && acceptedBody.status === "not-configured",
+    `status ${accepted.status} ${JSON.stringify(acceptedBody)}`,
+  );
+  check(
+    "CONTACT the answer is uncacheable, sniff-proof and carries no cookie",
+    accepted.headers.get("cache-control") === "no-store"
+      && accepted.headers.get("x-content-type-options") === "nosniff"
+      && accepted.headers.get("set-cookie") === null,
+    JSON.stringify([accepted.headers.get("cache-control"), accepted.headers.get("x-content-type-options")]),
+  );
+  check(
+    "CONTACT no response echoes a submitted value",
+    !JSON.stringify(acceptedBody).includes("ada@example.com") && !JSON.stringify(acceptedBody).includes("Ada Lovelace"),
+  );
+
+  for (const [name, payload, expected] of [
+    ["an invalid mailbox", { ...valid, email: "ada" }, "contact:email-invalid"],
+    ["a missing field", { name: "", email: "ada@example.com", message: "x" }, "contact:empty"],
+    ["an unknown field", { ...valid, admin: true }, "contact:unknown-field"],
+    ["a filled honeypot", { ...valid, website: "https://spam.example" }, "contact:honeypot-filled"],
+  ]) {
+    const response = await postJson("/api/contact", payload, { "x-forwarded-for": `198.51.100.${String(Math.floor(Math.random() * 200) + 2)}` });
+    const body = await response.json();
+    check(`CONTACT ${name} is refused by name`, response.status === 400 && body.reason === expected,
+      `status ${response.status} ${JSON.stringify(body)}`);
+  }
+
+  const malformed = await postJson("/api/contact", "{not json", { "x-forwarded-for": "198.51.100.30" });
+  check("CONTACT malformed JSON is refused without a parse detail",
+    malformed.status === 400 && (await malformed.json()).reason === "contact:not-an-object");
+  void malformed;
+
+  const oversized = await postJson("/api/contact", { ...valid, message: "m".repeat(9000) }, { "x-forwarded-for": "198.51.100.31" });
+  check("CONTACT an oversized body is refused before parsing", oversized.status === 413);
+
+  const wrongType = await fetch(`${base}/api/contact`, {
+    method: "POST",
+    headers: { "content-type": "text/plain", "x-forwarded-for": "198.51.100.32" },
+    body: "hello",
+    redirect: "manual",
+  });
+  check("CONTACT a non-JSON media type is refused", wrongType.status === 415);
+
+  // The Site boundary owns every unmatched GET, so a non-POST request never reaches the endpoint: it answers the Site's own
+  // 404 (or the endpoint's own 405 should a future matcher reach it) and never the endpoint vocabulary.
+  const wrongMethod = await request(`${base}/api/contact`);
+  check("CONTACT every method but POST is refused before it can reach the endpoint",
+    [404, 405].includes(wrongMethod.status) && !wrongMethod.body.includes("\"status\""),
+    `status ${wrongMethod.status}`);
+
+  // --- Contact: the bounded limiter refuses the sixth rapid submission from one caller --------------
+  const limited = [];
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    limited.push(await postJson("/api/contact", valid, { "x-forwarded-for": "198.51.100.77" }));
+  }
+  const statuses = limited.map((response) => response.status);
+  check("CONTACT the sixth rapid submission from one caller is refused with retry-after",
+    statuses.slice(0, 5).every((status) => status === 503) && statuses[5] === 429
+      && limited[5].headers.get("retry-after") !== null,
+    JSON.stringify(statuses));
+
+  // --- Analytics: accepted and stored nowhere, refusing everything else -----------------------------
+  const beacon = await postJson("/api/analytics", { event: "page-view", path: "/en-001/about" }, { "x-forwarded-for": "198.51.100.90" });
+  check("ANALYTICS one valid event is accepted with an empty 204 and no storage claim",
+    beacon.status === 204 && (await beacon.text()) === "");
+  const identifying = await postJson("/api/analytics", { event: "page-view", path: "/en-001", id: "visitor-1" }, { "x-forwarded-for": "198.51.100.91" });
+  check("ANALYTICS an identifying field is refused", identifying.status === 400);
+  const unknownEvent = await postJson("/api/analytics", { event: "click", path: "/en-001" }, { "x-forwarded-for": "198.51.100.92" });
+  check("ANALYTICS an unknown event is refused", unknownEvent.status === 400);
+  const analyticsMethod = await request(`${base}/api/analytics`);
+  check("ANALYTICS every method but POST is refused before it can reach the collector",
+    [404, 405].includes(analyticsMethod.status), `status ${analyticsMethod.status}`);
+}
+
+
 /** The five authorized starter paths: the two declarations and the three authored starter sources. */
 const STARTER_PATHS = Object.freeze([
   MANIFEST,
@@ -1535,6 +1639,7 @@ async function committedStarterPhase(nextBin) {
       await checkRefusal(base, pathname);
     }
 
+    await checkContactEndpoints(base);
     await checkDurableFamilyHttp(base);
     await checkDurableFamilyMedia(base);
 
@@ -1731,6 +1836,8 @@ async function assertOverHttp(base, child) {
   for (const pathname of REFUSED_PAGES) {
     await checkRefusal(base, pathname);
   }
+
+  await checkContactEndpoints(base);
 
   await checkCrawlerParity(base);
 

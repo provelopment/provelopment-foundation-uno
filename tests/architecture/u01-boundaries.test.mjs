@@ -183,6 +183,9 @@ export const LEGACY_ADDRESS_MARKERS = Object.freeze([
 export const ADAPTER_AUTHORED_FILES = Object.freeze([
   'src/adapters/efs/uno-confined-source-reader.ts',
   'src/adapters/assets/uno-owned-media-reader.ts',
+  // `U05`: the contact webhook adapter. It reads server-only environment values and performs one bounded, allowlisted HTTPS
+  // request only when an operator configured it; no core contract and no application use case may import it.
+  'src/adapters/contact/uno-contact-webhook.ts',
 ]);
 
 /** Modules a concrete Node adapter must never import. */
@@ -235,6 +238,10 @@ export const CORE_AUTHORED_FILES = Object.freeze([
   'src/core/efs/uno-discovery-policy.ts',
   'src/core/efs/uno-canonical-base.ts',
   'src/core/efs/uno-presentation.ts',
+  'src/core/efs/uno-public-destination.ts',
+  'src/core/analytics/uno-analytics.ts',
+  'src/core/contact/uno-contact-submission.ts',
+  'src/core/contact/uno-contact-rate-limit.ts',
   'src/core/efs/uno-locales.ts',
   'src/core/modules/capability-registry.ts',
   'src/core/page-authoring-policy.ts',
@@ -1697,15 +1704,25 @@ test('exactly one client island exists, and it is the U04 interaction island', (
     'next/',
     '@vercel/',
     'dangerouslySetInnerHTML',
-    'fetch(',
     'XMLHttpRequest',
     'localStorage',
     'sessionStorage',
     'document.cookie',
+    'indexedDB',
     'deployment/',
   ]) {
     assert.equal(island.includes(forbidden), false, `the client island must not reference ${forbidden}`);
   }
+  // `U05`: the island may now make exactly two requests, and only to its own origin's own endpoints. Every other destination —
+  // another origin, a provider SDK, a data URL, an authored URL — is refused by name, so the form and the beacon stay inside the
+  // product's own boundary rather than reaching a third party.
+  const requestTargets = [...island.matchAll(/fetch\(\s*([^,)]+)/gu)].map((match) => (match[1] ?? '').trim());
+  assert.deepEqual(
+    requestTargets.sort(),
+    ['"/api/analytics"', '"/api/contact"'],
+    'the island may only call its own origin endpoints',
+  );
+  assert.equal((island.match(/fetch\(/gu) ?? []).length, 2, 'the island makes exactly two request sites');
   // The only package the island may import is React itself; every other specifier would be a new authority.
   const packages = specifiersOf(island).filter((specifier) => !specifier.startsWith('.'));
   assert.deepEqual(packages, ['react'], 'the client island may import React and nothing else');

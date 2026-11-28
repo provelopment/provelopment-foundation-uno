@@ -31,7 +31,7 @@ import type { UnoPageMedia, UnoResolvedImage, UnoSectionMedia } from "../core/as
 import { readUnoFamilyMarkdown, readUnoPageDocument, isUnoExternalVideoProps, isUnoLayoutGridCards, isUnoLayoutGridFeatures, type UnoContentProseBody, type UnoPageDocument, type UnoSectionNode } from "../core/page-document";
 import { readUnoVideoEmbed } from "../core/video/uno-video-embeds";
 import { UnoFamilyMarkdown } from "./uno-family-markdown";
-import { UnoCarouselIsland, UnoExternalVideoIsland, UnoModalIsland, UnoTabsIsland } from "./uno-interaction-island";
+import { UnoCarouselIsland, UnoContactForm, UnoExternalVideoIsland, UnoModalIsland, UnoTabsIsland } from "./uno-interaction-island";
 
 /** The exact intrinsic heading element for each authored level; `h1` is deliberately absent. */
 const HEADING_TAGS = Object.freeze({
@@ -55,6 +55,11 @@ export interface UnoPageSectionsProps {
   readonly media?: UnoPageMedia;
   /** UNO-WO-104 / R01: proven canonical URLs only; this component never computes one. */
   readonly routeHrefs?: ReadonlyMap<string, string>;
+  /**
+   * `U05`: true only when the server holds a validated contact webhook configuration. It gates the one live form, so with
+   * delivery off (the shipped state) the contact module keeps rendering its inert, honest notice.
+   */
+  readonly contactDelivery?: boolean;
 }
 
 /** The resolved media of one section, or an empty record when the Page published none for it. */
@@ -199,10 +204,13 @@ function SectionNode({
   node,
   media,
   routeHrefs,
+  contactDelivery = false,
 }: {
   readonly node: UnoSectionNode;
   readonly media: UnoPageMedia | undefined;
   readonly routeHrefs?: ReadonlyMap<string, string>;
+  /** `U05`: true only when a validated webhook exists, so a contact module can render its real form. */
+  readonly contactDelivery?: boolean;
 }) {
 
 
@@ -218,7 +226,7 @@ function SectionNode({
           id={node.id}
         >
           {node.children.map((child) => (
-            <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} />
+            <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />
           ))}
         </div>
       );
@@ -368,7 +376,7 @@ function SectionNode({
           >
             {node.children.map((child) => (
               <li className="uno-json-cell" data-uno-cell-id={child.id} key={child.id}>
-                <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
+                <SectionNode media={media} node={child} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />
               </li>
             ))}
           </ul>
@@ -385,11 +393,11 @@ function SectionNode({
           {node.children.map((child) =>
             semantics === "article" ? (
               <article className="uno-json-card" data-uno-card-id={child.id} key={child.id}>
-                <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
+                <SectionNode media={media} node={child} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />
               </article>
             ) : (
               <div className="uno-json-cell" data-uno-cell-id={child.id} key={child.id}>
-                <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
+                <SectionNode media={media} node={child} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />
               </div>
             ),
           )}
@@ -417,13 +425,13 @@ function SectionNode({
                   data-uno-tile-span={span}
                   key={child.id}
                 >
-                  <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
+                  <SectionNode media={media} node={child} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />
                 </article>
               );
             }
             return (
               <div className="uno-json-tile" data-uno-tile-id={child.id} data-uno-tile-span={span} key={child.id}>
-                <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
+                <SectionNode media={media} node={child} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />
               </div>
             );
           })}
@@ -443,7 +451,7 @@ function SectionNode({
         >
           {node.children.map((child) => (
             <div className="uno-json-layer" data-uno-layer-id={child.id} key={child.id}>
-              <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
+              <SectionNode media={media} node={child} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />
             </div>
           ))}
         </div>
@@ -995,13 +1003,13 @@ function SectionNode({
           id={node.id}
         >
           {node.children.map((child) => (
-            <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} />
+            <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />
           ))}
         </div>
       );
     }
     case "interaction.tabs": {
-      const panels = node.children.map((child) => <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} />);
+      const panels = node.children.map((child) => <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />);
       return <UnoTabsIsland id={node.id} label={node.props.label} panels={panels} tabs={node.props.tabs} />;
     }
     case "interaction.accordion": {
@@ -1029,7 +1037,7 @@ function SectionNode({
                 )}
               </summary>
               <div className="uno-json-disclosure-body">
-                <SectionNode media={media} node={child} routeHrefs={routeHrefs} />
+                <SectionNode media={media} node={child} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />
               </div>
             </details>
           ))}
@@ -1038,7 +1046,7 @@ function SectionNode({
     }
 
     case "interaction.modal": {
-      const content = node.children.map((child) => <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} />);
+      const content = node.children.map((child) => <SectionNode key={child.id} media={media} node={child} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />);
       return (
         <UnoModalIsland
           closeLabel={node.props.closeLabel}
@@ -1069,40 +1077,49 @@ function SectionNode({
             <p className="uno-json-contact-description">{description}</p>
           )}
           {/*
-            The honest delivery-OFF state is stated in the Page itself. There is no `<form>`, no action, no handler and
-            no transport anywhere in this module, so "not sent" is a structural fact rather than a promise.
+            `U05`: when — and only when — the server holds a validated webhook configuration, the module hands the three fields
+            to the one contact island, which owns native validation, the status region and the single POST. With delivery off
+            (the shipped state) the honest notice below is rendered instead, so "not sent" stays a structural fact.
           */}
-          <p className="uno-json-contact-status">Delivery is switched off. Nothing entered here is sent or stored.</p>
-          {selected.length === 0 ? null : (
-            <div className="uno-json-contact-fields">
-              {selected.map((field) => (
-                <div className="uno-json-contact-field" key={field}>
-                  <label className="uno-json-contact-label" htmlFor={`${node.id}-${field}`}>
-                    {CONTACT_FIELD_LABELS[field]}
-                  </label>
-                  {field === "message" ? (
-                    <textarea
-                      className="uno-json-contact-input"
-                      id={`${node.id}-${field}`}
-                      readOnly
-                      rows={4}
-                    />
-                  ) : (
-                    <input
-                      className="uno-json-contact-input"
-                      id={`${node.id}-${field}`}
-                      readOnly
-                      type={field === "email" ? "email" : "text"}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
+          {contactDelivery && selected.length > 0 ? (
+            <UnoContactForm fields={selected} page={`/${node.id}`} submitLabel={submitLabel ?? "Send message"} />
+          ) : (
+            <p className="uno-json-contact-status">Delivery is switched off. Nothing entered here is sent or stored.</p>
           )}
-          {submitLabel === undefined ? null : (
-            <button className="uno-json-contact-submit" disabled type="button">
-              {submitLabel}
-            </button>
+          {contactDelivery && selected.length > 0 ? null : (
+            <>
+            {selected.length === 0 ? null : (
+              <div className="uno-json-contact-fields">
+                {selected.map((field) => (
+                  <div className="uno-json-contact-field" key={field}>
+                    <label className="uno-json-contact-label" htmlFor={`${node.id}-${field}`}>
+                      {CONTACT_FIELD_LABELS[field]}
+                    </label>
+                    {field === "message" ? (
+                      <textarea
+                        className="uno-json-contact-input"
+                        id={`${node.id}-${field}`}
+                        readOnly
+                        rows={4}
+                      />
+                    ) : (
+                      <input
+                        className="uno-json-contact-input"
+                        id={`${node.id}-${field}`}
+                        readOnly
+                        type={field === "email" ? "email" : "text"}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {submitLabel === undefined ? null : (
+              <button className="uno-json-contact-submit" disabled type="button">
+                {submitLabel}
+              </button>
+            )}
+            </>
           )}
         </section>
       );
@@ -1122,14 +1139,14 @@ function SectionNode({
  * The sections are wrapped in one `div` so the App Router page keeps its own `main` and heading structure. An invalid
  * document — which the serving gate should already have refused — renders nothing rather than a partial Page.
  */
-export function UnoPageSections({ document, media, routeHrefs }: UnoPageSectionsProps) {
+export function UnoPageSections({ document, media, routeHrefs, contactDelivery = false }: UnoPageSectionsProps) {
   const validated = readUnoPageDocument(document);
   if (!validated.accepted) return null;
 
   return (
     <div className="uno-json" data-uno-document-version={validated.document.version}>
       {validated.document.sections.map((section) => (
-        <SectionNode key={section.id} media={media} node={section} routeHrefs={routeHrefs} />
+        <SectionNode key={section.id} media={media} node={section} routeHrefs={routeHrefs} contactDelivery={contactDelivery} />
       ))}
     </div>
   );

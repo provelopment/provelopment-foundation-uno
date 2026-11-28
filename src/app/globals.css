@@ -2102,6 +2102,100 @@ main {
   font: inherit;
 }
 
+/* --- Contact: the opt-in form (`U05`) ------------------------------------------ */
+/* The form exists only when a validated webhook is configured; these rules therefore never appear in a default
+   installation. Every control keeps the declared 2.75rem touch target, the token focus ring and a wrapping layout. */
+.uno-contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.uno-contact-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.uno-contact-field label {
+  font-weight: 600;
+}
+
+.uno-contact-field input,
+.uno-contact-field textarea {
+  inline-size: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-background);
+  color: var(--uno-foreground);
+  font: inherit;
+}
+
+.uno-contact-field textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+
+.uno-contact-field [aria-invalid="true"] {
+  border-color: var(--uno-danger, #b3261e);
+}
+
+.uno-contact-hint {
+  margin: 0;
+  color: var(--uno-muted);
+  font-size: 0.875rem;
+}
+
+.uno-contact-error {
+  margin: 0;
+  color: var(--uno-danger, #b3261e);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.uno-contact-summary {
+  padding: 0.6rem 0.75rem;
+  border-inline-start: 3px solid var(--uno-danger, #b3261e);
+  border-radius: 4px;
+  background-color: var(--uno-surface-strong);
+  font-weight: 600;
+}
+
+.uno-contact-status:empty {
+  display: none;
+}
+
+.uno-contact-status {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-inline-start: 3px solid var(--uno-accent);
+  border-radius: 4px;
+  background-color: var(--uno-accent-soft);
+  font-size: 0.9375rem;
+}
+
+.uno-contact-submit {
+  align-self: flex-start;
+  min-height: 2.75rem;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid var(--uno-border);
+  border-radius: var(--uno-radius);
+  background-color: var(--uno-foreground);
+  color: var(--uno-background);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.uno-contact-submit[disabled] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
 .uno-json-contact-submit {
   align-self: flex-start;
   padding: 0.55rem 1rem;

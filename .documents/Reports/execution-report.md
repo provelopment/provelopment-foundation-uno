@@ -175,3 +175,74 @@ attribute, and refusing their removal or neutering; and a trace-gate rule for th
 - **Outstanding limitation:** the presentation entry is authored per Site. A Site added to the manifest without one is served
   correctly but carries no navigation until an operator authors it — the designed fail-closed behaviour, covered by a test.
 - **Recommendation:** accept U04, and authorise U05 to begin at safe contact functionality and approved integrations.
+
+## U05 — approved website functionality
+
+The inspection came first: `mailto:`, `https` and same-document actions were already admitted by the unchanged
+`classifyAuthorDestination`, the contact module was already a truthful delivery-OFF surface, and public-only property exposure
+already held. What was genuinely missing was a contact *interface*, an optional server-only transport, and opt-in analytics —
+each of which is now implemented inside the existing boundaries rather than beside them.
+
+**Safe authored actions — unchanged and verified, not reopened.** `content.actions`, hero, card and list-item actions still
+admit exactly a same-document fragment or a static `mailto:`/`https:` destination classified by the unchanged policy. That policy
+already refuses unsafe schemes, credentials in an origin, protocol-relative values, character references, nested encoding,
+malformed escapes, markup, whitespace, backslashes and ambiguous relative values, and it accepts the original bytes unchanged —
+so a maps, directions or booking link is validated by the same rule as any other authored link. No new action kind, no embedded
+engine, no geolocation.
+
+**Contact interface (new).** `interaction.contact` now renders one accessible form — three labelled fields, `role="status"`, a
+`role="alert"` summary that receives focus, `aria-invalid`/`aria-describedby` wiring, a disabled `aria-busy` submit — **only when**
+the server holds a validated webhook configuration. With delivery off, which is what ships, the module renders the same inert
+notice as before, so the family evidence is unchanged. Local validation refuses an incomplete form before any request, and the
+form has exactly four outcomes: accepted by the configured endpoint, invalid, not delivered, unavailable.
+
+**Server-only transport (new, OFF by default).** `POST /api/contact` validates a bounded JSON body against the closed contact
+contract (three fields, declared code-point bounds, conservative mailbox, control characters refused, unknown fields refused, a
+honeypot refused before any field is read), applies a bounded in-memory token bucket, and then — only with a configured
+`UNO_CONTACT_WEBHOOK_URL`, `UNO_CONTACT_WEBHOOK_HOSTS` allowlist and optional `UNO_CONTACT_WEBHOOK_TOKEN` — makes one `POST` with
+`redirect: "manual"`, an 8-second timeout and a bounded response read. The destination must pass the new
+`classifyPublicHttpsDestination`: `https` only, no credentials, no port, no IP literal, no loopback, RFC 1918, link-local, CGNAT,
+reserved, multicast or documentation address, no bare label. `accepted` is only ever a 2xx from that endpoint; a redirect, a peer
+refusal, a timeout and a network failure each answer their own status. Nothing is logged, stored, queued or retried.
+
+**Analytics (new, OFF by default).** A Site's presentation entry may carry `analytics: {enabled, endpoint}`. Absent is off;
+`enabled: false` is off; `enabled: true` requires a public-HTTPS endpoint, and a declaration that fails that policy refuses the
+whole presentation (`presentation:analytics-invalid`) rather than being quietly ignored. When it is on, the single client island
+posts one `page-view` to the product's **own** `/api/analytics` with `credentials: "omit"`, `referrerPolicy: "no-referrer"`,
+`cache: "no-store"` and no identifier, cookie or storage write; that route answers `204` and stores nothing, forwarding only to an
+allowlisted public-HTTPS endpoint when an operator configured one. In the shipped state the beacon is never rendered, so no request
+exists to be made.
+
+**Boundaries preserved.** One Entity per Installation, concurrent Facets and Sites, authored full-locale representations,
+validated routing and publication authority, public/unlisted distinctions, public-only property defaults, owned-asset
+confinement, the single presentation shell, the 22 module IDs and the earned `17/17`/`59/59` are untouched. Exactly one
+`"use client"` boundary still exists — the U04 island, which now also owns the form and the beacon — and the architecture test
+requires its two, and only two, request sites to be `/api/contact` and `/api/analytics`.
+
+
+| Requirement | Implementation | Executed evidence |
+| --- | --- | --- |
+| Safe authored actions | Unchanged `classifyAuthorDestination`; fragment or `mailto`/`https` only | Unit suite 1465 pass, including the classifier's refusal matrix; U04 gate 996/0 |
+| Independent accessible contact UI | `interaction.contact` → one island form, native validation, status region, alert summary | Published gate: form absent and notice present in the shipped state; architecture test pins the island contract |
+| Optional server-only webhook, OFF by default | `resolveUnoContactWebhookConfig` + `deliverUnoContactSubmission` + `POST /api/contact` | Published gate: a valid submission answers `not-configured` 503 with no delivery claim; unit suite: 2xx accepted, 302 refused, 422 rejected, timeout, network error, oversized response |
+| Valid and invalid input, bounds | Closed contact contract | Published gate: invalid mailbox, empty field, unknown field and honeypot each refused by name; 9 KB body → 413; `text/plain` → 415; malformed JSON → 400; unit suite: exact limit accepted, limit + 1 refused |
+| Abuse protection | Bounded token bucket, honeypot, body bound, media-type check | Published gate: sixth rapid submission from one caller → 429 with `retry-after`; unit suite: burst, refill, caller isolation, eviction ceiling |
+| Destination allowlisting, SSRF, redirects | `classifyPublicHttpsDestination` + `isUnoAllowlistedHost` + `redirect: "manual"` | Unit suite: 15 private/loopback/link-local/CGNAT/reserved/IPv6 destinations refused; suffix trickery refused; a redirect is answered `redirect-refused` |
+| Server-only credentials, no leakage | Env read at call time; token added to the one allowlisted request | Unit suite: no error path contains the submission, the mailbox or the token; published gate: no response echoes a submitted value, sets a cookie or is cacheable |
+| Accepted ≠ delivered | `accepted` only for 2xx; `not-delivered`/`unavailable`/`not-configured` otherwise | Published gate + unit suite; the UI has no success wording on any non-2xx path |
+| Opt-in analytics, OFF default | Presentation declaration + same-origin beacon + `/api/analytics` | Committed config declares none; the browser proof requires zero `/api/analytics` and `/api/contact` requests on every Page; unit suite: absent/disabled/enabled/invalid declarations and the one-event shape |
+| Public-only exposure, privacy, licensing | Public property defaults; no new dependency, SDK or donor code | Bootstrap leak scan, readiness PASS, `pnpm audit` no known vulnerabilities, ledger untouched |
+
+**Verified at this head (local, Node 26.13.1, pnpm 11.6.0).** U04 gate **996/0**, with the closure oracle still crediting the D row
+at **17/17** and **59/59**; published HTTP + Chromium **1379/0**; deployment suites **405/0**; unit **1465**; architecture **47/0**;
+bootstrap **19**; lint and typecheck clean; build and bounded trace clean; readiness PASS; Multi-Site, U01 and U03 HTTP pass; audit
+clean.
+
+**Limitations, stated plainly.** Configured success, rejection, redirect, timeout and network failure are proven with an injected
+transport in the unit suite, not against a live provider: no credential, endpoint or real submission was created and no external
+delivery was activated. The enabled analytics path is proven at the contract level and its disabled path in the browser; enabling
+it in a browser run would require committing an operator declaration and a destination, which remains an Owner decision. The
+limiter is per-process and in-memory, so several instances each hold their own buckets.
+
+**Authorization status.** No provider, credential, DNS record, deployment, release, tag or external delivery was created, and
+analytics remain off. Both routes read `process.env` inside the request, so no value is baked into the build.

@@ -194,7 +194,13 @@ criteria.
 
 ### U05 — Retain appropriate website functionality
 
-Not started. Blocked on U04 exit.
+**OPEN — implementation and evidence complete; independent acceptance outstanding.** Was blocked on U04 exit; the U04
+navigation obligation is complete on evidence, so this stage proceeded within the authorized local scope. Delivered: the
+accessible contact interface (rendered only when configured), the optional server-only allowlisted HTTPS webhook with delivery
+**OFF** by default, a bounded abuse limiter, public-destination/SSRF and redirect refusal, opt-in same-origin analytics with
+**OFF** by default, and the wiring guard that refuses any of those clauses being removed. Authored `mailto:`/`https` actions were
+inspected and left unchanged: they were already admitted only through the established policy, which now also has U05 evidence.
+Parity, the 22 module IDs, the single client island and the single presentation shell are preserved.
 
 Scope: retain appropriate website functionality, including **safe contact** and explicitly
 approved integrations.

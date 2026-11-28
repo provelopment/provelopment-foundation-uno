@@ -338,3 +338,215 @@ export function UnoExternalVideoIsland({
   );
 }
 
+/**
+ * `U05`: the opt-in contact form. It exists only when the server holds a validated webhook configuration, and it reports exactly
+ * four outcomes — accepted by the configured endpoint, invalid, not delivered, unavailable. It never claims a delivery it cannot
+ * support, never writes storage and never generates an identifier.
+ */
+
+
+import type { UnoContactField } from "../core/page-document";
+
+/** The readable label of each closed contact field. Fixed Uno chrome, never authored copy. */
+const FIELD_LABELS: Readonly<Record<UnoContactField, string>> = Object.freeze({
+  name: "Name",
+  email: "Email",
+  message: "Message",
+});
+
+/** The declared client bounds, matching the contract the endpoint enforces. */
+const FIELD_LIMITS: Readonly<Record<UnoContactField, number>> = Object.freeze({
+  name: 100,
+  email: 254,
+  message: 4000,
+});
+
+/** What the visitor is told, and only what actually happened. */
+type Outcome =
+  | { readonly kind: "idle" }
+  | { readonly kind: "sending" }
+  | { readonly kind: "accepted" }
+  | { readonly kind: "invalid"; readonly message: string }
+  | { readonly kind: "not-delivered" }
+  | { readonly kind: "unavailable" };
+
+export interface UnoContactFormProps {
+  readonly fields: readonly UnoContactField[];
+  readonly submitLabel: string;
+  /** The Page path the submission names; a bounded, non-authoritative hint for the receiving endpoint. */
+  readonly page: string;
+}
+
+/** Render one form control with its label, hint and error wiring. */
+function Field(props: {
+  readonly field: UnoContactField;
+  readonly value: string;
+  readonly invalid: boolean;
+  readonly onChange: (value: string) => void;
+}) {
+  const { field, value, invalid, onChange } = props;
+  const id = `uno-contact-${field}`;
+  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  const shared = {
+    id,
+    name: field,
+    required: true,
+    value,
+    "aria-invalid": invalid ? true : undefined,
+    "aria-describedby": invalid ? `${hintId} ${errorId}` : hintId,
+    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(event.target.value),
+  } as const;
+
+  return (
+    <div className="uno-contact-field">
+      {field === "message" ? (
+        <>
+          <label htmlFor={id}>{FIELD_LABELS[field]}</label>
+          <textarea {...shared} maxLength={FIELD_LIMITS[field]} rows={6} />
+        </>
+      ) : (
+        <>
+          <label htmlFor={id}>{FIELD_LABELS[field]}</label>
+          <input
+            {...shared}
+            autoComplete={field === "name" ? "name" : "email"}
+            maxLength={FIELD_LIMITS[field]}
+            type={field === "email" ? "email" : "text"}
+          />
+        </>
+      )}
+      <p className="uno-contact-hint" id={hintId}>
+        {field === "message" ? `Up to ${FIELD_LIMITS[field]} characters.` : "Required."}
+      </p>
+      {invalid ? (
+        <p className="uno-contact-error" id={errorId}>
+          {FIELD_LABELS[field]} needs a value{field === "email" ? " in the form name@example.com" : ""}.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** The form itself: three fields, one submit control, one status region and one honest outcome. */
+export function UnoContactForm({ fields, submitLabel, page }: UnoContactFormProps) {
+  const [values, setValues] = useState<Record<UnoContactField, string>>({ name: "", email: "", message: "" });
+  const [invalid, setInvalid] = useState<readonly UnoContactField[]>([]);
+  const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
+  const summaryRef = useRef<HTMLDivElement | null>(null);
+
+  const sending = outcome.kind === "sending";
+
+  /** Validate locally first, so an obviously incomplete form never reaches the network. */
+  function localProblems(): readonly UnoContactField[] {
+    const problems: UnoContactField[] = [];
+    for (const field of fields) {
+      if (values[field].trim().length === 0) problems.push(field);
+      else if (field === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(values[field].trim())) problems.push(field);
+    }
+    return problems;
+  }
+
+  async function submit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    const problems = localProblems();
+    setInvalid(problems);
+    if (problems.length > 0) {
+      setOutcome({ kind: "invalid", message: "Some fields need attention before this can be sent." });
+      summaryRef.current?.focus();
+      return;
+    }
+
+    setOutcome({ kind: "sending" });
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: values.name,
+          email: values.email,
+          message: values.message,
+          page,
+        }),
+        cache: "no-store",
+        credentials: "omit",
+        redirect: "manual",
+      });
+      const body = (await response.json()) as { readonly status?: unknown };
+      const status = typeof body.status === "string" ? body.status : "unknown";
+      if (response.status === 202 && status === "accepted") setOutcome({ kind: "accepted" });
+      else if (response.status === 400) setOutcome({ kind: "invalid", message: "The form was refused. Check every field." });
+      else if (response.status === 503) setOutcome({ kind: "unavailable" });
+      else setOutcome({ kind: "not-delivered" });
+    } catch {
+      // A transport failure is "not delivered" — never a success and never a retry loop.
+      setOutcome({ kind: "not-delivered" });
+    }
+  }
+
+  return (
+    <form className="uno-contact-form" noValidate onSubmit={submit}>
+      <div aria-live="polite" className="uno-contact-status" role="status">
+        {outcome.kind === "sending" ? "Sending this message now." : null}
+        {outcome.kind === "accepted" ? "This message reached the configured receiving endpoint." : null}
+        {outcome.kind === "not-delivered" ? "This message was not delivered. Nothing has been stored." : null}
+        {outcome.kind === "unavailable" ? "Messaging is not available right now. Nothing was sent." : null}
+      </div>
+
+      {outcome.kind === "invalid" ? (
+        <div className="uno-contact-summary" ref={summaryRef} role="alert" tabIndex={-1}>
+          {outcome.message}
+        </div>
+      ) : null}
+
+      {fields.map((field) => (
+        <Field
+          field={field}
+          invalid={invalid.includes(field)}
+          key={field}
+          onChange={(value) => setValues((current) => ({ ...current, [field]: value }))}
+          value={values[field]}
+        />
+      ))}
+
+      <button aria-busy={sending ? true : undefined} className="uno-contact-submit" disabled={sending} type="submit">
+        {sending ? "Sending…" : submitLabel}
+      </button>
+    </form>
+  );
+}
+
+
+/**
+ * `U05`: the opt-in analytics beacon. It renders nothing, and only when an operator authored an enabled declaration does it post
+ * one same-origin `page-view` to `/api/analytics` — no cookie, no storage, no identifier, no referrer, no third-party host.
+ */
+
+
+export interface UnoAnalyticsBeaconProps {
+  /** The exact Page path this view reports, already validated by the server. */
+  readonly path: string;
+}
+
+export function UnoAnalyticsBeacon({ path }: UnoAnalyticsBeaconProps) {
+  const sent = useRef(false);
+
+  useEffect(() => {
+    if (sent.current) return;
+    sent.current = true;
+    // One fire-and-forget request, same origin, no credentials, no referrer, no cache. A failure is deliberately silent: an
+    // opt-in measurement must never disturb the Page or the visitor.
+    void fetch("/api/analytics", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ event: "page-view", path }),
+      cache: "no-store",
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+      keepalive: true,
+      redirect: "manual",
+    }).catch(() => undefined);
+  }, [path]);
+
+  return null;
+}

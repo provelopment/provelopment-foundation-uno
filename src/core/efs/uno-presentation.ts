@@ -13,6 +13,10 @@
  * ABSENT IS NORMAL. A Site with no entry, or a project with no such file, is not an error: the shell simply renders no
  * navigation. Only a **present and malformed** file refuses, and that refusal still leaves every Page served.
  */
+import {
+  validateUnoAnalyticsDeclaration,
+  type UnoAnalyticsVerdict,
+} from "../analytics/uno-analytics";
 
 /** The one accepted version. A different version refuses rather than being read optimistically. */
 export const UNO_PRESENTATION_CONFIG_VERSION = 1;
@@ -39,7 +43,9 @@ export type UnoPresentationRefusal =
   | "presentation:item-invalid"
   | "presentation:duplicate-item"
   | "presentation:label-invalid"
-  | "presentation:text-invalid";
+  | "presentation:text-invalid"
+  /** `U05`: a present analytics declaration that the analytics contract refused. */
+  | "presentation:analytics-invalid";
 
 /** The same vocabulary as frozen data, so a caller can assert membership without copying literals. */
 export const UNO_PRESENTATION_REFUSAL_REASONS: readonly UnoPresentationRefusal[] = Object.freeze([
@@ -85,6 +91,8 @@ export interface UnoPresentationSite {
   readonly site: UnoPresentationSiteKey;
   readonly brand: UnoPresentationBrand | null;
   readonly navigation: UnoPresentationNavigation | null;
+  /** `U05`: the resolved analytics verdict, or `null` when this Site declares none. Off is the default. */
+  readonly analytics: UnoAnalyticsVerdict | null;
 }
 
 /** The validated whole file. */
@@ -192,7 +200,7 @@ function readBrand(value: unknown): UnoPresentationBrand | UnoPresentationRefusa
 /** Validate one Site entry: the Site key plus its optional branding and navigation. */
 function readSite(value: unknown): UnoPresentationSite | UnoPresentationRefusal {
   if (!isRecord(value)) return "presentation:site-invalid";
-  if (!hasExactly(value, ["site", "brand", "navigation"], ["site"])) return "presentation:site-invalid";
+  if (!hasExactly(value, ["site", "brand", "navigation", "analytics"], ["site"])) return "presentation:site-invalid";
   const site = readSiteKey(value.site);
   if (site === null) return "presentation:site-invalid";
 
@@ -210,7 +218,19 @@ function readSite(value: unknown): UnoPresentationSite | UnoPresentationRefusal 
     navigation = read;
   }
 
-  return Object.freeze({ site, brand, navigation });
+  // `U05`: analytics are opt-in and off unless an operator authors them. A declaration that is present but refused fails the
+  // whole presentation rather than being quietly treated as off, so a half-configured installation can never appear compliant.
+  let analytics: UnoAnalyticsVerdict | null = null;
+  if (value.analytics !== undefined) {
+    const declared = validateUnoAnalyticsDeclaration(value.analytics);
+    if ("endpoint" in declared === false && declared.enabled === false
+      && declared.reason !== "analytics:disabled" && declared.reason !== "analytics:not-declared") {
+      return "presentation:analytics-invalid";
+    }
+    analytics = declared;
+  }
+
+  return Object.freeze({ site, brand, navigation, analytics });
 }
 
 /**
