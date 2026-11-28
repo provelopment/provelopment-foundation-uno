@@ -79,7 +79,12 @@ function rawQueryOf(requestUrl: string): string | null {
  */
 async function decide(request: NextRequest, pathname: string): Promise<NextResponse> {
   const decision = await resolveUnoServingRequest({ host: request.headers.get('host') ?? '', pathname });
-  if (decision.kind === 'refused') return approvedRefusal();
+  // `serving:authority-unavailable` means this responder could not read the declarations, not that the address is unpublished. A
+  // platform bundles this responder separately from the Page, and a bundling omission must never become an outage: continuing leaves
+  // the Page — which owns the same decision and the same declarations — as the authority, and its own 404 is still a real 404.
+  if (decision.kind === 'refused') {
+    return decision.reason === 'serving:authority-unavailable' ? NextResponse.next() : approvedRefusal();
+  }
   if (decision.kind === 'page') return NextResponse.next();
 
   const rawQuery = rawQueryOf(request.url);

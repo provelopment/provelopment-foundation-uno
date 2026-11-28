@@ -71,4 +71,12 @@ describe("the deployment-specific origin is deliberate, server-only and absent f
     assert.ok(guide.includes("VERCEL_PROJECT_PRODUCTION_URL"), "the platform statement is documented");
     assert.ok(guide.includes("uno.deploy.json"), "the hosting profile is documented");
   });
+
+  it("never turns its own inability to read into a refusal of a published address", () => {
+    // A platform bundles the refusal responder separately from the Page; a bundling omission is not an unpublished address, so the
+    // responder continues and the Page — same decision, same declarations — answers. Without this, one missing file becomes an outage.
+    const proxy = read("src/proxy.ts");
+    assert.ok(proxy.includes("serving:authority-unavailable"), "the responder distinguishes a read failure");
+    assert.match(proxy, /decision\.reason === 'serving:authority-unavailable' \? NextResponse\.next\(\) : approvedRefusal\(\)/u);
+  });
 });

@@ -49,6 +49,12 @@ const nextConfig: NextConfig = {
     globalNotFound: true,
   },
   outputFileTracingIncludes: {
+    // The refusal responder (`src/proxy.ts`) makes the *same* serving decision as the Page, and on a hosting platform it is
+    // bundled separately from the Page. It therefore needs the declarations itself: without them the decision cannot be made at
+    // all, and every published address would answer 404 while the demonstration root still served. Both keys are declared because
+    // the bundler names this bundle by its source file, and a missing key is silent.
+    '/proxy': UNO_DEPLOYMENT_INPUTS,
+    '/middleware': UNO_DEPLOYMENT_INPUTS,
     '/[...segments]': [...UNO_DEPLOYMENT_INPUTS, ...UNO_MEDIA_ZONE_INPUTS],
     '/sitemap.xml': UNO_DEPLOYMENT_INPUTS,
     '/robots.txt': UNO_DEPLOYMENT_INPUTS,
