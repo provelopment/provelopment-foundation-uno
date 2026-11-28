@@ -83,8 +83,8 @@ function validSnapshot() {
     '  <h1>One organisation. One connected digital presence.</h1>',
     '  <h3>Example: a community organisation</h3>',
     '  <h3>Example: a service provider with regional audiences</h3>',
-    '  <p>Foundation Uno will bring an organisation&apos;s websites, information and regional editions into one coherent publishing foundation.</p>',
-    '  <p>This is the live single-page introduction to Foundation Uno. The examples below illustrate the experience.</p>',
+    '  <p>Foundation Uno brings an organisation&apos;s websites, information and regional editions into one coherent publishing foundation.</p>',
+    '  <p>This is the non-indexable introduction to Foundation Uno. The examples below illustrate the experience.</p>',
     '  <p>© 2026 Provelopment. Foundation Uno is an open-source website foundation and a Provelopment initiative.</p>',
     '  <a href={SOURCE_URL}>Explore the open-source project</a>',
     '  <a href={SOURCE_URL}>View Foundation Uno on GitHub</a>',
@@ -101,7 +101,7 @@ function validSnapshot() {
     "import { Analytics } from '@vercel/analytics/next';",
     'export const metadata = {',
     "  title: 'Foundation Uno | One organisation. One connected digital presence.',",
-    "  description: 'Foundation Uno by Provelopment will give organisations clear ownership, structured content, reliable publishing and intentionally authored regional editions.',",
+    "  description: 'Foundation Uno by Provelopment gives organisations clear ownership, structured content, reliable publishing and intentionally authored regional editions.',",
     '  robots: { index: false, follow: false, nocache: true },',
     '};',
     '',
@@ -399,7 +399,7 @@ test('refuses a page without a real heading', () => {
 
 test('refuses a page that drops the live single-page disclosure', () => {
   const snapshot = withChange('page', (text) =>
-    text.replace('This is the live single-page introduction to Foundation Uno.', 'Welcome.'),
+    text.replace('This is the non-indexable introduction to Foundation Uno.', 'Welcome.'),
   );
   assertRefused(analyzeReadiness(snapshot), 'page:missing-disclosure');
 });
@@ -654,8 +654,8 @@ test('refuses a logo without the approved palette', () => {
 test('refuses a page claiming the EFS content runtime is live', () => {
   const snapshot = withChange('page', (text) =>
     text.replace(
-      '<p>This is the live single-page introduction to Foundation Uno.',
-      '<p>EFS publication is live and locale routes are live.<p>This is the live single-page introduction to Foundation Uno.',
+      '<p>This is the non-indexable introduction to Foundation Uno.',
+      '<p>EFS publication is live and locale routes are live.<p>This is the non-indexable introduction to Foundation Uno.',
     ),
   );
   assertRefused(analyzeReadiness(snapshot), 'page:fabricated-publication');
@@ -856,7 +856,7 @@ test('refuses a page that drops an illustrative example label', () => {
 
 test('refuses a page whose benefit sentence is missing', () => {
   const snapshot = withChange('page', (text) =>
-    text.replace('Foundation Uno will bring an organisation&apos;s websites', 'Foundation Uno brings websites'),
+    text.replace('Foundation Uno brings an organisation&apos;s websites', 'Foundation Uno brings websites'),
   );
   assertRefused(analyzeReadiness(snapshot), 'page:hero-lead');
 });

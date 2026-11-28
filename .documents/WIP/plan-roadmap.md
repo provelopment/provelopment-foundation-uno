@@ -220,11 +220,12 @@ pipeline on both hosts. Operator documentation ships in the artefact.
 
 ### U07 — Full independent review and Owner-controlled first release
 
-**IN PROGRESS — live installation accepted as the reference installation; one render-level blocker remains.** The deployment-specific
-canonical origin is implemented and proven live (robots, sitemap, canonical and `/api/uno-health` all report `uno.provelopment.com`), and
-two genuine live defects were corrected at their cause (the refusal responder refusing on a bundle gap, and the responder owning
-`/api`). The three Site addresses still return Next's error shell on the platform while the same build renders them locally in three
-runtime shapes; the deployment's function log is the missing fact. U07 is not accepted and the live Site does not yet serve its Pages.
+**EVIDENCE COMPLETE — submitted for independent U07 acceptance.** The packaged-function defect that made the live Page refuse is fixed at
+its cause (declarations and owned-media roots are read through traceable literal paths, and the composition no longer touches the
+filesystem), a blocking gate now inspects the emitted traces for exactly this defect, and the live installation serves `/`, the three authored
+Pages, the locale alias, both discovery surfaces, owned media, genuine refusals and a health reading that agrees with the Page. Visual and
+interaction evidence at four widths in both themes is recorded in `.documents/Reports/evidence/u07-live/`. Tagging, publication and domain
+activation remain the Owner's separate decisions.
 
 ## Dependency summary
 

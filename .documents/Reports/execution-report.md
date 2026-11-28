@@ -480,3 +480,53 @@ language from the same decision.
 **Current live state, measured.** `/` 200; `/robots.txt` 200 on the production origin; `/sitemap.xml` 200 listing all three Pages with
 `hreflang`; `/api/uno-health` 200 `serving`; `/en-001`, `/en-001/about`, `/en-001/components`, `/en` and `/en-001/no-such-page` return Next's
 error shell with 404. The demonstration and every discovery surface are correct; the three authored Pages are not yet served.
+
+## U07 — resolved: the packaged function now carries what it reads, and the live installation serves
+
+**The divergence between the health route and the Page, settled from the build artifact.** A hosting platform packages each server route
+separately and decides what a function carries from the build's file trace; that trace follows *literal* path components. The declarations
+were read through a path assembled from a constant, so the Page and refusal-responder bundles carried the authored content and **not**
+`manifest.json`, `uno.config.json` or `site.config.json`, while the health, robots and sitemap handlers did. The cause was proved twice over:
+the emitted traces showed the asymmetry directly (`page.js.nft.json` contained no declaration and no media-zone file at all — so
+`outputFileTracingIncludes` was not being applied to that bundle), and removing the declarations locally reproduces the live failure
+byte for byte (`/en-001` renders the error shell; health answers `503 serving:authority-unavailable`). The Architect's runtime log contained
+no throwing frame because there was none: the Page was deciding, correctly, on an input it did not have.
+
+**Correction, at the cause and inside the architecture.** The confined reader now exposes `readUnoDeclarationJson`/`Value`, which builds
+each declaration path from literal components, and the owned-media reader selects each of the four zone roots the same way — keeping
+`unoOwnedMediaZoneRoot` the single authority and refusing any disagreement before a read. The serving composition now reads declarations
+*through* the adapter, so `src/config` touches no filesystem at all; the architecture guard was tightened to require exactly that. Every
+consuming bundle — Page, responder, health, robots, sitemap and owned media — now physically carries what it reads.
+
+**A gate that would have caught it.** `scripts/verify-u07-function-inputs.mjs` reads the emitted file traces, the contract a platform
+consumes, and fails unless each consuming bundle carries its inputs; `--self-test` proves sensitivity by omitting each input in turn. It is a
+blocking CI step after the build, and it fails against the previous head.
+
+**Live installation, verified at `6376965`** (deployment produced by the repository's Git integration; the deployed tree is proven to be this
+commit by copy that exists only in it):
+
+| Address | Result |
+| --- | --- |
+| `/` | 200, `lang=en`, `noindex, nofollow, nocache` preserved |
+| `/en-001`, `/en-001/about`, `/en-001/components` | 200, `lang=en-001`, canonical on `https://uno.provelopment.com/…`, `index, follow` |
+| `/en` | 307 → `/en-001` (the declared locale alias) |
+| `/robots.txt` | 200, sitemap on the production origin |
+| `/sitemap.xml` | 200, three authored URLs with `hreflang` |
+| `/api/uno-health` | 200 `serving`, canonical `…/en-001` — agrees with the Page |
+| `/en-001/no-such-page`, `/zzz` | genuine 404 with the approved refusal document |
+| `/uno-media/en-001/components/{0,1,2}` | 200 `image/png` (owned media) |
+| `/uno-media/en-001/0` | 404 (undeclared occurrence refused) |
+
+**Visual and interaction review** (pinned Chromium, 320/390/768/1280 px, light and dark, reduced motion): sixteen page-and-width combinations,
+all 200, no overflow, no broken image, no console error, no uncaught exception, no failed request. Skip navigation is the first keyboard stop
+and moves the document to `#main`; focus rings are visible at every stop; the four native disclosures toggle; the table carries scoped header
+cells; the delivery-off notice is present and no form is served. Measured: TTFB 61–62 ms, LCP 412 ms (Home) and 432 ms (Components), nine
+resources. Evidence: `.documents/Reports/evidence/u07-live/`.
+
+**Demonstration corrected.** The false statement that publication selects one public Site at a time is replaced with the concurrent-Sites
+truth; the future-tense descriptions now describe what is implemented and verified; and the demonstration's primary call to action opens the
+published Site, with Home, About and Components linked directly from it. The retired claims are pinned in the copy contract so they cannot
+return, and the non-indexable policy is unchanged.
+
+**U07 evidence is complete and submitted for independent acceptance.** Contact and analytics remain OFF on the live installation and no
+provider, credential, tag or release was activated.

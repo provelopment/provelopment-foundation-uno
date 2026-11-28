@@ -1,0 +1,78 @@
+{
+  "scheme:light": {
+    "background": "rgb(255, 255, 255)",
+    "color": "rgb(16, 22, 32)",
+    "reducedMotion": false
+  },
+  "scheme:dark": {
+    "background": "rgb(12, 17, 24)",
+    "color": "rgb(238, 242, 248)",
+    "reducedMotion": true
+  },
+  "focusTrace": [
+    {
+      "tag": "a",
+      "text": "Skip to main content",
+      "href": "#main",
+      "outline": "solid 3px",
+      "shadow": "none"
+    },
+    {
+      "tag": "a",
+      "text": "Foundation Uno",
+      "href": "/en-001",
+      "outline": "solid 3px",
+      "shadow": "none"
+    },
+    {
+      "tag": "a",
+      "text": "Foundation Uno",
+      "href": "/en-001",
+      "outline": "solid 3px",
+      "shadow": "none"
+    },
+    {
+      "tag": "a",
+      "text": "About this starter",
+      "href": "/en-001/about",
+      "outline": "solid 3px",
+      "shadow": "none"
+    },
+    {
+      "tag": "a",
+      "text": "Components",
+      "href": "/en-001/components",
+      "outline": "solid 3px",
+      "shadow": "none"
+    }
+  ],
+  "skip": {
+    "firstFocus": null,
+    "hash": "",
+    "mainExists": true
+  },
+  "disclosure": {
+    "before": true,
+    "after": false
+  },
+  "performance": {
+    "home": {
+      "lcpMs": 412,
+      "ttfbMs": 62,
+      "domContentLoadedMs": 408,
+      "transferKb": 0,
+      "resources": 9
+    },
+    "components": {
+      "lcpMs": 432,
+      "ttfbMs": 61,
+      "domContentLoadedMs": 363,
+      "transferKb": 0,
+      "resources": 9
+    }
+  },
+  "navigation": {
+    "landedOn": "/en-001",
+    "h1": "Foundation Uno"
+  }
+}

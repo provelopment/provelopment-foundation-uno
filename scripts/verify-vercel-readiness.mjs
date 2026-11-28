@@ -68,8 +68,8 @@ const SOURCE_URL = 'https://github.com/provelopment/provelopment-foundation-uno'
 
 /** Approved visitor-facing copy (UNO-WO-016 / R01). Compared literally, never fuzzily. */
 const HERO_HEADING = 'One organisation. One connected digital presence.';
-const HERO_LEAD = 'Foundation Uno will bring an organisation';
-const HERO_NOTE = 'This is the live single-page introduction to Foundation Uno.';
+const HERO_LEAD = 'Foundation Uno brings an organisation';
+const HERO_NOTE = 'This is the non-indexable introduction to Foundation Uno.';
 const FOOTER_COPY = '© 2026 Provelopment. Foundation Uno is an open-source website foundation and a';
 const META_TITLE = 'Foundation Uno | One organisation. One connected digital presence.';
 
@@ -502,7 +502,7 @@ export function analyzeReadiness(snapshot) {
   expect(/nocache:\s*true/.test(layoutText), 'layout:nocache-guard');
   expect(layoutText.includes(`title: '${META_TITLE}'`), 'layout:title');
   expect(
-    layoutText.includes('Foundation Uno by Provelopment will give organisations'),
+    layoutText.includes('Foundation Uno by Provelopment gives organisations'),
     'layout:description',
   );
   expect(!/alternates\s*:/.test(layoutText), 'layout:canonical-or-hreflang');
